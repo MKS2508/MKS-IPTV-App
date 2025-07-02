@@ -1,0 +1,42 @@
+# GitHub Pages Configuration
+title: "MKS-IPTV-App"
+description: "Native multiplatform IPTV client built with Swift 6"
+url: "https://mks2508.github.io"
+baseurl: "/mks-multiplatform-iptv"
+
+# Theme - Hacker theme for terminal/cyberpunk aesthetic
+remote_theme: pages-themes/hacker@v0.2.0
+
+plugins:
+  - jekyll-feed
+  - jekyll-sitemap
+  - jekyll-remote-theme
+
+# Navigation
+header_pages:
+  - installation.md
+  - screenshots.md
+  - contributing.md
+
+# Social
+github_username: mks2508
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Exclude from processing
+exclude:
+  - README.md
+  - LICENSE
+  - build/
+  - mks-multiplatform-iptv/
+  - mks-multiplataforma-tvos-iptv/
+  - .gitignore
+
+# Include
+include:
+  - imgs/

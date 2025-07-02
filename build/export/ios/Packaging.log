@@ -1,0 +1,150 @@
+2025-07-02 20:53:45 +0000 [MT] Initial pipeline context: <IDEDistributionProcessingPipelineContext: 0x86b813000; archive(resolved)="<IDEArchive: 0x86dd66a00>", distributionTask(resolved)="2", distributionDestination(resolved)="1", distributionMethod(resolved)="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team(resolved)="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	Chain (14, self inclusive):
+	<IDEDistributionProcessingPipelineContext: 0x86b813000; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionProcessingPipelineContext: 0x86b811200; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b966300; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b965400; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b965180; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b964f00; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b964c80; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b964a00; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b964780; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="<IDEProvisioningBasicTeam: 0x86ddec720; teamID='QL3NVUPD27', teamName='(null)'>">
+	<IDEDistributionContext: 0x86b964500; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="(null)">
+	<IDEDistributionContext: 0x86b964280; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="(null)">
+	<IDEDistributionContext: 0x86b964000; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="(null)">
+	<IDEDistributionContext: 0x10108eb50; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="<IDEDistributionMethodDevelopmentSigned: 0x86c53bc90>", team="(null)">
+	<IDEDistributionContext: 0x1010bc6b0; archive = "<IDEArchive: 0x86dd66a00>", distributionMethod="(null)", team="(null)">
+</IDEDistributionProcessingPipelineContext: 0x86b813000>
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionCreateDestRootStep
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionCopyItemStep
+2025-07-02 20:53:45 +0000 [MT] Running /usr/bin/ditto '-V' '/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app' '/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Root/Payload/mks-multiplatform-iptv.app'
+2025-07-02 20:53:45 +0000  >>> Copying /Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app 
+2025-07-02 20:53:45 +0000  copying file ./_CodeSignature/CodeResources ... 
+2025-07-02 20:53:45 +0000  2775 bytes for ./_CodeSignature/CodeResources
+2025-07-02 20:53:45 +0000  copying file ./AppIcon60x60@2x.png ... 
+2025-07-02 20:53:45 +0000  16399 bytes for ./AppIcon60x60@2x.png
+2025-07-02 20:53:45 +0000  copying file ./mks-multiplatform-iptv ... 
+2025-07-02 20:53:45 +0000  1624464 bytes for ./mks-multiplatform-iptv
+2025-07-02 20:53:45 +0000  copying file ./Assets.car ... 
+2025-07-02 20:53:45 +0000  5342184 bytes for ./Assets.car
+2025-07-02 20:53:45 +0000  copying file ./AppIcon76x76@2x~ipad.png ... 
+2025-07-02 20:53:45 +0000  23008 bytes for ./AppIcon76x76@2x~ipad.png
+2025-07-02 20:53:45 +0000  copying file ./embedded.mobileprovision ... 
+2025-07-02 20:53:45 +0000  12630 bytes for ./embedded.mobileprovision
+2025-07-02 20:53:45 +0000  copying file ./Info.plist ... 
+2025-07-02 20:53:45 +0000  1650 bytes for ./Info.plist
+2025-07-02 20:53:45 +0000  copying file ./PkgInfo ... 
+2025-07-02 20:53:45 +0000  8 bytes for ./PkgInfo
+2025-07-02 20:53:45 +0000 [MT] /usr/bin/ditto exited with 0
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionEmbedProfileStep
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionInfoPlistStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionInfoPlistStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionAppThinningPlistStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionAppThinningPlistStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionSymbolsStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionSymbolsStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionAppThinningStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionAppThinningStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionArchThinningStep
+2025-07-02 20:53:45 +0000 [MT] Archs to thin for item /Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app are []
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionODRStep
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionStripXattrsStep
+2025-07-02 20:53:45 +0000 [MT] Skipping stripping extended attributes because the codesign step will strip them.
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionCodesignStep
+2025-07-02 20:53:45 +0000 [MT] Entitlements for <IDEDistributionItem: 0x86b8bd440; bundleID='dev.mks2508.mks-multiplatform-iptv', path='<DVTFilePath:0x86dd66a70:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x86b8bd320; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x86ba1c180; name='Apple Development: marcosasensioblasco@gmail.com (QGSR7YP726)', hash='ABAEE1F3176B242E0EB264CED1EBF8E12458ECE9', serialNumber='58CC9E3453858E7296F529F29E1C0D65', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-07-01 18:14:53 +0000''>', entitlements='{
+    "application-identifier" = "QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv";
+    "com.apple.developer.team-identifier" = QL3NVUPD27;
+    "com.apple.security.application-groups" =     (
+        "group.mks",
+        "group.test.tv"
+    );
+    "get-task-allow" = 1;
+}', teamID='QL3NVUPD27', identifier='dev.mks2508.mks-multiplatform-iptv', executablePath='<DVTFilePath:0x86dd67020:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app/mks-multiplatform-iptv'>', hardenedRuntime='1'>'>: {
+    "application-identifier" = "QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv";
+    "com.apple.developer.team-identifier" = QL3NVUPD27;
+    "com.apple.security.application-groups" =     (
+        "group.mks",
+        "group.test.tv"
+    );
+    "get-task-allow" = 1;
+}
+2025-07-02 20:53:45 +0000 [MT] Associated App Clip Identifiers Filter: Skipping because "com.apple.developer.associated-appclip-app-identifiers" is not present
+2025-07-02 20:53:45 +0000 [MT] Entitlements for <IDEDistributionItem: 0x86b8bd440; bundleID='dev.mks2508.mks-multiplatform-iptv', path='<DVTFilePath:0x86dd66a70:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x86b8bd320; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x86ba1c3c0; name='Apple Development: marcosasensioblasco@gmail.com (QGSR7YP726)', hash='ABAEE1F3176B242E0EB264CED1EBF8E12458ECE9', serialNumber='58CC9E3453858E7296F529F29E1C0D65', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-07-01 18:14:53 +0000''>', entitlements='{
+    "application-identifier" = "QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv";
+    "com.apple.developer.team-identifier" = QL3NVUPD27;
+    "com.apple.security.application-groups" =     (
+        "group.mks",
+        "group.test.tv"
+    );
+    "get-task-allow" = 1;
+}', teamID='QL3NVUPD27', identifier='dev.mks2508.mks-multiplatform-iptv', executablePath='<DVTFilePath:0x86dd67020:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app/mks-multiplatform-iptv'>', hardenedRuntime='1'>'> are: {
+    "application-identifier" = "QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv";
+    "com.apple.developer.team-identifier" = QL3NVUPD27;
+    "com.apple.security.application-groups" =     (
+        "group.mks",
+        "group.test.tv"
+    );
+    "get-task-allow" = 1;
+}
+2025-07-02 20:53:45 +0000 [MT] Writing entitlements for <IDEDistributionItem: 0x86b8bd440; bundleID='dev.mks2508.mks-multiplatform-iptv', path='<DVTFilePath:0x86dd66a70:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app'>', codeSigningInfo='<_DVTCodeSigningInformation_Path: 0x86b8bd320; isSigned='1', isAdHocSigned='0', signingCertificate='<DVTSigningCertificate: 0x86ba1c3c0; name='Apple Development: marcosasensioblasco@gmail.com (QGSR7YP726)', hash='ABAEE1F3176B242E0EB264CED1EBF8E12458ECE9', serialNumber='58CC9E3453858E7296F529F29E1C0D65', certificateKinds='(
+    "1.2.840.113635.100.6.1.12",
+    "1.2.840.113635.100.6.1.2"
+), issueDate='2025-07-01 18:14:53 +0000''>', entitlements='{
+    "application-identifier" = "QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv";
+    "com.apple.developer.team-identifier" = QL3NVUPD27;
+    "com.apple.security.application-groups" =     (
+        "group.mks",
+        "group.test.tv"
+    );
+    "get-task-allow" = 1;
+}', teamID='QL3NVUPD27', identifier='dev.mks2508.mks-multiplatform-iptv', executablePath='<DVTFilePath:0x86dd67020:'/Users/mks/Documents/GitHub/mks-multiplatform-iptv/build/ios/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app/mks-multiplatform-iptv'>', hardenedRuntime='1'>'> to: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/entitlements~~~GHKO4v
+2025-07-02 20:53:45 +0000 [MT] invoking codesign: <NSConcreteTask: 0x86e05a2b0; launchPath='/usr/bin/codesign', arguments='(
+    "-f",
+    "-s",
+    ABAEE1F3176B242E0EB264CED1EBF8E12458ECE9,
+    "--entitlements",
+    "/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/entitlements~~~GHKO4v",
+    "--preserve-metadata=identifier,flags,runtime",
+    "--generate-entitlement-der",
+    "--strip-disallowed-xattrs",
+    "-vvv",
+    "/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Root/Payload/mks-multiplatform-iptv.app"
+)'>
+2025-07-02 20:53:45 +0000 [MT] codesign output: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Root/Payload/mks-multiplatform-iptv.app: replacing existing signature
+/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Root/Payload/mks-multiplatform-iptv.app: signed app bundle with Mach-O thin (arm64) [dev.mks2508.mks-multiplatform-iptv]
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionZipODRItemStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionZipODRItemStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionCreateIPAStep
+2025-07-02 20:53:45 +0000 [MT] Running /usr/bin/zip '-0' '-r' '/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Packages/mks-multiplatform-iptv.ipa' '.'
+2025-07-02 20:53:45 +0000    adding: Payload/
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/ (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/_CodeSignature/ (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/_CodeSignature/CodeResources
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/AppIcon60x60@2x.png
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/mks-multiplatform-iptv
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/Assets.car
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/AppIcon76x76@2x~ipad.png
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/embedded.mobileprovision
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/Info.plist
+2025-07-02 20:53:45 +0000   (stored 0%)
+  adding: Payload/mks-multiplatform-iptv.app/PkgInfo
+2025-07-02 20:53:45 +0000   (stored 0%)
+2025-07-02 20:53:45 +0000 [MT] /usr/bin/zip exited with 0
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionAppStoreInformationStep
+2025-07-02 20:53:45 +0000 [MT] Skipping step: IDEDistributionAppStoreInformationStep because it said so
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionGenerateProcessedDistributionItems
+2025-07-02 20:53:45 +0000 [MT] IDEDistributionItem init <DVTFilePath:0x86dfec5b0:'/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/XcodeDistPipeline.~~~X0GEo1/Root/Payload/mks-multiplatform-iptv.app'>
+2025-07-02 20:53:45 +0000 [MT] Processing step: IDEDistributionCreateManifestStep

@@ -146,7 +146,7 @@
   gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
-  margin: 50px 0 40px 0; /* Add bottom margin */
+  margin: 20px 0 40px 0; /* Reduced top margin */
 }
 
 .btn-primary {
@@ -1079,6 +1079,16 @@ body:hover .cursor-glow {
     0 0 40px rgba(255, 71, 87, 0.2);
   animation: subtle-float 12s ease-in-out infinite;
   transform: translateY(0);
+  
+  &.card-fixed {
+    position: fixed;
+    top: 20px; /* Adjust as needed */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%; /* Adjust as needed */
+    max-width: 600px; /* Adjust as needed */
+    margin: 0; /* Remove margin when fixed */
+  }
   
   // Compact variant
   &.compact {

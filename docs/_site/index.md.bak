@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=507cad39c48f4ca783d29d0dd6a237838a5ee9e7">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=81200f3beb656862720ef8d66297d5384207b26c">
   </head>
   <body>
     
@@ -359,44 +359,60 @@ document.addEventListener('DOMContentLoaded', function() {
   const isHomepage = document.body.classList.contains('homepage');
   const mainCard = document.getElementById('main-card');
   const scrollStages = document.querySelectorAll('.scroll-stage');
-  
+  const heroScrollIndicator = document.querySelector('.hero-scroll-indicator');
+
   let lastScrollY = window.pageYOffset;
   let headerVisible = false;
-  
+
   // Stage thresholds (in viewport heights)
   const stageThresholds = {
-    1: 0.1,   // Card appears
-    2: 0.3,   // Download button
-    3: 0.5,   // Badges
-    4: 0.7,   // Platform buttons
+    1: 0.01,   // Card appears almost immediately
+    2: 0.05,   // Download button appears very early
+    3: 0.1,   // Badges appear very early
+    4: 0.15,   // Platform buttons appear very early
     5: 0.9    // Header and rest of content
   };
-  
+
   function handleAdvancedScroll() {
     const scrollY = window.pageYOffset;
     const viewportHeight = window.innerHeight;
     const scrollProgress = scrollY / viewportHeight;
-    
-    // Stage 1: Main card animation
-    if (scrollProgress >= stageThresholds[1] && mainCard) {
-      mainCard.classList.add('card-visible');
+
+    // Hide scroll indicator on any scroll
+    if (heroScrollIndicator) {
+      if (scrollY > 0) {
+        heroScrollIndicator.style.opacity = '0';
+        heroScrollIndicator.style.visibility = 'hidden';
+      } else {
+        heroScrollIndicator.style.opacity = '1';
+        heroScrollIndicator.style.visibility = 'visible';
+      }
     }
-    
+
+    // Stage 1: Main card animation (no fixing, just visibility)
+    if (mainCard) {
+      if (scrollProgress >= stageThresholds[1]) {
+        mainCard.classList.add('card-visible');
+      }
+    }
+
     // Stages 2-4: Progressive content reveal
     scrollStages.forEach(stage => {
       const stageNum = parseInt(stage.dataset.stage);
       const threshold = stageThresholds[stageNum];
-      const stageElement = stage.querySelector('.stage-element');
-      
-      if (stageElement && scrollProgress >= threshold) {
-        stageElement.classList.add('stage-visible');
+      const stageElements = stage.querySelectorAll('.stage-element'); // Get all elements in the stage
+
+      if (scrollProgress >= threshold) {
+        stageElements.forEach(element => {
+          element.classList.add('stage-visible');
+        });
       }
     });
-    
+
     // Stage 5: Dynamic header behavior (only on homepage)
     if (isHomepage && scrollProgress >= stageThresholds[5]) {
       const scrollDirection = scrollY > lastScrollY ? 'down' : 'up';
-      
+
       if (scrollDirection === 'down' && !headerVisible) {
         // Show header when scrolling down
         headerVisible = true;
@@ -406,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function() {
           header.style.visibility = 'visible';
           header.classList.add('scrolled');
         }
-      } else if (scrollDirection === 'up' && scrollY > viewportHeight * 1.2) {
+      } else if (scrollDirection === 'up' && scrollY > viewportHeight * 0.5) { // Adjusted threshold for header hide
         // Hide header when scrolling up (but not at very top)
         headerVisible = false;
         if (header) {
@@ -415,21 +431,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
     }
-    
+
     // Enhanced parallax effects
     const particles = document.getElementById('particles');
     if (particles && scrollY < viewportHeight * 2) {
       const rate = scrollY * -0.3;
       particles.style.transform = `translateY(${rate}px)`;
     }
-    
+
     // Update background position for immersive effect
     const heroBackground = document.querySelector('.immersive-hero .hero-background');
+    const heroBanner = document.querySelector('.hero-banner');
+    const heroSection = document.querySelector('.hero-section');
+
     if (heroBackground && scrollY < viewportHeight * 1.5) {
       const parallaxRate = scrollY * 0.1;
       heroBackground.style.transform = `translateY(${parallaxRate}px)`;
     }
-    
+
+    // Control visibility of hero banner image
+    if (heroBanner && heroSection) {
+      const heroSectionBottom = heroSection.getBoundingClientRect().bottom + window.pageYOffset;
+      const threshold = 1978.5; // Fixed threshold as requested
+
+      if (scrollY > threshold) {
+        heroBanner.classList.add('banner-hidden');
+      } else {
+        heroBanner.classList.remove('banner-hidden');
+      }
+    }
+
     lastScrollY = scrollY;
   }
   

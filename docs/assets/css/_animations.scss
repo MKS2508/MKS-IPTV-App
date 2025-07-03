@@ -54,13 +54,12 @@
 }
 
 .badge-float {
-  animation: float 3s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.1s);
+  animation: badge-float 3s ease-in-out infinite;
 }
 
-@keyframes float {
+@keyframes badge-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
 }
 
 .btn-glow {

@@ -16,26 +16,55 @@
   </a>
 </p>
 
-> [!NOTE]
-> This repository contains the documentation, build artifacts, and installation guides for the MKS-IPTV-App. The Swift source code is maintained in a private repository.
+<table>
+  <tr>
+    <td valign="top">
+      <h3>A Powerful, Native IPTV Experience</h3>
+      <p>MKS-IPTV-App is a client built from the ground up for the Apple ecosystem. It provides a seamless, high-performance experience for streaming IPTV content, complete with modern features and a design that feels right at home on iOS, macOS, and tvOS.</p>
+      <ul>
+        <li><strong> Native Performance:</strong> Built with Swift & SwiftUI for a fast, responsive UI.</li>
+        <li><strong>📥 Offline Downloads:</strong> Save content directly to your device for offline viewing.</li>
+        <li><strong>🎨 Modern "Liquid Glass" UI:</strong> Features the latest design patterns from Apple.</li>
+        <li><strong>🔗 Smart Stream Handling:</strong> Automatically manages redirects and proxies for smooth playback.</li>
+      </ul>
+    </td>
+    <td width="500" align="center">
+      <img src="./docs/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" />
+    </td>
+  </tr>
+</table>
 
----
+## 📥 Get the App
 
-<details open>
-<summary><h2>🇬🇧 English Documentation</h2></summary>
-<br>
-
-This application provides comprehensive IPTV streaming capabilities including live TV, video-on-demand (VOD), and advanced download management across Apple's ecosystem, featuring an early adoption of iOS/macOS/tvOS 26 Beta with Liquid Glass design patterns.
-
-### 📥 Downloads & Installation
+Download the latest version for your platform. For installation help, see the guides in the documentation below.
 
 | Platform | Download | Installation Guide |
-|----------|----------|--------------------|
-| **iOS** | [Download IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa) | [AltStore Guide](./build/ios/INSTALL-WITH-ALTSTORE.md) |
-| **macOS** | [Download .zip](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip) | [See Instructions](#-macos-installation) |
+|:---|:---|:---|
+| **iOS & iPadOS** | <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv.ipa">**Download IPA**</a> | [AltStore Guide](./docs/iOS-Free-Installation-Guide.md) |
+| **macOS** | <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv-macos-arm64.zip">**Download for Apple Silicon**</a> | [See Instructions](#-macos-installation) |
 | **tvOS** | Build from source | [Developer Guide](#-tvos-installation) |
 
-> **Note**: All official releases are available on the [**Releases page**](https://github.com/MKS2508/MKS-IPTV-App/releases). For alternative installation methods, see the [TestFlight Guide](docs/TestFlight-Distribution-Guide.md) or the [iOS Free Installation Guide](docs/iOS-Free-Installation-Guide.md).
+> [!NOTE]
+> This repository contains the documentation and build artifacts. The source code is in a private repository.
+
+<p align="center">
+  <!-- Stars -->
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/stargazers"><img src="https://img.shields.io/github/stars/MKS2508/MKS-IPTV-App?style=social" alt="Stars"></a>
+  <!-- Forks -->
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/network/members"><img src="https://img.shields.io/github/forks/MKS2508/MKS-IPTV-App?style=social" alt="Forks"></a>
+  <!-- Watchers -->
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/watchers"><img src="https://img.shields.io/github/watchers/MKS2508/MKS-IPTV-App?style=social" alt="Watchers"></a>
+  <!-- Downloads -->
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest"><img src="https://img.shields.io/github/downloads/MKS2508/MKS-IPTV-App/total?style=social&logo=github" alt="Total Downloads"></a>
+  <!-- Follow -->
+  <a href="https://github.com/MKS2508"><img src="https://img.shields.io/github/followers/MKS2508?style=social" alt="Follow @MKS2508"></a>
+</p>
+
+<img src="https://i.imgur.com/f0I61D8.gif" width="100%">
+
+<details>
+<summary><h3>👩‍💻 Technical Documentation (English)</h3></summary>
+<br>
 
 ### 🚀 Core Features
 
@@ -46,12 +75,15 @@ This application provides comprehensive IPTV streaming capabilities including li
 - **macOS TouchBar Support**: Native controls for categories, search, and playback.
 - **MOV Conversion**: Automatic conversion to `.MOV` for optimal AirPlay and Apple TV integration.
 
-### 🛠️ Technical Architecture
+### 🛠️ Tech Stack
 
-- **Language**: Swift 6.0 with modern concurrency (async/await).
-- **Frameworks**: SwiftUI, AVKit, Network framework.
-- **Architecture**: MVVM with an Actor-based concurrency model.
-- **Platform Support**: iOS 26+, macOS 26+, tvOS 26+.
+| Logo | Technology | Description |
+| :---: | :--- | :--- |
+| <img src="https://img.shields.io/badge/-Swift-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift"> | **Swift 6.0** | Core application language, using modern concurrency (async/await). |
+| <img src="https://img.shields.io/badge/-SwiftUI-007AFF?style=for-the-badge&logo=swift&logoColor=white" alt="SwiftUI"> | **SwiftUI** | Framework for building the user interface across all Apple platforms. |
+| <img src="https://img.shields.io/badge/-Actors-4BC51D?style=for-the-badge" alt="Actors"> | **Actor Model** | For safe and structured concurrency, preventing data races. |
+| <img src="https://img.shields.io/badge/-MVVM-F7DF1E?style=for-the-badge" alt="MVVM"> | **MVVM** | Architectural pattern for a clean separation of concerns. |
+| <img src="https://img.shields.io/badge/-Network-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Network"> | **Network.framework** | Apple's native framework for all networking tasks. |
 
 ### 📸 Screenshots
 
@@ -120,7 +152,7 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma
 
 ##### **iOS (AltStore Method)**
 1. Download the `.ipa` file from the [Releases page](https://github.com/MKS2508/MKS-IPTV-App/releases/latest).
-2. Install using AltStore following the [**detailed installation guide**](./build/ios/INSTALL-WITH-ALTSTORE.md).
+2. Install using AltStore following the [**detailed installation guide**](./docs/iOS-Free-Installation-Guide.md).
 3. Trust the developer certificate in `Settings → General → VPN & Device Management`.
 
 ##### **macOS Installation**
@@ -143,20 +175,8 @@ This project is primarily a personal learning endeavor, but contributions are we
 ---
 
 <details>
-<summary><h2>🇪🇸 Documentación en Español</h2></summary>
+<summary><h3>👩‍💻 Documentación Técnica (Español)</h3></summary>
 <br>
-
-Esta aplicación ofrece capacidades completas de streaming IPTV, incluyendo TV en vivo, vídeo bajo demanda (VOD) y un sistema de descargas avanzado para todo el ecosistema de Apple, destacando por la adopción temprana del diseño Liquid Glass de iOS/macOS/tvOS 26.
-
-### 📥 Descargas e Instalación
-
-| Plataforma | Descarga | Guía de Instalación |
-|------------|----------|---------------------|
-| **iOS** | [Descargar IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa) | [Guía AltStore](./build/ios/INSTALL-WITH-ALTSTORE.md) |
-| **macOS** | [Descargar .zip](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip) | [Ver Instrucciones](#-instalación-en-macos) |
-| **tvOS** | Compilar desde código | [Guía para Desarrolladores](#-instalación-en-tvos) |
-
-> **Nota**: Todas las versiones oficiales están en la [**página de Releases**](https://github.com/MKS2508/MKS-IPTV-App/releases). Para métodos alternativos, consulta la [Guía de TestFlight](docs/TestFlight-Distribution-Guide.md) o la [Guía de Instalación Gratuita para iOS](docs/iOS-Free-Installation-Guide.md).
 
 ### 🚀 Características Principales
 
@@ -167,12 +187,15 @@ Esta aplicación ofrece capacidades completas de streaming IPTV, incluyendo TV e
 - **Soporte para TouchBar en macOS**: Controles nativos para categorías, búsqueda y reproducción.
 - **Conversión a MOV**: Conversión automática a `.MOV` para una integración óptima con AirPlay y Apple TV.
 
-### 🛠️ Arquitectura Técnica
+### 🛠️ Stack Tecnológico
 
-- **Lenguaje**: Swift 6.0 con concurrencia moderna (async/await).
-- **Frameworks**: SwiftUI, AVKit, Network.
-- **Arquitectura**: MVVM con un modelo de concurrencia basado en Actores.
-- **Soporte de Plataformas**: iOS 26+, macOS 26+, tvOS 26+.
+| Logo | Tecnología | Descripción |
+| :---: | :--- | :--- |
+| <img src="https://img.shields.io/badge/-Swift-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift"> | **Swift 6.0** | Lenguaje principal de la aplicación, usando concurrencia moderna (async/await). |
+| <img src="https://img.shields.io/badge/-SwiftUI-007AFF?style=for-the-badge&logo=swift&logoColor=white" alt="SwiftUI"> | **SwiftUI** | Framework para construir la interfaz de usuario en todas las plataformas de Apple. |
+| <img src="https://img.shields.io/badge/-Actors-4BC51D?style=for-the-badge" alt="Actors"> | **Modelo de Actores** | Para una concurrencia segura y estructurada, previniendo "data races". |
+| <img src="https://img.shields.io/badge/-MVVM-F7DF1E?style=for-the-badge" alt="MVVM"> | **MVVM** | Patrón de arquitectura para una clara separación de responsabilidades. |
+| <img src="https://img.shields.io/badge/-Network-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Network"> | **Network.framework** | Framework nativo de Apple para todas las tareas de red. |
 
 ### 📸 Capturas de Pantalla
 
@@ -241,7 +264,7 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma
 
 ##### **Instalación en iOS (Método AltStore)**
 1. Descarga el archivo `.ipa` desde la [página de Releases](https://github.com/MKS2508/MKS-IPTV-App/releases/latest).
-2. Instálalo usando AltStore, siguiendo la [**guía de instalación detallada**](./build/ios/INSTALL-WITH-ALTSTORE.md).
+2. Instálalo usando AltStore, siguiendo la [**guía de instalación detallada**](./docs/iOS-Free-Installation-Guide.md).
 3. Confía en el certificado de desarrollador en `Ajustes → General → VPN y Gestión de Dispositivos`.
 
 ##### **Instalación en macOS**

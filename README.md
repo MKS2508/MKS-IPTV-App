@@ -1,6 +1,6 @@
 # 🎬 MKS-IPTV-App
 
-[![Build Status](https://img.shields.io/badge/build-beta%20v1.0-yellow)](#) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](#) [![Platform](https://img.shields.io/badge/platform-iOS%2026%20Beta%20%7C%20macOS%2026%20Beta%20%7C%20tvOS%2026%20Beta-brightgreen)](#) [![Swift](https://img.shields.io/badge/Swift-6.0-orange)](#) [![Apple](https://img.shields.io/badge/Apple%20HIG-Liquid%20Glass-blue)](#)
+[![Build Status](https://img.shields.io/badge/build-beta%20v1.0-yellow)](https://github.com/MKS2508/MKS-IPTV-App/releases) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-iOS%2026%20Beta%20%7C%20macOS%2026%20Beta%20%7C%20tvOS%2026%20Beta-brightgreen)](#platform-support) [![Swift](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org) [![Apple](https://img.shields.io/badge/Apple%20HIG-Liquid%20Glass-blue)](https://developer.apple.com/design/) [![GitHub Release](https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases)](https://github.com/MKS2508/MKS-IPTV-App/releases/latest)
 
 ## English
 
@@ -10,6 +10,7 @@ This application provides comprehensive IPTV streaming capabilities including li
 
 ### Table of Contents
 - [English Documentation](#english)
+  - [Downloads](#downloads)
   - [Core Features](#core-features)
   - [Technical Architecture](#technical-architecture) 
   - [Platform Support](#platform-support)
@@ -18,6 +19,27 @@ This application provides comprehensive IPTV streaming capabilities including li
   - [Installation](#installation)
   - [Contributing](#contributing)
 - [Documentación en Español](#español)
+
+---
+
+## Downloads
+
+### 📥 Latest Release: v1.0 Beta
+
+Download the latest version for your platform:
+
+| Platform | Download | Installation Guide |
+|----------|----------|-------------------|
+| **iOS** | [Download IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv.ipa) | [Installation Guide](#ios-installation-altstore-method) |
+| **macOS** | [Download for Apple Silicon](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv-macos-arm64.zip) | [Installation Guide](#macos-installation) |
+| **tvOS** | Build from source | [Developer Guide](#tvos-installation) |
+
+> **Note**: All releases are available on the [Releases page](https://github.com/MKS2508/MKS-IPTV-App/releases)
+
+### Alternative Installation Methods
+- **TestFlight**: [Join Beta Program](docs/TestFlight-Distribution-Guide.md) (when available)
+- **Direct Install**: [iOS Free Installation Guide](docs/iOS-Free-Installation-Guide.md)
+- **Build from Source**: See [Development Setup](#development-setup)
 
 ---
 
@@ -268,10 +290,10 @@ This ensures that:
 
 ## Contact & Support
 
-- **Developer**: [@mks2508](https://github.com/mks2508)
-- **Bug Reports**: [GitHub Issues](https://github.com/mks2508/mks-multiplatform-iptv/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/mks2508/mks-multiplatform-iptv/discussions)
-- **Documentation**: [Project Wiki](https://github.com/mks2508/mks-multiplatform-iptv/wiki)
+- **Developer**: [@MKS2508](https://github.com/MKS2508)
+- **Bug Reports**: [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+- **Documentation**: [Project Wiki](https://github.com/MKS2508/MKS-IPTV-App/wiki)
 
 ---
 
@@ -280,6 +302,25 @@ This ensures that:
 # Documentación en Español
 
 Cliente IPTV nativo multiplataforma con soporte completo para las últimas versiones beta de iOS/macOS/tvOS 26, implementando patrones de diseño Liquid Glass y arquitectura Swift 6 moderna.
+
+## Descargas
+
+### 📥 Última Versión: v1.0 Beta
+
+Descarga la última versión para tu plataforma:
+
+| Plataforma | Descarga | Guía de Instalación |
+|------------|----------|---------------------|
+| **iOS** | [Descargar IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv.ipa) | [Guía de Instalación](#instalación-ios-método-altstore) |
+| **macOS** | [Descargar para Apple Silicon](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv-macos-arm64.zip) | [Guía de Instalación](#instalación-macos) |
+| **tvOS** | Compilar desde código | [Guía para Desarrolladores](#instalación-tvos) |
+
+> **Nota**: Todas las versiones están disponibles en la [página de Releases](https://github.com/MKS2508/MKS-IPTV-App/releases)
+
+### Métodos Alternativos de Instalación
+- **TestFlight**: [Unirse al Programa Beta](docs/TestFlight-Distribution-Guide.md) (cuando esté disponible)
+- **Instalación Directa**: [Guía de Instalación Gratuita iOS](docs/iOS-Free-Installation-Guide.md)
+- **Compilar desde Código**: Ver [Configuración de Desarrollo](#requisitos-de-desarrollo)
 
 ## Características Principales (Español)
 
@@ -375,8 +416,8 @@ Este proyecto está licenciado bajo **GNU General Public License v3.0 (GPL-3.0)*
 
 ## Contacto (Español)
 
-- **Desarrollador**: [@mks2508](https://github.com/mks2508)
-- **Reportar Bugs**: [GitHub Issues](https://github.com/mks2508/mks-multiplatform-iptv/issues)
-- **Solicitudes de Características**: [GitHub Discussions](https://github.com/mks2508/mks-multiplatform-iptv/discussions)
+- **Desarrollador**: [@MKS2508](https://github.com/MKS2508)
+- **Reportar Bugs**: [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- **Solicitudes de Características**: [GitHub Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
 
 *Construido con ❤️ usando Swift 6, SwiftUI, y mucho ☕️*

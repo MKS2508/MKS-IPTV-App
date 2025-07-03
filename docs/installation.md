@@ -30,7 +30,7 @@ For complete iOS installation instructions, see: [INSTALL-WITH-ALTSTORE.md](../b
 - Apple Silicon or Intel Mac
 
 ### Installation
-1. Download the macOS .app bundle from [Releases](https://github.com/mks2508/mks-multiplatform-iptv/releases)
+1. Download the macOS .app bundle from [Releases](https://github.com/MKS2508/MKS-IPTV-App/releases)
 2. Drag to Applications folder
 3. Right-click → Open (first launch only)
 4. Accept "Open from unidentified developer"
@@ -60,8 +60,8 @@ For complete iOS installation instructions, see: [INSTALL-WITH-ALTSTORE.md](../b
 ### Build from Source
 ```bash
 # Clone repository
-git clone https://github.com/mks2508/mks-multiplatform-iptv.git
-cd mks-multiplatform-iptv
+git clone https://github.com/MKS2508/MKS-IPTV-App.git
+cd MKS-IPTV-App
 
 # Build for macOS
 xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Debug
@@ -104,6 +104,6 @@ The app comes pre-configured with demo credentials. For production use:
 ## Support
 
 Need help? Check these resources:
-- [GitHub Issues](https://github.com/mks2508/mks-multiplatform-iptv/issues)
-- [Community Discussions](https://github.com/mks2508/mks-multiplatform-iptv/discussions)
-- [Project Wiki](https://github.com/mks2508/mks-multiplatform-iptv/wiki)
+- [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- [Community Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+- [Project Wiki](https://github.com/MKS2508/MKS-IPTV-App/wiki)

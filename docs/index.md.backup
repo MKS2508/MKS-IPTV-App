@@ -4,79 +4,24 @@ title: Home
 nav_order: 1
 ---
 
-<!-- Immersive Full-Screen Hero Section -->
-<section class="hero-section immersive-hero">
+<!-- New Hero Section with Carousel -->
+<section class="hero-section">
   <div class="hero-background">
-    <img src="imgs/banner4.webp" alt="MKS IPTV - Stream. Decode. Rebel." class="hero-banner">
-    <div class="hero-overlay"></div>
     <div class="hero-particles" id="particles"></div>
+    <div class="hero-gradient"></div>
   </div>
   
-  <!-- Centered Glass Card -->
-  <div class="hero-glass-card compact" id="main-card">
-    <div class="glass-card-content">
-      <div class="hero-title-row">
-        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="hero-logo-compact">
-        <h1 class="hero-title-compact">MKS-IPTV-App</h1>
+  <div class="hero-content">
+    <!-- Compact header -->
+    <div class="hero-header">
+      <div class="hero-logo-small">
+        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="app-icon"/>
+        <h1 class="hero-title-line">MKS-IPTV-App</h1>
       </div>
-      <p class="hero-tagline-compact">The Ultimate IPTV Experience for Apple Devices</p>
-    </div>
-  </div>
-  
-  <div class="hero-scroll-indicator">
-    <div class="mouse">
-      <div class="wheel"></div>
-    </div>
-    <span class="scroll-text">Scroll to explore</span>
-  </div>
-</section>
-
-<!-- Multi-Stage Scroll Animation Sections -->
-<!-- Stage 2: Download Button (appears after card initial reveal) -->
-<section class="scroll-stage" id="stage-download" data-stage="2">
-  <div class="download-button-stage">
-    <a href="download.html" class="btn-download-hero-compact stage-element">
-      <span class="btn-text">Download Now</span>
-      <span class="btn-icon">⬇</span>
-    </a>
-  </div>
-</section>
-
-<!-- Stage 3: Badges Section -->
-<section class="scroll-stage" id="stage-badges" data-stage="3">
-  <div class="badges-stage">
-    <div class="hero-badges stage-element">
-      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float">
-      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float">
-      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift" class="badge-float">
-    </div>
-  </div>
-</section>
-
-<!-- Stage 4: Platform Buttons -->
-<section class="scroll-stage" id="stage-buttons" data-stage="4">
-  <div class="platform-buttons-stage">
-    <div class="platform-buttons stage-element">
-      <a href="#features" class="btn btn-secondary btn-large">
-        <span class="btn-text">Explore Features</span>
-        <span class="btn-icon">✨</span>
-      </a>
-      <a href="screenshots.html" class="btn btn-outline btn-large">
-        <span class="btn-text">View Screenshots</span>
-        <span class="btn-icon">📱</span>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- Screenshot Carousel Section -->
-<section class="carousel-section">
-  <div class="container">
-    <div class="section-header">
-      <h2>See It in Action</h2>
-      <p>Experience the beautiful interface and powerful features</p>
+      <p class="hero-subtitle typewriter" data-text="The Ultimate IPTV Experience for Apple Devices"></p>
     </div>
     
+    <!-- Screenshot Carousel -->
     <div class="screenshot-carousel">
       <div class="carousel-container">
         <div class="carousel-track" id="carouselTrack">
@@ -123,6 +68,31 @@ nav_order: 1
         </div>
       </div>
     </div>
+    
+    <!-- Platform badges and CTA -->
+    <div class="hero-badges fade-in-up" data-delay="200">
+      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float">
+      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float">
+      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift" class="badge-float">
+    </div>
+    
+    <div class="hero-cta fade-in-up" data-delay="400">
+      <a href="download.html" class="btn btn-primary btn-glow">
+        <span class="btn-text">Download Now</span>
+        <span class="btn-icon">→</span>
+      </a>
+      <a href="#features" class="btn btn-secondary">
+        <span class="btn-text">Learn More</span>
+        <span class="btn-icon">↓</span>
+      </a>
+    </div>
+  </div>
+  
+  <div class="hero-scroll-indicator">
+    <div class="mouse">
+      <div class="wheel"></div>
+    </div>
+    <span class="scroll-text">Scroll to explore</span>
   </div>
 </section>
 

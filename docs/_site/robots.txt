@@ -1,1 +1,1 @@
-Sitemap: http://localhost:4000/MKS-IPTV-App/sitemap.xml
+Sitemap: https://mks2508.github.io/MKS-IPTV-App/sitemap.xml

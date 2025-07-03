@@ -6,53 +6,194 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
     <title>Home | MKS-IPTV-App</title>
-    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=cfe44e1da5a713c37f4eed835048d6bffbafe21d">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=25f1102e17601df46efd29a815bc631604f969a8">
   </head>
-  <body>
-    <header class="sticky-header">
+  <body class="homepage">
+    
+    <header class="sticky-header enhanced-nav">
+  <div class="container">
+    <div class="nav-brand">
+      <a href="https://mks2508.github.io/MKS-IPTV-App/" class="site-title">
+        <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="site-logo">
+        <span class="site-title-text">MKS-IPTV-App</span>
+      </a>
+    </div>
+    
+    <nav class="nav-menu">
+      <a href="https://mks2508.github.io/MKS-IPTV-App/" class="nav-link active">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Home</span>
+      </a>
+      
+        
+        <a href="/MKS-IPTV-App/download.html" class="nav-link">
+          <span class="nav-icon">
+            📥
+            
+          </span>
+          <span class="nav-text">Download</span>
+        </a>
+      
+        
+        <a href="/MKS-IPTV-App/installation.html" class="nav-link">
+          <span class="nav-icon">
+            🛠️
+            
+          </span>
+          <span class="nav-text">Installation</span>
+        </a>
+      
+        
+        <a href="/MKS-IPTV-App/screenshots.html" class="nav-link">
+          <span class="nav-icon">
+            📸
+            
+          </span>
+          <span class="nav-text">Screenshots</span>
+        </a>
+      
+    </nav>
+    
+    <div class="nav-actions">
+      <button class="search-btn" aria-label="Search">
+        <span class="search-icon">🔍</span>
+      </button>
+      <a href="https://github.com/MKS2508/MKS-IPTV-App" class="github-btn" aria-label="GitHub Repository">
+        <span class="github-icon">⭐</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation">
+        <span class="hamburger"></span>
+      </button>
+    </div>
+  </div>
+</header>
+    <main class="page-transition">
       <div class="container">
-        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
-        <button class="nav-toggle" aria-label="toggle navigation">
-          <span class="hamburger"></span>
-        </button>
-        <nav class="nav-menu">
-          
-            <a href="/MKS-IPTV-App/download.md" class="nav-link">Download</a>
-          
-            <a href="/MKS-IPTV-App/installation.md" class="nav-link">Installation</a>
-          
-            <a href="/MKS-IPTV-App/screenshots.md" class="nav-link">Screenshots</a>
-          
-        </nav>
+        <!-- Immersive Full-Screen Hero Section -->
+<section class="hero-section immersive-hero">
+  <div class="hero-background">
+    <img src="imgs/banner4.webp" alt="MKS IPTV - Stream. Decode. Rebel." class="hero-banner" />
+    <div class="hero-overlay"></div>
+    <div class="hero-particles" id="particles"></div>
+  </div>
+  
+  <!-- Centered Glass Card -->
+  <div class="hero-glass-card compact" id="main-card">
+    <div class="glass-card-content">
+      <div class="hero-title-row">
+        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="hero-logo-compact" />
+        <h1 class="hero-title-compact">MKS-IPTV-App</h1>
       </div>
-    </header>
-    <main>
-      <div class="container">
-        <div align="center">
-  <a href="https://github.com/MKS2508/MKS-IPTV-App">
-    <img src="imgs/banner3.webp" alt="MKS-IPTV-App Banner" width="800" />
-  </a>
-  <h1>MKS-IPTV-App Documentation</h1>
-  <p><strong>A native, multiplatform IPTV client for the Apple ecosystem, built with Swift 6 &amp; SwiftUI.</strong></p>
-</div>
+      <p class="hero-tagline-compact">The Ultimate IPTV Experience for Apple Devices</p>
+    </div>
+  </div>
+  
+  <div class="hero-scroll-indicator">
+    <div class="mouse">
+      <div class="wheel"></div>
+    </div>
+    <span class="scroll-text">Scroll to explore</span>
+  </div>
+</section>
 
-<p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" />
-  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" />
-  <img alt="License" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" />
-  <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&amp;logo=swift" />
-  <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest">
-    <img alt="Latest Release" src="https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases&amp;style=for-the-badge&amp;color=blue&amp;logo=github" />
-  </a>
-</p>
+<!-- Multi-Stage Scroll Animation Sections -->
+<!-- Stage 2: Download Button (appears after card initial reveal) -->
+<section class="scroll-stage" id="stage-download" data-stage="2">
+  <div class="download-button-stage">
+    <a href="download.html" class="btn-download-hero-compact stage-element">
+      <span class="btn-text">Download Now</span>
+      <span class="btn-icon">⬇</span>
+    </a>
+  </div>
+</section>
 
-<div align="center" style="margin-top: 40px;">
-  <a href="download.md" class="btn">Download Latest Version</a>
-</div>
+<!-- Stage 3: Badges Section -->
+<section class="scroll-stage" id="stage-badges" data-stage="3">
+  <div class="badges-stage">
+    <div class="hero-badges stage-element">
+      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float" />
+      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float" />
+      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&amp;logo=swift" class="badge-float" />
+    </div>
+  </div>
+</section>
+
+<!-- Stage 4: Platform Buttons -->
+<section class="scroll-stage" id="stage-buttons" data-stage="4">
+  <div class="platform-buttons-stage">
+    <div class="platform-buttons stage-element">
+      <a href="#features" class="btn btn-secondary btn-large">
+        <span class="btn-text">Explore Features</span>
+        <span class="btn-icon">✨</span>
+      </a>
+      <a href="screenshots.html" class="btn btn-outline btn-large">
+        <span class="btn-text">View Screenshots</span>
+        <span class="btn-icon">📱</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Screenshot Carousel Section -->
+<section class="carousel-section">
+  <div class="container">
+    <div class="section-header">
+      <h2>See It in Action</h2>
+      <p>Experience the beautiful interface and powerful features</p>
+    </div>
+    
+    <div class="screenshot-carousel">
+      <div class="carousel-container">
+        <div class="carousel-track" id="carouselTrack">
+          <div class="carousel-slide active">
+            <img src="imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" class="carousel-image" />
+            <div class="carousel-caption">
+              <h3>Liquid Glass Design</h3>
+              <p>Modern translucent UI patterns from iOS 26</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Download Management" class="carousel-image" />
+            <div class="carousel-caption">
+              <h3>Advanced Downloads</h3>
+              <p>Real-time progress tracking and queue management</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail View" class="carousel-image" />
+            <div class="carousel-caption">
+              <h3>Rich Content Views</h3>
+              <p>Comprehensive series and episode management</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Configuration" class="carousel-image" />
+            <div class="carousel-caption">
+              <h3>Flexible Configuration</h3>
+              <p>Customizable download settings and formats</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Carousel Navigation -->
+        <button class="carousel-nav prev" id="carouselPrev" aria-label="Previous screenshot">‹</button>
+        <button class="carousel-nav next" id="carouselNext" aria-label="Next screenshot">›</button>
+        
+        <!-- Carousel Dots -->
+        <div class="carousel-dots" id="carouselDots">
+          <button class="dot active" data-slide="0" aria-label="Screenshot 1"></button>
+          <button class="dot" data-slide="1" aria-label="Screenshot 2"></button>
+          <button class="dot" data-slide="2" aria-label="Screenshot 3"></button>
+          <button class="dot" data-slide="3" aria-label="Screenshot 4"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
 <hr />
 
@@ -67,15 +208,15 @@
   </thead>
   <tbody>
     <tr>
-      <td style="text-align: left">📥 <a href="/MKS-IPTV-App/download.html"><strong>Downloads</strong></a></td>
+      <td style="text-align: left">📥 <a href="download.html"><strong>Downloads</strong></a></td>
       <td style="text-align: left">Get the latest builds for all platforms.</td>
     </tr>
     <tr>
-      <td style="text-align: left">🛠️ <a href="/MKS-IPTV-App/installation.html"><strong>Installation Guide</strong></a></td>
+      <td style="text-align: left">🛠️ <a href="installation.html"><strong>Installation Guide</strong></a></td>
       <td style="text-align: left">Step-by-step instructions to get you started.</td>
     </tr>
     <tr>
-      <td style="text-align: left">📸 <a href="/MKS-IPTV-App/screenshots.html"><strong>Screenshots</strong></a></td>
+      <td style="text-align: left">📸 <a href="screenshots.html"><strong>Screenshots</strong></a></td>
       <td style="text-align: left">A visual tour of the app’s features.</td>
     </tr>
     <tr>
@@ -87,15 +228,45 @@
 
 <hr />
 
-<h2 id="-core-features">✨ Core Features</h2>
+<h2 id="features">✨ Core Features</h2>
 
-<ul>
-  <li><strong> Native Apple Experience</strong>: Built with Swift &amp; SwiftUI for optimal performance and integration.</li>
-  <li><strong>📺 Live TV &amp; VOD</strong>: Stream your favorite live channels, movies, and series.</li>
-  <li><strong>📥 Advanced Downloads</strong>: Download content for offline viewing with progress tracking.</li>
-  <li><strong>🎨 Liquid Glass Design</strong>: Featuring the latest UI patterns from iOS 26.</li>
-  <li><strong>💻 Multi-platform</strong>: Works seamlessly across iOS, macOS, and tvOS.</li>
-</ul>
+<div class="features-grid">
+  <div class="feature-card fade-in-up" data-delay="100">
+    <div class="feature-icon">🍎</div>
+    <h3>Native Apple Experience</h3>
+    <p>Built with Swift 6 &amp; SwiftUI for optimal performance and seamless integration with the Apple ecosystem.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="200">
+    <div class="feature-icon">📺</div>
+    <h3>Live TV &amp; VOD</h3>
+    <p>Stream your favorite live channels, movies, and series with adaptive quality and minimal buffering.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="300">
+    <div class="feature-icon">📥</div>
+    <h3>Advanced Downloads</h3>
+    <p>Download content for offline viewing with real-time progress tracking and queue management.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="400">
+    <div class="feature-icon">🎨</div>
+    <h3>Liquid Glass Design</h3>
+    <p>Experience the cutting-edge UI patterns from iOS 26 with beautiful translucency and fluid animations.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="500">
+    <div class="feature-icon">💻</div>
+    <h3>Multi-platform</h3>
+    <p>Works seamlessly across iOS, macOS, and tvOS with platform-specific optimizations.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="600">
+    <div class="feature-icon">🚀</div>
+    <h3>High Performance</h3>
+    <p>Optimized streaming with HTTP proxy servers and hardware acceleration for smooth playback.</p>
+  </div>
+</div>
 
 <hr />
 
@@ -111,22 +282,535 @@
 
       </div>
     </main>
+    
+    <!-- Professional Footer -->
+    <footer class="site-footer">
+      <div class="footer-content">
+        <div class="container">
+          <div class="footer-grid">
+            <!-- Brand Section -->
+            <div class="footer-brand">
+              <div class="footer-logo">
+                <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="footer-logo-img">
+                <span class="footer-brand-name">MKS-IPTV-App</span>
+              </div>
+              <p class="footer-description">The ultimate IPTV experience for Apple devices. Built with Swift 6 and SwiftUI for iOS, macOS, and tvOS.</p>
+              <div class="footer-version">
+                <span class="version-badge">v1.0-beta</span>
+                <span class="build-info">Built with ❤️ for Apple Ecosystem</span>
+              </div>
+            </div>
+            
+            <!-- Quick Links -->
+            <div class="footer-section">
+              <h4>Quick Links</h4>
+              <ul class="footer-links">
+                <li><a href="/MKS-IPTV-App/">🏠 Home</a></li>
+                <li><a href="/MKS-IPTV-App/download.html">📥 Downloads</a></li>
+                <li><a href="/MKS-IPTV-App/installation.html">🛠️ Installation</a></li>
+                <li><a href="/MKS-IPTV-App/screenshots.html">📸 Screenshots</a></li>
+              </ul>
+            </div>
+            
+            <!-- Resources -->
+            <div class="footer-section">
+              <h4>Resources</h4>
+              <ul class="footer-links">
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App" target="_blank">⭐ GitHub Repository</a></li>
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App/issues" target="_blank">🐛 Report Issues</a></li>
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App/discussions" target="_blank">💡 Discussions</a></li>
+                <li><a href="https://github.com/MKS2508" target="_blank">👨‍💻 Developer</a></li>
+              </ul>
+            </div>
+            
+            <!-- Technology Stack -->
+            <div class="footer-section">
+              <h4>Tech Stack</h4>
+              <div class="tech-badges">
+                <span class="tech-badge swift">Swift 6</span>
+                <span class="tech-badge swiftui">SwiftUI</span>
+                <span class="tech-badge avkit">AVKit</span>
+                <span class="tech-badge macos">macOS 26</span>
+                <span class="tech-badge ios">iOS 26</span>
+                <span class="tech-badge tvos">tvOS 26</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Footer Bottom -->
+          <div class="footer-bottom">
+            <div class="footer-bottom-content">
+              <p class="copyright">© 2024 MKS-IPTV-App. Open source project.</p>
+              <div class="footer-credits">
+                <span>🤖 Enhanced with <a href="https://claude.ai/code" target="_blank">Claude Code</a></span>
+                <span>🚀 Powered by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+    
     <a href="#" class="back-to-top">↑</a>
 
     <script>
-      const navToggle = document.querySelector('.nav-toggle');
-      const navMenu = document.querySelector('.nav-menu');
-      navToggle.addEventListener('click', () => {
-        navMenu.classList.toggle('active');
-        navToggle.classList.toggle('active');
+// Enhanced page interactions
+document.addEventListener('DOMContentLoaded', function() {
+  // Smooth scroll with offset for sticky header
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        const headerOffset = 80;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    });
+  });
+  
+  // Enhanced scroll animations
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -100px 0px'
+  };
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+      }
+    });
+  }, observerOptions);
+  
+  // Observe all content sections
+  document.querySelectorAll('.content-section').forEach(section => {
+    observer.observe(section);
+  });
+  
+  // Enhanced mobile navigation
+  const navToggle = document.querySelector('.nav-toggle');
+  const navMenu = document.querySelector('.nav-menu');
+  
+  if (navToggle && navMenu) {
+    navToggle.addEventListener('click', () => {
+      navMenu.classList.toggle('active');
+      navToggle.classList.toggle('active');
+      document.body.classList.toggle('menu-open');
+    });
+    
+    // Close menu when clicking on links
+    document.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', () => {
+        navMenu.classList.remove('active');
+        navToggle.classList.remove('active');
+        document.body.classList.remove('menu-open');
       });
+    });
+  }
+  
+  // Search functionality (placeholder)
+  const searchBtn = document.querySelector('.search-btn');
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      // Future: Implement search functionality
+      console.log('Search functionality coming soon...');
+    });
+  }
+  
+  // Carousel functionality
+  const carousel = document.querySelector('.carousel-track');
+  const slides = document.querySelectorAll('.carousel-slide');
+  const prevBtn = document.getElementById('carouselPrev');
+  const nextBtn = document.getElementById('carouselNext');
+  const dots = document.querySelectorAll('.dot');
+  
+  if (carousel && slides.length > 0) {
+    let currentSlide = 0;
+    const totalSlides = slides.length;
+    
+    function updateCarousel() {
+      const translateX = -currentSlide * 100;
+      carousel.style.transform = `translateX(${translateX}%)`;
+      
+      // Update active states
+      slides.forEach((slide, index) => {
+        slide.classList.toggle('active', index === currentSlide);
+      });
+      
+      dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === currentSlide);
+      });
+    }
+    
+    function nextSlide() {
+      currentSlide = (currentSlide + 1) % totalSlides;
+      updateCarousel();
+    }
+    
+    function prevSlide() {
+      currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+      updateCarousel();
+    }
+    
+    // Event listeners
+    if (nextBtn) nextBtn.addEventListener('click', nextSlide);
+    if (prevBtn) prevBtn.addEventListener('click', prevSlide);
+    
+    dots.forEach((dot, index) => {
+      dot.addEventListener('click', () => {
+        currentSlide = index;
+        updateCarousel();
+      });
+    });
+    
+    // Auto-play carousel
+    setInterval(nextSlide, 5000);
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'ArrowRight') nextSlide();
+    });
+  }
+  
+  // Advanced Multi-Stage Scroll Animation System
+  const header = document.querySelector('.sticky-header');
+  const isHomepage = document.body.classList.contains('homepage');
+  const mainCard = document.getElementById('main-card');
+  const scrollStages = document.querySelectorAll('.scroll-stage');
+  
+  let lastScrollY = window.pageYOffset;
+  let headerVisible = false;
+  
+  // Stage thresholds (in viewport heights)
+  const stageThresholds = {
+    1: 0.2,   // Card appears
+    2: 0.5,   // Download button
+    3: 0.8,   // Badges
+    4: 1.1,   // Platform buttons
+    5: 1.4    // Header and rest of content
+  };
+  
+  function handleAdvancedScroll() {
+    const scrollY = window.pageYOffset;
+    const viewportHeight = window.innerHeight;
+    const scrollProgress = scrollY / viewportHeight;
+    
+    // Stage 1: Main card animation
+    if (scrollProgress >= stageThresholds[1] && mainCard) {
+      mainCard.classList.add('card-visible');
+    }
+    
+    // Stages 2-4: Progressive content reveal
+    scrollStages.forEach(stage => {
+      const stageNum = parseInt(stage.dataset.stage);
+      const threshold = stageThresholds[stageNum];
+      const stageElement = stage.querySelector('.stage-element');
+      
+      if (stageElement && scrollProgress >= threshold) {
+        stageElement.classList.add('stage-visible');
+      }
+    });
+    
+    // Stage 5: Dynamic header behavior (only on homepage)
+    if (isHomepage && scrollProgress >= stageThresholds[5]) {
+      const scrollDirection = scrollY > lastScrollY ? 'down' : 'up';
+      
+      if (scrollDirection === 'down' && !headerVisible) {
+        // Show header when scrolling down
+        headerVisible = true;
+        if (header) {
+          header.style.transform = 'translateY(0)';
+          header.style.opacity = '1';
+          header.style.visibility = 'visible';
+          header.classList.add('scrolled');
+        }
+      } else if (scrollDirection === 'up' && scrollY > viewportHeight * 1.2) {
+        // Hide header when scrolling up (but not at very top)
+        headerVisible = false;
+        if (header) {
+          header.style.transform = 'translateY(-100%)';
+          header.style.opacity = '0';
+        }
+      }
+    }
+    
+    // Enhanced parallax effects
+    const particles = document.getElementById('particles');
+    if (particles && scrollY < viewportHeight * 2) {
+      const rate = scrollY * -0.3;
+      particles.style.transform = `translateY(${rate}px)`;
+    }
+    
+    // Update background position for immersive effect
+    const heroBackground = document.querySelector('.immersive-hero .hero-background');
+    if (heroBackground && scrollY < viewportHeight * 1.5) {
+      const parallaxRate = scrollY * 0.1;
+      heroBackground.style.transform = `translateY(${parallaxRate}px)`;
+    }
+    
+    lastScrollY = scrollY;
+  }
+  
+  // Smooth scroll behavior
+  function smoothScrollTo(target, duration = 1000) {
+    const targetPosition = target.getBoundingClientRect().top + window.pageYOffset - 80;
+    const startPosition = window.pageYOffset;
+    const distance = targetPosition - startPosition;
+    let startTime = null;
+    
+    function animation(currentTime) {
+      if (startTime === null) startTime = currentTime;
+      const timeElapsed = currentTime - startTime;
+      const run = easeInOutQuad(timeElapsed, startPosition, distance, duration);
+      window.scrollTo(0, run);
+      if (timeElapsed < duration) requestAnimationFrame(animation);
+    }
+    
+    function easeInOutQuad(t, b, c, d) {
+      t /= d / 2;
+      if (t < 1) return c / 2 * t * t + b;
+      t--;
+      return -c / 2 * (t * (t - 2) - 1) + b;
+    }
+    
+    requestAnimationFrame(animation);
+  }
+  
+  // Enhanced scroll listeners with performance optimization
+  let ticking = false;
+  function requestTick() {
+    if (!ticking) {
+      requestAnimationFrame(handleAdvancedScroll);
+      ticking = true;
+      setTimeout(() => { ticking = false; }, 16);
+    }
+  }
+  
+  window.addEventListener('scroll', requestTick, { passive: true });
+  
+  // Initialize on load
+  handleAdvancedScroll();
+  
+  // Initialize card visibility on page load for immediate effect
+  if (isHomepage && mainCard) {
+    setTimeout(() => {
+      mainCard.classList.add('card-visible');
+    }, 500);
+  }
+  
+  // Platform Tabs System (for Screenshots page)
+  const platformTabs = document.querySelectorAll('.tab-btn');
+  const platformContents = document.querySelectorAll('.platform-content');
+  
+  platformTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const platform = tab.dataset.platform;
+      
+      // Remove active class from all tabs and contents
+      platformTabs.forEach(t => t.classList.remove('active'));
+      platformContents.forEach(c => c.classList.remove('active'));
+      
+      // Add active class to clicked tab and corresponding content
+      tab.classList.add('active');
+      const targetContent = document.getElementById(`${platform}-content`);
+      if (targetContent) {
+        targetContent.classList.add('active');
+      }
+    });
+  });
+  
+  // Enhanced Gallery Lightbox
+  const galleryItems = document.querySelectorAll('.gallery-item');
+  const lightbox = document.getElementById('lightbox');
+  
+  if (galleryItems.length > 0 && lightbox) {
+    galleryItems.forEach((item, index) => {
+      const expandBtn = item.querySelector('.gallery-expand');
+      const img = item.querySelector('img');
+      
+      function openGalleryLightbox() {
+        const lightboxImg = lightbox.querySelector('.lightbox-content img');
+        if (lightboxImg && img) {
+          lightboxImg.src = img.src;
+          lightboxImg.alt = img.alt;
+          lightbox.classList.add('active');
+          document.body.style.overflow = 'hidden';
+        }
+      }
+      
+      if (expandBtn) {
+        expandBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openGalleryLightbox();
+        });
+      }
+      
+      // Also open on image click
+      if (img) {
+        img.addEventListener('click', openGalleryLightbox);
+      }
+    });
+  }
+  
+  // Enhanced Back to Top Button
+  const backToTopBtn = document.querySelector('.back-to-top');
+  
+  function updateBackToTopVisibility() {
+    if (window.pageYOffset > 300) {
+      backToTopBtn.classList.add('visible');
+    } else {
+      backToTopBtn.classList.remove('visible');
+    }
+  }
+  
+  if (backToTopBtn) {
+    backToTopBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    });
+    
+    window.addEventListener('scroll', updateBackToTopVisibility);
+    updateBackToTopVisibility(); // Initial check
+  }
+});
+    </script>
 
-      const backToTop = document.querySelector('.back-to-top');
-      window.addEventListener('scroll', () => {
-        if (window.scrollY > 200) {
-          backToTop.classList.add('visible');
-        } else {
-          backToTop.classList.remove('visible');
+    <!-- Enhanced Lightbox -->
+    <div id="lightbox" class="lightbox">
+      <span class="lightbox-close"></span>
+      <div class="lightbox-content">
+        <img src="" alt="">
+      </div>
+      <button class="lightbox-nav prev" aria-label="Previous image">‹</button>
+      <button class="lightbox-nav next" aria-label="Next image">›</button>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Enhanced Lightbox functionality
+        const gallery = document.querySelector('.screenshot-gallery');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = lightbox.querySelector('.lightbox-content img');
+        const closeBtn = lightbox.querySelector('.lightbox-close');
+        const prevBtn = lightbox.querySelector('.lightbox-nav.prev');
+        const nextBtn = lightbox.querySelector('.lightbox-nav.next');
+        
+        let currentImages = [];
+        let currentIndex = 0;
+        
+        if (gallery) {
+          // Collect all images in the gallery
+          const images = gallery.querySelectorAll('img');
+          images.forEach((img, index) => {
+            currentImages.push({
+              src: img.src,
+              alt: img.alt
+            });
+            
+            // Make the figure clickable
+            const figure = img.closest('figure');
+            if (figure) {
+              figure.addEventListener('click', function(e) {
+                e.preventDefault();
+                currentIndex = index;
+                openLightbox();
+              });
+            }
+          });
+        }
+        
+        function openLightbox() {
+          if (currentImages.length > 0) {
+            updateLightboxImage();
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+          }
+        }
+        
+        function closeLightbox() {
+          lightbox.classList.remove('active');
+          document.body.style.overflow = '';
+        }
+        
+        function updateLightboxImage() {
+          const image = currentImages[currentIndex];
+          lightboxImg.src = image.src;
+          lightboxImg.alt = image.alt;
+          
+          // Update navigation buttons visibility
+          prevBtn.style.display = currentIndex > 0 ? 'flex' : 'none';
+          nextBtn.style.display = currentIndex < currentImages.length - 1 ? 'flex' : 'none';
+        }
+        
+        function navigateImage(direction) {
+          if (direction === 'prev' && currentIndex > 0) {
+            currentIndex--;
+          } else if (direction === 'next' && currentIndex < currentImages.length - 1) {
+            currentIndex++;
+          }
+          updateLightboxImage();
+        }
+        
+        // Event listeners
+        if (closeBtn) {
+          closeBtn.addEventListener('click', closeLightbox);
+        }
+        
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => navigateImage('prev'));
+        }
+        
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => navigateImage('next'));
+        }
+        
+        // Close on background click
+        lightbox.addEventListener('click', function(e) {
+          if (e.target === lightbox || e.target.classList.contains('lightbox-content')) {
+            closeLightbox();
+          }
+        });
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+          if (lightbox.classList.contains('active')) {
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') navigateImage('prev');
+            if (e.key === 'ArrowRight') navigateImage('next');
+          }
+        });
+        
+        // Intersection Observer for lazy loading
+        if ('IntersectionObserver' in window && gallery) {
+          const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                const img = entry.target;
+                if (img.dataset.src) {
+                  img.src = img.dataset.src;
+                  img.removeAttribute('data-src');
+                  observer.unobserve(img);
+                }
+              }
+            });
+          }, {
+            rootMargin: '50px 0px',
+            threshold: 0.01
+          });
+          
+          gallery.querySelectorAll('img[data-src]').forEach(img => {
+            imageObserver.observe(img);
+          });
         }
       });
     </script>

@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
-    <title>Downloads | MKS-IPTV-App</title>
+    <title>Propuesta de Refactorización y Mejoras de UX | MKS-IPTV-App</title>
     <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -73,98 +73,107 @@
 </header>
     <main class="page-transition">
       <div class="container">
-        <h1 id="-downloads">📥 Downloads</h1>
+        <h1 id="propuesta-de-refactorización-y-mejoras-de-ux">Propuesta de Refactorización y Mejoras de UX</h1>
 
-<p>Download the latest version of MKS-IPTV-App for your platform. All builds are compiled directly from the source in our private repository.</p>
+<p>Este documento describe una serie de mejoras propuestas para la usabilidad y el profesionalismo del sitio web de documentación, centrándose en la experiencia del usuario (UX) y la calidad visual.</p>
 
-<h2 id="latest-release-v10-beta-new">Latest Release: v1.0 Beta <span class="badge badge-new">NEW</span></h2>
+<h2 id="1-mejora-de-la-galería-de-capturas-de-pantalla-docsscreenshotsmd">1. Mejora de la Galería de Capturas de Pantalla (docs/screenshots.md)</h2>
 
-<div class="download-grid">
-  <div class="download-card">
-    <h3><span role="img" aria-label="iOS &amp; iPadOS">📱</span> iOS &amp; iPadOS</h3>
-    <p>Requires iOS 26 Beta or later.</p>
-    <div class="download-info">
-      <span class="file-size">~45 MB</span>
-      <span class="tooltip" data-tooltip="Direct IPA download for sideloading">
-        <span class="info-icon">ⓘ</span>
-      </span>
-    </div>
-    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa" class="btn btn-download">
-      <span class="btn-text">Download IPA</span>
-      <span class="btn-icon">↓</span>
-    </a>
-    <a href="installation.md#ios-installation-altstore-method" class="btn-secondary">Installation Guide</a>
-  </div>
-  <div class="download-card">
-    <h3><span role="img" aria-label="macOS">💻</span> macOS</h3>
-    <p>Requires macOS 26 Beta or later.</p>
-    <div class="download-info">
-      <span class="file-size">~52 MB</span>
-      <span class="tooltip" data-tooltip="Optimized for M1/M2/M3 Macs">
-        <span class="info-icon">ⓘ</span>
-      </span>
-    </div>
-    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip" class="btn btn-download">
-      <span class="btn-text">Download for Apple Silicon</span>
-      <span class="btn-icon">↓</span>
-    </a>
-    <a href="installation.md#macos-installation" class="btn-secondary">Installation Guide</a>
-  </div>
-  <div class="download-card">
-    <h3><span role="img" aria-label="tvOS">📺</span> tvOS</h3>
-    <p>Requires tvOS 26 Beta &amp; Xcode.</p>
-    <div class="download-info">
-      <span class="badge badge-beta">BETA</span>
-      <span class="tooltip" data-tooltip="Source code compilation required">
-        <span class="info-icon">ⓘ</span>
-      </span>
-    </div>
-    <a href="installation.md#tvos-installation" class="btn btn-secondary">
-      <span class="btn-text">Build From Source Guide</span>
-      <span class="btn-icon">→</span>
-    </a>
-  </div>
-</div>
+<p><strong>Problema Actual:</strong> Las imágenes en la galería de capturas de pantalla son demasiado grandes y no se adaptan correctamente a diferentes tamaños de pantalla, lo que las hace poco usables y no responsivas.</p>
+
+<p><strong>Propuesta de Solución (CSS):</strong>
+Modificar la regla CSS para las imágenes dentro de <code class="language-plaintext highlighter-rouge">.screenshot-gallery</code> en <code class="language-plaintext highlighter-rouge">docs/assets/css/style.scss</code> para asegurar que las imágenes sean responsivas y mantengan su proporción.</p>
+
+<div class="language-scss highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// docs/assets/css/style.scss</span>
+
+<span class="nc">.screenshot-gallery</span> <span class="nt">img</span> <span class="p">{</span>
+  <span class="nl">width</span><span class="p">:</span> <span class="m">100%</span><span class="p">;</span>
+  <span class="nl">height</span><span class="p">:</span> <span class="nb">auto</span><span class="p">;</span> <span class="cm">/* Altura automática para mantener la proporción */</span>
+  <span class="nl">max-width</span><span class="p">:</span> <span class="m">100%</span><span class="p">;</span> <span class="cm">/* Asegura que no exceda el tamaño del contenedor */</span>
+  <span class="nl">object-fit</span><span class="p">:</span> <span class="n">cover</span><span class="p">;</span>
+  <span class="nl">display</span><span class="p">:</span> <span class="nb">block</span><span class="p">;</span>
+  <span class="nl">border-bottom</span><span class="p">:</span> <span class="m">1px</span> <span class="nb">solid</span> <span class="nf">rgba</span><span class="p">(</span><span class="m">233</span><span class="o">,</span> <span class="m">30</span><span class="o">,</span> <span class="m">99</span><span class="o">,</span> <span class="m">0</span><span class="mi">.2</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Además, revisar la configuración de la cuadrícula (<code class="language-plaintext highlighter-rouge">grid-template-columns</code>) para <code class="language-plaintext highlighter-rouge">.screenshot-gallery</code> para asegurar que se adapte a diferentes tamaños de pantalla de manera óptima.</p>
+
+<h2 id="2-planes-de-mejora-de-ux-a-alto-nivel">2. Planes de Mejora de UX a Alto Nivel</h2>
+
+<h3 id="21-navegación-consistente-y-funcional">2.1. Navegación Consistente y Funcional</h3>
+
+<ul>
+  <li><strong>Problema:</strong> Enlaces inconsistentes (algunos <code class="language-plaintext highlighter-rouge">.md</code>, otros <code class="language-plaintext highlighter-rouge">.html</code>) y problemas de visibilidad/funcionalidad en la barra de navegación superior.</li>
+  <li><strong>Propuesta:</strong>
+    <ul>
+      <li>Asegurar que todos los enlaces de navegación (barra superior, navegación rápida, etc.) apunten consistentemente a las versiones <code class="language-plaintext highlighter-rouge">.html</code> de las páginas.</li>
+      <li>Optimizar la visibilidad y el comportamiento responsivo de la barra de navegación superior, incluyendo el logo y los elementos de menú, para garantizar una experiencia fluida en todos los dispositivos.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3 id="22-diseño-responsivo-integral">2.2. Diseño Responsivo Integral</h3>
+
+<ul>
+  <li><strong>Problema:</strong> El sitio puede no ser completamente responsivo en todos los componentes y tamaños de pantalla, lo que afecta la experiencia en dispositivos móviles y tabletas.</li>
+  <li><strong>Propuesta:</strong> Realizar una auditoría completa del diseño responsivo y aplicar ajustes CSS y de estructura HTML donde sea necesario para garantizar que el sitio se vea y funcione bien en cualquier dispositivo.</li>
+</ul>
+
+<h3 id="23-pulido-visual-y-estético">2.3. Pulido Visual y Estético</h3>
+
+<ul>
+  <li><strong>Problema:</strong> Posibles inconsistencias en el esquema de colores, tipografía, espaciado y animaciones que pueden restar profesionalismo.</li>
+  <li><strong>Propuesta:</strong>
+    <ul>
+      <li>Refinar la paleta de colores para una mayor armonía y contraste.</li>
+      <li>Optimizar la tipografía para mejorar la legibilidad y la jerarquía visual.</li>
+      <li>Ajustar el espaciado y el diseño general para una apariencia más limpia y moderna.</li>
+      <li>Revisar y mejorar las animaciones para que sean sutiles, funcionales y contribuyan a una experiencia de usuario agradable.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3 id="24-accesibilidad-a11y">2.4. Accesibilidad (A11y)</h3>
+
+<ul>
+  <li><strong>Problema:</strong> Posibles barreras de accesibilidad para usuarios con discapacidades.</li>
+  <li><strong>Propuesta:</strong>
+    <ul>
+      <li>Implementar atributos ARIA (Accessible Rich Internet Applications) donde sea apropiado.</li>
+      <li>Asegurar un contraste de color adecuado para el texto y los elementos interactivos.</li>
+      <li>Mejorar la navegación por teclado.</li>
+      <li>Proporcionar texto alternativo (<code class="language-plaintext highlighter-rouge">alt text</code>) descriptivo para todas las imágenes.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3 id="25-optimización-del-rendimiento">2.5. Optimización del Rendimiento</h3>
+
+<ul>
+  <li><strong>Problema:</strong> Tiempos de carga de página potencialmente lentos debido a imágenes no optimizadas o entrega ineficiente de recursos.</li>
+  <li><strong>Propuesta:</strong>
+    <ul>
+      <li>Optimizar todas las imágenes para la web (compresión, formatos modernos como WebP).</li>
+      <li>Minificar y concatenar archivos CSS y JavaScript.</li>
+      <li>Considerar la carga diferida (lazy loading) para imágenes y otros recursos no críticos.</li>
+    </ul>
+  </li>
+</ul>
+
+<h3 id="26-claridad-y-concisión-del-contenido">2.6. Claridad y Concisión del Contenido</h3>
+
+<ul>
+  <li><strong>Problema:</strong> El contenido puede ser demasiado extenso o no estar optimizado para una lectura rápida y eficiente.</li>
+  <li><strong>Propuesta:</strong> Revisar toda la documentación para:
+    <ul>
+      <li>Eliminar redundancias.</li>
+      <li>Simplificar el lenguaje.</li>
+      <li>Utilizar listas, viñetas y encabezados de forma efectiva para mejorar la escaneabilidad.</li>
+    </ul>
+  </li>
+</ul>
 
 <hr />
-
-<h2 id="️-system-requirements">⚙️ System Requirements</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th style="text-align: left">Platform</th>
-      <th style="text-align: left">Minimum Version</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align: left"><strong>iOS / iPadOS</strong></td>
-      <td style="text-align: left">iOS 26 Beta</td>
-    </tr>
-    <tr>
-      <td style="text-align: left"><strong>macOS</strong></td>
-      <td style="text-align: left">macOS 26 Beta</td>
-    </tr>
-    <tr>
-      <td style="text-align: left"><strong>tvOS</strong></td>
-      <td style="text-align: left">tvOS 26 Beta</td>
-    </tr>
-  </tbody>
-</table>
-
-<blockquote>
-  <p><strong>Note:</strong> An Apple Developer Account may be required for installation on some platforms.</p>
-</blockquote>
-
-<hr />
-
-<h2 id="-previous-versions">📦 Previous Versions</h2>
-
-<p>All previous releases are available on our <a href="https://github.com/MKS2508/MKS-IPTV-App/releases"><strong>GitHub Releases</strong></a> page. You can find older builds and review changelogs there.</p>
-
-<hr />
-
 
       </div>
     </main>

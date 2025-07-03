@@ -1,21 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/TestFlight-Distribution-Guide.html</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/TestFlight-Distribution-Guide.html</loc>
 </url>
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/download.html</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/download.html</loc>
 </url>
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/iOS-Free-Installation-Guide.html</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/iOS-Free-Installation-Guide.html</loc>
 </url>
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/</loc>
 </url>
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/installation.html</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/installation.html</loc>
 </url>
 <url>
-<loc>http://localhost:4000/MKS-IPTV-App/screenshots.html</loc>
+<loc>https://mks2508.github.io/MKS-IPTV-App/screenshots.html</loc>
+</url>
+<url>
+<loc>https://mks2508.github.io/MKS-IPTV-App/refactor.ux.proposal.html</loc>
 </url>
 </urlset>

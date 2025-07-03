@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
-    <title>Downloads | MKS-IPTV-App</title>
+    <title>Home | MKS-IPTV-App</title>
     <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -73,99 +73,160 @@
 </header>
     <main class="page-transition">
       <div class="container">
-        <h1 id="-downloads">📥 Downloads</h1>
-
-<p>Download the latest version of MKS-IPTV-App for your platform. All builds are compiled directly from the source in our private repository.</p>
-
-<h2 id="latest-release-v10-beta-new">Latest Release: v1.0 Beta <span class="badge badge-new">NEW</span></h2>
-
-<div class="download-grid">
-  <div class="download-card">
-    <h3><span role="img" aria-label="iOS &amp; iPadOS">📱</span> iOS &amp; iPadOS</h3>
-    <p>Requires iOS 26 Beta or later.</p>
-    <div class="download-info">
-      <span class="file-size">~45 MB</span>
-      <span class="tooltip" data-tooltip="Direct IPA download for sideloading">
-        <span class="info-icon">ⓘ</span>
-      </span>
-    </div>
-    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa" class="btn btn-download">
-      <span class="btn-text">Download IPA</span>
-      <span class="btn-icon">↓</span>
-    </a>
-    <a href="installation.md#ios-installation-altstore-method" class="btn-secondary">Installation Guide</a>
+        <!-- New Hero Section with Carousel -->
+<section class="hero-section">
+  <div class="hero-background">
+    <div class="hero-particles" id="particles"></div>
+    <div class="hero-gradient"></div>
   </div>
-  <div class="download-card">
-    <h3><span role="img" aria-label="macOS">💻</span> macOS</h3>
-    <p>Requires macOS 26 Beta or later.</p>
-    <div class="download-info">
-      <span class="file-size">~52 MB</span>
-      <span class="tooltip" data-tooltip="Optimized for M1/M2/M3 Macs">
-        <span class="info-icon">ⓘ</span>
-      </span>
+  
+  <div class="hero-content">
+    <!-- Compact header -->
+    <div class="hero-header">
+      <div class="hero-logo-small">
+        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="app-icon"/>
+        <h1 class="hero-title-line">MKS-IPTV-App</h1>
+      </div>
+      <p class="hero-subtitle typewriter" data-text="The Ultimate IPTV Experience for Apple Devices"></p>
     </div>
-    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip" class="btn btn-download">
-      <span class="btn-text">Download for Apple Silicon</span>
-      <span class="btn-icon">↓</span>
-    </a>
-    <a href="installation.md#macos-installation" class="btn-secondary">Installation Guide</a>
+    
+    <!-- Screenshot Carousel -->
+    <div class="screenshot-carousel">
+      <div class="carousel-container">
+        <div class="carousel-track" id="carouselTrack">
+          <div class="carousel-slide active">
+            <img src="imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" class="carousel-image">
+            <div class="carousel-caption">
+              <h3>Liquid Glass Design</h3>
+              <p>Modern translucent UI patterns from iOS 26</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Download Management" class="carousel-image">
+            <div class="carousel-caption">
+              <h3>Advanced Downloads</h3>
+              <p>Real-time progress tracking and queue management</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail View" class="carousel-image">
+            <div class="carousel-caption">
+              <h3>Rich Content Views</h3>
+              <p>Comprehensive series and episode management</p>
+            </div>
+          </div>
+          <div class="carousel-slide">
+            <img src="imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Configuration" class="carousel-image">
+            <div class="carousel-caption">
+              <h3>Flexible Configuration</h3>
+              <p>Customizable download settings and formats</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Carousel Navigation -->
+        <button class="carousel-nav prev" id="carouselPrev" aria-label="Previous screenshot">‹</button>
+        <button class="carousel-nav next" id="carouselNext" aria-label="Next screenshot">›</button>
+        
+        <!-- Carousel Dots -->
+        <div class="carousel-dots" id="carouselDots">
+          <button class="dot active" data-slide="0" aria-label="Screenshot 1"></button>
+          <button class="dot" data-slide="1" aria-label="Screenshot 2"></button>
+          <button class="dot" data-slide="2" aria-label="Screenshot 3"></button>
+          <button class="dot" data-slide="3" aria-label="Screenshot 4"></button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Platform badges and CTA -->
+    <div class="hero-badges fade-in-up" data-delay="200">
+      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float">
+      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float">
+      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift" class="badge-float">
+    </div>
+    
+    <div class="hero-cta fade-in-up" data-delay="400">
+      <a href="download.html" class="btn btn-primary btn-glow">
+        <span class="btn-text">Download Now</span>
+        <span class="btn-icon">→</span>
+      </a>
+      <a href="#features" class="btn btn-secondary">
+        <span class="btn-text">Learn More</span>
+        <span class="btn-icon">↓</span>
+      </a>
+    </div>
   </div>
-  <div class="download-card">
-    <h3><span role="img" aria-label="tvOS">📺</span> tvOS</h3>
-    <p>Requires tvOS 26 Beta &amp; Xcode.</p>
-    <div class="download-info">
-      <span class="badge badge-beta">BETA</span>
-      <span class="tooltip" data-tooltip="Source code compilation required">
-        <span class="info-icon">ⓘ</span>
-      </span>
+  
+  <div class="hero-scroll-indicator">
+    <div class="mouse">
+      <div class="wheel"></div>
     </div>
-    <a href="installation.md#tvos-installation" class="btn btn-secondary">
-      <span class="btn-text">Build From Source Guide</span>
-      <span class="btn-icon">→</span>
-    </a>
+    <span class="scroll-text">Scroll to explore</span>
+  </div>
+</section>
+
+---
+
+## 🗺️ Quick Navigation
+
+| | |
+| :--- | :--- |
+| 📥 [**Downloads**](download.html) | Get the latest builds for all platforms. |
+| 🛠️ [**Installation Guide**](installation.html) | Step-by-step instructions to get you started. |
+| 📸 [**Screenshots**](screenshots.html) | A visual tour of the app's features. |
+| 🐙 [**GitHub Repository**](https://github.com/MKS2508/MKS-IPTV-App) | View the project source and contribute. |
+
+---
+
+## ✨ Core Features {#features}
+
+<div class="features-grid">
+  <div class="feature-card fade-in-up" data-delay="100">
+    <div class="feature-icon">🍎</div>
+    <h3>Native Apple Experience</h3>
+    <p>Built with Swift 6 & SwiftUI for optimal performance and seamless integration with the Apple ecosystem.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="200">
+    <div class="feature-icon">📺</div>
+    <h3>Live TV & VOD</h3>
+    <p>Stream your favorite live channels, movies, and series with adaptive quality and minimal buffering.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="300">
+    <div class="feature-icon">📥</div>
+    <h3>Advanced Downloads</h3>
+    <p>Download content for offline viewing with real-time progress tracking and queue management.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="400">
+    <div class="feature-icon">🎨</div>
+    <h3>Liquid Glass Design</h3>
+    <p>Experience the cutting-edge UI patterns from iOS 26 with beautiful translucency and fluid animations.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="500">
+    <div class="feature-icon">💻</div>
+    <h3>Multi-platform</h3>
+    <p>Works seamlessly across iOS, macOS, and tvOS with platform-specific optimizations.</p>
+  </div>
+  
+  <div class="feature-card fade-in-up" data-delay="600">
+    <div class="feature-icon">🚀</div>
+    <h3>High Performance</h3>
+    <p>Optimized streaming with HTTP proxy servers and hardware acceleration for smooth playback.</p>
   </div>
 </div>
 
-<hr />
+---
 
-<h2 id="️-system-requirements">⚙️ System Requirements</h2>
+## 💬 Support
 
-<table>
-  <thead>
-    <tr>
-      <th style="text-align: left">Platform</th>
-      <th style="text-align: left">Minimum Version</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align: left"><strong>iOS / iPadOS</strong></td>
-      <td style="text-align: left">iOS 26 Beta</td>
-    </tr>
-    <tr>
-      <td style="text-align: left"><strong>macOS</strong></td>
-      <td style="text-align: left">macOS 26 Beta</td>
-    </tr>
-    <tr>
-      <td style="text-align: left"><strong>tvOS</strong></td>
-      <td style="text-align: left">tvOS 26 Beta</td>
-    </tr>
-  </tbody>
-</table>
+Need help? Have a question or a feature request?
 
-<blockquote>
-  <p><strong>Note:</strong> An Apple Developer Account may be required for installation on some platforms.</p>
-</blockquote>
-
-<hr />
-
-<h2 id="-previous-versions">📦 Previous Versions</h2>
-
-<p>All previous releases are available on our <a href="https://github.com/MKS2508/MKS-IPTV-App/releases"><strong>GitHub Releases</strong></a> page. You can find older builds and review changelogs there.</p>
-
-<hr />
-
-
+- 🐛 [**Report an Issue**](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- 💡 [**Start a Discussion**](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+- 👨‍💻 [**Contact Developer**](https://github.com/MKS2508)
       </div>
     </main>
     

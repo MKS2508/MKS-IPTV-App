@@ -1,0 +1,88 @@
+---
+layout: default
+title: Home
+nav_order: 1
+---
+
+<!-- Hero Section -->
+<section class="hero-section">
+  <div class="hero-background">
+    <div class="hero-particles" id="particles"></div>
+    <div class="hero-gradient"></div>
+  </div>
+  
+  <div class="hero-content">
+    <div class="hero-logo-wrapper">
+      <img src="imgs/banner3.webp" alt="MKS-IPTV-App" class="hero-logo animate-float"/>
+    </div>
+    
+    <h1 class="hero-title">
+      <span class="hero-title-line">MKS-IPTV-App</span>
+      <span class="hero-subtitle typewriter" data-text="The Ultimate IPTV Experience for Apple Devices"></span>
+    </h1>
+    
+    <p class="hero-description fade-in-up">
+      A native, multiplatform IPTV client for the Apple ecosystem,<br/>
+      built with Swift 6 & SwiftUI for iOS 26, macOS 26, and tvOS 26.
+    </p>
+    
+    <div class="hero-badges fade-in-up" data-delay="200">
+      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float">
+      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float">
+      <img alt="License" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" class="badge-float">
+      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift" class="badge-float">
+      <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest">
+        <img alt="Latest Release" src="https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases&style=for-the-badge&color=blue&logo=github" class="badge-float">
+      </a>
+    </div>
+    
+    <div class="hero-cta fade-in-up" data-delay="400">
+      <a href="download.html" class="btn btn-primary btn-glow">
+        <span class="btn-text">Download Now</span>
+        <span class="btn-icon">→</span>
+      </a>
+      <a href="#features" class="btn btn-secondary">
+        <span class="btn-text">Learn More</span>
+        <span class="btn-icon">↓</span>
+      </a>
+    </div>
+  </div>
+  
+  <div class="hero-scroll-indicator">
+    <div class="mouse">
+      <div class="wheel"></div>
+    </div>
+    <span class="scroll-text">Scroll to explore</span>
+  </div>
+</section>
+
+---
+
+## 🗺️ Quick Navigation
+
+| | |
+| :--- | :--- |
+| 📥 [**Downloads**](download.html) | Get the latest builds for all platforms. |
+| 🛠️ [**Installation Guide**](installation.html) | Step-by-step instructions to get you started. |
+| 📸 [**Screenshots**](screenshots.html) | A visual tour of the app's features. |
+| 🐙 [**GitHub Repository**](https://github.com/MKS2508/MKS-IPTV-App) | View the project source and contribute. |
+
+---
+
+## ✨ Core Features
+
+- ** Native Apple Experience**: Built with Swift & SwiftUI for optimal performance and integration.
+- **📺 Live TV & VOD**: Stream your favorite live channels, movies, and series.
+- **📥 Advanced Downloads**: Download content for offline viewing with progress tracking.
+- **🎨 Liquid Glass Design**: Featuring the latest UI patterns from iOS 26.
+- **💻 Multi-platform**: Works seamlessly across iOS, macOS, and tvOS.
+
+---
+
+## 💬 Support
+
+Need help? Have a question or a feature request?
+
+- 🐛 [**Report an Issue**](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- 💡 [**Start a Discussion**](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+- 👨‍💻 [**Contact Developer**](https://github.com/MKS2508)

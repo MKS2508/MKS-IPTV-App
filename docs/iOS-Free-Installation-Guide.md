@@ -34,7 +34,7 @@ AltStore uses your free Apple ID to sign apps and automatically refreshes them i
 1.  **Install AltServer**: Download and install AltServer from [altstore.io](https://altstore.io) on your computer.
 2.  **Install AltStore on iOS**: Connect your iPhone to your computer, open AltServer on your computer, and select "Install AltStore" → (Your iPhone).
 3.  **Trust Developer**: On your iPhone, go to `Settings → General → VPN & Device Management` and trust the certificate associated with your Apple ID.
-4.  **Install the App**: Download the `.ipa` file from the [Downloads page](download.md), then open it within the AltStore app on your iPhone to begin installation.
+4.  **Install the App**: Download the `.ipa` file from the [Downloads page](download.html), then open it within the AltStore app on your iPhone to begin installation.
 
 > **Note:** For AltStore to automatically refresh your apps, AltServer must be running on your computer and connected to the same WiFi network as your iPhone.
 

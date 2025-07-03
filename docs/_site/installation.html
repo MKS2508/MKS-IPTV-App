@@ -6,16 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
     <title>Installation | MKS-IPTV-App</title>
-    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=dff33eefb62b00434772f5baae0e290658120b4b">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=7884a2a594bc0db368a54ed36b113d4269629bf4">
   </head>
   <body>
+    <div class="hero-banner">
+      <h1>MKS-IPTV-App</h1>
+      <p>Native multiplatform IPTV client built with Swift 6</p>
+    </div>
     <header class="sticky-header">
       <div class="container">
-        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">
+          <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="site-logo">
+          MKS-IPTV-App
+        </a>
         <button class="nav-toggle" aria-label="toggle navigation">
           <span class="hamburger"></span>
         </button>
@@ -46,13 +53,13 @@
 <ul>
   <li>An iPhone or iPad running iOS 26 Beta or later.</li>
   <li>A computer running AltServer.</li>
-  <li>The latest <code class="language-plaintext highlighter-rouge">.ipa</code> file from our <a href="/MKS-IPTV-App/download.html"><strong>Downloads page</strong></a>.</li>
+  <li>The latest <code class="language-plaintext highlighter-rouge">.ipa</code> file from our <a href="download.html"><strong>Downloads page</strong></a>.</li>
 </ul>
 
 <h3 id="step-by-step-instructions">Step-by-Step Instructions</h3>
 
 <ol>
-  <li><strong>Download the IPA</strong>: Grab the latest <code class="language-plaintext highlighter-rouge">mks-iptv.ipa</code> from the <a href="/MKS-IPTV-App/download.html">Downloads page</a>.</li>
+  <li><strong>Download the IPA</strong>: Grab the latest <code class="language-plaintext highlighter-rouge">mks-iptv.ipa</code> from the <a href="download.html">Downloads page</a>.</li>
   <li><strong>Install with AltStore</strong>: Open the <code class="language-plaintext highlighter-rouge">.ipa</code> file on your iOS device and choose to open it with AltStore.</li>
   <li><strong>Trust the Certificate</strong>: After installation, navigate to <code class="language-plaintext highlighter-rouge">Settings → General → VPN &amp; Device Management</code> and trust the certificate associated with your Apple ID.</li>
 </ol>
@@ -140,6 +147,47 @@
           backToTop.classList.add('visible');
         } else {
           backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+
+    <div id="myLightbox" class="lightbox">
+      <span class="close">&times;</span>
+      <img class="lightbox-content" id="img01">
+      <div id="caption" class="caption"></div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const gallery = document.querySelector('.screenshot-gallery');
+        const lightbox = document.getElementById('myLightbox');
+        const lightboxImg = document.getElementById('img01');
+        const captionText = document.getElementById('caption');
+        const closeBtn = document.querySelector('.close');
+
+        if (gallery) {
+          gallery.addEventListener('click', function(e) {
+            if (e.target.tagName === 'IMG') {
+              lightbox.style.display = 'block';
+              lightboxImg.src = e.target.src;
+              captionText.innerHTML = e.target.alt;
+            }
+          });
+        }
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function() {
+            lightbox.style.display = 'none';
+          });
+        }
+
+        // Close when clicking outside the image
+        if (lightbox) {
+          lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) {
+              lightbox.style.display = 'none';
+            }
+          });
         }
       });
     </script>

@@ -6,16 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
     <title>Screenshots | MKS-IPTV-App</title>
-    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=dff33eefb62b00434772f5baae0e290658120b4b">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=7884a2a594bc0db368a54ed36b113d4269629bf4">
   </head>
   <body>
+    <div class="hero-banner">
+      <h1>MKS-IPTV-App</h1>
+      <p>Native multiplatform IPTV client built with Swift 6</p>
+    </div>
     <header class="sticky-header">
       <div class="container">
-        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">
+          <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="site-logo">
+          MKS-IPTV-App
+        </a>
         <button class="nav-toggle" aria-label="toggle navigation">
           <span class="hamburger"></span>
         </button>
@@ -42,37 +49,36 @@
 
 <p>Here is a showcase of the application running on macOS 26 Beta, highlighting key features and the Liquid Glass design.</p>
 
-<table>
-  <thead>
-    <tr>
-      <th style="text-align: center">Download Management System</th>
-      <th style="text-align: center">Download Configuration Modal</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Downloads Section" /></td>
-      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Modal" /></td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><strong>Liquid Glass Navigation</strong></td>
-      <td style="text-align: center"><strong>Series Detail View</strong></td>
-    </tr>
-    <tr>
-      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" /></td>
-      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail" /></td>
-    </tr>
-  </tbody>
-</table>
-
-<h3 id="feature-descriptions">Feature Descriptions</h3>
-
-<ul>
-  <li><strong>Download Management System</strong>: Shows real-time progress, speed, ETA, and status for all your downloads.</li>
-  <li><strong>Download Configuration Modal</strong>: Allows you to select storage location and enable <code class="language-plaintext highlighter-rouge">.MOV</code> conversion for better AirPlay compatibility.</li>
-  <li><strong>Liquid Glass Navigation</strong>: An early adoption of iOS 26’s translucent and modern design patterns, adapted for macOS.</li>
-  <li><strong>Series Detail View</strong>: Displays comprehensive series information, episode management, and download options.</li>
-</ul>
+<div class="screenshot-gallery">
+  <figure>
+    <img src="./imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Download Management System" />
+    <figcaption>
+      <h3>Download Management System</h3>
+      <p>Shows real-time progress, speed, ETA, and status for all your downloads.</p>
+    </figcaption>
+  </figure>
+  <figure>
+    <img src="./imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Configuration Modal" />
+    <figcaption>
+      <h3>Download Configuration Modal</h3>
+      <p>Allows you to select storage location and enable .MOV conversion for better AirPlay compatibility.</p>
+    </figcaption>
+  </figure>
+  <figure>
+    <img src="./imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" />
+    <figcaption>
+      <h3>Liquid Glass Navigation</h3>
+      <p>An early adoption of iOS 26's translucent and modern design patterns, adapted for macOS.</p>
+    </figcaption>
+  </figure>
+  <figure>
+    <img src="./imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail View" />
+    <figcaption>
+      <h3>Series Detail View</h3>
+      <p>Displays comprehensive series information, episode management, and download options.</p>
+    </figcaption>
+  </figure>
+</div>
 
 <hr />
 
@@ -111,6 +117,47 @@
           backToTop.classList.add('visible');
         } else {
           backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+
+    <div id="myLightbox" class="lightbox">
+      <span class="close">&times;</span>
+      <img class="lightbox-content" id="img01">
+      <div id="caption" class="caption"></div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const gallery = document.querySelector('.screenshot-gallery');
+        const lightbox = document.getElementById('myLightbox');
+        const lightboxImg = document.getElementById('img01');
+        const captionText = document.getElementById('caption');
+        const closeBtn = document.querySelector('.close');
+
+        if (gallery) {
+          gallery.addEventListener('click', function(e) {
+            if (e.target.tagName === 'IMG') {
+              lightbox.style.display = 'block';
+              lightboxImg.src = e.target.src;
+              captionText.innerHTML = e.target.alt;
+            }
+          });
+        }
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function() {
+            lightbox.style.display = 'none';
+          });
+        }
+
+        // Close when clicking outside the image
+        if (lightbox) {
+          lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) {
+              lightbox.style.display = 'none';
+            }
+          });
         }
       });
     </script>

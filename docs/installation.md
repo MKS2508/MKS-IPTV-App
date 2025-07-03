@@ -17,11 +17,11 @@ This is the recommended method for installing the app on iPhone and iPad.
 ### Prerequisites
 - An iPhone or iPad running iOS 26 Beta or later.
 - A computer running AltServer.
-- The latest `.ipa` file from our [**Downloads page**](download.md).
+- The latest `.ipa` file from our [**Downloads page**](download.html).
 
 ### Step-by-Step Instructions
 
-1.  **Download the IPA**: Grab the latest `mks-iptv.ipa` from the [Downloads page](download.md).
+1.  **Download the IPA**: Grab the latest `mks-iptv.ipa` from the [Downloads page](download.html).
 2.  **Install with AltStore**: Open the `.ipa` file on your iOS device and choose to open it with AltStore.
 3.  **Trust the Certificate**: After installation, navigate to `Settings → General → VPN & Device Management` and trust the certificate associated with your Apple ID.
 

@@ -33,64 +33,36 @@ A visual tour of MKS-IPTV-App across its supported platforms. Experience the bea
   
   <div class="enhanced-screenshot-gallery">
     <div class="gallery-grid">
-      <figure class="gallery-item" data-category="interface">
+      <figure class="gallery-item macos-horizontal">
         <img src="./imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" loading="lazy">
-        <div class="gallery-overlay">
-          <div class="gallery-info">
-            <h3>Liquid Glass Navigation</h3>
-            <p>Modern translucent UI patterns from iOS 26, adapted for macOS with native window controls.</p>
-            <div class="gallery-tags">
-              <span class="tag">Interface</span>
-              <span class="tag">Design</span>
-            </div>
-          </div>
-          <button class="gallery-expand" aria-label="View full size">🔍</button>
-        </div>
+        <figcaption>
+          <h3>Liquid Glass Navigation</h3>
+          <p>Modern translucent UI patterns from iOS 26, adapted for macOS with native window controls.</p>
+        </figcaption>
       </figure>
       
-      <figure class="gallery-item" data-category="downloads">
+      <figure class="gallery-item macos-horizontal">
         <img src="./imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Download Management System" loading="lazy">
-        <div class="gallery-overlay">
-          <div class="gallery-info">
-            <h3>Download Management</h3>
-            <p>Real-time progress tracking with speed, ETA, and status for all your downloads.</p>
-            <div class="gallery-tags">
-              <span class="tag">Downloads</span>
-              <span class="tag">Management</span>
-            </div>
-          </div>
-          <button class="gallery-expand" aria-label="View full size">🔍</button>
-        </div>
+        <figcaption>
+          <h3>Download Management</h3>
+          <p>Real-time progress tracking with speed, ETA, and status for all your downloads.</p>
+        </figcaption>
       </figure>
       
-      <figure class="gallery-item" data-category="configuration">
+      <figure class="gallery-item macos-horizontal">
         <img src="./imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Configuration Modal" loading="lazy">
-        <div class="gallery-overlay">
-          <div class="gallery-info">
-            <h3>Download Configuration</h3>
-            <p>Configure storage location and enable .MOV conversion for better AirPlay compatibility.</p>
-            <div class="gallery-tags">
-              <span class="tag">Settings</span>
-              <span class="tag">AirPlay</span>
-            </div>
-          </div>
-          <button class="gallery-expand" aria-label="View full size">🔍</button>
-        </div>
+        <figcaption>
+          <h3>Download Configuration</h3>
+          <p>Configure storage location and enable .MOV conversion for better AirPlay compatibility.</p>
+        </figcaption>
       </figure>
       
-      <figure class="gallery-item" data-category="content">
+      <figure class="gallery-item macos-horizontal">
         <img src="./imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail View" loading="lazy">
-        <div class="gallery-overlay">
-          <div class="gallery-info">
-            <h3>Series Detail View</h3>
-            <p>Comprehensive series information with episode management and download options.</p>
-            <div class="gallery-tags">
-              <span class="tag">Content</span>
-              <span class="tag">Episodes</span>
-            </div>
-          </div>
-          <button class="gallery-expand" aria-label="View full size">🔍</button>
-        </div>
+        <figcaption>
+          <h3>Series Detail View</h3>
+          <p>Comprehensive series information with episode management and download options.</p>
+        </figcaption>
       </figure>
     </div>
   </div>
@@ -102,16 +74,64 @@ A visual tour of MKS-IPTV-App across its supported platforms. Experience the bea
     <p>Native iOS 26 Beta implementation with Liquid Glass patterns optimized for iPhone and iPad.</p>
   </div>
   
-  <div class="coming-soon-section">
-    <div class="coming-soon-content">
-      <h3>🚧 Coming Soon</h3>
-      <p>iOS and iPadOS screenshots are currently in development. Stay tuned for:</p>
-      <ul class="feature-list">
-        <li>📱 iPhone interface with tab bar navigation</li>
-        <li>📺 Live TV player with picture-in-picture</li>
-        <li>🍎 iPad split view for multitasking</li>
-        <li>✨ Native iOS 26 Liquid Glass effects</li>
-      </ul>
+  <div class="enhanced-screenshot-gallery">
+    <div class="gallery-grid">
+      <figure class="gallery-item ios-vertical">
+        <div class="iphone-svg-container">
+          <img class="screenshot-content" src="./imgs/v0.0.1-alpha/ios/ios_loadingscreen.webp" alt="iOS Loading Screen" loading="lazy">
+          <div class="iphone-frame-svg"></div>
+        </div>
+        <figcaption>
+          <h3>Loading Screen</h3>
+          <p>The initial loading experience with a clean and modern design.</p>
+        </figcaption>
+      </figure>
+      
+      <figure class="gallery-item ios-vertical">
+        <div class="iphone-svg-container">
+          <img class="screenshot-content" src="./imgs/v0.0.1-alpha/ios/ios_seriedetail.webp" alt="iOS Series Detail" loading="lazy">
+          <div class="iphone-frame-svg"></div>
+        </div>
+        <figcaption>
+          <h3>Series Detail View</h3>
+          <p>Detailed view of a series with episode information and playback options.</p>
+        </figcaption>
+      </figure>
+      
+      <figure class="gallery-item ios-vertical">
+        <div class="iphone-svg-container">
+          <img class="screenshot-content" src="./imgs/v0.0.1-alpha/ios/ios_serielistsearch.webp" alt="iOS Series List Search" loading="lazy">
+          <div class="iphone-frame-svg"></div>
+        </div>
+        <figcaption>
+          <h3>Series List Search</h3>
+          <p>Efficient search functionality within the series list for quick content discovery.</p>
+        </figcaption>
+      </figure>
+      
+      <figure class="gallery-item ios-vertical">
+        <div class="iphone-svg-container">
+          <img class="screenshot-content" src="./imgs/v0.0.1-alpha/ios/ios_seriemodaldownload.webp" alt="iOS Series Download Modal" loading="lazy">
+          <div class="iphone-frame-svg"></div>
+        </div>
+        <figcaption>
+          <h3>Download Modal</h3>
+          <p>Modal for managing downloads, including quality and storage options.</p>
+        </figcaption>
+      </figure>
+      <figure class="gallery-item ios-vertical">
+        <div class="iphone-svg-container">
+          <video class="screenshot-content" controls autoplay loop muted playsinline>
+            <source src="./imgs/v0.0.1-alpha/ios/ios full demo.MP4" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          <div class="iphone-frame-svg"></div>
+        </div>
+        <figcaption>
+          <h3>Full Demo Video</h3>
+          <p>A complete demonstration of the iOS application's features and user experience.</p>
+        </figcaption>
+      </figure>
     </div>
   </div>
 </div>
@@ -122,16 +142,23 @@ A visual tour of MKS-IPTV-App across its supported platforms. Experience the bea
     <p>Focus-based navigation optimized for the living room experience on Apple TV.</p>
   </div>
   
-  <div class="coming-soon-section">
-    <div class="coming-soon-content">
-      <h3>🚧 Coming Soon</h3>
-      <p>Apple TV interface screenshots will showcase:</p>
-      <ul class="feature-list">
-        <li>📺 Focus-based navigation system</li>
-        <li>🎮 Remote control optimized interface</li>
-        <li>🖼️ Living room optimized layouts</li>
-        <li>⚡ Performance optimizations for Apple TV</li>
-      </ul>
+  <div class="enhanced-screenshot-gallery">
+    <div class="gallery-grid">
+      <figure class="gallery-item tvos-horizontal">
+        <img src="./imgs/v0.0.1-alpha/tvos/tvos_placeholder_1.webp" alt="tvOS Interface" loading="lazy">
+        <figcaption>
+          <h3>tvOS Interface</h3>
+          <p>A sleek and intuitive interface designed for the big screen.</p>
+        </figcaption>
+      </figure>
+      
+      <figure class="gallery-item tvos-horizontal">
+        <img src="./imgs/v0.0.1-alpha/tvos/tvos_placeholder_2.webp" alt="tvOS Content Browsing" loading="lazy">
+        <figcaption>
+          <h3>Content Browsing</h3>
+          <p>Easy navigation through your favorite shows and movies.</p>
+        </figcaption>
+      </figure>
     </div>
   </div>
 </div>

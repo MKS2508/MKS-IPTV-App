@@ -58,8 +58,15 @@
 }
 
 @keyframes badge-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%, 100% { 
+    transform: translateY(0) rotate(0deg);
+  }
+  33% { 
+    transform: translateY(-6px) rotate(-1deg);
+  }
+  66% { 
+    transform: translateY(3px) rotate(1deg);
+  }
 }
 
 .btn-glow {
@@ -271,25 +278,139 @@ body:hover .cursor-glow {
   }
 }
 
-// New Animations for Hero
-@keyframes border-glow {
-  0%, 100% { 
-    opacity: 0.3;
-    filter: hue-rotate(0deg);
+// Enhanced Hero Animations
+@keyframes gradient-border {
+  0% { 
+    background-position: 0% 50%;
+    opacity: 0.4;
+  }
+  25% {
+    background-position: 100% 50%;
+    opacity: 0.8;
   }
   50% { 
+    background-position: 100% 50%;
     opacity: 0.6;
-    filter: hue-rotate(90deg);
+  }
+  75% {
+    background-position: 0% 50%;
+    opacity: 0.8;
+  }
+  100% { 
+    background-position: 0% 50%;
+    opacity: 0.4;
   }
 }
 
-@keyframes logo-pulse {
+@keyframes logo-float {
   0%, 100% { 
-    transform: scale(1);
-    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.5));
+    transform: translateY(0) rotate(0deg);
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4))
+            drop-shadow(0 0 40px rgba(198, 39, 144, 0.3));
+  }
+  33% { 
+    transform: translateY(-8px) rotate(-1deg);
+    filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.5))
+            drop-shadow(0 0 50px rgba(255, 71, 87, 0.4));
+  }
+  66% { 
+    transform: translateY(4px) rotate(1deg);
+    filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.3))
+            drop-shadow(0 0 30px rgba(198, 39, 144, 0.5));
+  }
+}
+
+@keyframes bounce-icon {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px) scale(1.1); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes fade-in-stagger {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 6px 20px rgba(198, 39, 144, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  }
+  50% {
+    box-shadow: 
+      0 8px 30px rgba(198, 39, 144, 0.6),
+      0 0 60px rgba(255, 71, 87, 0.3),
+      0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  }
+}
+
+// Additional button and card animations
+@keyframes rotate-shimmer {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-icon {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2) rotate(5deg); }
+  100% { transform: scale(1); }
+}
+
+@keyframes rotate-border {
+  0% { 
+    transform: rotate(0deg);
+    background-position: 0% 50%;
+  }
+  100% { 
+    transform: rotate(360deg);
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes shimmer-border {
+  0% { 
+    opacity: 0.4;
+    background-position: 0% 50%;
+  }
+  100% { 
+    opacity: 0.8;
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes card-float {
+  0%, 100% { 
+    transform: translateY(0) scale(1);
   }
   50% { 
-    transform: scale(1.05);
-    filter: drop-shadow(0 15px 40px rgba(255, 71, 87, 0.4));
+    transform: translateY(-3px) scale(1.005);
+  }
+}
+
+// Responsive element visibility animation
+.fade-element {
+  opacity: 0;
+  transform: translateY(30px) scale(0.95);
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.revealed {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }

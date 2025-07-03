@@ -4,68 +4,79 @@ title: Home
 nav_order: 1
 ---
 
-<!-- Immersive Full-Screen Hero Section -->
+<!-- Professional Three-Stage Hero Section -->
 <section class="hero-section immersive-hero">
+  <!-- Stage 1: Banner Only (Always Visible) -->
   <div class="hero-background">
     <img src="imgs/banner4.webp" alt="MKS IPTV - Stream. Decode. Rebel." class="hero-banner">
     <div class="hero-overlay"></div>
     <div class="hero-particles" id="particles"></div>
   </div>
   
-  <!-- Centered Glass Card -->
-  <div class="hero-glass-card compact" id="main-card">
-    <div class="glass-card-content">
-      <div class="hero-title-row">
-        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="hero-logo-compact">
-        <h1 class="hero-title-compact">MKS-IPTV-App</h1>
+  <!-- Stage 2: Minimal Glass Header (First Scroll) -->
+  <div class="hero-minimal-header" id="minimal-header">
+    <div class="minimal-glass-container">
+      <div class="hero-brand-inline">
+        <img src="assets/imgs/applogo.webp" alt="MKS-IPTV-App" class="logo-minimal">
+        <h1 class="title-minimal">MKS-IPTV-App</h1>
       </div>
-      <p class="hero-tagline-compact">The Ultimate IPTV Experience for Apple Devices</p>
     </div>
   </div>
   
-  <div class="hero-scroll-indicator">
+  <!-- Stage 3: Progressive Element Reveal (Continued Scroll) -->
+  <div class="hero-content-progressive" id="progressive-content">
+    <!-- Tagline (Appears First) -->
+    <div class="hero-element tagline-element" id="tagline-element">
+      <p class="hero-tagline-elegant">The Ultimate IPTV Experience for Apple Devices</p>
+    </div>
+    
+    <!-- Download Button (Appears Second) -->
+    <div class="hero-element download-element" id="download-element">
+      <a href="download.html" class="btn-download-elegant">
+        <span class="btn-text">Download Now</span>
+        <span class="btn-icon">⬇</span>
+      </a>
+    </div>
+    
+    <!-- Badges (Appear Third) -->
+    <div class="hero-element badges-element" id="badges-element">
+      <div class="hero-badges-elegant">
+        <div class="elegant-badge version-badge">
+          <span class="badge-icon">🚀</span>
+          <span class="badge-text">v1.0-beta</span>
+        </div>
+        <div class="elegant-badge platform-badge">
+          <span class="badge-icon">🍎</span>
+          <span class="badge-text">iOS • macOS • tvOS</span>
+        </div>
+        <div class="elegant-badge swift-badge">
+          <span class="badge-icon">⚡</span>
+          <span class="badge-text">Swift 6.0</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Platform Buttons (Appear Last) -->
+    <div class="hero-element buttons-element" id="buttons-element">
+      <div class="platform-buttons-elegant">
+        <a href="#features" class="btn-elegant btn-secondary">
+          <span class="btn-text">Explore Features</span>
+          <span class="btn-icon">✨</span>
+        </a>
+        <a href="screenshots.html" class="btn-elegant btn-outline">
+          <span class="btn-text">View Screenshots</span>
+          <span class="btn-icon">📱</span>
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Scroll Indicator -->
+  <div class="hero-scroll-indicator" id="scroll-indicator">
     <div class="mouse">
       <div class="wheel"></div>
     </div>
     <span class="scroll-text">Scroll to explore</span>
-  </div>
-</section>
-
-<!-- Multi-Stage Scroll Animation Sections -->
-<!-- Stage 2: Download Button (appears after card initial reveal) -->
-<section class="scroll-stage" id="stage-download" data-stage="2">
-  <div class="download-button-stage">
-    <a href="download.html" class="btn-download-hero-compact stage-element">
-      <span class="btn-text">Download Now</span>
-      <span class="btn-icon">⬇</span>
-    </a>
-  </div>
-</section>
-
-<!-- Stage 3: Badges Section -->
-<section class="scroll-stage" id="stage-badges" data-stage="3">
-  <div class="badges-stage">
-    <div class="hero-badges stage-element">
-      <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge" class="badge-float">
-      <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge" class="badge-float">
-      <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift" class="badge-float">
-    </div>
-  </div>
-</section>
-
-<!-- Stage 4: Platform Buttons -->
-<section class="scroll-stage" id="stage-buttons" data-stage="4">
-  <div class="platform-buttons-stage">
-    <div class="platform-buttons stage-element">
-      <a href="#features" class="btn btn-secondary btn-large">
-        <span class="btn-text">Explore Features</span>
-        <span class="btn-icon">✨</span>
-      </a>
-      <a href="screenshots.html" class="btn btn-outline btn-large">
-        <span class="btn-text">View Screenshots</span>
-        <span class="btn-icon">📱</span>
-      </a>
-    </div>
   </div>
 </section>
 

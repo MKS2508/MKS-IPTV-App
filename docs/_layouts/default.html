@@ -328,9 +328,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update background position for immersive effect
     const heroBackground = document.querySelector('.immersive-hero .hero-background');
+    const heroBanner = document.querySelector('.hero-banner');
+    const heroSection = document.querySelector('.hero-section');
+
     if (heroBackground && scrollY < viewportHeight * 1.5) {
       const parallaxRate = scrollY * 0.1;
       heroBackground.style.transform = `translateY(${parallaxRate}px)`;
+    }
+
+    // Control visibility of hero banner image
+    if (heroBanner && heroSection) {
+      const heroSectionBottom = heroSection.getBoundingClientRect().bottom + window.pageYOffset;
+      const threshold = heroSectionBottom - (viewportHeight * 0.5); // Adjust threshold as needed
+
+      console.log(`scrollY: ${scrollY}, heroSectionBottom: ${heroSectionBottom}, viewportHeight: ${viewportHeight}, threshold: ${threshold}`);
+
+      if (scrollY > threshold) {
+        heroBanner.classList.add('banner-hidden');
+      } else {
+        heroBanner.classList.remove('banner-hidden');
+      }
     }
     
     lastScrollY = scrollY;

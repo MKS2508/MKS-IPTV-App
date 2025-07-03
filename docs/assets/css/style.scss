@@ -30,7 +30,7 @@ body {
     linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 30px 30px;
-  background-attachment: fixed; /* Ensure background grid stays fixed */
+  /* Removed background-attachment: fixed; */
   animation: fadeIn 1s ease-in-out;
 }
 
@@ -668,8 +668,24 @@ table {
   left: 0;
   width: 100%;
   height: 100%;
-  /* Removed z-index: -1 to ensure visibility */
-  background-attachment: fixed; /* Ensure hero background stays fixed */
+  /* Removed background-image and related properties */
+  z-index: 0; /* Ensure it's behind other content */
+}
+
+.hero-banner {
+  position: fixed; /* Make the image fixed */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1; /* Ensure it's behind the hero content but above body background */
+  transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+}
+
+.hero-banner.banner-hidden {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .hero-gradient {
@@ -681,13 +697,17 @@ table {
   background: radial-gradient(ellipse at center, transparent 0%, var(--background) 70%),
               linear-gradient(180deg, rgba(198, 39, 144, 0.1) 0%, transparent 50%),
               linear-gradient(0deg, rgba(255, 71, 87, 0.05) 0%, transparent 50%);
+  z-index: 1; /* Ensure gradient is above the background image */
 }
 
-.hero-particles {
+.hero-overlay {
   position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.3;
+  background: transparent; /* Made transparent to ensure visibility of underlying elements */
+  z-index: 1; /* Ensure overlay is above the background image */
 }
 
 .hero-content {

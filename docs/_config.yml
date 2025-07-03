@@ -27,6 +27,10 @@ kramdown:
   input: GFM
   syntax_highlighter: rouge
 
+sass:
+  sass_dir: assets/css
+  style: compressed
+
 # Exclude from processing
 exclude:
   - README.md

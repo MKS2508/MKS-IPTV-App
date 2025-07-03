@@ -339,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Control visibility of hero banner image
     if (heroBanner && heroSection) {
       const heroSectionBottom = heroSection.getBoundingClientRect().bottom + window.pageYOffset;
-      const threshold = heroSectionBottom - (viewportHeight * 0.5); // Adjust threshold as needed
+      const threshold = 1978.5; // Fixed threshold as requested
 
       console.log(`scrollY: ${scrollY}, heroSectionBottom: ${heroSectionBottom}, viewportHeight: ${viewportHeight}, threshold: ${threshold}`);
 

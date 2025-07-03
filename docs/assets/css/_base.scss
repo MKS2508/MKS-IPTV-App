@@ -1,0 +1,162 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--background);
+  color: var(--text-primary);
+  margin: 0;
+  padding-top: 70px; /* Space for sticky header */
+  line-height: 1.6;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 30px 30px;
+  /* Removed background-attachment: fixed; */
+  animation: fadeIn 1s ease-in-out;
+}
+
+// Hide header on homepage initially
+body.homepage {
+  padding-top: 0;
+  
+  .sticky-header {
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--text-primary);
+  
+  /* Only use gradient on specific elements */
+  &.gradient-text {
+    background: linear-gradient(90deg, var(--accent), var(--red-neon));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-flow 5s ease infinite;
+    background-size: 200% 200%;
+  }
+}
+
+a {
+  color: var(--red-neon);
+  text-decoration: none;
+  transition: color 0.3s;
+  &:hover {
+    color: var(--highlight);
+  }
+}
+
+blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 20px;
+  margin: 20px 0;
+  background: rgba(var(--primary), 0.1);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 25px 0;
+  th, td {
+    border: 1px solid var(--primary);
+    padding: 12px;
+    text-align: left;
+  }
+  th {
+    background-color: var(--primary);
+    color: var(--text-primary);
+  }
+  tbody tr:nth-child(odd) {
+    background-color: var(--surface);
+  }
+}
+
+// Smooth scrollbar
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 6px;
+  transition: background 0.3s ease;
+  
+  &:hover {
+    background: var(--accent);
+  }
+}
+
+// Selection colors
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+::-moz-selection {
+  background: var(--accent);
+  color: white;
+}
+
+.tip {
+  background: rgba(255, 71, 87, 0.1);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  
+  strong {
+    color: var(--red-neon);
+  }
+}
+
+.warning {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  
+  strong {
+    color: var(--highlight);
+  }
+}
+
+.code-block {
+  background: var(--background);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 15px 0;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  
+  code {
+    background: none;
+    color: var(--red-neon);
+    padding: 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+}

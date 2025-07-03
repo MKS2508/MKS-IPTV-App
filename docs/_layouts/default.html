@@ -268,11 +268,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Stage thresholds (in viewport heights)
   const stageThresholds = {
-    1: 0.2,   // Card appears
-    2: 0.5,   // Download button
-    3: 0.8,   // Badges
-    4: 1.1,   // Platform buttons
-    5: 1.4    // Header and rest of content
+    1: 0.1,   // Card appears
+    2: 0.3,   // Download button
+    3: 0.5,   // Badges
+    4: 0.7,   // Platform buttons
+    5: 0.9    // Header and rest of content
   };
   
   function handleAdvancedScroll() {
@@ -378,9 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Initialize card visibility on page load for immediate effect
   if (isHomepage && mainCard) {
-    setTimeout(() => {
-      mainCard.classList.add('card-visible');
-    }, 500);
+    mainCard.classList.add('card-visible');
   }
   
   // Platform Tabs System (for Screenshots page)

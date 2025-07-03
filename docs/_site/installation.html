@@ -10,21 +10,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=25f1102e17601df46efd29a815bc631604f969a8">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=507cad39c48f4ca783d29d0dd6a237838a5ee9e7">
   </head>
   <body>
     
     <header class="sticky-header enhanced-nav">
   <div class="container">
     <div class="nav-brand">
-      <a href="https://mks2508.github.io/MKS-IPTV-App/" class="site-title">
+      <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">
         <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="site-logo">
         <span class="site-title-text">MKS-IPTV-App</span>
       </a>
     </div>
     
     <nav class="nav-menu">
-      <a href="https://mks2508.github.io/MKS-IPTV-App/" class="nav-link">
+      <a href="http://localhost:4000/MKS-IPTV-App/" class="nav-link">
         <span class="nav-icon">🏠</span>
         <span class="nav-text">Home</span>
       </a>
@@ -611,11 +611,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Stage thresholds (in viewport heights)
   const stageThresholds = {
-    1: 0.2,   // Card appears
-    2: 0.5,   // Download button
-    3: 0.8,   // Badges
-    4: 1.1,   // Platform buttons
-    5: 1.4    // Header and rest of content
+    1: 0.1,   // Card appears
+    2: 0.3,   // Download button
+    3: 0.5,   // Badges
+    4: 0.7,   // Platform buttons
+    5: 0.9    // Header and rest of content
   };
   
   function handleAdvancedScroll() {
@@ -721,9 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Initialize card visibility on page load for immediate effect
   if (isHomepage && mainCard) {
-    setTimeout(() => {
-      mainCard.classList.add('card-visible');
-    }, 500);
+    mainCard.classList.add('card-visible');
   }
   
   // Platform Tabs System (for Screenshots page)

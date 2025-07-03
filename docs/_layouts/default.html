@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{% if page.excerpt %}{{ page.excerpt | strip_html | strip_newlines | truncate: 160 }}{% else %}{{ site.description }}{% endif %}">
+    <title>{{ page.title }} | {{ site.title }}</title>
+    <link rel="icon" href="{{ '/assets/imgs/favicon.png' | relative_url }}" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+  </head>
+  <body>
+    <header class="sticky-header">
+      <div class="container">
+        <a href="{{ '/' | absolute_url }}" class="site-title">{{ site.title }}</a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+          <span class="hamburger"></span>
+        </button>
+        <nav class="nav-menu">
+          {% for page in site.header_pages %}
+            <a href="{{ page | relative_url }}" class="nav-link">{{ page | replace: ".md", "" | capitalize }}</a>
+          {% endfor %}
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        {{ content }}
+      </div>
+    </main>
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.querySelector('.nav-menu');
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        navToggle.classList.toggle('active');
+      });
+
+      const backToTop = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+          backToTop.classList.add('visible');
+        } else {
+          backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+  </body>
+</html>

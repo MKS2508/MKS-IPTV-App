@@ -15,15 +15,16 @@ nav_order: 1
 <p align="center">
   <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge">
   <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge">
+  <img alt="License" src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift">
   <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest">
     <img alt="Latest Release" src="https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases&style=for-the-badge&color=blue&logo=github">
   </a>
 </p>
 
-## 🚀 Welcome
-
-Welcome to the official documentation for MKS-IPTV-App. This site provides all the information you need to download, install, and use the application.
+<div align="center" style="margin-top: 40px;">
+  <a href="download.md" class="btn">Download Latest Version</a>
+</div>
 
 ---
 

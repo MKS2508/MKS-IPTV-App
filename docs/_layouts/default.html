@@ -6,16 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{% if page.excerpt %}{{ page.excerpt | strip_html | strip_newlines | truncate: 160 }}{% else %}{{ site.description }}{% endif %}">
     <title>{{ page.title }} | {{ site.title }}</title>
-    <link rel="icon" href="{{ '/assets/imgs/favicon.png' | relative_url }}" type="image/png">
+    <link rel="icon" href="{{ '/assets/favicon/favicon.ico' | relative_url }}" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
   </head>
   <body>
+    <div class="hero-banner">
+      <h1>{{ site.title }}</h1>
+      <p>{{ site.description }}</p>
+    </div>
     <header class="sticky-header">
       <div class="container">
-        <a href="{{ '/' | absolute_url }}" class="site-title">{{ site.title }}</a>
+        <a href="{{ '/' | absolute_url }}" class="site-title">
+          <img src="{{ '/assets/imgs/applogo.webp' | relative_url }}" alt="{{ site.title }} Logo" class="site-logo">
+          {{ site.title }}
+        </a>
         <button class="nav-toggle" aria-label="toggle navigation">
           <span class="hamburger"></span>
         </button>
@@ -47,6 +54,47 @@
           backToTop.classList.add('visible');
         } else {
           backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+
+    <div id="myLightbox" class="lightbox">
+      <span class="close">&times;</span>
+      <img class="lightbox-content" id="img01">
+      <div id="caption" class="caption"></div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const gallery = document.querySelector('.screenshot-gallery');
+        const lightbox = document.getElementById('myLightbox');
+        const lightboxImg = document.getElementById('img01');
+        const captionText = document.getElementById('caption');
+        const closeBtn = document.querySelector('.close');
+
+        if (gallery) {
+          gallery.addEventListener('click', function(e) {
+            if (e.target.tagName === 'IMG') {
+              lightbox.style.display = 'block';
+              lightboxImg.src = e.target.src;
+              captionText.innerHTML = e.target.alt;
+            }
+          });
+        }
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function() {
+            lightbox.style.display = 'none';
+          });
+        }
+
+        // Close when clicking outside the image
+        if (lightbox) {
+          lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) {
+              lightbox.style.display = 'none';
+            }
+          });
         }
       });
     </script>

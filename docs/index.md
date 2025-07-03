@@ -32,9 +32,9 @@ nav_order: 1
 
 | | |
 | :--- | :--- |
-| 📥 [**Downloads**](download.md) | Get the latest builds for all platforms. |
-| 🛠️ [**Installation Guide**](installation.md) | Step-by-step instructions to get you started. |
-| 📸 [**Screenshots**](screenshots.md) | A visual tour of the app's features. |
+| 📥 [**Downloads**](download.html) | Get the latest builds for all platforms. |
+| 🛠️ [**Installation Guide**](installation.html) | Step-by-step instructions to get you started. |
+| 📸 [**Screenshots**](screenshots.html) | A visual tour of the app's features. |
 | 🐙 [**GitHub Repository**](https://github.com/MKS2508/MKS-IPTV-App) | View the project source and contribute. |
 
 ---

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
+    <title>Installation | MKS-IPTV-App</title>
+    <link rel="icon" href="/MKS-IPTV-App/assets/favicon/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="/MKS-IPTV-App/assets/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/MKS-IPTV-App/assets/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/MKS-IPTV-App/assets/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/MKS-IPTV-App/assets/favicon/site.webmanifest">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=c11a702cea5020af3bb23f674a7670d0fa90eaff">
+  </head>
+  <body>
+    <div class="hero-banner" style="background-image: url('/MKS-IPTV-App/assets/imgs/banner3.webp');">
+      <h1>MKS-IPTV-App</h1>
+      <p>Native multiplatform IPTV client built with Swift 6</p>
+    </div>
+    <header class="sticky-header">
+      <div class="container">
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">
+          <img src="/MKS-IPTV-App/assets/imgs/applogo.webp" alt="MKS-IPTV-App Logo" class="site-logo">
+          MKS-IPTV-App
+        </a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+          <span class="hamburger"></span>
+        </button>
+        <nav class="nav-menu">
+          
+            <a href="/MKS-IPTV-App/download.md" class="nav-link">Download</a>
+          
+            <a href="/MKS-IPTV-App/installation.md" class="nav-link">Installation</a>
+          
+            <a href="/MKS-IPTV-App/screenshots.md" class="nav-link">Screenshots</a>
+          
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <h1 id="️-installation-guide">🛠️ Installation Guide</h1>
+
+<p>This guide provides detailed installation instructions for all supported platforms.</p>
+
+<hr />
+
+<h2 id="-ios--ipados-installation-altstore-method">📱 iOS &amp; iPadOS Installation (AltStore Method)</h2>
+
+<p>This is the recommended method for installing the app on iPhone and iPad.</p>
+
+<h3 id="prerequisites">Prerequisites</h3>
+<ul>
+  <li>An iPhone or iPad running iOS 26 Beta or later.</li>
+  <li>A computer running AltServer.</li>
+  <li>The latest <code class="language-plaintext highlighter-rouge">.ipa</code> file from our <a href="download.html"><strong>Downloads page</strong></a>.</li>
+</ul>
+
+<h3 id="step-by-step-instructions">Step-by-Step Instructions</h3>
+
+<ol>
+  <li><strong>Download the IPA</strong>: Grab the latest <code class="language-plaintext highlighter-rouge">mks-iptv.ipa</code> from the <a href="download.html">Downloads page</a>.</li>
+  <li><strong>Install with AltStore</strong>: Open the <code class="language-plaintext highlighter-rouge">.ipa</code> file on your iOS device and choose to open it with AltStore.</li>
+  <li><strong>Trust the Certificate</strong>: After installation, navigate to <code class="language-plaintext highlighter-rouge">Settings → General → VPN &amp; Device Management</code> and trust the certificate associated with your Apple ID.</li>
+</ol>
+
+<blockquote>
+  <p>For a more detailed walkthrough, see the <a href="https://altstore.io">official AltStore documentation</a>.</p>
+</blockquote>
+
+<hr />
+
+<h2 id="-macos-installation">💻 macOS Installation</h2>
+
+<p>Installing on a Mac is straightforward.</p>
+
+<h3 id="prerequisites-1">Prerequisites</h3>
+<ul>
+  <li>A Mac running macOS 26 Beta or later.</li>
+  <li>The latest <code class="language-plaintext highlighter-rouge">.zip</code> file for Apple Silicon from our <a href="download.html"><strong>Downloads page</strong></a>.</li>
+</ul>
+
+<h3 id="step-by-step-instructions-1">Step-by-Step Instructions</h3>
+
+<ol>
+  <li><strong>Download the App</strong>: Get the <code class="language-plaintext highlighter-rouge">.zip</code> file from the <a href="download.html">Downloads page</a>.</li>
+  <li><strong>Unzip the File</strong>: Double-click the downloaded <code class="language-plaintext highlighter-rouge">.zip</code> file to extract the application.</li>
+  <li><strong>Move to Applications</strong>: Drag the <code class="language-plaintext highlighter-rouge">MKS-IPTV-App.app</code> file into your <code class="language-plaintext highlighter-rouge">/Applications</code> folder.</li>
+  <li><strong>First Launch</strong>: Right-click the app icon and select “Open”. You may need to confirm that you want to run an application from an unidentified developer.</li>
+</ol>
+
+<hr />
+
+<h2 id="-tvos-installation-xcode-required">📺 tvOS Installation (Xcode Required)</h2>
+
+<p>Installing on tvOS requires a Mac with Xcode.</p>
+
+<h3 id="prerequisites-2">Prerequisites</h3>
+<ul>
+  <li>An Apple TV running tvOS 26 Beta.</li>
+  <li>A Mac with <strong>Xcode 16 Beta</strong> installed.</li>
+  <li>An Apple Developer Account (a free account is sufficient).</li>
+  <li>The project source code (cloned from GitHub).</li>
+</ul>
+
+<h3 id="step-by-step-instructions-2">Step-by-Step Instructions</h3>
+
+<ol>
+  <li><strong>Clone the Repository</strong>:
+    <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git clone https://github.com/MKS2508/MKS-IPTV-App.git
+<span class="nb">cd </span>MKS-IPTV-App
+</code></pre></div>    </div>
+  </li>
+  <li><strong>Connect your Apple TV</strong>: Connect the Apple TV to your Mac using a USB-C cable.</li>
+  <li><strong>Open in Xcode</strong>: Open the <code class="language-plaintext highlighter-rouge">.xcodeproj</code> file in Xcode.</li>
+  <li><strong>Select the Target</strong>: Choose the <code class="language-plaintext highlighter-rouge">mks-multiplataforma-tvos-iptv</code> scheme and your connected Apple TV as the target device.</li>
+  <li><strong>Build and Deploy</strong>: Click the “Run” button (▶) in Xcode to build and install the app on your Apple TV.</li>
+</ol>
+
+<hr />
+
+<h2 id="-troubleshooting--support">💬 Troubleshooting &amp; Support</h2>
+
+<p>If you encounter any issues during installation, please:</p>
+
+<ul>
+  <li>Double-check the system requirements on the <a href="download.html">Downloads page</a>.</li>
+  <li>Open an issue on our <a href="https://github.com/MKS2508/MKS-IPTV-App/issues"><strong>GitHub Issues page</strong></a>.</li>
+  <li>Start a thread on our <a href="https://github.com/MKS2508/MKS-IPTV-App/discussions"><strong>Discussions page</strong></a>.</li>
+</ul>
+
+      </div>
+    </main>
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.querySelector('.nav-menu');
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        navToggle.classList.toggle('active');
+      });
+
+      const backToTop = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+          backToTop.classList.add('visible');
+        } else {
+          backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+
+    <div id="myLightbox" class="lightbox">
+      <span class="close">&times;</span>
+      <img class="lightbox-content" id="img01">
+      <div id="caption" class="caption"></div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const gallery = document.querySelector('.screenshot-gallery');
+        const lightbox = document.getElementById('myLightbox');
+        const lightboxImg = document.getElementById('img01');
+        const captionText = document.getElementById('caption');
+        const closeBtn = document.querySelector('.close');
+
+        if (gallery) {
+          gallery.addEventListener('click', function(e) {
+            if (e.target.tagName === 'IMG') {
+              lightbox.style.display = 'block';
+              lightboxImg.src = e.target.src;
+              captionText.innerHTML = e.target.alt;
+            }
+          });
+        }
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function() {
+            lightbox.style.display = 'none';
+          });
+        }
+
+        // Close when clicking outside the image
+        if (lightbox) {
+          lightbox.addEventListener('click', function(e) {
+            if (e.target === lightbox) {
+              lightbox.style.display = 'none';
+            }
+          });
+        }
+      });
+    </script>
+  </body>
+</html>

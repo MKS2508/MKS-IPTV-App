@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/TestFlight-Distribution-Guide.html</loc>
+</url>
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/download.html</loc>
+</url>
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/iOS-Free-Installation-Guide.html</loc>
+</url>
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/</loc>
+</url>
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/installation.html</loc>
+</url>
+<url>
+<loc>http://localhost:4000/MKS-IPTV-App/screenshots.html</loc>
+</url>
+</urlset>

@@ -1,40 +1,26 @@
-# Guía de Distribución con TestFlight
+---
+layout: default
+title: TestFlight Guide
+nav_order: 6
 
-Esta guía describe el proceso completo para distribuir tu app IPTV mediante TestFlight.
+# ✈️ TestFlight Distribution Guide
 
-## Requisitos Previos
+This guide describes the complete process for distributing your IPTV app via TestFlight.
 
-### 1. Cuenta de Desarrollador de Apple
-- **Costo**: $99 USD/año
-- **Registro**: https://developer.apple.com/programs/
-- **Tiempo de aprobación**: 24-48 horas típicamente
+---
 
-### 2. Certificados y Perfiles
-- **Certificado de Distribución**: Apple Distribution Certificate
-- **Provisioning Profile**: App Store Distribution Profile
-- **App ID**: Debe coincidir con tu bundle identifier (`dev.mks2508.mks-multiplatform-iptv`)
+## 📋 Prerequisites
 
-### 3. App Store Connect
-- Crear una nueva app en https://appstoreconnect.apple.com
-- Configurar la información básica de la app
+- **Apple Developer Account**: Required for App Store Connect access ($99/year).
+- **Certificates & Profiles**: An Apple Distribution Certificate and an App Store Distribution Provisioning Profile.
+- **App Store Connect Record**: You must have an app record created in App Store Connect.
 
-## Paso 1: Configurar App Store Connect
+---
 
-1. Accede a [App Store Connect](https://appstoreconnect.apple.com)
-2. Haz clic en "My Apps" → "+"
-3. Completa la información:
-   ```
-   - Platform: macOS
-   - App Name: MKS Multiplatform IPTV
-   - Primary Language: English
-   - Bundle ID: dev.mks2508.mks-multiplatform-iptv
-   - SKU: mks-iptv-mac (o cualquier identificador único)
-   ```
+## 🚀 Distribution Steps
 
-## Paso 2: Crear el Archive para Distribución
-
-El archive ya está creado. Si necesitas crear uno nuevo:
-
+### Step 1: Create the Archive
+If you need to generate a new archive:
 ```bash
 xcodebuild -project mks-multiplatform-iptv.xcodeproj \
            -scheme mks-multiplatform-iptv \
@@ -43,10 +29,8 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj \
            -archivePath ./build/mks-iptv-appstore.xcarchive
 ```
 
-## Paso 3: Crear ExportOptions para App Store
-
-Crea un archivo `ExportOptionsAppStore.plist`:
-
+### Step 2: Create ExportOptions.plist
+Create an `ExportOptionsAppStore.plist` file:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -55,138 +39,51 @@ Crea un archivo `ExportOptionsAppStore.plist`:
     <key>method</key>
     <string>app-store</string>
     <key>teamID</key>
-    <string>QL3NVUPD27</string>
+    <string>YOUR_TEAM_ID</string>
     <key>uploadBitcode</key>
     <false/>
     <key>uploadSymbols</key>
     <true/>
     <key>signingStyle</key>
     <string>automatic</string>
-    <key>generateAppStoreInformation</key>
-    <true/>
-    <key>stripSwiftSymbols</key>
-    <true/>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>dev.mks2508.mks-multiplatform-iptv</key>
-        <string>automatic</string>
-    </dict>
-    <key>destination</key>
-    <string>upload</string>
 </dict>
 </plist>
 ```
 
-## Paso 4: Exportar para App Store
+### Step 3: Upload to App Store Connect
+You can upload the build using Xcode, Transporter, or the command line.
 
-```bash
-xcodebuild -exportArchive \
-           -archivePath ./build/mks-iptv.xcarchive \
-           -exportPath ./build/appstore-export \
-           -exportOptionsPlist ./ExportOptionsAppStore.plist
-```
-
-## Paso 5: Subir a App Store Connect
-
-### Opción A: Usando xcrun altool (Línea de comandos)
-
+**Using `xcrun altool` (Command Line):**
 ```bash
 xcrun altool --upload-app \
              -f "./build/appstore-export/mks-multiplatform-iptv.pkg" \
              -t macos \
-             -u "tu-apple-id@email.com" \
+             -u "your-apple-id@email.com" \
              -p "app-specific-password"
 ```
 
-### Opción B: Usando Transporter
+### Step 4: Configure TestFlight
+Once the build is processed in App Store Connect:
+1.  Navigate to your app's **TestFlight** tab.
+2.  Complete any required compliance information.
+3.  Add build notes under **"What to Test"**.
+4.  Start inviting internal or external testers.
 
-1. Descarga [Transporter](https://apps.apple.com/app/transporter/id1450874784) desde la Mac App Store
-2. Arrastra el archivo `.pkg` a Transporter
-3. Inicia sesión con tu Apple ID
-4. Haz clic en "Deliver"
+---
 
-### Opción C: Usando Xcode
+## ⚙️ Managing Testers
 
-1. Abre Xcode
-2. Ve a Window → Organizer
-3. Selecciona tu archive
-4. Haz clic en "Distribute App"
-5. Selecciona "App Store Connect"
-6. Sigue el asistente
+- **Internal Testers (up to 100)**: Team members with a role in App Store Connect. They get access immediately.
+- **External Testers (up to 10,000)**: Any user you invite via email or a public link. The first build for external testers requires a beta review by Apple.
 
-## Paso 6: Configurar TestFlight
+> **Note:** TestFlight builds expire after 90 days.
 
-Una vez subida la app (procesamiento ~5-30 minutos):
+---
 
-1. En App Store Connect, ve a tu app
-2. Haz clic en "TestFlight"
-3. Completa la información requerida:
-   - **Información de cumplimiento de exportación**
-   - **Información de prueba beta**
-   - **Qué probar**
+## 🔧 Troubleshooting
 
-## Paso 7: Gestionar Testers
+- **"Invalid Signature"**: Ensure you are using a Distribution Certificate, not a Development one.
+- **"Provisioning Profile Mismatch"**: Regenerate the profile in the Apple Developer Portal and ensure it's linked to your App ID.
+- **Build Not Processing**: Check your email for notifications from Apple regarding any issues with the build.
 
-### Testers Internos (hasta 100)
-- Miembros del equipo de App Store Connect
-- Acceso inmediato sin revisión
-
-### Testers Externos (hasta 10,000)
-- Requiere revisión de Apple (24-48 horas)
-- Crear grupos de prueba
-- Enviar invitaciones por email
-
-## Comandos Útiles
-
-### Verificar la firma del archive
-```bash
-codesign -dv --verbose=4 ./build/mks-iptv.xcarchive/Products/Applications/mks-multiplatform-iptv.app
-```
-
-### Ver el contenido del archive
-```bash
-xcodebuild -exportArchive -archivePath ./build/mks-iptv.xcarchive -exportOptionsPlist ./ExportOptionsAppStore.plist -allowProvisioningUpdates
-```
-
-### Validar antes de subir
-```bash
-xcrun altool --validate-app \
-             -f "./build/appstore-export/mks-multiplatform-iptv.pkg" \
-             -t macos \
-             -u "tu-apple-id@email.com" \
-             -p "app-specific-password"
-```
-
-## Solución de Problemas
-
-### Error: "No suitable signing identity found"
-- Verifica que tienes un certificado de distribución válido
-- Revisa Keychain Access para certificados expirados
-
-### Error: "Invalid provisioning profile"
-- Regenera el perfil en Apple Developer Portal
-- Asegúrate de que incluye tu certificado de distribución
-
-### Error: "Bundle identifier mismatch"
-- Verifica que el bundle ID en Xcode coincide con App Store Connect
-- Revisa Info.plist
-
-### La app no aparece en TestFlight
-- Espera el procesamiento (puede tardar hasta 1 hora)
-- Verifica el estado en App Store Connect → Activity
-- Revisa tu email por notificaciones de Apple
-
-## Notas Importantes
-
-1. **Primera vez**: La primera subida puede requerir configuración adicional
-2. **Revisión**: La primera versión beta externa requiere revisión de Apple
-3. **Actualizaciones**: Las actualizaciones posteriores son más rápidas
-4. **Caducidad**: Las builds de TestFlight caducan después de 90 días
-5. **Feedback**: TestFlight incluye herramientas de feedback integradas
-
-## Enlaces Útiles
-
-- [App Store Connect Help](https://help.apple.com/app-store-connect/)
-- [TestFlight Documentation](https://developer.apple.com/testflight/)
-- [Distributing Your App for Beta Testing](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
-- [Transporter User Guide](https://help.apple.com/itc/transporter/)
+For more details, refer to the official [**TestFlight Documentation**](https://developer.apple.com/testflight/).

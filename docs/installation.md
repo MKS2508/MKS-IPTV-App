@@ -1,109 +1,79 @@
-# Installation Guide
+---
+layout: default
+title: Installation
+nav_order: 3
+---
 
-Complete installation instructions for all supported platforms.
+# 🛠️ Installation Guide
 
-## iOS Installation (AltStore Method)
+This guide provides detailed installation instructions for all supported platforms.
 
-### Prerequisites
-- iOS 26 Beta or later
-- AltStore installed on your device
-- Mac with AltServer running
+---
 
-### Steps
-1. **Download IPA**: Get the latest [mks-multiplatform-iptv.ipa](../build/ios/mks-multiplatform-iptv.ipa)
-2. **Transfer to Device**: Use AirDrop, iCloud, or email
-3. **Install with AltStore**: 
-   - Open the IPA file on your iOS device
-   - Select "Share" → "AltStore"
-   - Follow AltStore installation prompts
-4. **Trust Certificate**:
-   - Settings → General → VPN & Device Management
-   - Trust your Apple ID certificate
+## 📱 iOS & iPadOS Installation (AltStore Method)
 
-### Detailed iOS Guide
-For complete iOS installation instructions, see: [INSTALL-WITH-ALTSTORE.md](../build/ios/INSTALL-WITH-ALTSTORE.md)
-
-## macOS Installation
-
-### System Requirements
-- macOS 26 Beta or later
-- Apple Silicon or Intel Mac
-
-### Installation
-1. Download the macOS .app bundle from [Releases](https://github.com/MKS2508/MKS-IPTV-App/releases)
-2. Drag to Applications folder
-3. Right-click → Open (first launch only)
-4. Accept "Open from unidentified developer"
-
-## tvOS Installation
-
-### Requirements
-- Apple TV with tvOS 26 Beta
-- Xcode 16 Beta
-- Apple Developer Account
-- USB-C cable (Apple TV 4K 3rd gen)
-
-### Steps
-1. Connect Apple TV to Mac via USB-C
-2. Open project in Xcode
-3. Select tvOS scheme: `mks-multiplataforma-tvos-iptv`
-4. Build and deploy to device
-
-## Development Setup
+This is the recommended method for installing the app on iPhone and iPad.
 
 ### Prerequisites
-- Xcode 16 Beta
-- macOS 26 Beta
-- Swift 6.0
-- Apple Developer Account
+- An iPhone or iPad running iOS 26 Beta or later.
+- A computer running AltServer.
+- The latest `.ipa` file from our [**Downloads page**](download.md).
 
-### Build from Source
-```bash
-# Clone repository
-git clone https://github.com/MKS2508/MKS-IPTV-App.git
-cd MKS-IPTV-App
+### Step-by-Step Instructions
 
-# Build for macOS
-xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Debug
+1.  **Download the IPA**: Grab the latest `mks-iptv.ipa` from the [Downloads page](download.md).
+2.  **Install with AltStore**: Open the `.ipa` file on your iOS device and choose to open it with AltStore.
+3.  **Trust the Certificate**: After installation, navigate to `Settings → General → VPN & Device Management` and trust the certificate associated with your Apple ID.
 
-# Build for iOS (requires code signing)
-xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Release archive
+> For a more detailed walkthrough, see the [official AltStore documentation](https://altstore.io).
 
-# Build for tvOS
-xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma-tvos-iptv -configuration Debug
-```
+---
 
-## Configuration
+## 💻 macOS Installation
 
-### First Launch
-1. Launch the app
-2. The app will automatically load available categories
-3. Navigate between Movies, Series, Live TV, and Downloads
+Installing on a Mac is straightforward.
 
-### IPTV Service Configuration
-The app comes pre-configured with demo credentials. For production use:
-1. Modify `IPTVConfiguration.swift`
-2. Update service endpoints and credentials
-3. Rebuild the application
+### Prerequisites
+- A Mac running macOS 26 Beta or later.
+- The latest `.zip` file for Apple Silicon from our [**Downloads page**](download.md).
 
-## Troubleshooting
+### Step-by-Step Instructions
 
-### iOS Installation Issues
-- **"Unable to install"**: Check you have fewer than 3 sideloaded apps
-- **Certificate issues**: Revoke old certificates at appleid.apple.com
-- **AltStore not appearing**: Ensure AltServer is running on your Mac
+1.  **Download the App**: Get the `.zip` file from the [Downloads page](download.md).
+2.  **Unzip the File**: Double-click the downloaded `.zip` file to extract the application.
+3.  **Move to Applications**: Drag the `MKS-IPTV-App.app` file into your `/Applications` folder.
+4.  **First Launch**: Right-click the app icon and select "Open". You may need to confirm that you want to run an application from an unidentified developer.
 
-### macOS Security
-- **"Cannot verify developer"**: System Preferences → Security → Allow anyway
-- **App won't launch**: Right-click → Open instead of double-clicking
+---
 
-### tvOS Development
-- **Build fails**: Ensure Apple TV is connected and in developer mode
-- **Deployment issues**: Check Apple Developer account provisioning
+## 📺 tvOS Installation (Xcode Required)
 
-## Support
+Installing on tvOS requires a Mac with Xcode.
 
-Need help? Check these resources:
-- [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
-- [Community Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
-- [Project Wiki](https://github.com/MKS2508/MKS-IPTV-App/wiki)
+### Prerequisites
+- An Apple TV running tvOS 26 Beta.
+- A Mac with **Xcode 16 Beta** installed.
+- An Apple Developer Account (a free account is sufficient).
+- The project source code (cloned from GitHub).
+
+### Step-by-Step Instructions
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone https://github.com/MKS2508/MKS-IPTV-App.git
+    cd MKS-IPTV-App
+    ```
+2.  **Connect your Apple TV**: Connect the Apple TV to your Mac using a USB-C cable.
+3.  **Open in Xcode**: Open the `.xcodeproj` file in Xcode.
+4.  **Select the Target**: Choose the `mks-multiplataforma-tvos-iptv` scheme and your connected Apple TV as the target device.
+5.  **Build and Deploy**: Click the "Run" button (▶) in Xcode to build and install the app on your Apple TV.
+
+---
+
+## 💬 Troubleshooting & Support
+
+If you encounter any issues during installation, please:
+
+- Double-check the system requirements on the [Downloads page](download.md).
+- Open an issue on our [**GitHub Issues page**](https://github.com/MKS2508/MKS-IPTV-App/issues).
+- Start a thread on our [**Discussions page**](https://github.com/MKS2508/MKS-IPTV-App/discussions).

@@ -1,241 +1,74 @@
-# Guía de Instalación Gratuita en iOS
+---
+layout: default
+title: iOS Free Installation Guide
+nav_order: 5
+---
 
-Esta guía explica cómo instalar tu app IPTV en dispositivos iOS de forma gratuita, minimizando la necesidad de reinstalación.
+# 📱 iOS Free Installation Guide
 
-## Tabla de Comparación
+This guide explains how to install the IPTV app on iOS devices for free using sideloading methods.
 
-| Método | Duración | Renovación | Límite Apps | Requisitos |
-|--------|----------|------------|-------------|------------|
-| AltStore | 7 días | Automática (WiFi) | 3 apps | Mac + WiFi |
-| Sideloadly | 7 días | Manual | Sin límite | Mac/Windows |
-| TrollStore | Permanente | No necesaria | Sin límite | iOS 14.0-16.6.1 |
-| Xcode | 7 días | Manual | 3 apps | Mac + Cable |
+---
 
-## Método 1: AltStore (Recomendado)
+## Comparison of Sideloading Methods
 
-### Ventajas
-- Renovación automática sin cables
-- Interfaz amigable
-- Soporte activo
+| Method | App Duration | Renewal | App Limit | Requirements |
+|:---|:---|:---|:---|:---|
+| **AltStore** | 7 Days | Automatic (WiFi) | 3 Apps | Mac/PC + WiFi |
+| **Sideloadly** | 7 Days | Manual (USB) | 3 Apps | Mac/PC + USB |
+| **TrollStore** | Permanent | Not Required | Unlimited | Specific iOS versions |
 
-### Requisitos
-- Mac con macOS 10.14.4+
-- iPhone/iPad con iOS 12.2+
-- Apple ID gratuito
-- Misma red WiFi
+---
 
-### Paso 1: Preparar el IPA
+## Method 1: AltStore (Recommended)
 
-```bash
-# Crear archive para iOS
-xcodebuild -project mks-multiplatform-iptv.xcodeproj \
-           -scheme mks-multiplatform-iptv \
-           -sdk iphoneos \
-           -configuration Release \
-           -archivePath ./build/ios/mks-iptv.xcarchive \
-           archive
+AltStore uses your free Apple ID to sign apps and automatically refreshes them in the background.
 
-# Crear ExportOptions-iOS.plist
-cat > ./build/ios/ExportOptions-iOS.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>development</string>
-    <key>teamID</key>
-    <string>QL3NVUPD27</string>
-    <key>compileBitcode</key>
-    <false/>
-    <key>stripSwiftSymbols</key>
-    <true/>
-    <key>signingStyle</key>
-    <string>automatic</string>
-    <key>thinning</key>
-    <string>&lt;none&gt;</string>
-</dict>
-</plist>
-EOF
+### Requirements
+- A Mac or Windows PC running AltServer.
+- iPhone or iPad with iOS 12.2 or later.
+- Both devices must be on the same WiFi network for automatic refresh.
 
-# Exportar IPA
-xcodebuild -exportArchive \
-           -archivePath ./build/ios/mks-iptv.xcarchive \
-           -exportPath ./build/ios/export \
-           -exportOptionsPlist ./build/ios/ExportOptions-iOS.plist
-```
+### Installation Steps
 
-### Paso 2: Instalar AltServer
+1.  **Install AltServer**: Download and install AltServer from [altstore.io](https://altstore.io) on your computer.
+2.  **Install AltStore on iOS**: Connect your iPhone to your computer, open AltServer on your computer, and select "Install AltStore" → (Your iPhone).
+3.  **Trust Developer**: On your iPhone, go to `Settings → General → VPN & Device Management` and trust the certificate associated with your Apple ID.
+4.  **Install the App**: Download the `.ipa` file from the [Downloads page](download.md), then open it within the AltStore app on your iPhone to begin installation.
 
-1. Descarga AltServer desde [altstore.io](https://altstore.io)
-2. Instala AltServer en tu Mac
-3. Abre AltServer (aparecerá en la barra de menú)
-4. Ve a AltServer → Preferences
-5. Habilita "Enable JIT compilation"
+> **Note:** For AltStore to automatically refresh your apps, AltServer must be running on your computer and connected to the same WiFi network as your iPhone.
 
-### Paso 3: Instalar AltStore en iPhone
+---
 
-1. Conecta tu iPhone por cable USB
-2. Confía en el ordenador si es necesario
-3. En Mac: AltServer → Install AltStore → [Tu iPhone]
-4. Ingresa tu Apple ID y contraseña
-5. En iPhone: Ajustes → General → VPN y gestión de dispositivos
-6. Confía en tu Apple ID
-7. Abre AltStore en tu iPhone
+## Method 2: Sideloadly
 
-### Paso 4: Habilitar Renovación Automática
+Sideloadly is a popular alternative that works over a USB connection.
 
-1. En iPhone: Ajustes → AltStore
-2. Activa "Background App Refresh"
-3. En Mac: AltServer debe estar ejecutándose
-4. Ambos dispositivos en la misma red WiFi
+### Quick Steps
 
-### Paso 5: Instalar tu App
+1.  **Download Sideloadly**: Get the app from [sideloadly.io](https://sideloadly.io).
+2.  **Connect iPhone**: Connect your iPhone to your computer via USB.
+3.  **Load IPA**: Drag the `.ipa` file into Sideloadly, enter your Apple ID, and click "Start".
+4.  **Trust Developer**: Trust the certificate in your iPhone's settings as with AltStore.
 
-1. Copia el archivo .ipa a tu iPhone:
-   - AirDrop
-   - iCloud Drive
-   - Correo electrónico
-2. En iPhone: Abre el .ipa con AltStore
-3. Toca "Install"
-4. La app se instalará y aparecerá en la pantalla de inicio
+> **Note:** You must manually re-install the app every 7 days by repeating these steps.
 
-## Método 2: Sideloadly
+---
 
-### Instalación Rápida
+## Method 3: TrollStore (iOS 14.0 - 16.6.1)
 
-1. Descarga [Sideloadly](https://sideloadly.io)
-2. Conecta tu iPhone
-3. Arrastra el .ipa a Sideloadly
-4. Ingresa tu Apple ID
-5. Haz clic en "Start"
-6. Confía en el certificado en Ajustes
+TrollStore uses a system vulnerability to permanently sign apps, so they never expire. This method only works on specific, unpatched iOS versions.
 
-### Renovación (cada 7 días)
-- Conecta el iPhone
-- Abre Sideloadly
-- Reinstala la app
+### Compatibility
+- **Supported**: iOS 14.0-15.4.1, 16.0-16.1.2, and some other specific versions.
+- **Not Supported**: iOS 16.7 and newer.
 
-## Método 3: TrollStore (iOS 14.0-16.6.1)
+> Check the official [TrollStore GitHub](https://github.com/opa334/TrollStore) for detailed compatibility and installation instructions.
 
-### ⚠️ Verificar Compatibilidad
+---
 
-| iOS Version | Compatibilidad |
-|-------------|----------------|
-| 14.0-14.8.1 | ✅ Completa |
-| 15.0-15.4.1 | ✅ Completa |
-| 15.5-15.6.1 | ⚠️ Limitada |
-| 15.7-15.7.1 | ❌ No compatible |
-| 16.0-16.1.2 | ✅ Completa |
-| 16.2-16.6.1 | ⚠️ Requiere MacDirtyCow |
-| 16.7+ | ❌ No compatible |
+## 🔧 Troubleshooting
 
-### Instalación
-
-1. Visita [TrollStore GitHub](https://github.com/opa334/TrollStore)
-2. Sigue las instrucciones específicas para tu versión
-3. Una vez instalado TrollStore:
-   - Abre TrollStore
-   - Toca "+"
-   - Selecciona tu .ipa
-   - Instalación permanente
-
-## Método 4: Xcode Directo
-
-### Proceso Básico
-
-```bash
-# 1. Conecta tu iPhone
-# 2. Abre Xcode
-# 3. Selecciona tu dispositivo como destino
-# 4. Build and Run (Cmd+R)
-```
-
-### Renovación Manual
-- Cada 7 días
-- Requiere cable y Xcode
-
-## Automatización con Shortcuts
-
-### Crear Recordatorio Automático
-
-1. Abre Shortcuts en iPhone
-2. Crea nuevo atajo:
-   ```
-   - Add "Get Current Date"
-   - Add "Add 6 Days"
-   - Add "Create Reminder"
-     - Title: "Renovar Apps Sideloaded"
-     - Alert: Resultado de "Add 6 Days"
-   ```
-3. Ejecuta después de cada instalación
-
-## Solución de Problemas
-
-### "Unable to verify app"
-1. Ajustes → General → VPN y gestión de dispositivos
-2. Confía en el desarrollador
-3. Si persiste, revoca certificados en appleid.apple.com
-
-### "Maximum apps reached"
-- Con Apple ID gratuito: máximo 3 apps
-- Elimina apps no usadas en Xcode → Window → Devices
-
-### AltStore no renueva automáticamente
-1. Verifica que AltServer esté ejecutándose
-2. Ambos dispositivos en la misma red
-3. Background App Refresh activado
-4. Reinstala AltStore si es necesario
-
-### "Device not supported"
-- Verifica la versión de iOS
-- Actualiza Xcode/AltStore/Sideloadly
-
-## Consejos Pro
-
-1. **Backup del IPA**: Guarda siempre una copia del .ipa
-2. **Apple ID secundario**: Usa un Apple ID dedicado para sideloading
-3. **Notificaciones**: Activa notificaciones en AltStore
-4. **WiFi Sync**: Habilita sincronización WiFi en iTunes/Finder
-
-## Scripts Útiles
-
-### Crear IPA rápidamente
-```bash
-#!/bin/bash
-# save as: build-ios-ipa.sh
-
-echo "Building iOS IPA..."
-xcodebuild -project mks-multiplatform-iptv.xcodeproj \
-           -scheme mks-multiplatform-iptv \
-           -sdk iphoneos \
-           -configuration Release \
-           clean archive \
-           -archivePath ./build/ios/mks-iptv.xcarchive
-
-xcodebuild -exportArchive \
-           -archivePath ./build/ios/mks-iptv.xcarchive \
-           -exportPath ./build/ios/ \
-           -exportOptionsPlist ./ExportOptions-iOS.plist
-
-echo "IPA created at: ./build/ios/"
-```
-
-### Verificar firma del IPA
-```bash
-unzip -q yourapp.ipa
-codesign -dv Payload/*.app
-```
-
-## Enlaces Útiles
-
-- [AltStore](https://altstore.io) - Sitio oficial
-- [Sideloadly](https://sideloadly.io) - Descarga directa
-- [TrollStore Releases](https://github.com/opa334/TrollStore/releases)
-- [iOS Sideloading Guide](https://ios.cfw.guide/sideloading)
-
-## Notas Finales
-
-- **Seguridad**: Solo instala apps de fuentes confiables
-- **Actualizaciones**: Las apps sideloaded no se actualizan automáticamente
-- **Datos**: Los datos se mantienen al renovar (excepto si desinstalas)
-- **Notificaciones**: Funcionan normalmente en apps sideloaded
+- **"Unable to Verify App"**: Make sure you have trusted the developer certificate in your iPhone's settings.
+- **"Maximum Number of Apps Installed"**: A free Apple ID only allows for 3 sideloaded apps to be active at one time.
+- **AltStore Refresh Fails**: Ensure AltServer is running on your computer and both devices are on the same WiFi network.

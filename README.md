@@ -1,423 +1,275 @@
-# 🎬 MKS-IPTV-App
+<div align="center">
+  <a href="https://github.com/MKS2508/MKS-IPTV-App">
+    <img src="docs/imgs/banner3.webp" alt="MKS-IPTV-App Banner" width="800"/>
+  </a>
+  <h1>MKS-IPTV-App</h1>
+  <p><strong>A native, multiplatform IPTV client for the Apple ecosystem, built with Swift 6 & SwiftUI.</strong></p>
+</div>
 
-[![Build Status](https://img.shields.io/badge/build-beta%20v1.0-yellow)](https://github.com/MKS2508/MKS-IPTV-App/releases) [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE) [![Platform](https://img.shields.io/badge/platform-iOS%2026%20Beta%20%7C%20macOS%2026%20Beta%20%7C%20tvOS%2026%20Beta-brightgreen)](#platform-support) [![Swift](https://img.shields.io/badge/Swift-6.0-orange)](https://swift.org) [![Apple](https://img.shields.io/badge/Apple%20HIG-Liquid%20Glass-blue)](https://developer.apple.com/design/) [![GitHub Release](https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases)](https://github.com/MKS2508/MKS-IPTV-App/releases/latest)
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift">
+  <img alt="License" src="https://img.shields.io/github/license/MKS2508/MKS-IPTV-App?style=for-the-badge&color=lightgrey">
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest">
+    <img alt="Latest Release" src="https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases&style=for-the-badge&color=blue&logo=github">
+  </a>
+</p>
 
-## English
-
-A native multiplatform IPTV client built with Swift 6, featuring early adoption of iOS/macOS/tvOS 26 Beta with Liquid Glass design patterns and the latest Apple Human Interface Guidelines.
-
-This application provides comprehensive IPTV streaming capabilities including live TV, video-on-demand (VOD), and advanced download management across Apple's ecosystem.
-
-### Table of Contents
-- [English Documentation](#english)
-  - [Downloads](#downloads)
-  - [Core Features](#core-features)
-  - [Technical Architecture](#technical-architecture) 
-  - [Platform Support](#platform-support)
-  - [Screenshots](#screenshots-english)
-  - [Development Story](#development-story)
-  - [Installation](#installation)
-  - [Contributing](#contributing)
-- [Documentación en Español](#español)
+> [!NOTE]
+> This repository contains the documentation, build artifacts, and installation guides for the MKS-IPTV-App. The Swift source code is maintained in a private repository.
 
 ---
 
-## Downloads
+<details open>
+<summary><h2>🇬🇧 English Documentation</h2></summary>
+<br>
 
-### 📥 Latest Release: v1.0 Beta
+This application provides comprehensive IPTV streaming capabilities including live TV, video-on-demand (VOD), and advanced download management across Apple's ecosystem, featuring an early adoption of iOS/macOS/tvOS 26 Beta with Liquid Glass design patterns.
 
-Download the latest version for your platform:
+### 📥 Downloads & Installation
 
 | Platform | Download | Installation Guide |
-|----------|----------|-------------------|
-| **iOS** | [Download IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv.ipa) | [Installation Guide](#ios-installation-altstore-method) |
-| **macOS** | [Download for Apple Silicon](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv-macos-arm64.zip) | [Installation Guide](#macos-installation) |
-| **tvOS** | Build from source | [Developer Guide](#tvos-installation) |
+|----------|----------|--------------------|
+| **iOS** | [Download IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa) | [AltStore Guide](./build/ios/INSTALL-WITH-ALTSTORE.md) |
+| **macOS** | [Download .zip](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip) | [See Instructions](#-macos-installation) |
+| **tvOS** | Build from source | [Developer Guide](#-tvos-installation) |
 
-> **Note**: All releases are available on the [Releases page](https://github.com/MKS2508/MKS-IPTV-App/releases)
+> **Note**: All official releases are available on the [**Releases page**](https://github.com/MKS2508/MKS-IPTV-App/releases). For alternative installation methods, see the [TestFlight Guide](docs/TestFlight-Distribution-Guide.md) or the [iOS Free Installation Guide](docs/iOS-Free-Installation-Guide.md).
 
-### Alternative Installation Methods
-- **TestFlight**: [Join Beta Program](docs/TestFlight-Distribution-Guide.md) (when available)
-- **Direct Install**: [iOS Free Installation Guide](docs/iOS-Free-Installation-Guide.md)
-- **Build from Source**: See [Development Setup](#development-setup)
+### 🚀 Core Features
 
----
+- **Native Live TV Streaming**: Real-time playback using `StreamManager` and `AVPlayer`.
+- **Advanced Download System**: Local downloads with integrated HTTP server for streaming and progress tracking.
+- **Smart Stream Management**: Automatic redirect resolution and optimized headers for IPTV services.
+- **iOS 26 Liquid Glass Navigation**: Early implementation of Apple's newest design patterns.
+- **macOS TouchBar Support**: Native controls for categories, search, and playback.
+- **MOV Conversion**: Automatic conversion to `.MOV` for optimal AirPlay and Apple TV integration.
 
-## Español
+### 🛠️ Technical Architecture
 
-Cliente IPTV nativo multiplataforma desarrollado con Swift 6, implementando las últimas versiones beta de iOS/macOS/tvOS 26 con patrones de diseño Liquid Glass y las Guías de Interfaz Humana más recientes de Apple.
+- **Language**: Swift 6.0 with modern concurrency (async/await).
+- **Frameworks**: SwiftUI, AVKit, Network framework.
+- **Architecture**: MVVM with an Actor-based concurrency model.
+- **Platform Support**: iOS 26+, macOS 26+, tvOS 26+.
 
-Esta aplicación proporciona capacidades completas de streaming IPTV incluyendo TV en vivo, video bajo demanda (VOD), y gestión avanzada de descargas en todo el ecosistema de Apple.
+### 📸 Screenshots
 
----
+<details>
+<summary>Click to view macOS Screenshots</summary>
 
-## Core Features
+| Download Manager | Download Modal |
+| :---: | :---: |
+| ![Downloads Section](./docs/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png) | ![Download Modal](./docs/imgs/v0.0.1-alpha/macos/download_modal.png) |
+| **Liquid Glass Navigation** | **Series Detail View** |
+| ![Liquid Glass Navigation](./docs/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png) | ![Series Detail](./docs/imgs/v0.0.1-alpha/macos/seriesdetail_1.png) |
 
-### Live Streaming & VOD
-- **Native Live TV Streaming**: Real-time playback using `StreamManager` and `AVPlayer`
-- **Advanced Download System**: Local downloads with integrated HTTP server for streaming
-- **Smart Stream Management**: 
-  - HTTP proxy servers for AVPlayer compatibility
-  - Automatic redirect resolution
-  - Optimized headers for IPTV services
+</details>
 
-### Platform Integration
-- **iOS 26 Beta Liquid Glass Navigation**: Early implementation of Apple's newest design patterns
-- **macOS TouchBar Support**: Native controls for categories, search, and playback
-- **Cross-Platform Architecture**: Adaptive navigation across iOS, macOS, and tvOS
-- **Apple Ecosystem Optimization**: Enhanced AirPlay integration and Apple TV app compatibility
+### 📈 Feature Status
 
-### Content Management
-- **Four Complete Modules**: Movies, Series, Live TV, Downloads with gallery views, search, and filtering
-- **Per-Content Actions**:
-  - ▶️ Stream live TV (fully functional)
-  - 📥 Download with real-time progress tracking
-  - 🔗 Open in external players (VLC, IINA, etc.)
-  - 📋 Copy direct stream links
+<details>
+<summary>Click to view Feature Roadmap</summary>
 
-### File Format Optimization
-- **MOV Conversion**: Automatic conversion to .MOV format for optimal AirPlay and Apple TV integration
-- **Metadata Enhancement**: Improved metadata handling for better Apple ecosystem experience
-- **Format Compatibility**: MP4 fallback with MOV preferred for Apple devices
+#### ✅ **Production Ready**
+- [x] Live TV Streaming
+- [x] Download Management
+- [x] Cross-Platform Navigation
+- [x] iOS 26 Beta Liquid Glass
+- [x] macOS TouchBar Integration
+- [x] Real-time Search & Filtering
 
----
+#### 🔜 **Next Release (v1.1)**
+- [ ] VOD Streaming Integration
+- [ ] Enhanced AirPlay Support
+- [ ] Background Download Support
+- [ ] Favorites System
 
-## Technical Architecture
+#### 📋 **Future Roadmap (v1.2+)**
+- [ ] Multiple Playback Engines (AVPlayer/VLC/FFmpeg)
+- [ ] Offline Playback Mode
+- [ ] Advanced Content Filtering
+- [ ] Subtitle Management
 
-### Core Technologies
-- **Language**: Swift 6.0 with modern concurrency (async/await)
-- **Frameworks**: SwiftUI, AVKit, Network framework
-- **Architecture**: MVVM with clear separation of concerns
-- **Concurrency**: Actor-based concurrency model with structured concurrency
+</details>
 
-### Platform Support
-- **iOS 26 Beta+** (iPhone, iPad) - Liquid Glass design system
-- **macOS 26 Beta+** (Intel & Apple Silicon) - TouchBar integration
-- **tvOS 26 Beta+** (Apple TV) - Focus-based navigation
+### 🏗️ Build & Installation
 
-### Key Components
-- `PlatformNavigationView`: Adaptive cross-platform navigation
-- `StreamManager`: Live stream management and URL resolution
-- `DownloadManager`: Reactive download system with progress tracking
-- `HTTPStreamServer`: Local HTTP server for downloaded content streaming
-- `TouchBarManager`: Native macOS TouchBar integration
+<details>
+<summary>Click to view Build & Installation Instructions</summary>
 
----
+#### **Development Requirements**
+- Xcode 16 Beta
+- macOS 15 Beta+
+- Swift 6.0
+- Apple Developer Account
 
-## Screenshots (English)
-
-### macOS Implementation
-
-#### 1. Download Management System
-![Downloads Section](./docs/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png)
-*Advanced download manager showing real-time progress bars, download speeds, file sizes, completion percentages, and ETA calculations. Features pause/resume functionality and queue management.*
-
-#### 2. Download Configuration Modal
-![Download Modal](./docs/imgs/v0.0.1-alpha/macos/download_modal.png)
-*Download configuration interface allowing users to select storage location and enable MOV conversion checkbox. The MOV format conversion enhances AirPlay compatibility and Apple TV integration through improved metadata handling.*
-
-#### 3. Liquid Glass Navigation Implementation
-![Liquid Glass Navigation](./docs/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png)
-*Early implementation of iOS 26 Beta's Liquid Glass design patterns adapted for macOS, featuring translucent navigation elements and modern visual hierarchy.*
-
-#### 4. Series Detail View
-![Series Detail](./docs/imgs/v0.0.1-alpha/macos/seriesdetail_1.png)
-*Comprehensive series information display with episode management, download options, and streaming controls integrated within the Liquid Glass design framework.*
-
-### iOS Screenshots
-*iOS screenshots will be available at `./docs/imgs/v0.0.1-alpha/ios/` showcasing iPhone and iPad implementations with native iOS 26 Beta Liquid Glass patterns.*
-
----
-
-## Development Story
-
-### Personal Learning Journey
-This application represents my first comprehensive Swift project, developed as a learning exercise to master Swift 6, SwiftUI, and modern iOS development patterns. The project emerged from a practical need combined with educational curiosity.
-
-### Problem Statement
-The existing IPTV client landscape presents several limitations:
-- **Commercial solutions** require paid subscriptions
-- **Open-source alternatives** often feature outdated, non-native interfaces
-- **Cross-platform apps** sacrifice native platform integration
-- **Legacy codebases** lack modern Swift concurrency and iOS design patterns
-
-### Reverse Engineering Approach
-The core IPTV business logic was developed through **self-taught reverse engineering** of various commercial IPTV services, conducted **strictly for educational purposes**. This process involved:
-
-- Analyzing network traffic patterns from existing commercial IPTV applications
-- Understanding IPTV protocol implementations and streaming formats
-- Reverse-engineering API endpoints and authentication mechanisms
-- Studying optimal streaming configurations for different content types
-
-### Technical Discoveries
-Through experimentation and testing, several technical optimizations were discovered:
-- **MOV format superiority** over MP4 for AirPlay and Apple TV integration
-- **Metadata enhancement techniques** for better Apple ecosystem compatibility
-- **HTTP proxy optimization** for AVPlayer streaming compatibility
-- **TouchBar integration patterns** for professional macOS applications
-
-### Open Source Philosophy
-This project follows the principle: *"If it solves my problem, it might solve others' problems too."* While not claiming to be the definitive IPTV solution, it demonstrates modern Swift development practices and fills a gap in the native Apple ecosystem IPTV client space.
-
----
-
-## Feature Status
-
-### ✅ **Production Ready**
-- [x] **Live TV Streaming**: Real-time playback with native controls
-- [x] **Download Management**: Complete download system with progress tracking  
-- [x] **Cross-Platform Navigation**: Sidebar (macOS), Split View (iPad), Tab Bar (iPhone)
-- [x] **iOS 26 Beta Liquid Glass**: Early implementation of newest design patterns
-- [x] **macOS TouchBar Integration**: Native controls for categories, search, and playback
-- [x] **Category Management**: Automatic loading and filtering system
-- [x] **Real-time Search & Filtering**: Instant search across all content modules
-- [x] **HTTP Proxy Infrastructure**: AVPlayer compatibility with IPTV streams
-- [x] **External Player Support**: Integration with VLC, IINA, and other players
-- [x] **Modern Concurrency**: Swift 6 async/await architecture
-
-### 🔜 **Next Release (v1.1)**
-- [ ] **VOD Streaming Integration**: Connect existing infrastructure with UI
-- [ ] **Enhanced AirPlay Support**: Real-time MKV transmuxing for AirPlay
-- [ ] **Advanced Video Controls**: Native player with enhanced control options
-- [ ] **Background Download Support**: Downloads continue when app is backgrounded
-- [ ] **Favorites System**: Bookmarking and personalized content lists
-
-### 📋 **Future Roadmap (v1.2+)**
-- [ ] **Multiple Playback Engines**: Automatic selection between AVPlayer/VLC/FFmpeg
-- [ ] **Offline Playback Mode**: Downloaded content playback without internet
-- [ ] **Advanced Content Filtering**: Genre, year, quality, and custom filters
-- [ ] **Subtitle Management**: Automatic subtitle detection and integration
-- [ ] **tvOS Focus Optimization**: Apple TV-specific UI enhancements
-
----
-
-## Installation
-
-### Development Requirements
-- **Xcode 16 Beta** (for iOS/macOS/tvOS 26 Beta support)
-- **macOS 15 Beta+** (development environment)
-- **Swift 6.0**
-- **Apple Developer Account** (for device installation)
-
-### Build Commands
+#### **Build Commands**
 ```bash
 # macOS Build
 xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Debug
 
-# tvOS Build  
-xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma-tvos-iptv -configuration Debug
-
 # iOS Build (Archive + Export)
 xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Release -archivePath build/ios/mks-iptv.xcarchive archive
+
+# tvOS Build
+xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma-tvos-iptv -configuration Debug
 ```
 
-### End User Installation
+#### **End User Installation**
 
-#### iOS Installation (AltStore Method)
-1. Download the .ipa file from [build/ios/mks-multiplatform-iptv.ipa](./build/ios/mks-multiplatform-iptv.ipa)
-2. Install using AltStore following the [detailed installation guide](./build/ios/INSTALL-WITH-ALTSTORE.md)
-3. Trust the developer certificate in Settings → General → VPN & Device Management
+##### **iOS (AltStore Method)**
+1. Download the `.ipa` file from the [Releases page](https://github.com/MKS2508/MKS-IPTV-App/releases/latest).
+2. Install using AltStore following the [**detailed installation guide**](./build/ios/INSTALL-WITH-ALTSTORE.md).
+3. Trust the developer certificate in `Settings → General → VPN & Device Management`.
 
-#### macOS Installation
-- Download the .app bundle from Releases
-- Drag to Applications folder
-- Accept "Open application from unidentified developer" prompt
+##### **macOS Installation**
+1. Download the `.zip` file from Releases and unzip it.
+2. Drag the `.app` bundle to your `/Applications` folder.
+3. Right-click the app and select "Open", then accept the "unidentified developer" prompt.
 
-#### tvOS Installation
-- Requires Xcode installation with Apple Developer account
-- Connect Apple TV via USB-C and deploy through Xcode
+##### **tvOS Installation**
+- Requires Xcode installation with an Apple Developer account.
+- Connect Apple TV via USB-C and deploy the build through Xcode.
 
----
+</details>
 
-## Contributing
+### 🤝 Contributing
 
-### Development Guidelines
-1. Fork the project repository
-2. Create a feature branch: `git checkout -b feature/EnhancementName`
-3. Implement changes following Swift 6 and SwiftUI best practices
-4. Ensure compatibility with iOS/macOS/tvOS 26 Beta
-5. Test across all target platforms
-6. Commit changes: `git commit -m 'Add feature: EnhancementName'`
-7. Push to branch: `git push origin feature/EnhancementName`
-8. Open a Pull Request with detailed description
+This project is primarily a personal learning endeavor, but contributions are welcome. Please follow the standard `Fork -> Branch -> PR` workflow. Ensure changes are tested across all platforms and adhere to the existing MVVM architecture and Swift 6 concurrency patterns.
 
-### Code Standards
-- Follow Apple Human Interface Guidelines
-- Implement proper Swift 6 concurrency patterns
-- Maintain MVVM architecture consistency
-- Include comprehensive documentation for new features
+</details>
 
 ---
 
-## Project Structure
+<details>
+<summary><h2>🇪🇸 Documentación en Español</h2></summary>
+<br>
 
-```
-mks-multiplatform-iptv/
-├── IPTVDownloader/
-│   ├── Core/                 # Configuration, networking, HTTP servers
-│   │   ├── Configuration/    # IPTV service configuration
-│   │   ├── Networking/       # HTTP clients and streaming
-│   │   └── Player/           # Video player implementations
-│   ├── Features/
-│   │   ├── Downloads/        # Download system + ViewModels
-│   │   ├── LiveChannels/     # Live TV streaming (production ready)
-│   │   ├── Movies/           # VOD Movies (UI + backend ready)
-│   │   ├── Series/           # VOD Series (UI + backend ready)
-│   │   └── TouchBar/         # macOS TouchBar native integration
-│   ├── Models/               # Data models (Movie, Series, LiveChannel)
-│   ├── Services/             # API services and networking layer
-│   └── Utils/                # HTTP servers, streaming utilities
-├── mks-multiplataforma-tvos-iptv/  # tvOS-specific target
-├── build/
-│   └── ios/                  # Distribution builds
-└── docs/
-    └── imgs/                 # Version-organized screenshots
-```
+Esta aplicación ofrece capacidades completas de streaming IPTV, incluyendo TV en vivo, vídeo bajo demanda (VOD) y un sistema de descargas avanzado para todo el ecosistema de Apple, destacando por la adopción temprana del diseño Liquid Glass de iOS/macOS/tvOS 26.
 
----
-
-## License
-
-This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
-
-This ensures that:
-- The source code remains open and accessible
-- Modifications and derivatives must also be open source
-- Commercial use is permitted under GPL terms
-- See [LICENSE](LICENSE) file for complete terms
-
----
-
-## Contact & Support
-
-- **Developer**: [@MKS2508](https://github.com/MKS2508)
-- **Bug Reports**: [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
-- **Documentation**: [Project Wiki](https://github.com/MKS2508/MKS-IPTV-App/wiki)
-
----
-
----
-
-# Documentación en Español
-
-Cliente IPTV nativo multiplataforma con soporte completo para las últimas versiones beta de iOS/macOS/tvOS 26, implementando patrones de diseño Liquid Glass y arquitectura Swift 6 moderna.
-
-## Descargas
-
-### 📥 Última Versión: v1.0 Beta
-
-Descarga la última versión para tu plataforma:
+### 📥 Descargas e Instalación
 
 | Plataforma | Descarga | Guía de Instalación |
 |------------|----------|---------------------|
-| **iOS** | [Descargar IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv.ipa) | [Guía de Instalación](#instalación-ios-método-altstore) |
-| **macOS** | [Descargar para Apple Silicon](https://github.com/MKS2508/MKS-IPTV-App/releases/latest/download/mks-iptv-macos-arm64.zip) | [Guía de Instalación](#instalación-macos) |
-| **tvOS** | Compilar desde código | [Guía para Desarrolladores](#instalación-tvos) |
+| **iOS** | [Descargar IPA](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa) | [Guía AltStore](./build/ios/INSTALL-WITH-ALTSTORE.md) |
+| **macOS** | [Descargar .zip](https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip) | [Ver Instrucciones](#-instalación-en-macos) |
+| **tvOS** | Compilar desde código | [Guía para Desarrolladores](#-instalación-en-tvos) |
 
-> **Nota**: Todas las versiones están disponibles en la [página de Releases](https://github.com/MKS2508/MKS-IPTV-App/releases)
+> **Nota**: Todas las versiones oficiales están en la [**página de Releases**](https://github.com/MKS2508/MKS-IPTV-App/releases). Para métodos alternativos, consulta la [Guía de TestFlight](docs/TestFlight-Distribution-Guide.md) o la [Guía de Instalación Gratuita para iOS](docs/iOS-Free-Installation-Guide.md).
 
-### Métodos Alternativos de Instalación
-- **TestFlight**: [Unirse al Programa Beta](docs/TestFlight-Distribution-Guide.md) (cuando esté disponible)
-- **Instalación Directa**: [Guía de Instalación Gratuita iOS](docs/iOS-Free-Installation-Guide.md)
-- **Compilar desde Código**: Ver [Configuración de Desarrollo](#requisitos-de-desarrollo)
+### 🚀 Características Principales
 
-## Características Principales (Español)
+- **Streaming de TV en Vivo Nativo**: Reproducción en tiempo real con `StreamManager` y `AVPlayer`.
+- **Sistema de Descargas Avanzado**: Descargas locales con servidor HTTP integrado para streaming y seguimiento del progreso.
+- **Gestión Inteligente de Streams**: Resolución automática de redirecciones y cabeceras optimizadas.
+- **Navegación Liquid Glass de iOS 26**: Implementación temprana de los nuevos patrones de diseño de Apple.
+- **Soporte para TouchBar en macOS**: Controles nativos para categorías, búsqueda y reproducción.
+- **Conversión a MOV**: Conversión automática a `.MOV` para una integración óptima con AirPlay y Apple TV.
 
-### Streaming y Contenido
-- **Streaming de TV en Vivo**: Reproducción nativa con `StreamManager` y `AVPlayer`
-- **Sistema de Descargas Avanzado**: Descargas locales con servidor HTTP integrado
-- **Gestión Inteligente de Streams**: Servidores proxy HTTP, resolución automática de redirects
+### 🛠️ Arquitectura Técnica
 
-### Integración con Plataformas
-- **Navegación Liquid Glass iOS 26**: Implementación temprana de los patrones más recientes
-- **Soporte TouchBar macOS**: Controles nativos para categorías y reproducción
-- **Arquitectura Cross-Platform**: Navegación adaptativa en todas las plataformas Apple
+- **Lenguaje**: Swift 6.0 con concurrencia moderna (async/await).
+- **Frameworks**: SwiftUI, AVKit, Network.
+- **Arquitectura**: MVVM con un modelo de concurrencia basado en Actores.
+- **Soporte de Plataformas**: iOS 26+, macOS 26+, tvOS 26+.
 
-### Optimización de Formatos
-- **Conversión MOV**: Conversión automática para mejor integración con AirPlay
-- **Mejora de Metadatos**: Manejo optimizado para el ecosistema Apple
-- **Compatibilidad de Formatos**: MP4 como respaldo, MOV preferido para dispositivos Apple
+### 📸 Capturas de Pantalla
 
-## Historia del Desarrollo (Español)
+<details>
+<summary>Haz clic para ver las capturas de macOS</summary>
 
-Este proyecto representa mi primera aplicación Swift completa, desarrollada como ejercicio de aprendizaje para dominar Swift 6, SwiftUI y patrones modernos de desarrollo iOS.
+| Gestor de Descargas | Modal de Descarga |
+| :---: | :---: |
+| ![Sección de Descargas](./docs/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png) | ![Modal de Descarga](./docs/imgs/v0.0.1-alpha/macos/download_modal.png) |
+| **Navegación Liquid Glass** | **Vista de Detalle de Serie** |
+| ![Navegación Liquid Glass](./docs/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png) | ![Detalle de Serie](./docs/imgs/v0.0.1-alpha/macos/seriesdetail_1.png) |
 
-### Motivación Personal
-La necesidad surgió de las limitaciones encontradas en clientes IPTV existentes:
-- Soluciones comerciales requieren suscripciones pagadas
-- Alternativas open-source con interfaces desactualizadas y no nativas
-- Aplicaciones cross-platform que sacrifican integración nativa
-- Bases de código legacy sin concurrencia moderna Swift
+</details>
 
-### Enfoque de Ingeniería Inversa
-La lógica central de IPTV fue desarrollada mediante **ingeniería inversa autodidacta** de varios servicios IPTV comerciales, realizada **estrictamente con fines educativos**:
+### 📈 Estado de las Funcionalidades
 
-- Análisis de patrones de tráfico de red
-- Comprensión de implementaciones de protocolos IPTV
-- Ingeniería inversa de endpoints API y mecanismos de autenticación
-- Estudio de configuraciones óptimas de streaming
+<details>
+<summary>Haz clic para ver el Roadmap de Funcionalidades</summary>
 
-### Descubrimientos Técnicos
-A través de experimentación y pruebas se descubrieron varias optimizaciones:
-- **Superioridad del formato MOV** sobre MP4 para integración AirPlay y Apple TV
-- **Técnicas de mejora de metadatos** para mejor compatibilidad con el ecosistema Apple
-- **Optimización de proxy HTTP** para compatibilidad de streaming AVPlayer
+#### ✅ **Listo para Producción**
+- [x] Streaming de TV en Vivo
+- [x] Gestión de Descargas
+- [x] Navegación Multiplataforma
+- [x] Liquid Glass de iOS 26 Beta
+- [x] Integración con TouchBar de macOS
+- [x] Búsqueda y Filtrado en Tiempo Real
 
-## Estado de Funcionalidades (Español)
+#### 🔜 **Próxima Versión (v1.1)**
+- [ ] Integración de Streaming VOD
+- [ ] Soporte Mejorado para AirPlay
+- [ ] Soporte para Descargas en Segundo Plano
+- [ ] Sistema de Favoritos
 
-### ✅ **Listo para Producción**
-- [x] **Streaming TV en Vivo**: Reproducción en tiempo real
-- [x] **Gestión de Descargas**: Sistema completo con seguimiento de progreso
-- [x] **Navegación Cross-Platform**: Adaptativa para cada plataforma
-- [x] **Liquid Glass iOS 26**: Implementación temprana de nuevos patrones
-- [x] **Integración TouchBar macOS**: Controles nativos
+#### 📋 **Roadmap Futuro (v1.2+)**
+- [ ] Múltiples Motores de Reproducción (AVPlayer/VLC/FFmpeg)
+- [ ] Modo de Reproducción Offline
+- [ ] Filtrado Avanzado de Contenido
+- [ ] Gestión de Subtítulos
 
-### 🔜 **Próxima Versión (v1.1)**
-- [ ] **Integración Streaming VOD**: Conectar infraestructura existente
-- [ ] **Soporte AirPlay Mejorado**: Transmux MKV en tiempo real
-- [ ] **Controles de Video Avanzados**: Reproductor nativo mejorado
+</details>
 
-### 📋 **Roadmap Futuro (v1.2+)**
-- [ ] **Múltiples Motores de Reproducción**: Selección automática
-- [ ] **Modo Offline**: Reproducción sin conexión
-- [ ] **Filtrado Avanzado**: Por género, año, calidad
+### 🏗️ Compilación e Instalación
 
-## Instalación (Español)
+<details>
+<summary>Haz clic para ver las Instrucciones de Compilación e Instalación</summary>
 
-### Requisitos de Desarrollo
-- **Xcode 16 Beta** (para soporte iOS/macOS/tvOS 26 Beta)
-- **macOS 15 Beta+** 
-- **Swift 6.0**
-- **Apple Developer Account**
+#### **Requisitos de Desarrollo**
+- Xcode 16 Beta
+- macOS 15 Beta+
+- Swift 6.0
+- Cuenta de Desarrollador de Apple
 
-### Instalación Usuario Final
+#### **Comandos de Compilación**
+```bash
+# Compilar para macOS
+xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Debug
 
-#### iOS (Método AltStore)
-1. Descargar archivo .ipa desde [build/ios/mks-multiplatform-iptv.ipa](./build/ios/mks-multiplatform-iptv.ipa)
-2. Instalar usando AltStore siguiendo la [guía detallada](./build/ios/INSTALL-WITH-ALTSTORE.md)
-3. Confiar en certificado de desarrollador
+# Compilar para iOS (Archivar y Exportar)
+xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplatform-iptv -configuration Release -archivePath build/ios/mks-iptv.xcarchive archive
 
-## Screenshots (Español)
+# Compilar para tvOS
+xcodebuild -project mks-multiplatform-iptv.xcodeproj -scheme mks-multiplataforma-tvos-iptv -configuration Debug
+```
 
-### Implementación macOS
+#### **Instalación para Usuario Final**
 
-#### 1. Sistema de Gestión de Descargas
-![Sección de Descargas](./docs/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png)
-*Gestor avanzado de descargas mostrando barras de progreso en tiempo real, velocidades de descarga, tamaños de archivo, porcentajes de finalización y cálculos ETA.*
+##### **Instalación en iOS (Método AltStore)**
+1. Descarga el archivo `.ipa` desde la [página de Releases](https://github.com/MKS2508/MKS-IPTV-App/releases/latest).
+2. Instálalo usando AltStore, siguiendo la [**guía de instalación detallada**](./build/ios/INSTALL-WITH-ALTSTORE.md).
+3. Confía en el certificado de desarrollador en `Ajustes → General → VPN y Gestión de Dispositivos`.
 
-#### 2. Modal de Configuración de Descarga
-![Modal de Descarga](./docs/imgs/v0.0.1-alpha/macos/download_modal.png)
-*Interfaz de configuración permitiendo selección de ubicación de almacenamiento y habilitación de conversión MOV para mejor compatibilidad AirPlay y Apple TV.*
+##### **Instalación en macOS**
+1. Descarga el archivo `.zip` de la página de Releases y descomprímelo.
+2. Arrastra la aplicación `.app` a tu carpeta de `/Aplicaciones`.
+3. Haz clic derecho en la app, selecciona "Abrir" y acepta el aviso de "desarrollador no identificado".
 
-## Licencia (Español)
+##### **Instalación en tvOS**
+- Requiere instalación con Xcode y una cuenta de Desarrollador de Apple.
+- Conecta el Apple TV por USB-C y despliega la compilación a través de Xcode.
 
-Este proyecto está licenciado bajo **GNU General Public License v3.0 (GPL-3.0)**, garantizando que el código fuente permanezca abierto y accesible.
+</details>
 
-## Contacto (Español)
+### 🤝 Contribuciones
 
-- **Desarrollador**: [@MKS2508](https://github.com/MKS2508)
-- **Reportar Bugs**: [GitHub Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
-- **Solicitudes de Características**: [GitHub Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+Este proyecto es principalmente un esfuerzo de aprendizaje personal, pero las contribuciones son bienvenidas. Por favor, sigue el flujo de trabajo estándar `Fork -> Branch -> PR`. Asegúrate de que los cambios se prueben en todas las plataformas y se adhieran a la arquitectura MVVM y los patrones de concurrencia de Swift 6 existentes.
 
-*Construido con ❤️ usando Swift 6, SwiftUI, y mucho ☕️*
+</details>
+
+---
+
+<div align="center">
+  <p><em>Licenciado bajo la <strong>GNU General Public License v3.0</strong>.</em></p>
+  <p>
+    <a href="https://github.com/MKS2508"><strong>Desarrollador: @MKS2508</strong></a> &nbsp;&middot;&nbsp;
+    <a href="https://github.com/MKS2508/MKS-IPTV-App/issues">Reportar un Bug</a> &nbsp;&middot;&nbsp;
+    <a href="https://github.com/MKS2508/MKS-IPTV-App/discussions">Solicitar una Característica</a>
+  </p>
+  <br>
+  <p><em>Construido con ❤️ usando Swift 6, SwiftUI, y mucho ☕️</em></p>
+</div>

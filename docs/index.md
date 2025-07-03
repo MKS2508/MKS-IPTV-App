@@ -1,54 +1,57 @@
-# MKS-IPTV-App
+---
+layout: default
+title: Home
+nav_order: 1
+---
 
-> Native multiplatform IPTV client built with Swift 6
+<div align="center">
+  <a href="https://github.com/MKS2508/MKS-IPTV-App">
+    <img src="imgs/banner3.webp" alt="MKS-IPTV-App Banner" width="800"/>
+  </a>
+  <h1>MKS-IPTV-App Documentation</h1>
+  <p><strong>A native, multiplatform IPTV client for the Apple ecosystem, built with Swift 6 & SwiftUI.</strong></p>
+</div>
 
-[![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-181717?logo=github)](https://github.com/MKS2508/MKS-IPTV-App)
+<p align="center">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0--beta-blueviolet?style=for-the-badge">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20macOS%20%7C%20tvOS-4BC51D?style=for-the-badge">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift">
+  <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/latest">
+    <img alt="Latest Release" src="https://img.shields.io/github/v/release/MKS2508/MKS-IPTV-App?include_prereleases&style=for-the-badge&color=blue&logo=github">
+  </a>
+</p>
 
-## MKS-IPTV-App Documentation
+## 🚀 Welcome
 
-Welcome to the official documentation for MKS-IPTV-App, a native multiplatform IPTV client built with Swift 6.
-
-## Quick Navigation
-
-- 📥 [**Download & Install**](download.md) - Get started with the app
-- 🖼️ [**Screenshots**](screenshots.md) - Visual tour of the app  
-- 🛠️ [**Development**](installation.md#development-setup) - Build from source
-- 🤝 [**Contributing**](https://github.com/MKS2508/MKS-IPTV-App/blob/main/CONTRIBUTING.md) - Help improve the project
-- 📖 [**API Documentation**](https://github.com/MKS2508/MKS-IPTV-App/wiki) - Technical reference
-
-## About This Project
-
-MKS-IPTV-App is a native multiplatform IPTV client featuring:
-
-- **iOS 26 Beta** support with Liquid Glass design
-- **Live TV streaming** with native AVPlayer integration
-- **Advanced download system** with progress tracking
-- **Cross-platform compatibility** (iOS, macOS, tvOS)
-
-## Latest Release
-
-**Version 1.0 Beta** - [Download Latest Release](https://github.com/MKS2508/MKS-IPTV-App/releases/latest)
-
-## Quick Start
-
-1. Download the appropriate version for your platform
-2. Follow the [installation guide](installation.md)
-3. Configure your IPTV service
-4. Start streaming!
-
-## Screenshots
-
-### macOS Interface
-![Download Manager](imgs/v0.0.1-alpha/macos/DownloadsSection_1.png)
-
-[View all screenshots →](screenshots.md)
-
-## Support
-
-- 🐛 [Report Issues](https://github.com/MKS2508/MKS-IPTV-App/issues)
-- 💬 [Discussions](https://github.com/MKS2508/MKS-IPTV-App/discussions)
-- 📧 Contact: [@MKS2508](https://github.com/MKS2508)
+Welcome to the official documentation for MKS-IPTV-App. This site provides all the information you need to download, install, and use the application.
 
 ---
 
-*Built with ❤️ using Swift 6 and SwiftUI*
+## 🗺️ Quick Navigation
+
+| | |
+| :--- | :--- |
+| 📥 [**Downloads**](download.md) | Get the latest builds for all platforms. |
+| 🛠️ [**Installation Guide**](installation.md) | Step-by-step instructions to get you started. |
+| 📸 [**Screenshots**](screenshots.md) | A visual tour of the app's features. |
+| 🐙 [**GitHub Repository**](https://github.com/MKS2508/MKS-IPTV-App) | View the project source and contribute. |
+
+---
+
+## ✨ Core Features
+
+- ** Native Apple Experience**: Built with Swift & SwiftUI for optimal performance and integration.
+- **📺 Live TV & VOD**: Stream your favorite live channels, movies, and series.
+- **📥 Advanced Downloads**: Download content for offline viewing with progress tracking.
+- **🎨 Liquid Glass Design**: Featuring the latest UI patterns from iOS 26.
+- **💻 Multi-platform**: Works seamlessly across iOS, macOS, and tvOS.
+
+---
+
+## 💬 Support
+
+Need help? Have a question or a feature request?
+
+- 🐛 [**Report an Issue**](https://github.com/MKS2508/MKS-IPTV-App/issues)
+- 💡 [**Start a Discussion**](https://github.com/MKS2508/MKS-IPTV-App/discussions)
+- 👨‍💻 [**Contact Developer**](https://github.com/MKS2508)

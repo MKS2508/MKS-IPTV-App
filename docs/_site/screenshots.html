@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
+    <title>Screenshots | MKS-IPTV-App</title>
+    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=cfe44e1da5a713c37f4eed835048d6bffbafe21d">
+  </head>
+  <body>
+    <header class="sticky-header">
+      <div class="container">
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+          <span class="hamburger"></span>
+        </button>
+        <nav class="nav-menu">
+          
+            <a href="/MKS-IPTV-App/download.md" class="nav-link">Download</a>
+          
+            <a href="/MKS-IPTV-App/installation.md" class="nav-link">Installation</a>
+          
+            <a href="/MKS-IPTV-App/screenshots.md" class="nav-link">Screenshots</a>
+          
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <h1 id="-screenshots-gallery">📸 Screenshots Gallery</h1>
+
+<p>A visual tour of MKS-IPTV-App across its supported platforms. These screenshots are from the <code class="language-plaintext highlighter-rouge">v1.0-beta</code> release.</p>
+
+<hr />
+
+<h2 id="-macos-implementation">💻 macOS Implementation</h2>
+
+<p>Here is a showcase of the application running on macOS 26 Beta, highlighting key features and the Liquid Glass design.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Download Management System</th>
+      <th style="text-align: center">Download Configuration Modal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" alt="Downloads Section" /></td>
+      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/download_modal.png" alt="Download Modal" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><strong>Liquid Glass Navigation</strong></td>
+      <td style="text-align: center"><strong>Series Detail View</strong></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" alt="Liquid Glass Navigation" /></td>
+      <td style="text-align: center"><img src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/seriesdetail_1.png" alt="Series Detail" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="feature-descriptions">Feature Descriptions</h3>
+
+<ul>
+  <li><strong>Download Management System</strong>: Shows real-time progress, speed, ETA, and status for all your downloads.</li>
+  <li><strong>Download Configuration Modal</strong>: Allows you to select storage location and enable <code class="language-plaintext highlighter-rouge">.MOV</code> conversion for better AirPlay compatibility.</li>
+  <li><strong>Liquid Glass Navigation</strong>: An early adoption of iOS 26’s translucent and modern design patterns, adapted for macOS.</li>
+  <li><strong>Series Detail View</strong>: Displays comprehensive series information, episode management, and download options.</li>
+</ul>
+
+<hr />
+
+<h2 id="-ios--ipados-coming-soon">📱 iOS &amp; iPadOS (Coming Soon)</h2>
+
+<p>Screenshots showcasing the native iOS 26 Beta Liquid Glass patterns on both iPhone and iPad are in progress. They will be available in the <code class="language-plaintext highlighter-rouge">docs/imgs/v0.0.1-alpha/ios/</code> directory soon.</p>
+
+<p><strong>Planned views:</strong></p>
+<ul>
+  <li>Home Screen with Tab Bar Navigation</li>
+  <li>Live TV Player Interface</li>
+  <li>iPad Split View for Multitasking</li>
+</ul>
+
+<hr />
+
+<h2 id="-tvos-coming-soon">📺 tvOS (Coming Soon)</h2>
+
+<p>Apple TV screenshots will be added to demonstrate the focus-based navigation and living-room-optimized user experience.</p>
+
+      </div>
+    </main>
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.querySelector('.nav-menu');
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        navToggle.classList.toggle('active');
+      });
+
+      const backToTop = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+          backToTop.classList.add('visible');
+        } else {
+          backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+  </body>
+</html>

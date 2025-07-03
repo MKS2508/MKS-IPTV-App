@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
+    <title>Downloads | MKS-IPTV-App</title>
+    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=cfe44e1da5a713c37f4eed835048d6bffbafe21d">
+  </head>
+  <body>
+    <header class="sticky-header">
+      <div class="container">
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+          <span class="hamburger"></span>
+        </button>
+        <nav class="nav-menu">
+          
+            <a href="/MKS-IPTV-App/download.md" class="nav-link">Download</a>
+          
+            <a href="/MKS-IPTV-App/installation.md" class="nav-link">Installation</a>
+          
+            <a href="/MKS-IPTV-App/screenshots.md" class="nav-link">Screenshots</a>
+          
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <h1 id="-downloads">📥 Downloads</h1>
+
+<p>Download the latest version of MKS-IPTV-App for your platform. All builds are compiled directly from the source in our private repository.</p>
+
+<h2 id="latest-release-v10-beta">Latest Release: v1.0 Beta</h2>
+
+<div class="download-grid">
+  <div class="download-card">
+    <h3><span role="img" aria-label="iOS &amp; iPadOS">📱</span> iOS &amp; iPadOS</h3>
+    <p>Requires iOS 26 Beta or later.</p>
+    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/ios_pre_mks-multiplatform-iptv.ipa" class="btn">Download IPA</a>
+    <a href="installation.md#ios-installation-altstore-method" class="btn-secondary">Installation Guide</a>
+  </div>
+  <div class="download-card">
+    <h3><span role="img" aria-label="macOS">💻</span> macOS</h3>
+    <p>Requires macOS 26 Beta or later.</p>
+    <a href="https://github.com/MKS2508/MKS-IPTV-App/releases/download/v1.0.0-alpha/mac-os-arm64_pre_mks-multiplatform-iptv.app.zip" class="btn">Download for Apple Silicon</a>
+    <a href="installation.md#macos-installation" class="btn-secondary">Installation Guide</a>
+  </div>
+  <div class="download-card">
+    <h3><span role="img" aria-label="tvOS">📺</span> tvOS</h3>
+    <p>Requires tvOS 26 Beta &amp; Xcode.</p>
+    <a href="installation.md#tvos-installation" class="btn">Build From Source Guide</a>
+  </div>
+</div>
+
+<hr />
+
+<h2 id="️-system-requirements">⚙️ System Requirements</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: left">Platform</th>
+      <th style="text-align: left">Minimum Version</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: left"><strong>iOS / iPadOS</strong></td>
+      <td style="text-align: left">iOS 26 Beta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><strong>macOS</strong></td>
+      <td style="text-align: left">macOS 26 Beta</td>
+    </tr>
+    <tr>
+      <td style="text-align: left"><strong>tvOS</strong></td>
+      <td style="text-align: left">tvOS 26 Beta</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p><strong>Note:</strong> An Apple Developer Account may be required for installation on some platforms.</p>
+</blockquote>
+
+<hr />
+
+<h2 id="-previous-versions">📦 Previous Versions</h2>
+
+<p>All previous releases are available on our <a href="https://github.com/MKS2508/MKS-IPTV-App/releases"><strong>GitHub Releases</strong></a> page. You can find older builds and review changelogs there.</p>
+
+<hr />
+
+
+      </div>
+    </main>
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.querySelector('.nav-menu');
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        navToggle.classList.toggle('active');
+      });
+
+      const backToTop = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+          backToTop.classList.add('visible');
+        } else {
+          backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+  </body>
+</html>

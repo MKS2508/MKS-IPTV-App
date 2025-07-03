@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Native multiplatform IPTV client built with Swift 6">
+    <title>📋 Prerequisites | MKS-IPTV-App</title>
+    <link rel="icon" href="/MKS-IPTV-App/assets/imgs/favicon.png" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/MKS-IPTV-App/assets/css/style.css?v=cfe44e1da5a713c37f4eed835048d6bffbafe21d">
+  </head>
+  <body>
+    <header class="sticky-header">
+      <div class="container">
+        <a href="http://localhost:4000/MKS-IPTV-App/" class="site-title">MKS-IPTV-App</a>
+        <button class="nav-toggle" aria-label="toggle navigation">
+          <span class="hamburger"></span>
+        </button>
+        <nav class="nav-menu">
+          
+            <a href="/MKS-IPTV-App/download.md" class="nav-link">Download</a>
+          
+            <a href="/MKS-IPTV-App/installation.md" class="nav-link">Installation</a>
+          
+            <a href="/MKS-IPTV-App/screenshots.md" class="nav-link">Screenshots</a>
+          
+        </nav>
+      </div>
+    </header>
+    <main>
+      <div class="container">
+        <h2 id="-prerequisites">📋 Prerequisites</h2>
+
+<ul>
+  <li><strong>Apple Developer Account</strong>: Required for App Store Connect access ($99/year).</li>
+  <li><strong>Certificates &amp; Profiles</strong>: An Apple Distribution Certificate and an App Store Distribution Provisioning Profile.</li>
+  <li><strong>App Store Connect Record</strong>: You must have an app record created in App Store Connect.</li>
+</ul>
+
+<hr />
+
+<h2 id="-distribution-steps">🚀 Distribution Steps</h2>
+
+<h3 id="step-1-create-the-archive">Step 1: Create the Archive</h3>
+<p>If you need to generate a new archive:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>xcodebuild <span class="nt">-project</span> mks-multiplatform-iptv.xcodeproj <span class="se">\</span>
+           <span class="nt">-scheme</span> mks-multiplatform-iptv <span class="se">\</span>
+           <span class="nt">-configuration</span> Release <span class="se">\</span>
+           archive <span class="se">\</span>
+           <span class="nt">-archivePath</span> ./build/mks-iptv-appstore.xcarchive
+</code></pre></div></div>
+
+<h3 id="step-2-create-exportoptionsplist">Step 2: Create ExportOptions.plist</h3>
+<p>Create an <code class="language-plaintext highlighter-rouge">ExportOptionsAppStore.plist</code> file:</p>
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="cp">&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;</span>
+<span class="nt">&lt;plist</span> <span class="na">version=</span><span class="s">"1.0"</span><span class="nt">&gt;</span>
+<span class="nt">&lt;dict&gt;</span>
+    <span class="nt">&lt;key&gt;</span>method<span class="nt">&lt;/key&gt;</span>
+    <span class="nt">&lt;string&gt;</span>app-store<span class="nt">&lt;/string&gt;</span>
+    <span class="nt">&lt;key&gt;</span>teamID<span class="nt">&lt;/key&gt;</span>
+    <span class="nt">&lt;string&gt;</span>YOUR_TEAM_ID<span class="nt">&lt;/string&gt;</span>
+    <span class="nt">&lt;key&gt;</span>uploadBitcode<span class="nt">&lt;/key&gt;</span>
+    <span class="nt">&lt;false/&gt;</span>
+    <span class="nt">&lt;key&gt;</span>uploadSymbols<span class="nt">&lt;/key&gt;</span>
+    <span class="nt">&lt;true/&gt;</span>
+    <span class="nt">&lt;key&gt;</span>signingStyle<span class="nt">&lt;/key&gt;</span>
+    <span class="nt">&lt;string&gt;</span>automatic<span class="nt">&lt;/string&gt;</span>
+<span class="nt">&lt;/dict&gt;</span>
+<span class="nt">&lt;/plist&gt;</span>
+</code></pre></div></div>
+
+<h3 id="step-3-upload-to-app-store-connect">Step 3: Upload to App Store Connect</h3>
+<p>You can upload the build using Xcode, Transporter, or the command line.</p>
+
+<p><strong>Using <code class="language-plaintext highlighter-rouge">xcrun altool</code> (Command Line):</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>xcrun altool <span class="nt">--upload-app</span> <span class="se">\</span>
+             <span class="nt">-f</span> <span class="s2">"./build/appstore-export/mks-multiplatform-iptv.pkg"</span> <span class="se">\</span>
+             <span class="nt">-t</span> macos <span class="se">\</span>
+             <span class="nt">-u</span> <span class="s2">"your-apple-id@email.com"</span> <span class="se">\</span>
+             <span class="nt">-p</span> <span class="s2">"app-specific-password"</span>
+</code></pre></div></div>
+
+<h3 id="step-4-configure-testflight">Step 4: Configure TestFlight</h3>
+<p>Once the build is processed in App Store Connect:</p>
+<ol>
+  <li>Navigate to your app’s <strong>TestFlight</strong> tab.</li>
+  <li>Complete any required compliance information.</li>
+  <li>Add build notes under <strong>“What to Test”</strong>.</li>
+  <li>Start inviting internal or external testers.</li>
+</ol>
+
+<hr />
+
+<h2 id="️-managing-testers">⚙️ Managing Testers</h2>
+
+<ul>
+  <li><strong>Internal Testers (up to 100)</strong>: Team members with a role in App Store Connect. They get access immediately.</li>
+  <li><strong>External Testers (up to 10,000)</strong>: Any user you invite via email or a public link. The first build for external testers requires a beta review by Apple.</li>
+</ul>
+
+<blockquote>
+  <p><strong>Note:</strong> TestFlight builds expire after 90 days.</p>
+</blockquote>
+
+<hr />
+
+<h2 id="-troubleshooting">🔧 Troubleshooting</h2>
+
+<ul>
+  <li><strong>“Invalid Signature”</strong>: Ensure you are using a Distribution Certificate, not a Development one.</li>
+  <li><strong>“Provisioning Profile Mismatch”</strong>: Regenerate the profile in the Apple Developer Portal and ensure it’s linked to your App ID.</li>
+  <li><strong>Build Not Processing</strong>: Check your email for notifications from Apple regarding any issues with the build.</li>
+</ul>
+
+<p>For more details, refer to the official <a href="https://developer.apple.com/testflight/"><strong>TestFlight Documentation</strong></a>.</p>
+
+      </div>
+    </main>
+    <a href="#" class="back-to-top">↑</a>
+
+    <script>
+      const navToggle = document.querySelector('.nav-toggle');
+      const navMenu = document.querySelector('.nav-menu');
+      navToggle.addEventListener('click', () => {
+        navMenu.classList.toggle('active');
+        navToggle.classList.toggle('active');
+      });
+
+      const backToTop = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 200) {
+          backToTop.classList.add('visible');
+        } else {
+          backToTop.classList.remove('visible');
+        }
+      });
+    </script>
+  </body>
+</html>

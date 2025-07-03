@@ -172,14 +172,13 @@ document.addEventListener('DOMContentLoaded', function() {
       particles.style.transform = `translateY(${rate}px) scale(${1 + scrollY * 0.0001})`;
     }
 
-    // Gentle parallax for minimal header
-    if (minimalHeader && scrollY < viewportHeight && stage2Revealed) {
-      const headerParallax = scrollY * 0.05;
-      minimalHeader.style.transform = `translate(-50%, -50%) translateY(${headerParallax}px)`;
+    // Remove conflicting transforms from hero elements
+    if (minimalHeader && stage2Revealed) {
+      minimalHeader.style.transform = `translateX(-50%)`;
     }
 
     // Gradual banner fade out starting at 150vh
-    const heroBackground = document.querySelector('.immersive-hero .hero-background');
+    const heroBackground = document.querySelector('.hero-background');
     const bannerFadeStart = viewportHeight * 1.5; // 150vh
     const bannerFadeEnd = viewportHeight * 1.8; // 180vh
     

@@ -148,6 +148,16 @@ bun run lint
 bun run format
 ```
 
+## CRITICAL Development Rules
+
+### NEVER Run Development Server
+**NUNCA ejecutar `npm run dev` o `bun dev`** - El usuario maneja el servidor de desarrollo en su IDE.
+
+Si necesitas verificar cambios:
+1. Usa `bun run check` para verificación de tipos
+2. Usa `bun run build` para verificar que compila
+3. Pide feedback al usuario sobre funcionamiento
+
 ## Commit Guidelines
 
 ### Commit Message Format
@@ -159,6 +169,17 @@ tipo(alcance): descripción corta
 
 Cuerpo del commit explicando el porqué del cambio.
 ```
+
+### Original Content Migration
+Cuando se necesite migrar contenido original, este se encuentra en:
+`/Users/mks/Documents/GitHub/MKS-IPTV-App/docs/` (archivos HTML, CSS, JS con todas las secciones)
+
+## 4 Páginas Esenciales
+El proyecto debe contar con estas 4 páginas mínimas:
+- **Home** (`src/pages/index.astro`) - Página principal con Hero y características
+- **Installation** (`src/pages/installation.astro`) - Guía de instalación
+- **Download** (`src/pages/download.astro`) - Enlaces de descarga
+- **Screenshots** (`src/pages/screenshots.astro`) - Galería de capturas
 
 ## Integration with Main Project
 

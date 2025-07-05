@@ -6,19 +6,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0f9ff',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          900: '#1e3a8a',
-        },
-        cyber: {
-          purple: '#8B5CF6',
-          pink: '#EC4899',
-          blue: '#3B82F6',
-          green: '#10B981',
-        },
+        // Legacy color system from /docs/assets/css/_variables.scss
+        background: 'var(--background)',
+        surface: 'var(--surface)',
+        primary: 'var(--primary)',
+        accent: 'var(--accent)',
+        highlight: 'var(--highlight)',
+        'red-neon': 'var(--red-neon)',
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        
+        // Semantic aliases for easier usage
+        'app-background': 'var(--background)',
+        'app-surface': 'var(--surface)',
+        'app-primary': 'var(--primary)',
+        'app-accent': 'var(--accent)',
+        'app-highlight': 'var(--highlight)',
+        'app-red-neon': 'var(--red-neon)',
+        'app-text': 'var(--text-primary)',
+        'app-text-muted': 'var(--text-secondary)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

@@ -1,11 +1,124 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import Header from '../components/layout/Header/index.astro';
+import Footer from '../components/layout/Footer/index.astro';
+import { strings } from '../i18n/strings/es-es';
+import { homeContent } from '../data/legacy-content';
 ---
 
-<Layout>
-	<Welcome />
+<Layout 
+  title={strings.meta.titleHome}
+  description={strings.meta.description}
+>
+  <Header currentPath="/" />
+  
+  <main class="pt-16 lg:pt-20">
+    <!-- Hero Section -->
+    <section class="min-h-[80vh] flex items-center justify-center bg-cyberpunk relative overflow-hidden">
+      <!-- Background Pattern -->
+      <div class="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,68,68,.2)_50%,transparent_75%,transparent)] bg-[length:60px_60px] opacity-20"></div>
+      
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+        <h1 class="text-4xl md:text-6xl lg:text-7xl font-bold text-app-text mb-6">
+          <span class="text-gradient">
+            MKS-IPTV
+          </span>
+        </h1>
+        
+        <p class="text-xl md:text-2xl text-app-text-muted mb-8 max-w-3xl mx-auto">
+          {homeContent.hero.tagline}
+        </p>
+        
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <a 
+            href="/MKS-IPTV-App/download" 
+            class="btn-primary transform hover:scale-105 shadow-lg"
+          >
+            {strings.buttons.downloadNow}
+          </a>
+          <a 
+            href="/MKS-IPTV-App/screenshots" 
+            class="border border-app-primary hover:border-app-accent text-app-text-muted hover:text-app-text font-semibold py-3 px-8 rounded-lg transition-all duration-200"
+          >
+            {strings.buttons.viewScreenshots}
+          </a>
+        </div>
+        
+        <div class="mt-8 text-center">
+          <p class="text-app-text-muted text-sm">
+            {homeContent.hero.version} • {homeContent.hero.platforms} • {homeContent.hero.swift}
+          </p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Features Preview -->
+    <section class="py-20 bg-app-surface/50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-3xl md:text-4xl font-bold text-center text-app-text mb-12">
+          {strings.sections.features}
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {homeContent.features.map((feature) => (
+            <div class="text-center p-6 bg-app-surface/30 rounded-xl hover:bg-app-surface/50 transition-colors duration-200">
+              <div class="text-4xl mb-4">{feature.icon}</div>
+              <h3 class="text-xl font-semibold text-app-text mb-3">{feature.title}</h3>
+              <p class="text-app-text-muted">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+    
+    <!-- Screenshots Carousel -->
+    <section class="py-20 bg-app-primary/10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl md:text-4xl font-bold text-app-text mb-4">
+            {homeContent.carousel.title}
+          </h2>
+          <p class="text-xl text-app-text-muted max-w-2xl mx-auto">
+            {homeContent.carousel.subtitle}
+          </p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {homeContent.carousel.slides.map((slide, index) => (
+            <div class="bg-app-surface/30 rounded-xl p-6 hover:bg-app-surface/50 transition-colors duration-200">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 flex items-center justify-center">
+                <svg class="w-16 h-16 text-app-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">{slide.title}</h3>
+              <p class="text-app-text-muted">{slide.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+    
+    <!-- Quick Stats -->
+    <section class="py-20 bg-gradient-to-r from-app-surface to-app-primary">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div>
+            <div class="text-4xl font-bold text-app-highlight mb-2">3</div>
+            <div class="text-app-text-muted">{strings.stats.platforms}</div>
+          </div>
+          <div>
+            <div class="text-4xl font-bold text-app-accent mb-2">100%</div>
+            <div class="text-app-text-muted">{strings.stats.native}</div>
+          </div>
+          <div>
+            <div class="text-4xl font-bold text-app-highlight mb-2">GPL-3.0</div>
+            <div class="text-app-text-muted">{strings.stats.opensource}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <Footer />
 </Layout>

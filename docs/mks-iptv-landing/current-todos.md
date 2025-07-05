@@ -23,11 +23,31 @@ Following the engineering approach from:
 ## 🚧 In Progress
 
 ### Phase 2: Core Components Setup
-- [ ] Create base components: Layout, Header, Footer, SEO
+- [x] Fix compilation error (Welcome.astro import removed)
+- [ ] Create MainLayout.astro with SEO and ViewTransitions
+- [ ] Create Header component with navigation
+- [ ] Create Footer component
+- [ ] Create 4 essential pages
+- [ ] Setup basic navigation between pages
 
 ## 📋 Pending Tasks
 
 ### Phase 2: Core Layout Components (High Priority)
+
+#### 2.0 IMMEDIATE: Project Compilation & Basic Structure
+- [x] **Fix Compilation Error**: Remove Welcome.astro import from index.astro
+- [ ] **Create 4 Essential Pages**: Home, Installation, Download, Screenshots
+- [ ] **Basic Navigation**: Working navigation between all pages
+- [ ] **Quality Verification**: Run bun run check and bun run build
+- [ ] **Project Commit**: Commit working project with navigation
+- [ ] **GitHub Pages Migration**: Setup proper deployment with Actions
+
+#### 2.1 Documentation & LLM Support
+- [ ] **Update GEMINI.md Files**: Create copies of CLAUDE.md for Gemini LLM
+  - Main project: `/Users/mks/Documents/GitHub/MKS-IPTV-App/GEMINI.md`
+  - Landing project: `/Users/mks/Documents/GitHub/MKS-IPTV-App/docs/mks-iptv-landing/GEMINI.md`
+- [ ] **Add Development Rules**: Never run npm run dev (user handles in IDE)
+- [ ] **Content Migration Reference**: Document original content location `/Users/mks/Documents/GitHub/MKS-IPTV-App/docs/`
 
 #### 2.1 Base Layout System
 - [ ] **Structure**: `src/layouts/MainLayout.astro` (Following PLAYBOOK-ASTRO.md mandatory structure)

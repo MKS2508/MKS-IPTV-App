@@ -78,7 +78,7 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj \
 
 ## Documentation Site Commands
 
-### Jekyll Development
+### Jekyll Development (Legacy)
 ```bash
 # Install dependencies
 bundle install
@@ -93,6 +93,27 @@ bundle exec jekyll build
 bundle exec jekyll clean
 ```
 
+### Astro Development (New Landing Page)
+```bash
+# Navigate to Astro project
+cd docs/mks-iptv-landing
+
+# Install dependencies
+bun install
+
+# Start development server
+bun dev
+
+# Build for production
+bun run build
+
+# Preview production build
+bun run preview
+
+# Deploy to GitHub Pages
+bun run deploy
+```
+
 ## Development Notes
 
 ### Current Repository State
@@ -101,11 +122,25 @@ bundle exec jekyll clean
 ### Repository Structure
 ```
 MKS-IPTV-App/
-├── docs/                    # Jekyll documentation site
-│   ├── _layouts/           # Jekyll layouts
-│   ├── _site/             # Generated static site (do not edit)
+├── docs/                    # Documentation sites
+│   ├── _layouts/           # Jekyll layouts (legacy)
+│   ├── _site/             # Generated Jekyll site (do not edit)
 │   ├── assets/            # CSS, JS, images
 │   ├── imgs/              # Screenshots organized by version
+│   ├── mks-iptv-landing/  # Astro landing page project
+│   │   ├── src/           # Astro source files
+│   │   │   ├── components/   # Reusable Astro components
+│   │   │   ├── layouts/      # Page layouts
+│   │   │   ├── pages/        # Route pages
+│   │   │   ├── scripts/      # TypeScript/JavaScript files
+│   │   │   ├── styles/       # CSS and styling
+│   │   │   ├── types/        # TypeScript type definitions
+│   │   │   └── data/         # Static data files
+│   │   ├── public/        # Static assets
+│   │   ├── astro.config.mjs  # Astro configuration
+│   │   ├── package.json      # Dependencies and scripts
+│   │   ├── tailwind.config.ts # Tailwind CSS configuration
+│   │   └── tsconfig.json     # TypeScript configuration
 │   └── *.md               # Documentation pages
 ├── build/                  # Build artifacts
 │   └── export/
@@ -117,16 +152,34 @@ MKS-IPTV-App/
 
 ### GitHub Pages Documentation
 The documentation site is hosted at: https://MKS2508.github.io/MKS-IPTV-App/
+
+#### Jekyll Site (Legacy)
 - Configuration: `docs/_config.yml` with Jekyll and Hacker theme
 - Main pages: index.md, download.md, installation.md, screenshots.md
 - Custom CSS: Cyberpunk/synthwave styling in `docs/assets/css/`
 - **Language Support**: Documentation is bilingual (English/Spanish)
 
+#### Astro Landing Page (New)
+- **Working Directory**: `docs/mks-iptv-landing/`
+- **Tech Stack**: Astro 5.11 + TypeScript 5.8 + Tailwind CSS 3.4 + Bun
+- **Animation Libraries**: GSAP 3.13, Lenis 1.3.4, tsParticles 3.8.1
+- **UI Components**: Embla Carousel, PhotoSwipe, Keen Slider
+- **Build Target**: Static site optimized for GitHub Pages
+- **Features**: Modern landing page with cyberpunk styling, smooth animations, and responsive design
+
 ### Required Development Environment
+
+#### Swift App Development
 - Xcode 16 Beta (for iOS/macOS/tvOS 26 Beta support)
 - macOS 15 Beta or later
 - Swift 6.0
 - Apple Developer Account for device deployment
+
+#### Astro Landing Page Development
+- **Runtime**: Bun (latest) - Ultra-fast package manager and runtime
+- **Node.js**: v18+ (for compatibility)
+- **TypeScript**: 5.8+ with strict configuration
+- **Git**: For version control and GitHub Pages deployment
 
 ### Code Signing
 The project requires proper code signing configuration. Ensure developer certificates and provisioning profiles are correctly set up in Xcode.

@@ -16,7 +16,9 @@ export const strings = {
   // Botones y acciones
   buttons: {
     downloadNow: 'Descargar Ahora',
-    viewScreenshots: 'Ver Screenshots',
+    viewScreenshots: 'Ver Capturas',
+    documentation: 'Documentación',
+    learnMore: 'Saber Más',
     viewInstallation: 'Ver Guía de Instalación',
     download: 'Descargar',
     requestAccess: 'Solicitar Acceso',
@@ -26,6 +28,12 @@ export const strings = {
     downloadFormacOS: 'Descargar para macOS',
     downloadForTvOS: 'Descargar para tvOS',
     installGuide: 'Guía de Instalación'
+  },
+
+  hero: {
+    scrollDown: 'Desplázate para explorar',
+    watchDemo: 'Ver Demo',
+    version: 'Versión'
   },
 
   // Etiquetas de estado

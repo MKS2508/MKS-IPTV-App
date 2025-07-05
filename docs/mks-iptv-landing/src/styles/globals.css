@@ -71,4 +71,25 @@
   .border-app-accent {
     border-color: var(--accent);
   }
+
+  @keyframes particle-fade-move {
+    0% {
+      transform: translate(0, 0) scale(0);
+      opacity: 0;
+    }
+    25% {
+      opacity: 0.5;
+    }
+    50% {
+      transform: translate(var(--x), var(--y)) scale(1);
+      opacity: 1;
+    }
+    75% {
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(calc(var(--x) * 2), calc(var(--y) * 2)) scale(0);
+      opacity: 0;
+    }
+  }
 }

@@ -1,0 +1,195 @@
+---
+/**
+ * @component Hero
+ * @description Componente principal de Héroe para la página de inicio.
+ * Muestra el título, descripción y llamadas a la acción principales con
+ * animaciones avanzadas y efectos visuales para crear un impacto inmediato.
+ * @see /docs/mks-iptv-landing/docs/HERO_COMPONENT_IMPLEMENTATION.md
+ */
+import type { HeroProps } from './types';
+import { heroStyles, animationClasses } from './styles';
+import { strings } from '../../../i18n/strings/es-es';
+import { homeContent } from '../../../data/legacy-content';
+import ParticleBackground from '../../interactive/ParticleBackground/index.astro';
+
+const {
+  subtitle = homeContent.hero.version,
+  title = homeContent.hero.title,
+  description = homeContent.hero.description,
+  tagline = homeContent.hero.tagline,
+  ctaPrimaryText = strings.buttons.downloadNow,
+  ctaSecondaryText = strings.buttons.viewScreenshots,
+  ctaTertiaryText = strings.buttons.documentation,
+  ctaPrimaryLink = '/MKS-IPTV-App/download',
+  ctaSecondaryLink = '/MKS-IPTV-App/screenshots',
+  ctaTertiaryLink = '/MKS-IPTV-App/installation',
+  showParticles = true,
+  enableScrollAnimations = true,
+  className = '',
+  backgroundImage = undefined
+}: HeroProps = Astro.props;
+
+const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
+---
+
+<section id="hero-section" class={heroClasses} aria-labelledby="hero-title">
+  <!-- Efectos de Fondo -->
+  <div class={heroStyles.background.overlay}></div>
+  {backgroundImage && (
+    <img 
+      src={backgroundImage}
+      alt="MKS-IPTV Hero Background"
+      class="absolute inset-0 w-full h-full object-cover opacity-20"
+    />
+  )}
+  {showParticles && <div class="absolute inset-0 z-0" id="css-particles"></div>}
+
+  <!-- Contenido Principal -->
+  <div class={heroStyles.content.wrapper}>
+    <div class:list={[animationClasses.willChange, animationClasses.subtitle]}>
+      <p class={heroStyles.content.subtitle}>{subtitle}</p>
+    </div>
+
+    <h1 id="hero-title" class:list={[animationClasses.willChange, animationClasses.title, heroStyles.glow]}>
+      {title}
+    </h1>
+
+    <p class:list={[animationClasses.willChange, animationClasses.description]}>
+      {description}
+    </p>
+
+    <p class:list={[animationClasses.willChange, animationClasses.tagline]}>
+      {tagline}
+    </p>
+
+    <div class:list={[animationClasses.willChange, animationClasses.ctaGroup, heroStyles.content.ctaGroup]}>
+      <a href={ctaPrimaryLink} class={heroStyles.content.cta.primary}>
+        {ctaPrimaryText}
+      </a>
+      <a href={ctaSecondaryLink} class={heroStyles.content.cta.secondary}>
+        {ctaSecondaryText}
+      </a>
+    </div>
+     <div class="mt-4">
+        <a href={ctaTertiaryLink} class={heroStyles.content.cta.tertiary}>
+            {ctaTertiaryText}
+        </a>
+    </div>
+  </div>
+
+  <!-- Indicador de Scroll -->
+  {enableScrollAnimations && (
+    <div id={animationClasses.scrollIndicator} class={heroStyles.scroll.indicator}>
+      <svg class={heroStyles.scroll.arrow} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+      </svg>
+      <span class="text-sm">{strings.hero.scrollDown}</span>
+    </div>
+  )}
+</section>
+
+<script>
+  import { gsap } from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  import { animationClasses, heroStyles } from './styles';
+
+  gsap.registerPlugin(ScrollTrigger);
+
+  console.log("Hero script loaded.");
+
+  const initHeroAnimations = async () => {
+    const heroSection = document.getElementById('hero-section');
+    if (!heroSection) return;
+
+    // GSAP Animations
+    const heroTl = gsap.timeline({
+      delay: 0.5,
+      onComplete: () => console.log('Hero loaded')
+    });
+
+    const mm = gsap.matchMedia();
+
+    mm.add({
+      isDesktop: "(min-width: 768px)",
+      isMobile: "(max-width: 767px)"
+    }, (context) => {
+      const { isDesktop } = context.conditions!;
+
+      heroTl
+        .from(`.${animationClasses.subtitle}`, { 
+          duration: 1, 
+          y: -30, 
+          opacity: 0, 
+          ease: 'back.out(1.7)' 
+        })
+        .from(`.${animationClasses.title}`, { 
+          duration: 1.2, 
+          y: 50, 
+          scale: 0.9,
+          opacity: 0, 
+          ease: 'power3.out' 
+        }, '-=0.7')
+        .from(`.${animationClasses.description}`, { 
+          duration: 1, 
+          y: 30, 
+          opacity: 0, 
+          stagger: 0.2 
+        }, '-=0.8')
+        .from(`.${animationClasses.tagline}`, { 
+          duration: 0.8, 
+          opacity: 0 
+        }, '-=0.7')
+        .from(`.${animationClasses.ctaGroup}`, { 
+          duration: 1, 
+          scale: 0.8, 
+          opacity: 0, 
+          ease: 'back.out(1.7)' 
+        }, '-=0.6');
+
+      // Scroll Triggers
+      ScrollTrigger.create({
+        trigger: heroSection,
+        start: 'top top',
+        end: 'bottom top',
+        scrub: 1,
+        onUpdate: self => {
+          gsap.to(`.${animationClasses.title}`, { y: self.progress * (isDesktop ? 200 : 100), autoAlpha: 1 - self.progress * 1.5 });
+          gsap.to(`.${animationClasses.description}`, { autoAlpha: 1 - self.progress * 1.2 });
+          gsap.to(`.${animationClasses.ctaGroup}`, { autoAlpha: 1 - self.progress * 1.2 });
+        }
+      });
+
+      const scrollIndicator = document.getElementById(animationClasses.scrollIndicator);
+      if (scrollIndicator) {
+        gsap.to(scrollIndicator, { y: 10, repeat: -1, yoyo: true, ease: 'power1.inOut', duration: 1.5 });
+        ScrollTrigger.create({
+            trigger: heroSection,
+            start: 'top top',
+            onUpdate: self => {
+                gsap.to(scrollIndicator, { autoAlpha: 1 - self.progress * 5 });
+            }
+        });
+      }
+    });
+  };
+
+  document.addEventListener('DOMContentLoaded', initHeroAnimations);
+
+  // CSS Particles Generation
+  const cssParticlesContainer = document.getElementById('css-particles');
+  if (cssParticlesContainer) {
+    for (let i = 0; i < 50; i++) {
+      const particle = document.createElement('div');
+      particle.className = `${heroStyles.cssParticles.particle} ${heroStyles.cssParticles.animation}`;
+      const size = Math.random() * 5 + 2; // Size between 2px and 7px
+      particle.style.width = `${size}px`;
+      particle.style.height = `${size}px`;
+      particle.style.left = `${Math.random() * 100}%`;
+      particle.style.top = `${Math.random() * 100}%`;
+      particle.style.setProperty('--x', `${(Math.random() - 0.5) * 200}px`);
+      particle.style.setProperty('--y', `${(Math.random() - 0.5) * 200}px`);
+      particle.style.animationDelay = `${Math.random() * 10}s`;
+      particle.style.animationDuration = `${Math.random() * 10 + 5}s`;
+      cssParticlesContainer.appendChild(particle);
+    }
+  }

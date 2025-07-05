@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 import sitemap from '@astrojs/sitemap';
+import react from '@astrojs/react';
 
 export default defineConfig({
   site: 'https://MKS2508.github.io',
@@ -12,11 +13,12 @@ export default defineConfig({
       applyBaseStyles: false,
     }),
     sitemap(),
+    react(),
   ],
 
   vite: {
     optimizeDeps: {
-      include: ['gsap', 'lenis', '@tsparticles/engine'],
+      include: ['gsap', 'lenis'],
     },
     build: {
       cssMinify: true,

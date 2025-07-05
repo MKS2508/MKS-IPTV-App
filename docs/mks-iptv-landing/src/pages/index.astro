@@ -2,56 +2,21 @@
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
+import Hero from '../components/sections/Hero/index.astro';
 import { strings } from '../i18n/strings/es-es';
 import { homeContent } from '../data/legacy-content';
 import { getImagePath } from '../utils/image-paths';
+import { banners } from '../data/assets';
 ---
 
 <Layout 
   title={strings.meta.titleHome}
   description={strings.meta.description}
 >
-  <Header currentPath="/" />
+  <Header currentPath="/" transparent={true} />
   
-  <main class="pt-16 lg:pt-20">
-    <!-- Hero Section -->
-    <section class="min-h-[80vh] flex items-center justify-center bg-cyberpunk relative overflow-hidden">
-      <!-- Background Pattern -->
-      <div class="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,68,68,.2)_50%,transparent_75%,transparent)] bg-[length:60px_60px] opacity-20"></div>
-      
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-        <h1 class="text-4xl md:text-6xl lg:text-7xl font-bold text-app-text mb-6">
-          <span class="text-gradient">
-            MKS-IPTV
-          </span>
-        </h1>
-        
-        <p class="text-xl md:text-2xl text-app-text-muted mb-8 max-w-3xl mx-auto">
-          {homeContent.hero.tagline}
-        </p>
-        
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <a 
-            href="/MKS-IPTV-App/download" 
-            class="btn-primary transform hover:scale-105 shadow-lg"
-          >
-            {strings.buttons.downloadNow}
-          </a>
-          <a 
-            href="/MKS-IPTV-App/screenshots" 
-            class="border border-app-primary hover:border-app-accent text-app-text-muted hover:text-app-text font-semibold py-3 px-8 rounded-lg transition-all duration-200"
-          >
-            {strings.buttons.viewScreenshots}
-          </a>
-        </div>
-        
-        <div class="mt-8 text-center">
-          <p class="text-app-text-muted text-sm">
-            {homeContent.hero.version} • {homeContent.hero.platforms} • {homeContent.hero.swift}
-          </p>
-        </div>
-      </div>
-    </section>
+  <main>
+    <Hero backgroundImage={getImagePath(banners.hero.src)} />
     
     <!-- Features Preview -->
     <section class="py-20 bg-app-surface/50">

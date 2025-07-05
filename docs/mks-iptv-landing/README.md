@@ -72,8 +72,31 @@ mks-iptv-landing/
 │       ├── screenshots.ts          # Screenshot gallery data
 │       └── downloads.ts            # Download links data
 ├── public/
-│   ├── images/                     # Static images
+│   ├── favicon/                    # Favicon files (multiple sizes)
+│   ├── images/                     # Organized static images
+│   │   ├── logos/                  # App logos and branding
+│   │   │   └── applogo.webp        # Main app logo
+│   │   ├── banners/                # Hero banners and marketing images
+│   │   │   ├── banner3.webp        # Primary hero banner (WebP)
+│   │   │   ├── banner3.png         # Primary hero banner (PNG)
+│   │   │   ├── banner4.webp        # Secondary banner (WebP)
+│   │   │   └── banner4.png         # Secondary banner (PNG)
+│   │   ├── frames/                 # Device frames for mockups
+│   │   │   ├── iphone-frame.svg    # iPhone mockup frame (SVG)
+│   │   │   └── marco_iphone.png    # iPhone mockup frame (PNG)
+│   │   └── screenshots/            # App screenshots by platform
+│   │       ├── ios/                # iOS app screenshots
+│   │       │   ├── ios_loadingscreen.webp
+│   │       │   ├── ios_seriedetail.webp
+│   │       │   ├── ios_serielistsearch.webp
+│   │       │   └── ios_seriemodaldownload.webp
+│   │       └── macos/              # macOS app screenshots
+│   │           ├── DownloadsSection_1.png
+│   │           ├── download_modal.png
+│   │           ├── listview_liquidglasstopbar.png
+│   │           └── seriesdetail_1.png
 │   ├── videos/                     # Demo videos
+│   │   └── ios-demo.mp4            # iOS app demonstration
 │   └── files/                      # App downloads (.ipa, .app.zip)
 ├── CLAUDE.md                       # Claude Code guidance
 ├── PLAYBOOK-ASTRO.md               # Astro development patterns
@@ -109,6 +132,43 @@ All commands are run from the project root (`docs/mks-iptv-landing/`):
 | Command | Action |
 |:--------|:-------|
 | `bun run deploy` | Build and deploy to GitHub Pages |
+
+## 📸 Assets & Media
+
+### Image Organization
+All visual assets are organized in the `public/images/` directory:
+
+- **📋 Logos**: App branding and icons (`logos/applogo.webp`)
+- **🎨 Banners**: Hero images and marketing banners in WebP and PNG formats
+- **📱 Device Frames**: iPhone and device mockup frames for screenshots
+- **🖼️ Screenshots**: Platform-specific app screenshots (iOS and macOS)
+- **🎬 Videos**: App demonstration videos (`videos/ios-demo.mp4`)
+- **🔖 Favicons**: Complete favicon set for all devices and platforms
+
+### Asset Usage in Components
+```astro
+---
+// Import and use assets in Astro components
+import { Image } from 'astro:assets';
+import appLogo from '/images/logos/applogo.webp';
+import heroBanner from '/images/banners/banner3.webp';
+---
+
+<Image 
+  src={appLogo} 
+  alt="MKS-IPTV App Logo" 
+  width={120} 
+  height={120}
+  format="webp"
+  loading="eager"
+/>
+```
+
+### Performance Optimization
+- **WebP Format**: Primary images use WebP for better compression
+- **Fallback Support**: PNG versions available for compatibility
+- **Responsive Images**: Multiple sizes generated automatically by Astro
+- **Lazy Loading**: Non-critical images load on demand
 
 ## 🎨 Tech Stack
 

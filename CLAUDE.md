@@ -95,7 +95,10 @@ bundle exec jekyll clean
 
 ### Astro Development (New Landing Page)
 ```bash
-# Navigate to Astro project
+# Navigate to Astro project from main repository
+cd /Users/mks/Documents/GitHub/MKS-IPTV-App/docs/mks-iptv-landing
+
+# Or relative navigation if already in MKS-IPTV-App directory
 cd docs/mks-iptv-landing
 
 # Install dependencies
@@ -119,6 +122,13 @@ bun run deploy
 ### Current Repository State
 **IMPORTANT**: This repository contains ONLY documentation and build artifacts. The actual Swift source code is maintained in a private repository and is not available here. When asked to modify application code, inform users that source code access is not available.
 
+### Implementation Source Location
+**Main Repository Path**: `/Users/mks/Documents/GitHub/MKS-IPTV-App`
+- This is the primary working directory for the documentation and build artifacts
+- The Astro landing page implementation is located at: `/Users/mks/Documents/GitHub/MKS-IPTV-App/docs/mks-iptv-landing`
+- All refactor plans and project documentation are consolidated in the Astro landing directory
+- Use absolute paths when navigating between different parts of the project
+
 ### Repository Structure
 ```
 MKS-IPTV-App/
@@ -140,7 +150,11 @@ MKS-IPTV-App/
 │   │   ├── astro.config.mjs  # Astro configuration
 │   │   ├── package.json      # Dependencies and scripts
 │   │   ├── tailwind.config.ts # Tailwind CSS configuration
-│   │   └── tsconfig.json     # TypeScript configuration
+│   │   ├── tsconfig.json     # TypeScript configuration
+│   │   ├── CLAUDE.md         # Landing-specific Claude guidance
+│   │   ├── PLAYBOOK-ASTRO.md # Astro development patterns and guidelines
+│   │   ├── current-todos.md  # Current project todos and progress
+│   │   └── refactor.astro.md # Astro migration technical plan
 │   └── *.md               # Documentation pages
 ├── build/                  # Build artifacts
 │   └── export/
@@ -195,12 +209,29 @@ No test infrastructure is currently visible in the repository. When implementing
 ### License
 This project is licensed under GPL-3.0. Ensure any contributions comply with the license terms.
 
+### Development Methodology
+The project follows a rigorous engineering approach with documented playbooks:
+
+#### General Development (All Projects)
+- **Phase 1**: Analysis and Planning (Create PROJECT_MANIFEST.md)
+- **Phase 2**: Version Control (Atomic commits with Conventional Commits format)
+- **Phase 3**: Execution and Verification (Definition of Done checklist)
+
+#### Astro Landing Page Development
+- **Architecture**: Atomic Design adapted for Astro components
+- **Component Structure**: `.astro` files with TypeScript logic and type definitions
+- **Styling**: Tailwind CSS utility-first approach with organized style objects
+- **Interactivity**: Astro Islands pattern for client-side functionality
+- **Animation**: GSAP for complex animations, CSS for simple transitions
+- **Documentation**: JSDoc in Spanish for all components
+
 ### Working with Documentation
 When updating documentation:
 - Edit source files in `docs/` directory, not `docs/_site/` (which is auto-generated)
 - Test changes locally with `bundle exec jekyll serve` before committing
 - Screenshots should be organized in `docs/imgs/` by version number
 - Maintain bilingual support (English/Spanish) when updating documentation
+- Follow playbook patterns defined in `docs/mks-iptv-landing/PLAYBOOK-ASTRO.md`
 
 ### Handling Code Modification Requests
 Since the Swift source code is not present in this repository:
@@ -208,3 +239,6 @@ Since the Swift source code is not present in this repository:
 - Focus on documentation improvements, build artifact management, and website updates
 - Provide architectural guidance based on the documented structure
 - Suggest implementation approaches without actual code changes
+
+### Commit Message Guidelines
+**IMPORTANTE**: NUNCA agregar co-author ni menciones de "Generated with Claude Code" en los commits. Usar únicamente el formato estándar de Conventional Commits sin referencias a Claude o AI.

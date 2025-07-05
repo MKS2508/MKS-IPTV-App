@@ -18,8 +18,10 @@ import { banners } from '../data/assets';
   <main>
     <Hero backgroundImage={getImagePath(banners.hero.src)} />
     
-    <!-- Features Preview -->
-    <section class="py-20 bg-app-surface/50">
+    <!-- Contenedor para secciones que aparecen después del Hero -->
+    <div id="post-hero-sections" style="opacity: 0; transform: translateY(50vh); transition: all 2s cubic-bezier(0.23, 1, 0.32, 1);">
+      <!-- Features Preview -->
+      <section class="py-20 bg-app-surface/50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h2 class="text-3xl md:text-4xl font-bold text-center text-app-text mb-12">
           {strings.sections.features}
@@ -87,7 +89,24 @@ import { banners } from '../data/assets';
         </div>
       </div>
     </section>
+    </div> <!-- Cierre de post-hero-sections -->
   </main>
   
   <Footer />
 </Layout>
+
+<script>
+  // =============================================================================
+  // SIMPLIFIED HOME PAGE SCRIPT - VIRTUAL SCROLL NOW HANDLED BY HERO COMPONENT
+  // =============================================================================
+  
+  console.log('🏠 Home page script loaded - Hero handles virtual scroll');
+  
+  // No virtual scroll logic needed here anymore!
+  // Hero component is now fully self-contained with its own virtual scroll system
+  
+  // The only remaining responsibility is to wait for the Hero sequence to complete
+  // and then reveal post-hero sections (this will be triggered by Hero component)
+  
+  console.log('✅ Home page initialization complete - All scroll logic in Hero');
+</script>

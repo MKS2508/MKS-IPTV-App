@@ -1,0 +1,196 @@
+---
+/**
+ * HeroTitle - Componente de título y subtítulo del Hero
+ * Typography hierarchy mejorada con animaciones GSAP sutiles
+ * Diseñado para trabajar con el sistema de virtual scroll del Hero
+ * 
+ * @component
+ * @param {string} title - Título principal
+ * @param {string} subtitle - Subtítulo/versión
+ * @param {boolean} animated - Mostrar animaciones GSAP
+ * @param {string} className - Clases CSS adicionales para el container
+ * @param {string} titleClassName - Clases CSS adicionales para el título
+ * @param {string} subtitleClassName - Clases CSS adicionales para el subtítulo
+ * @param {string} id - ID único para targeting de animaciones
+ */
+
+import type { HeroTitleProps } from './types';
+import { heroTitleStyles } from './styles';
+import { strings } from '../../../i18n/strings/es-es';
+
+const {
+  title = 'MKS IPTV',
+  subtitle = 'v2.5.1',
+  animated = true,
+  className = '',
+  titleClassName = '',
+  subtitleClassName = '',
+  id = 'hero-title'
+}: HeroTitleProps = Astro.props;
+
+// Construir clases finales
+const containerClasses = [heroTitleStyles.container, className].filter(Boolean).join(' ');
+const subtitleClasses = [
+  heroTitleStyles.subtitle.base,
+  heroTitleStyles.subtitle.color,
+  heroTitleStyles.subtitle.spacing,
+  heroTitleStyles.subtitle.glow,
+  animated ? heroTitleStyles.animation.initial : '',
+  subtitleClassName
+].filter(Boolean).join(' ');
+
+const titleClasses = [
+  heroTitleStyles.title.base,
+  heroTitleStyles.title.sizes.mobile,
+  heroTitleStyles.title.sizes.tablet,
+  heroTitleStyles.title.sizes.desktop,
+  heroTitleStyles.title.color,
+  heroTitleStyles.title.spacing,
+  heroTitleStyles.title.glow,
+  animated ? heroTitleStyles.animation.initial : '',
+  titleClassName
+].filter(Boolean).join(' ');
+---
+
+<div 
+  id={id}
+  class={containerClasses}
+>
+  <!-- Subtítulo con hierarchy mejorada -->
+  {subtitle && (
+    <div 
+      class={`hero-subtitle ${subtitleClasses}`}
+      data-gsap="hero-subtitle"
+    >
+      {subtitle}
+    </div>
+  )}
+  
+  <!-- Título principal con typography elegante -->
+  {title && (
+    <h1 
+      class={`hero-title ${titleClasses}`}
+      data-gsap="hero-title"
+    >
+      {title}
+    </h1>
+  )}
+</div>
+
+{animated && (
+  <script>
+    import { gsap } from 'gsap';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const initHeroTitle = () => {
+        const titleContainer = document.querySelector('#hero-title');
+        if (!titleContainer) return;
+
+        console.log('🎯 Initializing HeroTitle animations');
+
+        const subtitle = titleContainer.querySelector('.hero-subtitle');
+        const title = titleContainer.querySelector('.hero-title');
+
+        // Configurar estado inicial
+        if (subtitle) {
+          gsap.set(subtitle, {
+            opacity: 0,
+            y: 30,
+            scale: 0.95
+          });
+        }
+
+        if (title) {
+          gsap.set(title, {
+            opacity: 0,
+            y: 50,
+            scale: 0.9
+          });
+        }
+
+        // Exponer función para animación desde Hero
+        (window as any).animateHeroTitle = (progress = 0) => {
+          if (!subtitle || !title) return;
+
+          // Subtitle aparece primero (20% - 40%)
+          if (progress >= 0.2) {
+            const subtitleProgress = Math.min((progress - 0.2) / 0.2, 1);
+            gsap.to(subtitle, {
+              opacity: subtitleProgress,
+              y: 30 * (1 - subtitleProgress),
+              scale: 0.95 + (0.05 * subtitleProgress),
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+          }
+
+          // Title aparece después (40% - 70%)
+          if (progress >= 0.4) {
+            const titleProgress = Math.min((progress - 0.4) / 0.3, 1);
+            gsap.to(title, {
+              opacity: titleProgress,
+              y: 50 * (1 - titleProgress),
+              scale: 0.9 + (0.1 * titleProgress),
+              duration: 0.4,
+              ease: 'power2.out'
+            });
+          }
+        };
+
+        // Fallback para standalone (sin Hero)
+        if (!(window as any).heroVirtualScrollActive) {
+          setTimeout(() => {
+            (window as any).animateHeroTitle(1);
+          }, 500);
+        }
+      };
+
+      initHeroTitle();
+    });
+  </script>
+)}
+
+<style>
+  /* Mejoras visuales para mejor integración */
+  .hero-subtitle {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.2em;
+  }
+  
+  .hero-title {
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    line-height: 0.9;
+  }
+  
+  /* Efectos de glow sutiles */
+  .hero-subtitle:hover {
+    filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.4));
+    transition: filter 0.3s ease;
+  }
+  
+  .hero-title:hover {
+    filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.15));
+    transition: filter 0.3s ease;
+  }
+  
+  /* Responsive fine-tuning */
+  @media (max-width: 640px) {
+    .hero-subtitle {
+      letter-spacing: 0.15em;
+      font-size: 0.75rem;
+    }
+    
+    .hero-title {
+      line-height: 1;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .hero-subtitle,
+    .hero-title {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>

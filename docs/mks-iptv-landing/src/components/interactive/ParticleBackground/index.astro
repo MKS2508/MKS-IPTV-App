@@ -1,0 +1,374 @@
+---
+/**
+ * @component ParticleBackground
+ * @description Componente de fondo de partículas interactivas usando tsParticles.
+ * Proporciona efectos visuales avanzados con partículas animadas, conexiones
+ * dinámicas y respuesta a interacciones del usuario.
+ * 
+ * @param {string} id - ID único para el contenedor
+ * @param {number} particleCount - Número de partículas (default: 50)
+ * @param {string} variant - Variante de configuración: 'default' | 'minimal' | 'mobile'
+ * @param {string} intensity - Intensidad visual: 'subtle' | 'normal' | 'intense' | 'dramatic'
+ * @param {boolean} enableConnections - Habilitar líneas de conexión entre partículas
+ * @param {boolean} responsive - Reducir partículas en móviles automáticamente
+ * @param {string} className - Clases CSS adicionales
+ */
+
+import type { ParticleBackgroundProps } from './types';
+import { particleBackgroundStyles } from './styles';
+
+interface Props extends ParticleBackgroundProps {
+  variant?: 'default' | 'minimal' | 'mobile';
+  intensity?: 'subtle' | 'normal' | 'intense' | 'dramatic';
+  responsive?: boolean;
+}
+
+const {
+  id = 'particles-bg',
+  variant = 'default',
+  intensity = 'normal',
+  responsive = true,
+  className = ''
+}: Props = Astro.props;
+
+// Construir clases CSS del contenedor
+const containerClasses = [
+  particleBackgroundStyles.container,
+  particleBackgroundStyles.variants[intensity],
+  responsive ? particleBackgroundStyles.responsive.reduceOnMobile : '',
+  className
+].filter(Boolean).join(' ');
+---
+
+<div 
+  id={id} 
+  class={containerClasses}
+  data-variant={variant}
+  data-intensity={intensity}
+  data-responsive={responsive}
+>
+  <!-- tsParticles canvas se insertará aquí -->
+</div>
+
+<script define:vars={{ id, variant }}>
+  /**
+   * Inicialización de tsParticles con configuración dinámica
+   */
+  
+  // Importaciones dinámicas para optimizar bundle
+  let tsParticlesInstance = null;
+  let particleContainer = null;
+  
+  // Detectar si es dispositivo móvil
+  const isMobile = () => window.innerWidth < 768;
+  
+  // Configuraciones de partículas
+  const getParticleConfig = (variant, isMobileDevice) => {
+    const baseConfigs = {
+      default: {
+        particles: {
+          number: {
+            value: isMobileDevice ? 20 : 50,
+            density: {
+              enable: true,
+              value_area: isMobileDevice ? 600 : 800
+            }
+          },
+          color: {
+            value: ["#C62790", "#FFD700", "#463564", "#FF4757"]
+          },
+          shape: {
+            type: ["circle", "triangle"]
+          },
+          opacity: {
+            value: { min: 0.1, max: 0.8 },
+            animation: {
+              enable: true,
+              speed: 1,
+              minimumValue: 0.1,
+              sync: false
+            }
+          },
+          size: {
+            value: { min: 1, max: isMobileDevice ? 3 : 4 },
+            animation: {
+              enable: true,
+              speed: 2,
+              minimumValue: 0.5,
+              sync: false
+            }
+          },
+          move: {
+            enable: true,
+            speed: isMobileDevice ? 0.8 : 1.2,
+            direction: "none",
+            random: true,
+            straight: false,
+            outModes: {
+              default: "out"
+            },
+            attract: {
+              enable: false,
+              rotateX: 600,
+              rotateY: 1200
+            }
+          }
+        },
+        interactivity: {
+          detectsOn: "window",
+          events: {
+            onHover: {
+              enable: !isMobileDevice,
+              mode: ["attract", "connect"]
+            },
+            onClick: {
+              enable: true,
+              mode: "push"
+            },
+            resize: true
+          },
+          modes: {
+            attract: {
+              distance: 200,
+              duration: 0.4,
+              speed: 1
+            },
+            connect: {
+              distance: 150,
+              links: {
+                opacity: 0.3
+              },
+              radius: 60
+            },
+            push: {
+              quantity: 3
+            }
+          }
+        },
+        detectRetina: true,
+        background: {
+          color: "transparent"
+        },
+        fullScreen: {
+          enable: false
+        }
+      },
+      
+      minimal: {
+        particles: {
+          number: {
+            value: isMobileDevice ? 10 : 20,
+            density: {
+              enable: true,
+              value_area: 1000
+            }
+          },
+          color: {
+            value: "#463564"
+          },
+          opacity: {
+            value: 0.3,
+            animation: {
+              enable: true,
+              speed: 0.5
+            }
+          },
+          size: {
+            value: 2
+          },
+          move: {
+            enable: true,
+            speed: 0.5,
+            direction: "none",
+            random: true,
+            outModes: {
+              default: "out"
+            }
+          }
+        },
+        interactivity: {
+          events: {
+            resize: true
+          }
+        },
+        detectRetina: true,
+        background: {
+          color: "transparent"
+        },
+        fullScreen: {
+          enable: false
+        }
+      },
+      
+      mobile: {
+        particles: {
+          number: {
+            value: 15,
+            density: {
+              enable: true,
+              value_area: 600
+            }
+          },
+          color: {
+            value: "#C62790"
+          },
+          opacity: {
+            value: 0.4
+          },
+          size: {
+            value: 3
+          },
+          move: {
+            enable: true,
+            speed: 0.8,
+            direction: "none",
+            random: true,
+            outModes: {
+              default: "out"
+            }
+          }
+        },
+        interactivity: {
+          events: {
+            resize: true
+          }
+        },
+        detectRetina: true,
+        background: {
+          color: "transparent"
+        },
+        fullScreen: {
+          enable: false
+        }
+      }
+    };
+    
+    return baseConfigs[variant] || baseConfigs.default;
+  };
+  
+  // Función para inicializar partículas
+  const initParticles = async () => {
+    try {
+      // Importar tsParticles de forma dinámica
+      const tsParticlesModule = await import('tsparticles');
+      const { tsParticles } = tsParticlesModule;
+      
+      // Cargar el engine completo
+      await tsParticlesModule.loadFull(tsParticles);
+      
+      const container = document.getElementById(id);
+      if (!container) return;
+      
+      // Detectar dispositivo móvil
+      const isMobileDevice = isMobile();
+      
+      // Configurar partículas
+      const config = getParticleConfig(variant, isMobileDevice);
+      
+      // Inicializar tsParticles
+      particleContainer = await tsParticles.load(id, config);
+      
+      if (particleContainer) {
+        // Marcar como cargado
+        container.classList.remove('opacity-0');
+        container.classList.add('opacity-100');
+        
+        console.log(`✨ Particles loaded successfully: ${variant} variant`);
+      }
+      
+    } catch (error) {
+      console.error('Error loading particles:', error);
+    }
+  };
+  
+  // Función de cleanup
+  const destroyParticles = () => {
+    if (particleContainer) {
+      particleContainer.destroy();
+      particleContainer = null;
+    }
+  };
+  
+  // Observer para cargar partículas solo cuando sea visible
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '50px'
+  };
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !particleContainer) {
+        initParticles();
+        observer.unobserve(entry.target);
+      }
+    });
+  }, observerOptions);
+  
+  // Inicializar cuando el DOM esté listo
+  document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById(id);
+    if (container) {
+      // Usar intersection observer para lazy loading
+      observer.observe(container);
+    }
+  });
+  
+  // Cleanup al cambiar de página
+  document.addEventListener('astro:before-preparation', destroyParticles);
+  window.addEventListener('beforeunload', destroyParticles);
+  
+  // Responsive handling
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      if (particleContainer) {
+        const wasMobile = particleContainer.canvas.size.width < 768;
+        const isNowMobile = window.innerWidth < 768;
+        
+        // Reinicializar si cambió el breakpoint móvil
+        if (wasMobile !== isNowMobile) {
+          destroyParticles();
+          setTimeout(initParticles, 100);
+        }
+      }
+    }, 250);
+  });
+</script>
+
+<style>
+  /* Estilos específicos para el canvas de partículas */
+  #particles-bg canvas {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: none;
+  }
+  
+  /* Transiciones suaves */
+  #particles-bg {
+    transition: opacity 1s ease-in-out;
+  }
+  
+  /* Optimizaciones de performance */
+  #particles-bg canvas {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  
+  /* Ajustes para modo oscuro */
+  @media (prefers-color-scheme: dark) {
+    #particles-bg {
+      mix-blend-mode: screen;
+    }
+  }
+  
+  /* Respeto por preferencias de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    #particles-bg {
+      display: none;
+    }
+  }
+</style>

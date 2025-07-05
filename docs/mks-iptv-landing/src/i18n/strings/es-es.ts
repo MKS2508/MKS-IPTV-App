@@ -33,7 +33,11 @@ export const strings = {
   hero: {
     scrollDown: 'Desplázate para explorar',
     watchDemo: 'Ver Demo',
-    version: 'Versión'
+    version: 'Versión',
+    cta: {
+      download: 'Descargar Ahora',
+      learnMore: 'Saber Más'
+    }
   },
 
   // Etiquetas de estado

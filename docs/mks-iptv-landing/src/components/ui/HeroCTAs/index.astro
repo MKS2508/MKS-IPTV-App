@@ -1,0 +1,311 @@
+---
+/**
+ * HeroCTAs - Componente de botones Call-to-Action del Hero
+ * Botones mejorados con interacciones sutiles y animaciones GSAP
+ * Diseñado para trabajar con el sistema de virtual scroll del Hero
+ * 
+ * @component
+ * @param {CTAButton[]} buttons - Array de botones CTA
+ * @param {boolean} animated - Mostrar animaciones GSAP
+ * @param {string} layout - Layout de los botones
+ * @param {string} className - Clases CSS adicionales para el container
+ * @param {string} id - ID único para targeting de animaciones
+ */
+
+import type { HeroCTAsProps, CTAButton } from './types';
+import { heroCTAsStyles } from './styles';
+import { strings } from '../../../i18n/strings/es-es';
+
+const {
+  buttons = [
+    {
+      text: strings.hero.cta.download,
+      href: '#download',
+      variant: 'primary',
+      icon: 'download',
+      id: 'hero-download-btn'
+    },
+    {
+      text: strings.hero.cta.learnMore,
+      href: '#features',
+      variant: 'outline',
+      icon: 'info',
+      id: 'hero-learn-btn'
+    }
+  ],
+  animated = true,
+  layout = 'stacked',
+  className = '',
+  id = 'hero-ctas'
+}: HeroCTAsProps = Astro.props;
+
+// Construir clases del container
+const containerClasses = [
+  heroCTAsStyles.container.base,
+  heroCTAsStyles.container.layouts[layout],
+  className
+].filter(Boolean).join(' ');
+
+// Función para construir clases de botón
+const getButtonClasses = (button: CTAButton) => {
+  const variant = button.variant || 'primary';
+  const variantStyles = heroCTAsStyles.button.variants[variant];
+  
+  return [
+    heroCTAsStyles.button.base,
+    variantStyles.background,
+    variantStyles.text,
+    variantStyles.border,
+    variantStyles.shadow,
+    heroCTAsStyles.button.states.hover,
+    heroCTAsStyles.button.states.active,
+    heroCTAsStyles.effects.shimmer,
+    heroCTAsStyles.effects.ripple,
+    animated ? heroCTAsStyles.animation.initial : '',
+    button.disabled ? heroCTAsStyles.button.states.disabled : ''
+  ].filter(Boolean).join(' ');
+};
+
+// Iconos SVG simples
+const icons = {
+  download: '<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>',
+  info: '<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+  play: '<path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.5a1.5 1.5 0 011.5 1.5v1.5m-3-3h6m-6 0V7.5a1.5 1.5 0 011.5-1.5h3a1.5 1.5 0 011.5 1.5V10"/>',
+  external: '<path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>'
+};
+---
+
+<div 
+  id={id}
+  class={containerClasses}
+>
+  {buttons.map((button, index) => {
+    const buttonClasses = getButtonClasses(button);
+    const Component = button.external ? 'a' : 'a';
+    const iconSVG = button.icon && icons[button.icon as keyof typeof icons];
+    
+    return (
+      <Component
+        href={button.href}
+        class={`hero-cta-btn ${buttonClasses}`}
+        id={button.id || `hero-btn-${index}`}
+        target={button.external ? '_blank' : undefined}
+        rel={button.external ? 'noopener noreferrer' : undefined}
+        data-gsap={`hero-cta-${index}`}
+        data-variant={button.variant || 'primary'}
+        aria-label={button.text}
+      >
+        {iconSVG && (
+          <svg 
+            class={`btn-icon ${heroCTAsStyles.icon.base} ${heroCTAsStyles.icon.animation}`}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            set:html={iconSVG}
+          />
+        )}
+        <span class="btn-text">
+          {button.text}
+        </span>
+        
+        <!-- Efecto glow dinámico -->
+        <div class="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+      </Component>
+    );
+  })}
+</div>
+
+{animated && (
+  <script>
+    import { gsap } from 'gsap';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const initHeroCTAs = () => {
+        const ctasContainer = document.querySelector('#hero-ctas');
+        if (!ctasContainer) return;
+
+        console.log('🎯 Initializing HeroCTAs animations');
+
+        const buttons = ctasContainer.querySelectorAll('.hero-cta-btn');
+
+        // Configurar estado inicial
+        buttons.forEach((button, index) => {
+          gsap.set(button, {
+            opacity: 0,
+            y: 30 + (index * 10),
+            scale: 0.9
+          });
+        });
+
+        // Exponer función para animación desde Hero
+        (window as any).animateHeroCTAs = (progress = 0) => {
+          if (!buttons.length) return;
+
+          // CTAs aparecen al final (70% - 90%)
+          if (progress >= 0.7) {
+            const ctasProgress = Math.min((progress - 0.7) / 0.2, 1);
+            
+            buttons.forEach((button, index) => {
+              const delay = index * 0.1;
+              const adjustedProgress = Math.max(0, ctasProgress - delay);
+              
+              gsap.to(button, {
+                opacity: adjustedProgress,
+                y: (30 + (index * 10)) * (1 - adjustedProgress),
+                scale: 0.9 + (0.1 * adjustedProgress),
+                duration: 0.4,
+                ease: 'back.out(1.2)'
+              });
+            });
+          }
+        };
+
+        // Efectos hover mejorados
+        buttons.forEach((button) => {
+          const icon = button.querySelector('.btn-icon');
+          
+          button.addEventListener('mouseenter', () => {
+            gsap.to(button, {
+              scale: 1.05,
+              y: -2,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+            
+            if (icon) {
+              gsap.to(icon, {
+                rotation: 5,
+                scale: 1.1,
+                duration: 0.3,
+                ease: 'power2.out'
+              });
+            }
+          });
+          
+          button.addEventListener('mouseleave', () => {
+            gsap.to(button, {
+              scale: 1,
+              y: 0,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+            
+            if (icon) {
+              gsap.to(icon, {
+                rotation: 0,
+                scale: 1,
+                duration: 0.3,
+                ease: 'power2.out'
+              });
+            }
+          });
+          
+          // Efecto click/ripple
+          button.addEventListener('click', (e) => {
+            const rect = button.getBoundingClientRect();
+            const ripple = document.createElement('div');
+            const size = Math.max(rect.width, rect.height);
+            const x = e.clientX - rect.left - size / 2;
+            const y = e.clientY - rect.top - size / 2;
+            
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            ripple.classList.add('ripple-effect');
+            
+            button.appendChild(ripple);
+            
+            gsap.fromTo(ripple, 
+              { scale: 0, opacity: 0.5 },
+              { 
+                scale: 2, 
+                opacity: 0, 
+                duration: 0.6,
+                ease: 'power2.out',
+                onComplete: () => ripple.remove()
+              }
+            );
+          });
+        });
+
+        // Fallback para standalone (sin Hero)
+        if (!(window as any).heroVirtualScrollActive) {
+          setTimeout(() => {
+            (window as any).animateHeroCTAs(1);
+          }, 800);
+        }
+      };
+
+      initHeroCTAs();
+    });
+  </script>
+)}
+
+<style>
+  /* Mejoras visuales para mejor integración */
+  .hero-cta-btn {
+    min-width: 160px;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+  }
+  
+  /* Variantes de colores específicas */
+  .hero-cta-btn[data-variant="primary"] {
+    background: linear-gradient(135deg, rgb(var(--app-accent)) 0%, rgba(var(--app-accent), 0.8) 100%);
+  }
+  
+  .hero-cta-btn[data-variant="secondary"] {
+    background: linear-gradient(135deg, rgba(var(--app-highlight), 0.2) 0%, rgba(var(--app-highlight), 0.1) 100%);
+    backdrop-filter: blur(8px);
+  }
+  
+  .hero-cta-btn[data-variant="outline"] {
+    backdrop-filter: blur(4px);
+  }
+  
+  /* Efecto ripple */
+  .ripple-effect {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  /* Mejoras de accesibilidad */
+  .hero-cta-btn:focus-visible {
+    outline: 2px solid rgb(var(--app-accent));
+    outline-offset: 2px;
+  }
+  
+  /* Estados disabled */
+  .hero-cta-btn:disabled,
+  .hero-cta-btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .hero-cta-btn {
+      min-width: 140px;
+      padding: 0.75rem 1.5rem;
+      font-size: 0.875rem;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .hero-cta-btn,
+    .btn-icon {
+      transition: none !important;
+      animation: none !important;
+    }
+    
+    .hero-cta-btn:hover {
+      transform: none !important;
+    }
+  }
+</style>

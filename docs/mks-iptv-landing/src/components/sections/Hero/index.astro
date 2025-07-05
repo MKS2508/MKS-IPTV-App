@@ -1,16 +1,14 @@
 ---
 /**
- * @component Hero
- * @description Componente principal de Héroe para la página de inicio.
- * Muestra el título, descripción y llamadas a la acción principales con
- * animaciones avanzadas y efectos visuales para crear un impacto inmediato.
- * @see /docs/mks-iptv-landing/docs/HERO_COMPONENT_IMPLEMENTATION.md
+ * Hero component con animaciones avanzadas, parallax y tsParticles
+ * Versión mejorada con Lenis smooth scrolling y efectos 3D
  */
+
 import type { HeroProps } from './types';
 import { heroStyles, animationClasses } from './styles';
 import { strings } from '../../../i18n/strings/es-es';
 import { homeContent } from '../../../data/legacy-content';
-import ParticleBackground from '../../interactive/ParticleBackground/index.astro';
+import SimpleFallback from '../../interactive/ParticleBackground/SimpleFallback.astro';
 
 const {
   subtitle = homeContent.hero.version,
@@ -33,163 +31,806 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
 ---
 
 <section id="hero-section" class={heroClasses} aria-labelledby="hero-title">
-  <!-- Efectos de Fondo -->
+  <!-- Efectos de Fondo con Parallax -->
   <div class={heroStyles.background.overlay}></div>
   {backgroundImage && (
     <img 
+      id="hero-bg-image"
       src={backgroundImage}
       alt="MKS-IPTV Hero Background"
       class="absolute inset-0 w-full h-full object-cover opacity-20"
     />
   )}
-  {showParticles && <div class="absolute inset-0 z-0" id="css-particles"></div>}
+  {showParticles && <SimpleFallback id="hero-particles" />}
 
-  <!-- Contenido Principal -->
-  <div class={heroStyles.content.wrapper}>
+  <!-- Contenido Principal - Wrapper para pinning -->
+  <div class={`${heroStyles.content.wrapper} hero-content-wrapper`}>
     <div class:list={[animationClasses.willChange, animationClasses.subtitle]}>
-      <p class={heroStyles.content.subtitle}>{subtitle}</p>
+      <p class={`${heroStyles.content.subtitle} hero-subtitle`}>{subtitle}</p>
     </div>
 
-    <h1 id="hero-title" class:list={[animationClasses.willChange, animationClasses.title, heroStyles.glow]}>
-      {title}
-    </h1>
-
-    <p class:list={[animationClasses.willChange, animationClasses.description]}>
-      {description}
-    </p>
-
-    <p class:list={[animationClasses.willChange, animationClasses.tagline]}>
-      {tagline}
-    </p>
-
-    <div class:list={[animationClasses.willChange, animationClasses.ctaGroup, heroStyles.content.ctaGroup]}>
-      <a href={ctaPrimaryLink} class={heroStyles.content.cta.primary}>
-        {ctaPrimaryText}
-      </a>
-      <a href={ctaSecondaryLink} class={heroStyles.content.cta.secondary}>
-        {ctaSecondaryText}
-      </a>
+    <div class:list={[animationClasses.willChange, animationClasses.title]}>
+      <h1 id="hero-title" class={`${heroStyles.content.title} hero-title`}>
+        {title}
+      </h1>
     </div>
-     <div class="mt-4">
-        <a href={ctaTertiaryLink} class={heroStyles.content.cta.tertiary}>
-            {ctaTertiaryText}
+
+    <div class:list={[animationClasses.willChange, animationClasses.description]}>
+      <p class={`${heroStyles.content.description} hero-description`}>
+        {description}
+      </p>
+    </div>
+
+    <div class:list={[animationClasses.willChange, animationClasses.tagline]}>
+      <p class={`${heroStyles.content.tagline} hero-tagline`}>
+        {tagline}
+      </p>
+    </div>
+
+    <div class:list={[animationClasses.willChange, animationClasses.ctaGroup]}>
+      <div class={`${heroStyles.content.ctaGroup} hero-cta-group`}>
+        <a 
+          href={ctaPrimaryLink}
+          class={`${heroStyles.content.cta.primary} hero-cta-primary`}
+          aria-label={ctaPrimaryText}
+        >
+          {ctaPrimaryText}
         </a>
+        <a 
+          href={ctaSecondaryLink}
+          class={`${heroStyles.content.cta.secondary} hero-cta-secondary`}
+          aria-label={ctaSecondaryText}
+        >
+          {ctaSecondaryText}
+        </a>
+        <a 
+          href={ctaTertiaryLink}
+          class={`${heroStyles.content.cta.tertiary} hero-cta-tertiary`}
+          aria-label={ctaTertiaryText}
+        >
+          {ctaTertiaryText}
+        </a>
+      </div>
     </div>
+
+    <!-- Enhanced Scroll Indicator con GSAP - APARECE DESDE EL INICIO -->
+    {enableScrollAnimations && (
+      <div id="hero-scroll-indicator" class="hero-scroll-indicator absolute bottom-8 left-0 right-0 mx-auto w-fit flex flex-col items-center justify-center text-app-text-secondary z-50 opacity-100 visible pointer-events-none">
+        <!-- Icono mejorado con mejor diseño -->
+        <div class="scroll-icon-wrapper relative mb-3 flex items-center justify-center">
+          <div class="scroll-glow absolute inset-0 bg-app-accent/30 rounded-full blur-xl opacity-0 w-16 h-16 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+          <div class="scroll-border relative bg-app-surface/40 border-2 border-app-accent/60 rounded-full p-4 backdrop-blur-md shadow-2xl">
+            <svg class="scroll-arrow w-8 h-8 text-app-highlight" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+            </svg>
+          </div>
+        </div>
+        <!-- Texto elegante y visible -->
+        <span class="scroll-text text-sm font-bold text-app-text-primary tracking-widest uppercase opacity-100 text-center text-shadow-sm">{strings.hero.scrollDown}</span>
+        <!-- Línea animada -->
+        <div class="scroll-line w-px h-8 bg-gradient-to-b from-app-accent/80 to-transparent mt-4 mx-auto opacity-0"></div>
+      </div>
+    )}
   </div>
 
-  <!-- Indicador de Scroll -->
-  {enableScrollAnimations && (
-    <div id={animationClasses.scrollIndicator} class={heroStyles.scroll.indicator}>
-      <svg class={heroStyles.scroll.arrow} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-      </svg>
-      <span class="text-sm">{strings.hero.scrollDown}</span>
-    </div>
-  )}
 </section>
 
 <script>
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
-  import { animationClasses, heroStyles } from './styles';
+  import Lenis from 'lenis';
 
   gsap.registerPlugin(ScrollTrigger);
 
-  console.log("Hero script loaded.");
+  console.log("✨ Hero Self-Contained script loaded - Virtual scroll integrated");
+
+  // Enhanced Lenis smooth scrolling for post-hero content
+  let lenis;
+  const initLenisSmooth = () => {
+    lenis = new Lenis({
+      duration: 1.8,
+      easing: (t) => 1 - Math.pow(1 - t, 3), // Smooth cubic easing
+      smooth: true,
+      smoothTouch: true, // Enable on mobile
+      touchMultiplier: 1.5,
+      wheelMultiplier: 1.2,
+      normalizeWheel: true,
+      lerp: 0.05, // Very smooth interpolation
+      infinite: false
+    });
+
+    // Connect Lenis with GSAP
+    lenis.on('scroll', (e) => {
+      ScrollTrigger.update();
+    });
+
+    // RAF loop for smooth animations
+    const raf = (time) => {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    };
+    requestAnimationFrame(raf);
+    
+    console.log('✨ Lenis smooth scrolling activated for post-hero content');
+  };
+  
+  // Expose Lenis initialization globally
+  (window as any).initLenisScroll = initLenisSmooth;
+
+  // =============================================================================
+  // SELF-CONTAINED VIRTUAL SCROLL SYSTEM
+  // =============================================================================
+  
+  interface HeroScrollSystem {
+    initialize: () => void;
+    completeSequence: () => void;
+    masterTimeline: gsap.core.Timeline | null;
+    updateBackgroundParallax?: (progress: number) => void;
+  }
+  
+  let heroScrollSystem: HeroScrollSystem | null = null;
+
+  const createHeroVirtualScrollSystem = (): HeroScrollSystem => {
+    let scrollUnlocked = false;
+    let virtualScrollProgress = 0;
+    let targetProgress = 0;
+    let lastWheelTime = 0;
+
+    console.log('🔧 Creating Hero self-contained virtual scroll system');
+
+    // 1. BLOCK REAL SCROLL INITIALLY
+    const blockRealScroll = () => {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      console.log('🔒 Real scroll blocked by Hero component');
+    };
+
+    // 2. CONTINUOUS SMOOTH PROGRESS INTERPOLATION
+    const smoothProgress = () => {
+      const tolerance = 0.1;
+      const diff = Math.abs(targetProgress - virtualScrollProgress);
+      
+      if (diff > tolerance) {
+        // Interpolate towards target
+        virtualScrollProgress += (targetProgress - virtualScrollProgress) * 0.12;
+        
+        // Dispatch internal progress updates
+        dispatchHeroProgress(virtualScrollProgress);
+        
+        // Debug logs for key milestones
+        if (virtualScrollProgress % 10 < 1) {
+          console.log(`📡 Hero progress: ${virtualScrollProgress.toFixed(1)}%`);
+        }
+      } else {
+        // Snap to target when close enough
+        if (virtualScrollProgress !== targetProgress) {
+          virtualScrollProgress = targetProgress;
+          dispatchHeroProgress(virtualScrollProgress);
+          console.log(`🎯 Hero snapped to: ${virtualScrollProgress.toFixed(1)}%`);
+        }
+        
+        // Check if sequence complete
+        if (virtualScrollProgress >= 99.9 && !scrollUnlocked) {
+          console.log('🎯 Hero virtual scroll reached 100% - Completing sequence');
+          setTimeout(() => {
+            if (!scrollUnlocked) {
+              console.log('🚀 Hero manually triggering completion');
+              completeHeroSequence();
+            }
+          }, 500);
+        }
+      }
+      
+      // CRITICAL: ALWAYS continue the loop
+      requestAnimationFrame(smoothProgress);
+    };
+
+    // 3. INTERNAL PROGRESS DISPATCHER
+    const dispatchHeroProgress = (progress: number) => {
+      // Update master timeline directly
+      if (heroScrollSystem && heroScrollSystem.masterTimeline) {
+        const progressNormalized = progress / 100; // 0-1
+        heroScrollSystem.masterTimeline.progress(progressNormalized);
+        
+        if (progress > 95) {
+          console.log(`🎬 Hero timeline: ${progress.toFixed(1)}%`);
+        }
+        
+        // Force completion check near 100%
+        if (progressNormalized >= 0.98) {
+          console.log('🚀 Hero timeline reached 98% - Forcing completion');
+          heroScrollSystem.masterTimeline.progress(1);
+        }
+      }
+      
+      // Update background parallax if available
+      if (heroScrollSystem && heroScrollSystem.updateBackgroundParallax) {
+        heroScrollSystem.updateBackgroundParallax(progress);
+      }
+      
+      // HIDE SCROLL INDICATOR cuando el usuario empieza a hacer VIRTUAL SCROLL
+      if (progress > 3 && (window as any).hideScrollIndicatorOnVirtualScroll) {
+        (window as any).hideScrollIndicatorOnVirtualScroll('virtual scroll progress');
+        // Solo llamar una vez
+        (window as any).hideScrollIndicatorOnVirtualScroll = null;
+      }
+    };
+
+    // 4. VIRTUAL SCROLL HANDLER
+    const handleVirtualScroll = (event: WheelEvent) => {
+      console.log('🐭 Hero wheel event detected');
+      
+      // HIDE SCROLL INDICATOR en el primer wheel event
+      if ((window as any).hideScrollIndicatorOnVirtualScroll) {
+        (window as any).hideScrollIndicatorOnVirtualScroll('wheel event detected');
+        (window as any).hideScrollIndicatorOnVirtualScroll = null;
+      }
+      
+      if (scrollUnlocked) {
+        console.log('⚠️ Hero scroll already unlocked, ignoring');
+        return;
+      }
+      
+      event.preventDefault();
+      event.stopPropagation();
+    
+      const currentTime = Date.now();
+      const timeDelta = currentTime - lastWheelTime;
+      lastWheelTime = currentTime;
+      
+      // Normalize wheel delta across browsers
+      let delta = event.deltaY || event.detail || event.wheelDelta;
+      if (event.deltaMode === 1) delta *= 16; // Line mode
+      if (event.deltaMode === 2) delta *= 100; // Page mode
+      
+      // Enhanced momentum calculation
+      const scrollDirection = delta > 0 ? 1 : -1;
+      const scrollMagnitude = Math.min(Math.abs(delta), 120); // Cap maximum delta
+      
+      // Dynamic speed based on scroll frequency
+      const speedMultiplier = timeDelta < 50 ? 1.5 : 1; // Faster for rapid scrolling
+      const progressIncrement = (scrollMagnitude / 15) * scrollDirection * speedMultiplier;
+      
+      // Update target progress with momentum
+      targetProgress = Math.max(0, Math.min(100, targetProgress + progressIncrement));
+      
+      console.log(`🎯 Hero virtual scroll target: ${targetProgress.toFixed(1)}%`);
+    };
+
+    // 5. TOUCH SUPPORT FOR MOBILE
+    let touchStartY = 0;
+    
+    const handleTouchStart = (event: TouchEvent) => {
+      if (scrollUnlocked) return;
+      touchStartY = event.touches[0].clientY;
+    };
+    
+    const handleTouchMove = (event: TouchEvent) => {
+      if (scrollUnlocked) return;
+      
+      // HIDE SCROLL INDICATOR en el primer touch move
+      if ((window as any).hideScrollIndicatorOnVirtualScroll) {
+        (window as any).hideScrollIndicatorOnVirtualScroll('touch move detected');
+        (window as any).hideScrollIndicatorOnVirtualScroll = null;
+      }
+    
+      event.preventDefault();
+      const touchCurrentY = event.touches[0].clientY;
+      const touchDelta = touchStartY - touchCurrentY;
+      
+      // Convert touch movement to progress
+      const progressIncrement = (touchDelta / window.innerHeight) * 15;
+      targetProgress = Math.max(0, Math.min(100, targetProgress + progressIncrement));
+      
+      touchStartY = touchCurrentY;
+    };
+
+    // 6. SEQUENCE COMPLETION
+    const completeHeroSequence = () => {
+      if (!scrollUnlocked) {
+        scrollUnlocked = true;
+        
+        console.log('🎬 Hero sequence complete - Initiating smooth transition');
+        
+        // Smooth transition
+        gsap.to(window, {
+          duration: 0.8,
+          ease: 'power2.out',
+          onComplete: () => {
+            // Enable real scroll smoothly
+            document.body.style.overflow = 'auto';
+            document.documentElement.style.overflow = 'auto';
+            
+            // Remove virtual scroll listeners
+            window.removeEventListener('wheel', handleVirtualScroll as EventListener);
+            window.removeEventListener('DOMMouseScroll', handleVirtualScroll as EventListener);
+            window.removeEventListener('touchstart', handleTouchStart as EventListener);
+            window.removeEventListener('touchmove', handleTouchMove as EventListener);
+            
+            // Reveal post-hero sections if they exist
+            const postHeroSections = document.getElementById('post-hero-sections');
+            if (postHeroSections) {
+              gsap.to(postHeroSections, {
+                opacity: 1,
+                y: 0,
+                duration: 1.2,
+                ease: 'power3.out'
+              });
+              
+              // Initialize Lenis for smooth real scrolling
+              if ((window as any).initLenisScroll) {
+                (window as any).initLenisScroll();
+              }
+            }
+            
+            console.log('✅ Hero smooth scroll transition complete');
+          }
+        });
+      }
+    };
+
+    // 7. SETUP EVENT LISTENERS
+    const setupEventListeners = () => {
+      window.addEventListener('wheel', handleVirtualScroll as EventListener, { passive: false });
+      window.addEventListener('DOMMouseScroll', handleVirtualScroll as EventListener, { passive: false });
+      window.addEventListener('touchstart', handleTouchStart as EventListener, { passive: false });
+      window.addEventListener('touchmove', handleTouchMove as EventListener, { passive: false });
+      
+      console.log('🎧 Hero virtual scroll event listeners attached');
+    };
+
+    // 8. EMERGENCY UNLOCK
+    const setupEmergencyUnlock = () => {
+      setTimeout(() => {
+        if (!scrollUnlocked) {
+          console.log('🚨 Hero emergency unlock - Timeout reached');
+          completeHeroSequence();
+        }
+      }, 45000);
+    };
+
+    // Initialize the system
+    const initialize = () => {
+      blockRealScroll();
+      setupEventListeners();
+      setupEmergencyUnlock();
+      requestAnimationFrame(smoothProgress); // Start progress loop
+      
+      console.log('✨ Hero virtual scroll system initialized');
+    };
+
+    // Return system interface
+    return {
+      initialize,
+      completeSequence: completeHeroSequence,
+      masterTimeline: null // Will be set later
+    };
+  };
 
   const initHeroAnimations = async () => {
     const heroSection = document.getElementById('hero-section');
     if (!heroSection) return;
 
-    // GSAP Animations
-    const heroTl = gsap.timeline({
-      delay: 0.5,
-      onComplete: () => console.log('Hero loaded')
+    // Create self-contained virtual scroll system
+    heroScrollSystem = createHeroVirtualScrollSystem();
+
+    // Elements for animations
+    const backgroundImage = document.getElementById('hero-bg-image');
+    const subtitle = document.querySelector('.hero-subtitle');
+    const title = document.querySelector('.hero-title');
+    const description = document.querySelector('.hero-description');
+    const tagline = document.querySelector('.hero-tagline');
+    const ctaGroup = document.querySelector('.hero-cta-group');
+    const scrollIndicator = document.getElementById('hero-scroll-indicator');
+
+    // Set initial state for Hero elements (EXCEPTO scroll indicator que aparece inmediatamente)
+    gsap.set([subtitle, title, description, tagline, ctaGroup], { 
+      opacity: 0,
+      y: 30,
+      scale: 0.9,
+      visibility: 'hidden'
     });
-
-    const mm = gsap.matchMedia();
-
-    mm.add({
-      isDesktop: "(min-width: 768px)",
-      isMobile: "(max-width: 767px)"
-    }, (context) => {
-      const { isDesktop } = context.conditions!;
-
-      heroTl
-        .from(`.${animationClasses.subtitle}`, { 
-          duration: 1, 
-          y: -30, 
-          opacity: 0, 
-          ease: 'back.out(1.7)' 
-        })
-        .from(`.${animationClasses.title}`, { 
-          duration: 1.2, 
-          y: 50, 
-          scale: 0.9,
-          opacity: 0, 
-          ease: 'power3.out' 
-        }, '-=0.7')
-        .from(`.${animationClasses.description}`, { 
-          duration: 1, 
-          y: 30, 
-          opacity: 0, 
-          stagger: 0.2 
-        }, '-=0.8')
-        .from(`.${animationClasses.tagline}`, { 
-          duration: 0.8, 
-          opacity: 0 
-        }, '-=0.7')
-        .from(`.${animationClasses.ctaGroup}`, { 
-          duration: 1, 
-          scale: 0.8, 
-          opacity: 0, 
-          ease: 'back.out(1.7)' 
-        }, '-=0.6');
-
-      // Scroll Triggers
-      ScrollTrigger.create({
-        trigger: heroSection,
-        start: 'top top',
-        end: 'bottom top',
-        scrub: 1,
-        onUpdate: self => {
-          gsap.to(`.${animationClasses.title}`, { y: self.progress * (isDesktop ? 200 : 100), autoAlpha: 1 - self.progress * 1.5 });
-          gsap.to(`.${animationClasses.description}`, { autoAlpha: 1 - self.progress * 1.2 });
-          gsap.to(`.${animationClasses.ctaGroup}`, { autoAlpha: 1 - self.progress * 1.2 });
-        }
-      });
-
-      const scrollIndicator = document.getElementById(animationClasses.scrollIndicator);
-      if (scrollIndicator) {
-        gsap.to(scrollIndicator, { y: 10, repeat: -1, yoyo: true, ease: 'power1.inOut', duration: 1.5 });
-        ScrollTrigger.create({
-            trigger: heroSection,
-            start: 'top top',
-            onUpdate: self => {
-                gsap.to(scrollIndicator, { autoAlpha: 1 - self.progress * 5 });
-            }
+    
+    // Scroll indicator aparece inmediatamente con animaciones
+    if (scrollIndicator) {
+      console.log('🎯 Initializing scroll indicator immediately');
+      
+      // Activar animaciones inmediatamente
+      const scrollGlow = scrollIndicator.querySelector('.scroll-glow');
+      const scrollBorder = scrollIndicator.querySelector('.scroll-border');
+      const scrollArrow = scrollIndicator.querySelector('.scroll-arrow');
+      const scrollText = scrollIndicator.querySelector('.scroll-text');
+      const scrollLine = scrollIndicator.querySelector('.scroll-line');
+      
+      // Animaciones que empiezan inmediatamente
+      if (scrollGlow) gsap.to(scrollGlow, { opacity: 0.8, scale: 1.2, duration: 2, repeat: -1, yoyo: true, ease: 'power2.inOut' });
+      if (scrollBorder) gsap.to(scrollBorder, { rotation: 360, duration: 20, repeat: -1, ease: 'none' });
+      if (scrollArrow) gsap.to(scrollArrow, { y: 4, duration: 1.5, repeat: -1, yoyo: true, ease: 'power2.inOut' });
+      if (scrollText) gsap.to(scrollText, { opacity: 0.9, duration: 3, repeat: -1, yoyo: true, ease: 'power2.inOut' });
+      if (scrollLine) gsap.to(scrollLine, { opacity: 1, scaleY: 1, duration: 1, ease: 'power3.out', delay: 0.5 });
+      
+      // EXPONER FUNCIÓN PARA OCULTAR SCROLL INDICATOR AL SISTEMA VIRTUAL SCROLL
+      (window as any).hideScrollIndicatorOnVirtualScroll = (reason = 'virtual scroll') => {
+        console.log(`🎯 Hiding scroll indicator due to: ${reason}`);
+        gsap.to(scrollIndicator, {
+          opacity: 0,
+          y: 20,
+          duration: 0.8,
+          ease: 'power3.in'
         });
+      };
+      
+      // Auto-hide después de 12 segundos como fallback
+      setTimeout(() => {
+        if ((scrollIndicator as HTMLElement).style.opacity !== '0') {
+          (window as any).hideScrollIndicatorOnVirtualScroll('timeout');
+        }
+      }, 12000);
+    }
+
+    // =============================================================================
+    // ADAPTIVE TIMELINE CREATION - DETECTS CONTEXT AND CREATES APPROPRIATE TIMELINE
+    // =============================================================================
+    
+    const headerExists = document.getElementById('main-header');
+    const isStoryMode = !headerExists;
+    
+    console.log(`🎭 Context detected: ${isStoryMode ? 'Story/Standalone' : 'Coordinated with Header'}`);
+
+    // CREATE MASTER TIMELINE WITH COMPLETION HANDLER
+    const masterTimeline = gsap.timeline({ 
+      paused: true,
+      onComplete: () => {
+        console.log('🚀 MASTER TIMELINE COMPLETE - Triggering Hero completion');
+        heroScrollSystem.completeSequence();
+      },
+      onUpdate: () => {
+        const progress = masterTimeline.progress();
+        if (progress > 0.95) {
+          console.log(`📊 Master Timeline: ${(progress * 100).toFixed(1)}%`);
+        }
       }
     });
+
+    if (isStoryMode) {
+      // =============================================================================
+      // STANDALONE MODE: Hero Only (0% - 100%)
+      // =============================================================================
+      
+      console.log('🎬 Creating standalone Hero timeline (0-100%)');
+      
+      const heroSequence = gsap.timeline();
+      
+      heroSequence
+        .to(subtitle, {
+          duration: 0.6,
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          visibility: 'visible',
+          ease: 'back.out(1.7)'
+        }, 0)
+        .to(title, {
+          duration: 0.8,
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          visibility: 'visible',
+          ease: 'power4.out'
+        }, 0.1)
+        .to(description, {
+          duration: 0.6,
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          visibility: 'visible',
+          ease: 'power3.out'
+        }, 0.25)
+        .to(tagline, {
+          duration: 0.4,
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          visibility: 'visible',
+          ease: 'power2.out'
+        }, 0.4)
+        .to(ctaGroup, {
+          duration: 0.6,
+          y: 0,
+          opacity: 1,
+          scale: 1,
+          visibility: 'visible',
+          ease: 'elastic.out(1, 0.75)'
+        }, 0.55)
+        // Scroll indicator ya aparece inmediatamente, no necesita timeline
+      
+      // Hero timeline takes full duration (0-100%)
+      masterTimeline.add(heroSequence, 0);
+      
+      console.log('✅ Standalone Hero timeline created');
+      
+    } else {
+      // =============================================================================
+      // COORDINATED MODE: Header (0-20%) + Hero (20-90%) + Padding (90-100%)
+      // =============================================================================
+      
+      console.log('🎬 Creating coordinated Header + Hero timeline');
+      
+      // Wait for Header elements to be available
+      const waitForHeaderElements = () => {
+        return new Promise((resolve) => {
+          const checkHeader = () => {
+            if ((window as any).headerElements) {
+              resolve((window as any).headerElements);
+            } else {
+              setTimeout(checkHeader, 10);
+            }
+          };
+          checkHeader();
+        });
+      };
+
+      await waitForHeaderElements().then((headerElements) => {
+        const { header, logoContainer, navLinks, mobileButton } = headerElements;
+
+        // 1. HEADER SEQUENCE (0% - 20%)
+        const headerSequence = gsap.timeline();
+        
+        headerSequence.to(header, {
+          duration: 0.3,
+          opacity: 1,
+          y: 0,
+          visibility: 'visible',
+          ease: 'power2.out'
+        }, 0);
+        
+        headerSequence.to(logoContainer, {
+          duration: 0.3,
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          visibility: 'visible',
+          ease: 'back.out(1.7)'
+        }, 0.03);
+        
+        navLinks.forEach((link, index) => {
+          headerSequence.to(link, {
+            duration: 0.2,
+            opacity: 1,
+            y: 0,
+            visibility: 'visible',
+            ease: 'power2.out'
+          }, 0.06 + (index * 0.015));
+        });
+        
+        headerSequence.to(mobileButton, {
+          duration: 0.2,
+          opacity: 1,
+          scale: 1,
+          rotation: 0,
+          visibility: 'visible',
+          ease: 'elastic.out(1, 0.75)'
+        }, 0.15);
+
+        // 2. HERO SEQUENCE (20% - 90%)
+        const heroSequence = gsap.timeline();
+        
+        heroSequence
+          .to(subtitle, {
+            duration: 0.6,
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            visibility: 'visible',
+            ease: 'back.out(1.7)'
+          }, 0)
+          .to(title, {
+            duration: 0.8,
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            visibility: 'visible',
+            ease: 'power4.out'
+          }, 0.1)
+          .to(description, {
+            duration: 0.6,
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            visibility: 'visible',
+            ease: 'power3.out'
+          }, 0.25)
+          .to(tagline, {
+            duration: 0.4,
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            visibility: 'visible',
+            ease: 'power2.out'
+          }, 0.4)
+          .to(ctaGroup, {
+            duration: 0.6,
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            visibility: 'visible',
+            ease: 'elastic.out(1, 0.75)'
+          }, 0.55)
+          // Scroll indicator ya aparece inmediatamente, no necesita timeline
+
+        // 3. BUILD COORDINATED MASTER TIMELINE
+        masterTimeline
+          .add(headerSequence, 0)     // Header: 0%-20%
+          .add(heroSequence, 0.2)     // Hero: 20%-90%
+          .to({}, { duration: 0.1 }); // Padding: 90%-100%
+
+        console.log('✅ Coordinated Header + Hero timeline created');
+      });
+    }
+
+    // Connect Master Timeline to Virtual Scroll System
+    heroScrollSystem.masterTimeline = masterTimeline;
+    
+    // Initialize the virtual scroll system
+    heroScrollSystem.initialize();
+    
+    console.log('🎯 Hero component fully initialized - Self-contained and ready');
+
+    // Background image parallax setup
+    if (backgroundImage) {
+      gsap.set(backgroundImage, { 
+        scale: 1.1, // Slight scale to avoid white edges during parallax
+        transformOrigin: "center center"
+      });
+      
+      // Background parallax controlled directly by virtual scroll progress
+      // No external event listeners needed - handled internally by heroScrollSystem
+      const updateBackgroundParallax = (progress) => {
+        const progressNormalized = progress / 100; // 0-1
+        gsap.set(backgroundImage, {
+          y: progressNormalized * 30,
+          scale: 1.05 + (progressNormalized * 0.05),
+          filter: `brightness(${1 - progressNormalized * 0.1}) blur(${progressNormalized * 0.5}px)`
+        });
+      };
+      
+      // Expose to virtual scroll system for direct updates
+      heroScrollSystem.updateBackgroundParallax = updateBackgroundParallax;
+    }
+
+    // Mouse parallax effect (desktop only) - Works in all modes
+    if (window.innerWidth >= 768) {
+      let mouseX = 0;
+      let mouseY = 0;
+
+      document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 8;
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 8;
+
+        gsap.to([title, subtitle], {
+          x: mouseX * 0.2,
+          y: mouseY * 0.1,
+          rotationY: mouseX * 0.03,
+          rotationX: -mouseY * 0.03,
+          duration: 1,
+          ease: 'power2.out'
+        });
+
+        if (backgroundImage) {
+          gsap.to(backgroundImage, {
+            x: mouseX * 0.1,
+            y: mouseY * 0.1,
+            duration: 2,
+            ease: 'power2.out'
+          });
+        }
+      });
+    }
   };
 
-  document.addEventListener('DOMContentLoaded', initHeroAnimations);
+  // Intersection Observer for performance
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '50px'
+  };
 
-  // CSS Particles Generation
-  const cssParticlesContainer = document.getElementById('css-particles');
-  if (cssParticlesContainer) {
-    for (let i = 0; i < 50; i++) {
-      const particle = document.createElement('div');
-      particle.className = `${heroStyles.cssParticles.particle} ${heroStyles.cssParticles.animation}`;
-      const size = Math.random() * 5 + 2; // Size between 2px and 7px
-      particle.style.width = `${size}px`;
-      particle.style.height = `${size}px`;
-      particle.style.left = `${Math.random() * 100}%`;
-      particle.style.top = `${Math.random() * 100}%`;
-      particle.style.setProperty('--x', `${(Math.random() - 0.5) * 200}px`);
-      particle.style.setProperty('--y', `${(Math.random() - 0.5) * 200}px`);
-      particle.style.animationDelay = `${Math.random() * 10}s`;
-      particle.style.animationDuration = `${Math.random() * 10 + 5}s`;
-      cssParticlesContainer.appendChild(particle);
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        initHeroAnimations();
+        observer.unobserve(entry.target);
+      }
+    });
+  }, observerOptions);
+
+  // Initialize when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    const heroSection = document.getElementById('hero-section');
+    if (heroSection) {
+      observer.observe(heroSection);
+    }
+  });
+
+  // Enhanced cleanup
+  window.addEventListener('beforeunload', () => {
+    if (lenis) {
+      lenis.destroy();
+    }
+    ScrollTrigger.killAll();
+    gsap.killTweensOf('*');
+  });
+  
+  // Performance optimization - preload Lenis
+  document.addEventListener('DOMContentLoaded', () => {
+    // Preload Lenis for instant activation
+    new Promise(() => {
+      new Lenis();
+    }).catch(() => {});
+  });
+</script>
+
+<style>
+  /* 3D perspective for better parallax effects */
+  #hero-section {
+    perspective: 1000px;
+    transform-style: preserve-3d;
+  }
+
+  /* Smooth hardware acceleration */
+  .hero-subtitle,
+  .hero-title,
+  .hero-description,
+  .hero-tagline,
+  .hero-cta-group,
+  .hero-scroll-indicator,
+  #hero-bg-image {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+  }
+
+  /* Enhanced scroll indicator styles */
+  .hero-scroll-indicator {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+  }
+  
+  .scroll-icon-wrapper {
+    will-change: transform;
+  }
+  
+  .scroll-glow {
+    will-change: transform, opacity;
+  }
+  
+  .scroll-border {
+    backdrop-filter: blur(8px);
+    box-shadow: 
+      0 4px 16px rgba(198, 39, 144, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .scroll-line {
+    transform-origin: top;
+    will-change: transform, opacity;
+  }
+
+  /* Enhanced glassmorphism effects */
+  .hero-cta-primary,
+  .hero-cta-secondary {
+    backdrop-filter: blur(10px);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    #hero-section * {
+      animation: none !important;
+      transition: none !important;
+    }
+    
+    .hero-scroll-indicator {
+      opacity: 0.5;
     }
   }
+</style>

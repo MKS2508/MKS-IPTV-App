@@ -1,0 +1,310 @@
+---
+/**
+ * HeroContent - Componente de contenido descriptivo del Hero
+ * Maneja descripción, tagline y características destacadas
+ * Diseñado para trabajar con el sistema de virtual scroll del Hero
+ * 
+ * @component
+ * @param {string} description - Descripción principal
+ * @param {string} tagline - Tagline o slogan
+ * @param {string[]} features - Características destacadas
+ * @param {boolean} animated - Mostrar animaciones GSAP
+ * @param {string} alignment - Alineación del contenido
+ * @param {string} className - Clases CSS adicionales para el container
+ * @param {string} descriptionClassName - Clases CSS adicionales para la descripción
+ * @param {string} taglineClassName - Clases CSS adicionales para el tagline
+ * @param {string} id - ID único para targeting de animaciones
+ */
+
+import type { HeroContentProps } from './types';
+import { heroContentStyles } from './styles';
+import { strings } from '../../../i18n/strings/es-es';
+
+const {
+  description = 'Experimenta el streaming de televisión más avanzado',
+  tagline = 'El futuro del entretenimiento, hoy',
+  features = [
+    'Multiplataforma',
+    'Streaming 4K',
+    'Sin Publicidad',
+    'Actualizaciones Gratis'
+  ],
+  animated = true,
+  alignment = 'center',
+  className = '',
+  descriptionClassName = '',
+  taglineClassName = '',
+  id = 'hero-content'
+}: HeroContentProps = Astro.props;
+
+// Construir clases finales
+const containerClasses = [
+  heroContentStyles.container.base,
+  heroContentStyles.container.alignment[alignment],
+  className
+].filter(Boolean).join(' ');
+
+const descriptionClasses = [
+  heroContentStyles.description.base,
+  heroContentStyles.description.color,
+  heroContentStyles.description.spacing,
+  heroContentStyles.description.glow,
+  animated ? heroContentStyles.animation.initial : '',
+  descriptionClassName
+].filter(Boolean).join(' ');
+
+const taglineClasses = [
+  heroContentStyles.tagline.base,
+  heroContentStyles.tagline.color,
+  heroContentStyles.tagline.spacing,
+  heroContentStyles.tagline.glow,
+  animated ? heroContentStyles.animation.initial : '',
+  taglineClassName
+].filter(Boolean).join(' ');
+
+// Icono check para features
+const checkIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>';
+---
+
+<div 
+  id={id}
+  class={containerClasses}
+>
+  <!-- Descripción principal -->
+  {description && (
+    <p 
+      class={`hero-description ${descriptionClasses}`}
+      data-gsap="hero-description"
+    >
+      {description}
+    </p>
+  )}
+  
+  <!-- Tagline/Slogan -->
+  {tagline && (
+    <p 
+      class={`hero-tagline ${taglineClasses}`}
+      data-gsap="hero-tagline"
+    >
+      "{tagline}"
+    </p>
+  )}
+  
+  <!-- Características destacadas -->
+  {features && features.length > 0 && (
+    <div 
+      class={`hero-features ${heroContentStyles.features.container}`}
+      data-gsap="hero-features"
+    >
+      {features.map((feature, index) => (
+        <div 
+          class={`feature-item ${heroContentStyles.features.item.base} ${heroContentStyles.features.item.background} ${heroContentStyles.features.item.border} ${heroContentStyles.features.item.text} ${heroContentStyles.features.item.hover}`}
+          data-gsap={`hero-feature-${index}`}
+        >
+          <svg 
+            class={heroContentStyles.features.icon}
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            set:html={checkIcon}
+          />
+          <span>{feature}</span>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+{animated && (
+  <script>
+    import { gsap } from 'gsap';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const initHeroContent = () => {
+        const contentContainer = document.querySelector('#hero-content');
+        if (!contentContainer) return;
+
+        console.log('🎯 Initializing HeroContent animations');
+
+        const description = contentContainer.querySelector('.hero-description');
+        const tagline = contentContainer.querySelector('.hero-tagline');
+        const features = contentContainer.querySelector('.hero-features');
+        const featureItems = contentContainer.querySelectorAll('.feature-item');
+
+        // Configurar estado inicial
+        [description, tagline, features].forEach(element => {
+          if (element) {
+            gsap.set(element, {
+              opacity: 0,
+              y: 20,
+              scale: 0.95
+            });
+          }
+        });
+
+        featureItems.forEach((item) => {
+          gsap.set(item, {
+            opacity: 0,
+            y: 15,
+            scale: 0.9
+          });
+        });
+
+        // Exponer función para animación desde Hero
+        (window as any).animateHeroContent = (progress = 0) => {
+          // Descripción aparece (40% - 60%)
+          if (description && progress >= 0.4) {
+            const descProgress = Math.min((progress - 0.4) / 0.2, 1);
+            gsap.to(description, {
+              opacity: descProgress,
+              y: 20 * (1 - descProgress),
+              scale: 0.95 + (0.05 * descProgress),
+              duration: 0.4,
+              ease: 'power2.out'
+            });
+          }
+
+          // Tagline aparece (50% - 70%)
+          if (tagline && progress >= 0.5) {
+            const taglineProgress = Math.min((progress - 0.5) / 0.2, 1);
+            gsap.to(tagline, {
+              opacity: taglineProgress,
+              y: 20 * (1 - taglineProgress),
+              scale: 0.95 + (0.05 * taglineProgress),
+              duration: 0.4,
+              ease: 'power2.out'
+            });
+          }
+
+          // Features aparecen (60% - 80%)
+          if (features && progress >= 0.6) {
+            const featuresProgress = Math.min((progress - 0.6) / 0.2, 1);
+            
+            // Container de features
+            gsap.to(features, {
+              opacity: featuresProgress,
+              y: 20 * (1 - featuresProgress),
+              scale: 0.95 + (0.05 * featuresProgress),
+              duration: 0.4,
+              ease: 'power2.out'
+            });
+
+            // Items individuales con stagger
+            featureItems.forEach((item, index) => {
+              const delay = index * 0.1;
+              const adjustedProgress = Math.max(0, featuresProgress - delay);
+              
+              gsap.to(item, {
+                opacity: adjustedProgress,
+                y: 15 * (1 - adjustedProgress),
+                scale: 0.9 + (0.1 * adjustedProgress),
+                duration: 0.3,
+                ease: 'back.out(1.2)'
+              });
+            });
+          }
+        };
+
+        // Efectos hover para features
+        featureItems.forEach((item) => {
+          item.addEventListener('mouseenter', () => {
+            gsap.to(item, {
+              scale: 1.05,
+              y: -2,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+          });
+          
+          item.addEventListener('mouseleave', () => {
+            gsap.to(item, {
+              scale: 1,
+              y: 0,
+              duration: 0.3,
+              ease: 'power2.out'
+            });
+          });
+        });
+
+        // Fallback para standalone (sin Hero)
+        if (!(window as any).heroVirtualScrollActive) {
+          setTimeout(() => {
+            (window as any).animateHeroContent(1);
+          }, 600);
+        }
+      };
+
+      initHeroContent();
+    });
+  </script>
+)}
+
+<style>
+  /* Mejoras visuales para mejor integración */
+  .hero-description {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    line-height: 1.6;
+  }
+  
+  .hero-tagline {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    font-style: italic;
+    position: relative;
+  }
+  
+  .hero-tagline::before,
+  .hero-tagline::after {
+    content: '"';
+    opacity: 0.5;
+    font-size: 1.2em;
+    color: rgb(var(--app-highlight));
+  }
+  
+  .feature-item {
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(var(--app-text-muted), 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .feature-item:hover {
+    border-color: rgba(var(--app-text-muted), 0.4);
+    background: rgba(var(--app-surface), 0.5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 640px) {
+    .hero-description {
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+    
+    .hero-tagline {
+      font-size: 0.875rem;
+    }
+    
+    .feature-item {
+      font-size: 0.75rem;
+      padding: 0.5rem 0.75rem;
+    }
+    
+    .hero-features {
+      gap: 0.5rem;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .hero-description,
+    .hero-tagline,
+    .feature-item {
+      transition: none !important;
+      animation: none !important;
+    }
+    
+    .feature-item:hover {
+      transform: none !important;
+    }
+  }
+</style>

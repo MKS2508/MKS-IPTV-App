@@ -36,7 +36,7 @@ export const logos: Record<string, Asset> = {
 export const banners: Record<string, Asset> = {
   hero: {
     id: 'hero-banner',
-    src: '/images/banners/banner3.webp',
+    src: '/images/banners/banner4.webp',
     alt: 'MKS-IPTV App Hero Banner',
     title: 'Tu cliente IPTV multiplataforma',
     width: 1920,
@@ -46,7 +46,7 @@ export const banners: Record<string, Asset> = {
   },
   heroPng: {
     id: 'hero-banner-png',
-    src: '/images/banners/banner3.png',
+    src: '/images/banners/banner4.png',
     alt: 'MKS-IPTV App Hero Banner',
     title: 'Tu cliente IPTV multiplataforma',
     width: 1920,

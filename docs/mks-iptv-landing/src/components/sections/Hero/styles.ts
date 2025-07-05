@@ -1,12 +1,12 @@
 
 export const heroStyles = {
-  container: "relative min-h-screen flex items-center justify-center overflow-hidden text-center",
+  container: "relative min-h-[100vh] overflow-hidden",
   background: {
     overlay: "absolute inset-0 bg-gradient-to-b from-app-background via-app-surface/80 to-app-background",
     particles: "absolute inset-0 z-0",
   },
   content: {
-    wrapper: "relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8",
+    wrapper: "relative z-20 h-screen flex flex-col items-center justify-center text-center max-w-4xl mx-auto px-4 sm:px-6 lg:px-8",
     subtitle: "text-lg md:text-xl mb-2 text-app-highlight font-semibold tracking-wider",
     title: "text-5xl md:text-7xl lg:text-8xl font-bold text-app-text-primary mb-4",
     description: "text-md md:text-lg max-w-2xl mx-auto mb-6 text-app-text-secondary",

@@ -53,13 +53,13 @@ const headerClasses = [
 ].filter(Boolean).join(' ');
 ---
 
-<header class={headerClasses} id="main-header">
+<header class={headerClasses} id="main-header" style="opacity: 0; transform: translateY(-100%); visibility: hidden;">
   <div class={headerStyles.inner}>
     <div class={headerStyles.content}>
       
       <!-- Logo y Branding -->
       {showLogo && (
-        <div class={headerStyles.logo.container}>
+        <div class={`${headerStyles.logo.container} logo-container`}>
           <a href="/" class="flex items-center space-x-3 group">
             <div class="relative">
               <div class="absolute inset-0 bg-app-accent/20 rounded-full blur-lg group-hover:blur-xl transition-all duration-300 group-hover:scale-110"></div>
@@ -89,7 +89,7 @@ const headerClasses = [
               <li class={headerStyles.nav.item}>
                 <a 
                   href={item.href}
-                  class={linkClasses}
+                  class={`${linkClasses} nav-link`}
                   aria-current={isActive ? 'page' : undefined}
                   target={item.isExternal ? '_blank' : undefined}
                   rel={item.isExternal ? 'noopener noreferrer' : undefined}
@@ -111,7 +111,7 @@ const headerClasses = [
       </nav>
       
       <!-- Botón Menú Móvil -->
-      <div class={headerStyles.mobileButton.container}>
+      <div class={`${headerStyles.mobileButton.container} mobile-button-container`}>
         <button 
           type="button"
           class={headerStyles.mobileButton.button}
@@ -196,9 +196,51 @@ const headerClasses = [
 </header>
 
 <script>
+  import { gsap } from 'gsap';
+  
   // Funcionalidad del menú móvil y scroll
   document.addEventListener('DOMContentLoaded', () => {
     const header = document.getElementById('main-header');
+    
+    // HEADER INITIAL STATES - Será controlado por Master Timeline en Hero
+    const logoContainer = header.querySelector('.logo-container');
+    const navLinks = header.querySelectorAll('.nav-link');
+    const mobileButton = header.querySelector('.mobile-button-container');
+    
+    // Set initial states para que Master Timeline los controle
+    if (header) {
+      header.style.opacity = '0';
+      header.style.transform = 'translateY(-100%)';
+      header.style.visibility = 'hidden';
+    }
+    
+    if (logoContainer) {
+      logoContainer.style.opacity = '0';
+      logoContainer.style.visibility = 'hidden';
+      logoContainer.style.transform = 'scale(0.5) translateY(-20px)';
+    }
+    
+    navLinks.forEach(link => {
+      link.style.opacity = '0';
+      link.style.visibility = 'hidden';
+      link.style.transform = 'translateY(-30px)';
+    });
+    
+    if (mobileButton) {
+      mobileButton.style.opacity = '0';
+      mobileButton.style.visibility = 'hidden';
+      mobileButton.style.transform = 'scale(0.3) rotate(180deg)';
+    }
+
+    console.log('📋 Header elements prepared for Master Timeline control');
+    
+    // EXPONER ELEMENTOS PARA MASTER TIMELINE
+    window.headerElements = {
+      header,
+      logoContainer,
+      navLinks,
+      mobileButton
+    };
     const mobileMenuButton = document.getElementById('mobile-menu-button');
     const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
     const mobileMenu = document.getElementById('mobile-menu');
@@ -243,38 +285,7 @@ const headerClasses = [
       }
     });
     
-    // Efecto de scroll en el header
-    let lastScrollY = window.scrollY;
-    let ticking = false;
-    
-    function updateHeader() {
-      const scrollY = window.scrollY;
-      
-      if (header) {
-        if (scrollY > 50) {
-          header.classList.remove('bg-transparent', 'backdrop-blur-md');
-          header.classList.add('bg-slate-900/98', 'backdrop-blur-md', 'border-b', 'border-slate-700/50', 'shadow-lg');
-        } else {
-          header.classList.remove('bg-slate-900/98', 'border-b', 'border-slate-700/50', 'shadow-lg');
-          header.classList.add('bg-transparent', 'backdrop-blur-md');
-        }
-      }
-      
-      lastScrollY = scrollY;
-      ticking = false;
-    }
-    
-    function requestUpdate() {
-      if (!ticking) {
-        requestAnimationFrame(updateHeader);
-        ticking = true;
-      }
-    }
-    
-    // Listener para el scroll
-    window.addEventListener('scroll', requestUpdate, { passive: true });
-    
-    // Inicializar estado del header
-    updateHeader();
+    // DISABLED - Removed scroll listeners for virtual scroll mode
+    // Header styles will be controlled by timeline progress instead
   });
 </script>

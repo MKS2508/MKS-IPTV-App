@@ -76,16 +76,51 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj \
 - Per-content actions: Stream, Download, External Player, Copy Link
 - MOV format conversion for optimal AirPlay and Apple TV integration
 
+## Documentation Site Commands
+
+### Jekyll Development
+```bash
+# Install dependencies
+bundle install
+
+# Serve locally with live reload
+bundle exec jekyll serve
+
+# Build static site
+bundle exec jekyll build
+
+# Clean generated files
+bundle exec jekyll clean
+```
+
 ## Development Notes
 
 ### Current Repository State
-The repository currently contains build outputs and documentation. The actual Swift source code files are not present in the repository, which suggests the codebase might be in a separate location or not yet committed.
+**IMPORTANT**: This repository contains ONLY documentation and build artifacts. The actual Swift source code is maintained in a private repository and is not available here. When asked to modify application code, inform users that source code access is not available.
+
+### Repository Structure
+```
+MKS-IPTV-App/
+├── docs/                    # Jekyll documentation site
+│   ├── _layouts/           # Jekyll layouts
+│   ├── _site/             # Generated static site (do not edit)
+│   ├── assets/            # CSS, JS, images
+│   ├── imgs/              # Screenshots organized by version
+│   └── *.md               # Documentation pages
+├── build/                  # Build artifacts
+│   └── export/
+│       ├── ios/           # iOS .ipa files and archives
+│       └── macos-arm64/   # macOS .app bundle
+├── wiki-content/          # Additional documentation
+└── *.md                   # Root documentation files
+```
 
 ### GitHub Pages Documentation
 The documentation site is hosted at: https://MKS2508.github.io/MKS-IPTV-App/
 - Configuration: `docs/_config.yml` with Jekyll and Hacker theme
 - Main pages: index.md, download.md, installation.md, screenshots.md
 - Custom CSS: Cyberpunk/synthwave styling in `docs/assets/css/`
+- **Language Support**: Documentation is bilingual (English/Spanish)
 
 ### Required Development Environment
 - Xcode 16 Beta (for iOS/macOS/tvOS 26 Beta support)
@@ -101,3 +136,22 @@ No test infrastructure is currently visible in the repository. When implementing
 - Unit tests for ViewModels and business logic
 - UI tests for critical user flows
 - Integration tests for streaming and download functionality
+
+## Additional Information
+
+### License
+This project is licensed under GPL-3.0. Ensure any contributions comply with the license terms.
+
+### Working with Documentation
+When updating documentation:
+- Edit source files in `docs/` directory, not `docs/_site/` (which is auto-generated)
+- Test changes locally with `bundle exec jekyll serve` before committing
+- Screenshots should be organized in `docs/imgs/` by version number
+- Maintain bilingual support (English/Spanish) when updating documentation
+
+### Handling Code Modification Requests
+Since the Swift source code is not present in this repository:
+- Inform users that source code modifications cannot be made directly
+- Focus on documentation improvements, build artifact management, and website updates
+- Provide architectural guidance based on the documented structure
+- Suggest implementation approaches without actual code changes

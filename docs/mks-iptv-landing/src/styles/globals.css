@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Legacy color system from /docs/assets/css/_variables.scss */
+  :root {
+    --background: #252335;
+    --surface: #2B2139;
+    --primary: #463564;
+    --accent: #C62790;
+    --highlight: #FFD700;
+    --red-neon: #FF4757;
+    --text-primary: #FFFFFF;
+    --text-secondary: #B0A8B9;
+    --font-family: 'Inter', sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-family);
+  }
+  
+  body {
+    background-color: var(--background);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-app-accent hover:bg-app-primary text-app-text font-semibold py-3 px-6 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-app-primary hover:bg-app-accent text-app-text font-semibold py-3 px-6 rounded-lg transition-colors duration-200;
+  }
+  
+  .card {
+    @apply bg-app-surface border border-app-primary border-opacity-20 rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-200;
+  }
+  
+  .section-padding {
+    @apply py-16 px-4 sm:px-6 lg:px-8;
+  }
+  
+  .container {
+    @apply max-w-7xl mx-auto;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(45deg, var(--accent), var(--highlight));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .bg-cyberpunk {
+    background: linear-gradient(135deg, var(--background) 0%, var(--surface) 50%, var(--primary) 100%);
+  }
+  
+  .border-app {
+    border-color: var(--primary);
+  }
+  
+  .border-app-accent {
+    border-color: var(--accent);
+  }
+}

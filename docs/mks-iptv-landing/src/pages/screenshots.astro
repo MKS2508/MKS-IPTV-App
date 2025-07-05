@@ -1,0 +1,202 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/layout/Header/index.astro';
+import Footer from '../components/layout/Footer/index.astro';
+import { strings } from '../i18n/strings/es-es';
+import { getImagePath, screenshots } from '../utils/image-paths';
+---
+
+<Layout 
+  title={strings.meta.titleScreenshots}
+  description={strings.meta.description}
+>
+  <Header currentPath="/screenshots" />
+  
+  <main class="pt-16 lg:pt-20">
+    <!-- Hero Section -->
+    <section class="py-20 bg-cyberpunk">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-app-text mb-6">
+          <span class="text-gradient">Screenshots</span>
+        </h1>
+        <p class="text-xl text-app-text-muted mb-8 max-w-3xl mx-auto">
+          Explora la interfaz Liquid Glass y las características de MKS-IPTV en todas las plataformas Apple.
+        </p>
+      </div>
+    </section>
+    
+    <!-- Screenshots Gallery -->
+    <section class="py-20 bg-app-surface/30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- macOS Screenshots -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-primary to-app-accent rounded-lg flex items-center justify-center mr-4">
+              💻
+            </div>
+            {strings.platforms.macos}
+          </h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="card">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.macos.liquidGlass)} 
+                  alt="Liquid Glass Top Bar - macOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Liquid Glass Top Bar</h3>
+              <p class="text-app-text-muted">Lista principal con la barra superior translúcida que define el diseño Liquid Glass.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.macos.downloads)} 
+                  alt="Sistema de Descargas - macOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Sistema de Descargas</h3>
+              <p class="text-app-text-muted">Gestor avanzado de descargas con progreso en tiempo real y control de cola.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.macos.seriesDetail)} 
+                  alt="Detalle de Series - macOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Detalle de Series</h3>
+              <p class="text-app-text-muted">Vista detallada de series con información completa y gestión de episodios.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.macos.downloadModal)} 
+                  alt="Configuración de Descarga - macOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Configuración de Descarga</h3>
+              <p class="text-app-text-muted">Modal de configuración flexible para personalizar opciones de descarga.</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- iOS Screenshots -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-accent to-app-highlight rounded-lg flex items-center justify-center mr-4">
+              📱
+            </div>
+            {strings.platforms.ios}
+          </h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="card">
+              <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.ios.seriesList)} 
+                  alt="Navegación iPhone"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-lg font-semibold text-app-text mb-2">Navegación {strings.platforms.iphone}</h3>
+              <p class="text-app-text-muted text-sm">Diseño adaptativo optimizado para iPhone con navegación intuitiva.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.ios.seriesDetail)} 
+                  alt="Detalle de Serie - iOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-lg font-semibold text-app-text mb-2">Detalle de Serie</h3>
+              <p class="text-app-text-muted text-sm">Vista detallada con información completa y opciones de reproducción.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(screenshots.ios.downloadModal)} 
+                  alt="Modal de Descarga - iOS"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-lg font-semibold text-app-text mb-2">Modal de Descarga</h3>
+              <p class="text-app-text-muted text-sm">Configuración flexible para descargar contenido offline.</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- tvOS Screenshots -->
+        <div>
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-accent to-app-red-neon rounded-lg flex items-center justify-center mr-4">
+              📺
+            </div>
+            {strings.platforms.tvos}
+          </h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="card">
+              <div class="aspect-video bg-app-red-neon/20 rounded-lg mb-4 flex items-center justify-center">
+                <svg class="w-16 h-16 text-app-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 3H3c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h6l-2 3v1h8v-1l-2-3h6c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 11H3V5h18v9z" />
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Interfaz {strings.platforms.appleTV}</h3>
+              <p class="text-app-text-muted">Diseño optimizado para Apple TV con navegación por control remoto.</p>
+            </div>
+            
+            <div class="card">
+              <div class="aspect-video bg-app-red-neon/20 rounded-lg mb-4 flex items-center justify-center">
+                <svg class="w-16 h-16 text-app-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">Streaming en Vivo</h3>
+              <p class="text-app-text-muted">Experiencia de visualización inmersiva en pantalla grande.</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Note about screenshots -->
+        <div class="mt-16 text-center">
+          <div class="card max-w-2xl mx-auto">
+            <h3 class="text-xl font-semibold text-app-accent mb-4">📸 Nota sobre Screenshots</h3>
+            <p class="text-app-text-muted">
+              Las capturas de pantalla mostradas representan la interfaz de la aplicación MKS-IPTV. 
+              El diseño Liquid Glass se adapta dinámicamente según el contenido y las preferencias del sistema.
+            </p>
+            <div class="mt-6">
+              <a href="/MKS-IPTV-App/download" class="btn-primary mr-4">
+                {strings.buttons.downloadNow}
+              </a>
+              <a href="/MKS-IPTV-App/installation" class="btn-secondary">
+                {strings.buttons.viewInstallation}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <Footer />
+</Layout>

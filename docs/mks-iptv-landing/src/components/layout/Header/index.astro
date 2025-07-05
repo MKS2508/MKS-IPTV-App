@@ -1,0 +1,274 @@
+---
+/**
+ * Componente Header con navegación responsive y menú móvil.
+ * Incluye logo, navegación principal, y funcionalidad de scroll.
+ * 
+ * @component
+ * @param {string} currentPath - Ruta actual para highlighting de navegación
+ * @param {boolean} showLogo - Mostrar logo en el header
+ * @param {boolean} transparent - Header transparente inicial
+ * @param {string} className - Clases CSS adicionales
+ * 
+ * @example
+ * <Header currentPath="/installation" showLogo={true} transparent={false} />
+ */
+
+import { headerStyles, getNavLinkClasses, getMobileNavLinkClasses } from './styles';
+import type { HeaderProps, NavigationItem } from './types';
+import { strings } from '../../../i18n/strings/es-es';
+
+const {
+  currentPath = '/',
+  showLogo = true,
+  transparent = false,
+  className = ''
+}: HeaderProps = Astro.props;
+
+// Navegación principal usando strings localizadas
+const navigationItems: NavigationItem[] = [
+  { label: strings.nav.home, href: '/MKS-IPTV-App/' },
+  { label: strings.nav.installation, href: '/MKS-IPTV-App/installation' },
+  { label: strings.nav.downloads, href: '/MKS-IPTV-App/download' },
+  { label: strings.nav.screenshots, href: '/MKS-IPTV-App/screenshots' },
+  { 
+    label: strings.nav.github, 
+    href: 'https://github.com/MKS2508/MKS-IPTV-App', 
+    isExternal: true,
+    icon: 'github'
+  }
+];
+
+// Determinar si un enlace está activo
+function isActiveLink(href: string, currentPath: string): boolean {
+  if (href === '/MKS-IPTV-App/' && currentPath === '/') return true;
+  if (href !== '/MKS-IPTV-App/' && currentPath.startsWith(href.replace('/MKS-IPTV-App', ''))) return true;
+  return false;
+}
+
+// Clases del header basadas en transparencia
+const headerClasses = [
+  headerStyles.container,
+  transparent ? headerStyles.variants.transparent : headerStyles.variants.solid,
+  className
+].filter(Boolean).join(' ');
+---
+
+<header class={headerClasses} id="main-header">
+  <div class={headerStyles.inner}>
+    <div class={headerStyles.content}>
+      
+      <!-- Logo y Branding -->
+      {showLogo && (
+        <div class={headerStyles.logo.container}>
+          <a href="/" class="flex items-center space-x-3 group">
+            <img 
+              src="/MKS-IPTV-App/images/logos/applogo.webp"
+              alt="MKS-IPTV Logo"
+              class={headerStyles.logo.image}
+              width="40"
+              height="40"
+            />
+            <span class={headerStyles.logo.text}>
+              MKS-IPTV
+            </span>
+          </a>
+        </div>
+      )}
+      
+      <!-- Navegación Desktop -->
+      <nav class={headerStyles.nav.container} role="navigation" aria-label="Navegación principal">
+        <ul class={headerStyles.nav.list}>
+          {navigationItems.map((item) => {
+            const isActive = isActiveLink(item.href, currentPath);
+            const linkClasses = getNavLinkClasses(isActive, item.isExternal);
+            
+            return (
+              <li class={headerStyles.nav.item}>
+                <a 
+                  href={item.href}
+                  class={linkClasses}
+                  aria-current={isActive ? 'page' : undefined}
+                  target={item.isExternal ? '_blank' : undefined}
+                  rel={item.isExternal ? 'noopener noreferrer' : undefined}
+                >
+                  {item.label}
+                  {item.isExternal && (
+                    <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  )}
+                </a>
+                {isActive && (
+                  <div class={headerStyles.nav.activeIndicator}></div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      
+      <!-- Botón Menú Móvil -->
+      <div class={headerStyles.mobileButton.container}>
+        <button 
+          type="button"
+          class={headerStyles.mobileButton.button}
+          aria-label="Abrir menú de navegación"
+          id="mobile-menu-button"
+        >
+          <svg class={headerStyles.mobileButton.icon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Menú Móvil -->
+  <div 
+    class={headerStyles.mobileMenu.overlay} 
+    id="mobile-menu-overlay"
+    style="display: none;"
+  >
+    <div class={`${headerStyles.mobileMenu.container} ${headerStyles.mobileMenu.hidden}`} id="mobile-menu">
+      <div class={headerStyles.mobileMenu.content}>
+        
+        <!-- Header del menú móvil -->
+        <div class={headerStyles.mobileMenu.header}>
+          <div class={headerStyles.logo.container}>
+            <img 
+              src="/MKS-IPTV-App/images/logos/applogo.webp"
+              alt="MKS-IPTV Logo"
+              class="h-8 w-8"
+              width="32"
+              height="32"
+            />
+            <span class="text-lg font-bold text-white">MKS-IPTV</span>
+          </div>
+          <button 
+            type="button"
+            class={headerStyles.mobileMenu.closeButton}
+            aria-label="Cerrar menú de navegación"
+            id="mobile-menu-close"
+          >
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <!-- Navegación móvil -->
+        <nav class={headerStyles.mobileMenu.nav} role="navigation" aria-label="Navegación móvil">
+          <ul class={headerStyles.mobileMenu.list}>
+            {navigationItems.map((item) => {
+              const isActive = isActiveLink(item.href, currentPath);
+              const linkClasses = getMobileNavLinkClasses(isActive);
+              
+              return (
+                <li class={headerStyles.mobileMenu.item}>
+                  <a 
+                    href={item.href}
+                    class={linkClasses}
+                    aria-current={isActive ? 'page' : undefined}
+                    target={item.isExternal ? '_blank' : undefined}
+                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
+                  >
+                    {item.label}
+                    {item.isExternal && (
+                      <svg class="w-4 h-4 ml-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    )}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</header>
+
+<script>
+  // Funcionalidad del menú móvil y scroll
+  document.addEventListener('DOMContentLoaded', () => {
+    const header = document.getElementById('main-header');
+    const mobileMenuButton = document.getElementById('mobile-menu-button');
+    const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuClose = document.getElementById('mobile-menu-close');
+    
+    let isMenuOpen = false;
+    
+    // Función para alternar el menú móvil
+    function toggleMobileMenu() {
+      isMenuOpen = !isMenuOpen;
+      
+      if (isMenuOpen) {
+        mobileMenuOverlay.style.display = 'block';
+        setTimeout(() => {
+          mobileMenu.classList.remove('translate-x-full');
+          mobileMenu.classList.add('translate-x-0');
+        }, 10);
+        document.body.style.overflow = 'hidden';
+      } else {
+        mobileMenu.classList.remove('translate-x-0');
+        mobileMenu.classList.add('translate-x-full');
+        setTimeout(() => {
+          mobileMenuOverlay.style.display = 'none';
+        }, 300);
+        document.body.style.overflow = '';
+      }
+    }
+    
+    // Event listeners para el menú móvil
+    mobileMenuButton?.addEventListener('click', toggleMobileMenu);
+    mobileMenuClose?.addEventListener('click', toggleMobileMenu);
+    mobileMenuOverlay?.addEventListener('click', (e) => {
+      if (e.target === mobileMenuOverlay) {
+        toggleMobileMenu();
+      }
+    });
+    
+    // Cerrar menú con Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isMenuOpen) {
+        toggleMobileMenu();
+      }
+    });
+    
+    // Efecto de scroll en el header
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    
+    function updateHeader() {
+      const scrollY = window.scrollY;
+      
+      if (header) {
+        if (scrollY > 50) {
+          header.classList.remove('bg-transparent', 'backdrop-blur-md');
+          header.classList.add('bg-slate-900/98', 'backdrop-blur-md', 'border-b', 'border-slate-700/50', 'shadow-lg');
+        } else {
+          header.classList.remove('bg-slate-900/98', 'border-b', 'border-slate-700/50', 'shadow-lg');
+          header.classList.add('bg-transparent', 'backdrop-blur-md');
+        }
+      }
+      
+      lastScrollY = scrollY;
+      ticking = false;
+    }
+    
+    function requestUpdate() {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }
+    
+    // Listener para el scroll
+    window.addEventListener('scroll', requestUpdate, { passive: true });
+    
+    // Inicializar estado del header
+    updateHeader();
+  });
+</script>

@@ -1,0 +1,27 @@
+import { defineConfig } from 'astro/config';
+import tailwind from '@astrojs/tailwind';
+
+// https://astro.build/config
+export default defineConfig({
+  // Configuración para GitHub Pages
+  site: 'https://MKS2508.github.io',
+  base: '/MKS-IPTV-App',
+  
+  // Build output para GitHub Pages
+  output: 'static',
+  
+  // Integrations
+  integrations: [
+    tailwind({
+      applyBaseStyles: false, // Mantener estilos custom
+    }),
+  ],
+  
+  // Optimizaciones
+  vite: {
+    build: {
+      cssMinify: true,
+      minify: 'esbuild',
+    },
+  },
+});

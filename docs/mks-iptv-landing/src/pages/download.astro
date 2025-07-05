@@ -1,0 +1,195 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/layout/Header/index.astro';
+import Footer from '../components/layout/Footer/index.astro';
+import { strings } from '../i18n/strings/es-es';
+import { downloadContent } from '../data/legacy-content';
+---
+
+<Layout 
+  title={strings.meta.titleDownloads}
+  description={strings.meta.description}
+>
+  <Header currentPath="/download" />
+  
+  <main class="pt-16 lg:pt-20">
+    <!-- Hero Section -->
+    <section class="py-20 bg-cyberpunk">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-app-text mb-6">
+          <span class="text-gradient">{downloadContent.hero.title}</span>
+        </h1>
+        <p class="text-xl text-app-text-muted mb-6 max-w-3xl mx-auto">
+          {downloadContent.hero.subtitle}
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center text-app-text-muted">
+          <span class="text-lg font-semibold text-app-accent">{downloadContent.hero.version}</span>
+          <span class="hidden sm:block">•</span>
+          <span>{downloadContent.hero.lastUpdate}</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Downloads Section -->
+    <section class="py-20 bg-app-surface/30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- iOS Downloads -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-accent to-app-highlight rounded-lg flex items-center justify-center mr-4">
+              📱
+            </div>
+            {downloadContent.platforms.ios.title}
+          </h2>
+          
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Direct Download -->
+            <div class="card">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold text-app-accent">{downloadContent.platforms.ios.directDownload.title}</h3>
+                <span class="px-3 py-1 bg-app-accent/20 text-app-accent text-sm rounded-full">{strings.status.recommended}</span>
+              </div>
+              <div class="space-y-3 text-app-text-muted mb-6">
+                <div class="flex justify-between">
+                  <span>{strings.technical.version}:</span>
+                  <span class="text-app-text">{downloadContent.platforms.ios.directDownload.version}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>{strings.technical.size}:</span>
+                  <span class="text-app-text">{downloadContent.platforms.ios.directDownload.size}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>{strings.technical.requires}:</span>
+                  <span class="text-app-text">{downloadContent.platforms.ios.directDownload.requires}</span>
+                </div>
+              </div>
+              <div class="p-4 bg-app-highlight/10 border border-app-highlight/20 rounded-lg mb-6">
+                <p class="text-app-highlight text-sm">{downloadContent.platforms.ios.directDownload.note}</p>
+              </div>
+              <a href="#" class="btn-primary w-full text-center">
+                {strings.buttons.downloadForiOS}
+              </a>
+            </div>
+            
+            <!-- TestFlight -->
+            <div class="card">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold text-app-primary">{downloadContent.platforms.ios.testflight.title}</h3>
+                <span class="px-3 py-1 bg-app-primary/20 text-app-primary text-sm rounded-full">{strings.status.byInvitation}</span>
+              </div>
+              <div class="space-y-3 text-app-text-muted mb-6">
+                {downloadContent.platforms.ios.testflight.features.map((feature) => (
+                  <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-app-primary rounded-full"></div>
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              <a href="mailto:contact@mks-iptv.app" class="btn-secondary w-full text-center">
+                {strings.buttons.requestAccess}
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <!-- macOS Downloads -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-primary to-app-accent rounded-lg flex items-center justify-center mr-4">
+              💻
+            </div>
+            {downloadContent.platforms.macos.title}
+          </h2>
+          
+          <div class="card max-w-2xl">
+            <h3 class="text-xl font-semibold text-app-accent mb-4">{downloadContent.platforms.macos.universal.title}</h3>
+            <div class="grid grid-cols-2 gap-4 text-app-text-muted mb-6">
+              <div class="flex justify-between">
+                <span>{strings.technical.version}:</span>
+                <span class="text-app-text">{downloadContent.platforms.macos.universal.version}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>{strings.technical.size}:</span>
+                <span class="text-app-text">{downloadContent.platforms.macos.universal.size}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>{strings.technical.requires}:</span>
+                <span class="text-app-text">{downloadContent.platforms.macos.universal.requires}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Tipo:</span>
+                <span class="text-app-text">{strings.status.universal}</span>
+              </div>
+            </div>
+            <div class="space-y-3 text-app-text-muted mb-6">
+              {downloadContent.platforms.macos.universal.features.map((feature) => (
+                <div class="flex items-center space-x-2">
+                  <div class="w-2 h-2 bg-app-accent rounded-full"></div>
+                  <span>{feature}</span>
+                </div>
+              ))}
+            </div>
+            <a href="#" class="btn-primary w-full text-center">
+              {strings.buttons.downloadFormacOS}
+            </a>
+          </div>
+        </div>
+        
+        <!-- System Requirements -->
+        <div>
+          <h2 class="text-3xl font-bold text-app-text mb-8">{strings.technical.systemRequirements}</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- iOS Requirements -->
+            <div class="card">
+              <h3 class="text-xl font-semibold text-app-accent mb-4 flex items-center">
+                📱 {strings.platforms.ios}
+              </h3>
+              <ul class="space-y-2 text-app-text-muted">
+                {downloadContent.systemRequirements.ios.map((req) => (
+                  <li class="flex items-start space-x-2">
+                    <div class="w-1.5 h-1.5 bg-app-accent rounded-full mt-2 flex-shrink-0"></div>
+                    <span>{req}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <!-- macOS Requirements -->
+            <div class="card">
+              <h3 class="text-xl font-semibold text-app-primary mb-4 flex items-center">
+                💻 {strings.platforms.macos}
+              </h3>
+              <ul class="space-y-2 text-app-text-muted">
+                {downloadContent.systemRequirements.macos.map((req) => (
+                  <li class="flex items-start space-x-2">
+                    <div class="w-1.5 h-1.5 bg-app-primary rounded-full mt-2 flex-shrink-0"></div>
+                    <span>{req}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <!-- tvOS Requirements -->
+            <div class="card">
+              <h3 class="text-xl font-semibold text-app-red-neon mb-4 flex items-center">
+                📺 {strings.platforms.tvos}
+              </h3>
+              <ul class="space-y-2 text-app-text-muted">
+                {downloadContent.systemRequirements.tvos.map((req) => (
+                  <li class="flex items-start space-x-2">
+                    <div class="w-1.5 h-1.5 bg-app-red-neon rounded-full mt-2 flex-shrink-0"></div>
+                    <span>{req}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <Footer />
+</Layout>

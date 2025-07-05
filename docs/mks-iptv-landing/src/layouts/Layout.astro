@@ -1,0 +1,132 @@
+---
+/**
+ * Layout principal para todas las páginas del sitio MKS-IPTV.
+ * Incluye SEO, ViewTransitions, y configuración base responsive.
+ * 
+ * @component
+ * @param {string} title - Título de la página
+ * @param {string} description - Descripción meta de la página
+ * @param {string} image - URL de imagen para Open Graph
+ * @param {string} canonical - URL canónica de la página
+ */
+
+import { ViewTransitions } from 'astro:transitions';
+import '../styles/globals.css';
+
+export interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  canonical?: string;
+}
+
+const {
+  title = "MKS-IPTV - Tu cliente IPTV multiplataforma",
+  description = "Cliente IPTV nativo para iOS, macOS y tvOS. Streaming en vivo, descargas avanzadas y diseño Liquid Glass.",
+  image = "/MKS-IPTV-App/images/banners/banner3.webp",
+  canonical = Astro.url.href
+} = Astro.props;
+
+const siteUrl = "https://MKS2508.github.io/MKS-IPTV-App";
+const fullImageUrl = image.startsWith('http') ? image : `${siteUrl}${image}`;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    
+    <!-- Favicons with base path -->
+    <link rel="icon" type="image/svg+xml" href="/MKS-IPTV-App/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/MKS-IPTV-App/favicon/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/MKS-IPTV-App/favicon/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/MKS-IPTV-App/favicon/apple-touch-icon.png" />
+    <link rel="manifest" href="/MKS-IPTV-App/favicon/site.webmanifest" />
+    
+    <!-- SEO Meta Tags -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={fullImageUrl} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="MKS-IPTV" />
+    <meta property="og:locale" content="es_ES" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={fullImageUrl} />
+    
+    <!-- Theme and App Meta -->
+    <meta name="theme-color" content="#0f0f23" />
+    <meta name="color-scheme" content="dark" />
+    
+    <!-- Preload critical fonts (if any) -->
+    <!-- <link rel="preload" href="/fonts/font.woff2" as="font" type="font/woff2" crossorigin /> -->
+    
+    <!-- ViewTransitions for smooth page navigation -->
+    <ViewTransitions />
+  </head>
+  
+  <body>
+    <slot />
+    
+    <!-- Global scripts will be added here -->
+    <script>
+      // Initialize theme and basic functionality
+      document.documentElement.classList.add('theme-dark');
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  /* CSS Reset and base styles */
+  html {
+    font-family: system-ui, sans-serif;
+    scroll-behavior: smooth;
+  }
+  
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    background-color: #0f0f23;
+    color: #ffffff;
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  /* Focus styles for accessibility */
+  :focus-visible {
+    outline: 2px solid #00ffff;
+    outline-offset: 2px;
+  }
+  
+  /* Smooth transitions */
+  * {
+    transition: color 0.3s ease, background-color 0.3s ease;
+  }
+  
+  /* ViewTransitions fallback */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    
+    * {
+      transition: none !important;
+    }
+  }
+</style>

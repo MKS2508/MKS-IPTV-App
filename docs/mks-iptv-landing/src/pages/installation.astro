@@ -1,0 +1,194 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/layout/Header/index.astro';
+import Footer from '../components/layout/Footer/index.astro';
+import { strings } from '../i18n/strings/es-es';
+import { installationContent } from '../data/legacy-content';
+---
+
+<Layout 
+  title={strings.meta.titleInstallation}
+  description={strings.meta.description}
+>
+  <Header currentPath="/installation" />
+  
+  <main class="pt-16 lg:pt-20">
+    <!-- Hero Section -->
+    <section class="py-20 bg-cyberpunk">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-app-text mb-6">
+          Guía de <span class="text-gradient">Instalación</span>
+        </h1>
+        <p class="text-xl text-app-text-muted mb-8 max-w-3xl mx-auto">
+          {installationContent.hero.subtitle}
+        </p>
+      </div>
+    </section>
+    
+    <!-- Installation Methods -->
+    <section class="py-20 bg-app-surface/30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- iOS Installation -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-accent to-app-highlight rounded-lg flex items-center justify-center mr-4">
+              <svg class="w-6 h-6 text-app-text" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12.017 1.995c-.072-.113-.1-.214-.1-.323 0-.035.002-.071.005-.107.033-.364.171-.68.381-.926.253-.297.602-.492.983-.492.381 0 .73.195.983.492.21.246.348.562.381.926.003.036.005.072.005.107 0 .109-.028.21-.1.323l-2.538 4.001c-.072.113-.1.214-.1.323v14.682c0 .552-.448 1-1 1s-1-.448-1-1v-14.682c0-.109-.028-.21-.1-.323l-2.538-4.001z"/>
+              </svg>
+            </div>
+            Instalación en {strings.platforms.ios}
+          </h2>
+          
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- AltStore Method -->
+            <div class="card">
+              <h3 class="text-xl font-semibold text-app-accent mb-4">{strings.installation.method1}: {strings.installation.altstore} ({strings.status.recommended})</h3>
+              <div class="space-y-4 text-app-text-muted">
+                {installationContent.methods.ios[0].steps.map((step, index) => (
+                  <div class="flex items-start space-x-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-app-accent text-app-text rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
+                    <div>
+                      <p class="font-medium text-app-text">{step.split(': ')[0]}</p>
+                      <p class="text-sm text-app-text-muted">{step.split(': ')[1] || step}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="/MKS-IPTV-App/download#ios" class="btn-primary mt-6">
+                {strings.buttons.downloadForiOS}
+              </a>
+            </div>
+            
+            <!-- TestFlight Method -->
+            <div class="card">
+              <h3 class="text-xl font-semibold text-app-highlight mb-4">{strings.installation.method2}: {strings.installation.testflight}</h3>
+              <div class="space-y-4 text-app-text-muted">
+                {installationContent.methods.ios[1].steps.map((step, index) => (
+                  <div class="flex items-start space-x-3">
+                    <span class="flex-shrink-0 w-6 h-6 bg-app-highlight text-app-background rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
+                    <div>
+                      <p class="font-medium text-app-text">{step.split(' ')[0]} {step.split(' ')[1]}</p>
+                      <p class="text-sm text-app-text-muted">{step.split(' ').slice(2).join(' ')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <a href="mailto:contact@mks-iptv.app" class="btn-secondary mt-6">
+                {strings.buttons.requestAccess}
+              </a>
+            </div>
+          </div>
+        </div>
+        
+        <!-- macOS Installation -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-primary to-app-accent rounded-lg flex items-center justify-center mr-4">
+              <svg class="w-6 h-6 text-app-text" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12.017 1.995c-.072-.113-.1-.214-.1-.323 0-.035.002-.071.005-.107.033-.364.171-.68.381-.926.253-.297.602-.492.983-.492.381 0 .73.195.983.492.21.246.348.562.381.926.003.036.005.072.005.107 0 .109-.028.21-.1.323l-2.538 4.001c-.072.113-.1.214-.1.323v14.682c0 .552-.448 1-1 1s-1-.448-1-1v-14.682c0-.109-.028-.21-.1-.323l-2.538-4.001z"/>
+              </svg>
+            </div>
+            Instalación en {strings.platforms.macos}
+          </h2>
+          
+          <div class="card">
+            <div class="space-y-4 text-app-text-muted">
+              {installationContent.methods.macos.steps.map((step, index) => (
+                <div class="flex items-start space-x-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-app-primary text-app-text rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
+                  <div>
+                    <p class="font-medium text-app-text">{step.split(' ').slice(0, 3).join(' ')}</p>
+                    <p class="text-sm text-app-text-muted">{step.split(' ').slice(3).join(' ')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div class="mt-6 p-4 bg-app-highlight/10 border border-app-highlight/20 rounded-lg">
+              <p class="text-app-highlight text-sm">
+                <strong>Nota:</strong> {installationContent.methods.macos.note}
+              </p>
+            </div>
+            <a href="/MKS-IPTV-App/download#macos" class="btn-primary mt-6">
+              {strings.buttons.downloadFormacOS}
+            </a>
+          </div>
+        </div>
+        
+        <!-- tvOS Installation -->
+        <div class="mb-16">
+          <h2 class="text-3xl font-bold text-app-text mb-8 flex items-center">
+            <div class="w-10 h-10 bg-gradient-to-r from-app-accent to-app-red-neon rounded-lg flex items-center justify-center mr-4">
+              <svg class="w-6 h-6 text-app-text" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M21 3H3c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h6l-2 3v1h8v-1l-2-3h6c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 11H3V5h18v9z"/>
+              </svg>
+            </div>
+            Instalación en {strings.platforms.tvos}
+          </h2>
+          
+          <div class="card">
+            <div class="space-y-4 text-app-text-muted">
+              {installationContent.methods.tvos.steps.map((step, index) => (
+                <div class="flex items-start space-x-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-app-red-neon text-app-text rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
+                  <div>
+                    <p class="font-medium text-app-text">{step.split(' ').slice(0, 3).join(' ')}</p>
+                    <p class="text-sm text-app-text-muted">{step.split(' ').slice(3).join(' ')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div class="mt-6 p-4 bg-app-primary/10 border border-app-primary/20 rounded-lg">
+              <p class="text-app-primary text-sm">
+                <strong>Para Desarrolladores:</strong> {installationContent.methods.tvos.requirements}
+              </p>
+            </div>
+            <a href="https://github.com/MKS2508/MKS-IPTV-App" target="_blank" rel="noopener noreferrer" class="btn-secondary mt-6">
+              {strings.footer.sourceCode}
+            </a>
+          </div>
+        </div>
+        
+        <!-- Troubleshooting -->
+        <div>
+          <h2 class="text-3xl font-bold text-app-text mb-8">Solución de Problemas</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card">
+              <h3 class="text-lg font-semibold text-app-red-neon mb-3">❌ Error de "Desarrollador no confiable"</h3>
+              <p class="text-app-text-muted text-sm mb-4">
+                Ve a Configuración → General → Perfiles y gestión de dispositivos → Confía en el desarrollador.
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3 class="text-lg font-semibold text-app-highlight mb-3">⚠️ La app se cierra inmediatamente</h3>
+              <p class="text-app-text-muted text-sm mb-4">
+                Revisa que tengas iOS 17+ o macOS 14+. Versiones anteriores no son compatibles.
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3 class="text-lg font-semibold text-app-accent mb-3">✅ No puedo reproducir contenido</h3>
+              <p class="text-app-text-muted text-sm mb-4">
+                Verifica tu conexión a internet y que la URL de tu lista M3U sea válida.
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3 class="text-lg font-semibold text-app-primary mb-3">💬 {strings.messages.needsHelp}</h3>
+              <p class="text-app-text-muted text-sm mb-4">
+                {strings.buttons.openIssue} en GitHub o consulta la documentación completa.
+              </p>
+              <a href="https://github.com/MKS2508/MKS-IPTV-App/issues" target="_blank" rel="noopener noreferrer" class="text-app-primary hover:text-app-accent text-sm font-medium">
+                {strings.buttons.openIssue} →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <Footer />
+</Layout>

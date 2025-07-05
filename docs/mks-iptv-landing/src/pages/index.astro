@@ -4,6 +4,7 @@ import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
 import { strings } from '../i18n/strings/es-es';
 import { homeContent } from '../data/legacy-content';
+import { getImagePath } from '../utils/image-paths';
 ---
 
 <Layout 
@@ -88,7 +89,7 @@ import { homeContent } from '../data/legacy-content';
             <div class="bg-app-surface/30 rounded-xl p-6 hover:bg-app-surface/50 transition-colors duration-200">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src={`/MKS-IPTV-App/${slide.image}`}
+                  src={getImagePath(`/${slide.image}`)}
                   alt={slide.title}
                   class="w-full h-full object-cover"
                   loading="lazy"

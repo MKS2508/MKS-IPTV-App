@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
 import { strings } from '../i18n/strings/es-es';
+import { getImagePath, screenshots } from '../utils/image-paths';
 ---
 
 <Layout 
@@ -41,7 +42,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/listview_liquidglasstopbar.png" 
+                  src={getImagePath(screenshots.macos.liquidGlass)} 
                   alt="Liquid Glass Top Bar - macOS"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -54,7 +55,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/DownloadsSection_1.png" 
+                  src={getImagePath(screenshots.macos.downloads)} 
                   alt="Sistema de Descargas - macOS"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -67,7 +68,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/seriesdetail_1.png" 
+                  src={getImagePath(screenshots.macos.seriesDetail)} 
                   alt="Detalle de Series - macOS"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -80,7 +81,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/macos/download_modal.png" 
+                  src={getImagePath(screenshots.macos.downloadModal)} 
                   alt="Configuración de Descarga - macOS"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -105,7 +106,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/ios/ios_serielistsearch.webp" 
+                  src={getImagePath(screenshots.ios.seriesList)} 
                   alt="Navegación iPhone"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -118,7 +119,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/ios/ios_seriedetail.webp" 
+                  src={getImagePath(screenshots.ios.seriesDetail)} 
                   alt="Detalle de Serie - iOS"
                   class="w-full h-full object-cover"
                   loading="lazy"
@@ -131,7 +132,7 @@ import { strings } from '../i18n/strings/es-es';
             <div class="card">
               <div class="aspect-[9/16] bg-app-accent/20 rounded-lg mb-4 overflow-hidden">
                 <img 
-                  src="/MKS-IPTV-App/imgs/v0.0.1-alpha/ios/ios_seriemodaldownload.webp" 
+                  src={getImagePath(screenshots.ios.downloadModal)} 
                   alt="Modal de Descarga - iOS"
                   class="w-full h-full object-cover"
                   loading="lazy"

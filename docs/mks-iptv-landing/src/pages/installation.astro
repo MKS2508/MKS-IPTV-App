@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
+import Button from '../components/ui/Button/index.astro';
 import { strings } from '../i18n/strings/es-es';
 import { installationContent } from '../data/legacy-content';
 ---
@@ -55,9 +56,20 @@ import { installationContent } from '../data/legacy-content';
                   </div>
                 ))}
               </div>
-              <a href="/MKS-IPTV-App/download#ios" class="btn-primary mt-6">
+              <Button 
+                as="link"
+                href="/MKS-IPTV-App/download#ios"
+                variant="primary"
+                size="md"
+                icon={{ lucide: 'Download', position: 'left' }}
+                motionConfig={{
+                  engine: 'gsap',
+                  preset: 'bounce'
+                }}
+                className="mt-6"
+              >
                 {strings.buttons.downloadForiOS}
-              </a>
+              </Button>
             </div>
             
             <!-- TestFlight Method -->
@@ -74,9 +86,20 @@ import { installationContent } from '../data/legacy-content';
                   </div>
                 ))}
               </div>
-              <a href="mailto:contact@mks-iptv.app" class="btn-secondary mt-6">
+              <Button 
+                as="link"
+                href="mailto:contact@mks-iptv.app"
+                variant="secondary"
+                size="md"
+                icon={{ lucide: 'User', position: 'left' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'gentle'
+                }}
+                className="mt-6"
+              >
                 {strings.buttons.requestAccess}
-              </a>
+              </Button>
             </div>
           </div>
         </div>
@@ -109,9 +132,20 @@ import { installationContent } from '../data/legacy-content';
                 <strong>Nota:</strong> {installationContent.methods.macos.note}
               </p>
             </div>
-            <a href="/MKS-IPTV-App/download#macos" class="btn-primary mt-6">
+            <Button 
+              as="link"
+              href="/MKS-IPTV-App/download#macos"
+              variant="primary"
+              size="md"
+              icon={{ simple: 'apple', position: 'left' }}
+              motionConfig={{
+                engine: 'gsap',
+                preset: 'bounce'
+              }}
+              className="mt-6"
+            >
               {strings.buttons.downloadFormacOS}
-            </a>
+            </Button>
           </div>
         </div>
         
@@ -143,9 +177,21 @@ import { installationContent } from '../data/legacy-content';
                 <strong>Para Desarrolladores:</strong> {installationContent.methods.tvos.requirements}
               </p>
             </div>
-            <a href="https://github.com/MKS2508/MKS-IPTV-App" target="_blank" rel="noopener noreferrer" class="btn-secondary mt-6">
+            <Button 
+              as="link"
+              href="https://github.com/MKS2508/MKS-IPTV-App"
+              external
+              variant="secondary"
+              size="md"
+              icon={{ simple: 'github', position: 'left' }}
+              motionConfig={{
+                engine: 'framer',
+                preset: 'gentle'
+              }}
+              className="mt-6"
+            >
               {strings.footer.sourceCode}
-            </a>
+            </Button>
           </div>
         </div>
         
@@ -180,9 +226,19 @@ import { installationContent } from '../data/legacy-content';
               <p class="text-app-text-muted text-sm mb-4">
                 {strings.buttons.openIssue} en GitHub o consulta la documentación completa.
               </p>
-              <a href="https://github.com/MKS2508/MKS-IPTV-App/issues" target="_blank" rel="noopener noreferrer" class="text-app-primary hover:text-app-accent text-sm font-medium">
-                {strings.buttons.openIssue} →
-              </a>
+              <Button 
+                as="link"
+                href="https://github.com/MKS2508/MKS-IPTV-App/issues"
+                external
+                variant="ghost"
+                size="sm"
+                icon={{ lucide: 'ExternalLink', position: 'right' }}
+                motionConfig={{
+                  engine: 'css'
+                }}
+              >
+                {strings.buttons.openIssue}
+              </Button>
             </div>
           </div>
         </div>

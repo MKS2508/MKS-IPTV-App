@@ -76,7 +76,13 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
           variant="primary"
           size="lg"
           icon={{ lucide: 'Download', position: 'left' }}
-          motionConfig={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.95 } }}
+          motionConfig={{
+            engine: 'gsap',
+            gsap: {
+              hover: { scale: 1.05, y: -2 },
+              tap: { scale: 0.95 }
+            }
+          }}
           className="hero-cta-primary"
           aria-label={ctaPrimaryText}
         >
@@ -88,7 +94,13 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
           variant="outline"
           size="md"
           icon={{ lucide: 'Image', position: 'left' }}
-          motionConfig={{ hover: { scale: 1.02, y: -1 }, tap: { scale: 0.98 } }}
+          motionConfig={{
+            engine: 'gsap',
+            gsap: {
+              hover: { scale: 1.02, y: -1 },
+              tap: { scale: 0.98 }
+            }
+          }}
           className="hero-cta-secondary"
           aria-label={ctaSecondaryText}
         >
@@ -100,7 +112,13 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
           variant="ghost"
           size="md"
           icon={{ lucide: 'BookOpen', position: 'left' }}
-          motionConfig={{ hover: { scale: 1.02, y: -1 }, tap: { scale: 0.98 } }}
+          motionConfig={{
+            engine: 'gsap',
+            gsap: {
+              hover: { scale: 1.02, y: -1 },
+              tap: { scale: 0.98 }
+            }
+          }}
           className="hero-cta-tertiary"
           aria-label={ctaTertiaryText}
         >
@@ -345,7 +363,10 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       if (!scrollUnlocked) {
         scrollUnlocked = true;
         
-        console.log('🎬 Hero sequence complete - Initiating smooth transition');
+        // MARCAR HERO COMO COMPLETADO PARA EL HEADER
+        (window as any).heroScrollCompleted = true;
+        
+        console.log('🎬 Hero sequence complete - Marked as completed for Header');
         
         // Smooth transition
         gsap.to(window, {

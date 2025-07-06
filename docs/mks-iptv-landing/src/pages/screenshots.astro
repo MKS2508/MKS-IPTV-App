@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
+import Button from '../components/ui/Button/index.astro';
 import { strings } from '../i18n/strings/es-es';
 import { getImagePath, screenshots } from '../utils/image-paths';
 ---
@@ -184,13 +185,33 @@ import { getImagePath, screenshots } from '../utils/image-paths';
               Las capturas de pantalla mostradas representan la interfaz de la aplicación MKS-IPTV. 
               El diseño Liquid Glass se adapta dinámicamente según el contenido y las preferencias del sistema.
             </p>
-            <div class="mt-6">
-              <a href="/MKS-IPTV-App/download" class="btn-primary mr-4">
+            <div class="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                as="link"
+                href="/MKS-IPTV-App/download"
+                variant="primary"
+                size="lg"
+                icon={{ lucide: 'Download', position: 'left' }}
+                motionConfig={{
+                  engine: 'gsap',
+                  preset: 'bounce'
+                }}
+              >
                 {strings.buttons.downloadNow}
-              </a>
-              <a href="/MKS-IPTV-App/installation" class="btn-secondary">
+              </Button>
+              <Button 
+                as="link"
+                href="/MKS-IPTV-App/installation"
+                variant="secondary"
+                size="lg"
+                icon={{ lucide: 'BookOpen', position: 'left' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'gentle'
+                }}
+              >
                 {strings.buttons.viewInstallation}
-              </a>
+              </Button>
             </div>
           </div>
         </div>

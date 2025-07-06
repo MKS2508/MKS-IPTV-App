@@ -17,7 +17,7 @@
 import type { ParticleBackgroundProps } from './types';
 import { particleBackgroundStyles } from './styles';
 
-interface Props extends ParticleBackgroundProps {
+interface Props extends Omit<ParticleBackgroundProps, 'responsive'> {
   variant?: 'default' | 'minimal' | 'mobile';
   intensity?: 'subtle' | 'normal' | 'intense' | 'dramatic';
   responsive?: boolean;

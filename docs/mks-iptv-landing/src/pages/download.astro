@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/layout/Header/index.astro';
 import Footer from '../components/layout/Footer/index.astro';
+import Button from '../components/ui/Button/index.astro';
 import { strings } from '../i18n/strings/es-es';
 import { downloadContent } from '../data/legacy-content';
 ---
@@ -67,9 +68,19 @@ import { downloadContent } from '../data/legacy-content';
               <div class="p-4 bg-app-highlight/10 border border-app-highlight/20 rounded-lg mb-6">
                 <p class="text-app-highlight text-sm">{downloadContent.platforms.ios.directDownload.note}</p>
               </div>
-              <a href="#" class="btn-primary w-full text-center">
+              <Button 
+                href="#"
+                variant="primary"
+                size="lg"
+                width="full"
+                icon={{ lucide: 'Download', position: 'left' }}
+                motionConfig={{
+                  engine: 'gsap',
+                  preset: 'magnetic'
+                }}
+              >
                 {strings.buttons.downloadForiOS}
-              </a>
+              </Button>
             </div>
             
             <!-- TestFlight -->
@@ -86,9 +97,20 @@ import { downloadContent } from '../data/legacy-content';
                   </div>
                 ))}
               </div>
-              <a href="mailto:contact@mks-iptv.app" class="btn-secondary w-full text-center">
+              <Button 
+                as="link"
+                href="mailto:contact@mks-iptv.app"
+                variant="secondary"
+                size="lg"
+                width="full"
+                icon={{ lucide: 'User', position: 'left' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'gentle'
+                }}
+              >
                 {strings.buttons.requestAccess}
-              </a>
+              </Button>
             </div>
           </div>
         </div>
@@ -130,9 +152,19 @@ import { downloadContent } from '../data/legacy-content';
                 </div>
               ))}
             </div>
-            <a href="#" class="btn-primary w-full text-center">
+            <Button 
+              href="#"
+              variant="primary"
+              size="lg"
+              width="full"
+              icon={{ simple: 'apple', position: 'left' }}
+              motionConfig={{
+                engine: 'gsap',
+                preset: 'magnetic'
+              }}
+            >
               {strings.buttons.downloadFormacOS}
-            </a>
+            </Button>
           </div>
         </div>
         

@@ -16,6 +16,7 @@
 import { headerStyles, getNavLinkClasses, getMobileNavLinkClasses } from './styles';
 import type { HeaderProps, NavigationItem } from './types';
 import { strings } from '../../../i18n/strings/es-es';
+import Button from '../../ui/Button/index.astro';
 
 const {
   currentPath = '/',
@@ -53,7 +54,7 @@ const headerClasses = [
 ].filter(Boolean).join(' ');
 ---
 
-<header class={headerClasses} id="main-header" style="opacity: 0; transform: translateY(-100%); visibility: hidden;">
+<header class={headerClasses} id="main-header" style="opacity: 0; transform: translateY(-100%); visibility: hidden;" transition:persist>
   <div class={headerStyles.inner}>
     <div class={headerStyles.content}>
       
@@ -112,16 +113,18 @@ const headerClasses = [
       
       <!-- Botón Menú Móvil -->
       <div class={`${headerStyles.mobileButton.container} mobile-button-container`}>
-        <button 
-          type="button"
-          class={headerStyles.mobileButton.button}
-          aria-label="Abrir menú de navegación"
+        <Button 
+          variant="ghost"
+          size="md"
+          icon={{ lucide: 'Menu', position: 'only' }}
+          motionConfig={{
+            engine: 'framer',
+            preset: 'scale'
+          }}
+          className={headerStyles.mobileButton.button}
           id="mobile-menu-button"
-        >
-          <svg class={headerStyles.mobileButton.icon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+          aria-label="Abrir menú de navegación"
+        />
       </div>
     </div>
   </div>
@@ -150,16 +153,18 @@ const headerClasses = [
             </div>
             <span class="text-lg font-bold text-white drop-shadow-lg">MKS-IPTV</span>
           </div>
-          <button 
-            type="button"
-            class={headerStyles.mobileMenu.closeButton}
-            aria-label="Cerrar menú de navegación"
+          <Button 
+            variant="ghost"
+            size="md"
+            icon={{ lucide: 'X', position: 'only' }}
+            motionConfig={{
+              engine: 'framer',
+              preset: 'rotate'
+            }}
+            className={headerStyles.mobileMenu.closeButton}
             id="mobile-menu-close"
-          >
-            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+            aria-label="Cerrar menú de navegación"
+          />
         </div>
         
         <!-- Navegación móvil -->
@@ -196,51 +201,201 @@ const headerClasses = [
 </header>
 
 <script>
-  import { gsap } from 'gsap';
+  // import { gsap } from 'gsap';
+  
+  // Variable global para trackear estado del header
+  (window as any).headerInitialized = (window as any).headerInitialized || false;
   
   // Funcionalidad del menú móvil y scroll
-  document.addEventListener('DOMContentLoaded', () => {
+  const initHeader = () => {
     const header = document.getElementById('main-header');
+    if (!header) return;
     
-    // HEADER INITIAL STATES - Será controlado por Master Timeline en Hero
+    // RESET STYLES - Limpiar estados previos para navegación SPA
     const logoContainer = header.querySelector('.logo-container');
     const navLinks = header.querySelectorAll('.nav-link');
     const mobileButton = header.querySelector('.mobile-button-container');
     
-    // Set initial states para que Master Timeline los controle
-    if (header) {
-      header.style.opacity = '0';
-      header.style.transform = 'translateY(-100%)';
-      header.style.visibility = 'hidden';
-    }
-    
-    if (logoContainer) {
-      logoContainer.style.opacity = '0';
-      logoContainer.style.visibility = 'hidden';
-      logoContainer.style.transform = 'scale(0.5) translateY(-20px)';
-    }
-    
-    navLinks.forEach(link => {
-      link.style.opacity = '0';
-      link.style.visibility = 'hidden';
-      link.style.transform = 'translateY(-30px)';
+    // Reset transitions first
+    [header, logoContainer, mobileButton, ...navLinks].forEach(element => {
+      if (element) {
+        (element as HTMLElement).style.transition = '';
+      }
     });
     
-    if (mobileButton) {
-      mobileButton.style.opacity = '0';
-      mobileButton.style.visibility = 'hidden';
-      mobileButton.style.transform = 'scale(0.3) rotate(180deg)';
-    }
-
-    console.log('📋 Header elements prepared for Master Timeline control');
+    // DETECTAR SI TENEMOS HERO EN LA PÁGINA
+    const hasHero = document.querySelector('#hero-section') || 
+                   document.querySelector('.hero-section') || 
+                   window.location.pathname === '/' || 
+                   window.location.pathname === '/MKS-IPTV-App/';
     
-    // EXPONER ELEMENTOS PARA MASTER TIMELINE
-    window.headerElements = {
-      header,
-      logoContainer,
-      navLinks,
-      mobileButton
-    };
+    // DETECTAR SI EL HERO YA ESTÁ COMPLETAMENTE VISIBLE (usuario ya hizo scroll)
+    const heroElement = document.querySelector('#hero-section');
+    const isHeroCompleted = heroElement && (window as any).heroScrollCompleted;
+    
+    console.log('🔄 Header init:', {
+      url: window.location.pathname,
+      hasHero,
+      heroElement: !!heroElement,
+      isHeroCompleted,
+      headerInitialized: (window as any).headerInitialized
+    });
+    
+    // HEADER INITIAL STATES - Diferente comportamiento según contexto
+    
+    if (hasHero && !isHeroCompleted) {
+      // CON HERO Y NO COMPLETADO: Set initial states para que Master Timeline los controle
+      if (header) {
+        header.style.opacity = '0';
+        header.style.transform = 'translateY(-100%)';
+        header.style.visibility = 'hidden';
+      }
+      
+      if (logoContainer) {
+        (logoContainer as HTMLElement).style.opacity = '0';
+        (logoContainer as HTMLElement).style.visibility = 'hidden';
+        (logoContainer as HTMLElement).style.transform = 'scale(0.5) translateY(-20px)';
+      }
+      
+      navLinks.forEach((link) => {
+        (link as HTMLElement).style.opacity = '0';
+        (link as HTMLElement).style.visibility = 'hidden';
+        (link as HTMLElement).style.transform = 'translateY(-30px)';
+      });
+      
+      if (mobileButton) {
+        (mobileButton as HTMLElement).style.opacity = '0';
+        (mobileButton as HTMLElement).style.visibility = 'hidden';
+        (mobileButton as HTMLElement).style.transform = 'scale(0.3) rotate(180deg)';
+      }
+
+      console.log('📋 Header elements prepared for Master Timeline control');
+      
+      // EXPONER ELEMENTOS PARA MASTER TIMELINE
+      (window as any).headerElements = {
+        header,
+        logoContainer,
+        navLinks,
+        mobileButton
+      };
+      
+      (window as any).headerInitialized = true;
+    } else if (hasHero && isHeroCompleted) {
+      // CON HERO PERO YA COMPLETADO: Mostrar header inmediatamente
+      console.log('📋 Hero completed - showing header immediately');
+      
+      if (header) {
+        header.style.opacity = '1';
+        header.style.transform = 'translateY(0)';
+        header.style.visibility = 'visible';
+      }
+      
+      if (logoContainer) {
+        (logoContainer as HTMLElement).style.opacity = '1';
+        (logoContainer as HTMLElement).style.visibility = 'visible';
+        (logoContainer as HTMLElement).style.transform = 'scale(1) translateY(0)';
+        (logoContainer as HTMLElement).style.transition = 'none';
+      }
+      
+      navLinks.forEach((link) => {
+        (link as HTMLElement).style.opacity = '1';
+        (link as HTMLElement).style.visibility = 'visible';
+        (link as HTMLElement).style.transform = 'translateY(0)';
+        (link as HTMLElement).style.transition = 'none';
+      });
+      
+      if (mobileButton) {
+        (mobileButton as HTMLElement).style.opacity = '1';
+        (mobileButton as HTMLElement).style.visibility = 'visible';
+        (mobileButton as HTMLElement).style.transform = 'scale(1) rotate(0deg)';
+        (mobileButton as HTMLElement).style.transition = 'none';
+      }
+      
+      (window as any).headerInitialized = true;
+    } else {
+      // SIN HERO: Mostrar header inmediatamente sin animaciones innecesarias
+      
+      // Verificar múltiples condiciones para detectar si el header ya está visible
+      const isAlreadyVisible = (window as any).headerInitialized || 
+                              header.style.opacity === '1' || 
+                              getComputedStyle(header).opacity === '1' ||
+                              header.style.visibility === 'visible' ||
+                              getComputedStyle(header).visibility === 'visible';
+      
+      console.log('🔄 Header visibility check:', {
+        headerInitialized: (window as any).headerInitialized,
+        styleOpacity: header.style.opacity,
+        computedOpacity: getComputedStyle(header).opacity,
+        isAlreadyVisible
+      });
+      
+      // Set header visible state FIRST
+      if (header) {
+        header.style.opacity = '1';
+        header.style.transform = 'translateY(0)';
+        header.style.visibility = 'visible';
+      }
+      
+      if (isAlreadyVisible) {
+        // Header ya visible - Set all elements to final state WITHOUT transitions
+        console.log('📋 Header already visible - setting final state immediately');
+        
+        if (logoContainer) {
+          (logoContainer as HTMLElement).style.opacity = '1';
+          (logoContainer as HTMLElement).style.visibility = 'visible';
+          (logoContainer as HTMLElement).style.transform = 'scale(1) translateY(0)';
+          (logoContainer as HTMLElement).style.transition = 'none';
+        }
+        
+        navLinks.forEach((link) => {
+          (link as HTMLElement).style.opacity = '1';
+          (link as HTMLElement).style.visibility = 'visible';
+          (link as HTMLElement).style.transform = 'translateY(0)';
+          (link as HTMLElement).style.transition = 'none';
+        });
+        
+        if (mobileButton) {
+          (mobileButton as HTMLElement).style.opacity = '1';
+          (mobileButton as HTMLElement).style.visibility = 'visible';
+          (mobileButton as HTMLElement).style.transform = 'scale(1) rotate(0deg)';
+          (mobileButton as HTMLElement).style.transition = 'none';
+        }
+        
+        // Force reflow to ensure styles are applied
+        header.offsetHeight;
+        
+      } else {
+        // Primera carga - Animate header elements on load para páginas sin Hero
+        console.log('📋 Header first load - initializing with animation');
+        
+        setTimeout(() => {
+          if (logoContainer) {
+            (logoContainer as HTMLElement).style.opacity = '1';
+            (logoContainer as HTMLElement).style.visibility = 'visible';
+            (logoContainer as HTMLElement).style.transform = 'scale(1) translateY(0)';
+            (logoContainer as HTMLElement).style.transition = 'all 0.6s ease-out';
+          }
+          
+          navLinks.forEach((link, index) => {
+            setTimeout(() => {
+              (link as HTMLElement).style.opacity = '1';
+              (link as HTMLElement).style.visibility = 'visible';
+              (link as HTMLElement).style.transform = 'translateY(0)';
+              (link as HTMLElement).style.transition = 'all 0.4s ease-out';
+            }, index * 100);
+          });
+          
+          if (mobileButton) {
+            (mobileButton as HTMLElement).style.opacity = '1';
+            (mobileButton as HTMLElement).style.visibility = 'visible';
+            (mobileButton as HTMLElement).style.transform = 'scale(1) rotate(0deg)';
+            (mobileButton as HTMLElement).style.transition = 'all 0.5s ease-out';
+          }
+        }, 200);
+      }
+      
+      (window as any).headerInitialized = true;
+    }
     const mobileMenuButton = document.getElementById('mobile-menu-button');
     const mobileMenuOverlay = document.getElementById('mobile-menu-overlay');
     const mobileMenu = document.getElementById('mobile-menu');
@@ -253,17 +408,21 @@ const headerClasses = [
       isMenuOpen = !isMenuOpen;
       
       if (isMenuOpen) {
-        mobileMenuOverlay.style.display = 'block';
+        if (mobileMenuOverlay) (mobileMenuOverlay as HTMLElement).style.display = 'block';
         setTimeout(() => {
-          mobileMenu.classList.remove('translate-x-full');
-          mobileMenu.classList.add('translate-x-0');
+          if (mobileMenu) {
+            mobileMenu.classList.remove('translate-x-full');
+            mobileMenu.classList.add('translate-x-0');
+          }
         }, 10);
         document.body.style.overflow = 'hidden';
       } else {
-        mobileMenu.classList.remove('translate-x-0');
-        mobileMenu.classList.add('translate-x-full');
+        if (mobileMenu) {
+          mobileMenu.classList.remove('translate-x-0');
+          mobileMenu.classList.add('translate-x-full');
+        }
         setTimeout(() => {
-          mobileMenuOverlay.style.display = 'none';
+          if (mobileMenuOverlay) (mobileMenuOverlay as HTMLElement).style.display = 'none';
         }, 300);
         document.body.style.overflow = '';
       }
@@ -287,5 +446,147 @@ const headerClasses = [
     
     // DISABLED - Removed scroll listeners for virtual scroll mode
     // Header styles will be controlled by timeline progress instead
+    
+    // ACTUALIZAR ESTADOS ACTIVOS DE NAVEGACIÓN
+    updateActiveNavigation();
+  };
+
+  // Función para determinar si un enlace está activo (duplicada del Astro scope)
+  function isActiveLink(href: string, currentPath: string): boolean {
+    // Normalizar rutas para comparación
+    const normalizedHref = href.replace('/MKS-IPTV-App', '');
+    const normalizedPath = currentPath.replace('/MKS-IPTV-App', '');
+    
+    // Home page
+    if (normalizedHref === '/' && (normalizedPath === '/' || normalizedPath === '')) {
+      return true;
+    }
+    
+    // Otras páginas - match exacto o que empiece con la ruta
+    if (normalizedHref !== '/' && normalizedPath.startsWith(normalizedHref)) {
+      return true;
+    }
+    
+    // Enlaces externos no se marcan como activos
+    if (href.startsWith('http')) {
+      return false;
+    }
+    
+    return false;
+  }
+
+  // Variable para evitar ejecuciones duplicadas
+  let lastNavigationUpdate = '';
+  let navigationUpdateTimeout: number | null = null;
+
+  // Función para actualizar la navegación activa (optimizada)
+  function updateActiveNavigation() {
+    const currentPath = window.location.pathname;
+    
+    // Evitar actualizaciones duplicadas para la misma ruta
+    if (lastNavigationUpdate === currentPath) {
+      return;
+    }
+    
+    // Cancelar timeout anterior si existe
+    if (navigationUpdateTimeout) {
+      clearTimeout(navigationUpdateTimeout);
+    }
+    
+    // Debounce para evitar múltiples ejecuciones
+    navigationUpdateTimeout = setTimeout(() => {
+      const navLinks = document.querySelectorAll('.nav-link');
+      
+      console.log('🔗 Updating navigation for path:', currentPath);
+      
+      // Remover todos los indicadores activos existentes
+      const existingIndicators = document.querySelectorAll('.absolute.bottom-0.left-0.right-0.h-0\\.5.bg-gradient-to-r');
+      existingIndicators.forEach(indicator => indicator.remove());
+      
+      // Actualizar cada enlace de navegación
+      navLinks.forEach(link => {
+        const href = link.getAttribute('href');
+        if (!href) return;
+        
+        const isActive = isActiveLink(href, currentPath);
+        const linkElement = link as HTMLElement;
+        
+        // Remover todas las clases de estado
+        linkElement.classList.remove(
+          'text-app-text-muted', 'hover:text-app-text', 'hover:scale-105', // default
+          'text-app-accent', 'font-semibold' // active
+        );
+        
+        if (isActive) {
+          // Aplicar estilos activos
+          linkElement.classList.add('text-app-accent', 'font-semibold');
+          
+          // Agregar indicador activo siguiendo la estructura del CSS
+          const indicator = document.createElement('div');
+          indicator.className = 'absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-app-accent to-app-highlight rounded-full';
+          linkElement.parentElement?.appendChild(indicator);
+          
+          console.log('✅ Active link set:', href);
+        } else {
+          // Aplicar estilos por defecto
+          linkElement.classList.add('text-app-text-muted', 'hover:text-app-text', 'hover:scale-105');
+        }
+      });
+      
+      lastNavigationUpdate = currentPath;
+      navigationUpdateTimeout = null;
+    }, 100); // Debounce de 100ms
+  }
+
+  // Función combinada para inicializar header y actualizar navegación
+  function initHeaderAndNav() {
+    initHeader();
+    updateActiveNavigation(); // Una sola llamada con debouncing interno
+  }
+
+  // Función solo para actualizar navegación (más ligera)
+  function updateNavOnly() {
+    updateActiveNavigation(); // Una sola llamada con debouncing interno
+  }
+
+  // Inicializar header en carga inicial
+  document.addEventListener('DOMContentLoaded', initHeaderAndNav);
+  
+  // Re-inicializar header en navegación SPA (para Astro view transitions)
+  document.addEventListener('astro:page-load', initHeaderAndNav);
+  
+  // Eventos específicos de Astro ViewTransitions
+  document.addEventListener('astro:before-preparation', updateNavOnly);
+  document.addEventListener('astro:after-preparation', updateNavOnly);
+  document.addEventListener('astro:before-swap', updateNavOnly);
+  document.addEventListener('astro:after-swap', updateNavOnly);
+  
+  // Fallback para navegación manual
+  window.addEventListener('popstate', () => {
+    setTimeout(initHeaderAndNav, 100);
   });
+  
+  // Observer para cambios en el DOM (más robusto que polling)
+  const urlObserver = new MutationObserver(() => {
+    updateNavOnly();
+  });
+  
+  // Iniciar observación del título (cambia con cada página)
+  const titleElement = document.querySelector('title');
+  if (titleElement) {
+    urlObserver.observe(titleElement, { 
+      childList: true, 
+      characterData: true, 
+      subtree: true 
+    });
+  }
+  
+  // Detectar cambios de URL para casos edge (backup)
+  let currentUrl = window.location.href;
+  setInterval(() => {
+    if (window.location.href !== currentUrl) {
+      currentUrl = window.location.href;
+      updateNavOnly();
+    }
+  }, 500);
 </script>

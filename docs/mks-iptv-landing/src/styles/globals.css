@@ -31,6 +31,12 @@
 }
 
 @layer components {
+  /* 
+   * DEPRECATED: btn-primary and btn-secondary classes
+   * Use the universal Button component instead: import Button from '@/components/ui/Button/index.astro'
+   * These classes will be removed in a future version.
+   * Migration: Replace <a class="btn-primary"> with <Button variant="primary">
+   */
   .btn-primary {
     @apply bg-app-accent hover:bg-app-primary text-app-text font-semibold py-3 px-6 rounded-lg transition-colors duration-200;
   }

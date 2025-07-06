@@ -17,6 +17,7 @@ This is the **Astro landing page migration** for the MKS-IPTV-App project. The m
 - `current-todos.md` - Current project tasks and progress tracking
 - `refactor.astro.md` - Technical implementation plan for Astro migration
 - `PLAYBOOK-ASTRO.md` - Astro-specific development patterns and guidelines
+- `astrobook-docs.md` - **Documentación exhaustiva de Astrobook** (stories, showcases, mejores prácticas)
 - `package.json` - Project dependencies and scripts
 - `src/` - Source code directory with Astro components
 

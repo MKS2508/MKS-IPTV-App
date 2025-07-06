@@ -15,11 +15,11 @@
 
 import { footerStyles, getFooterLinkClasses, getAppBadgeClasses } from './styles';
 import type { FooterProps, FooterSection, SocialMedia, AppStoreBadge } from './types';
+import Button from '../../ui/Button/index.astro';
 
 const {
   showSocial = true,
   showAppBadges = true,
-  showNewsletter = false,
   className = ''
 }: FooterProps = Astro.props;
 
@@ -178,25 +178,32 @@ const currentYear = new Date().getFullYear();
               Descargar App
             </h3>
             <div class={footerStyles.appBadges.list}>
-              {appStoreBadges.map((badge) => {
-                const badgeClasses = getAppBadgeClasses(badge.available);
-                return (
-                  <a 
-                    href={badge.href}
-                    class={badgeClasses}
-                    aria-label={badge.imageAlt}
-                    title={badge.available ? badge.imageAlt : 'Próximamente disponible'}
-                  >
-                    <img 
-                      src={badge.imageSrc}
-                      alt={badge.imageAlt}
-                      class={`${footerStyles.appBadges.badge.image} ${!badge.available ? footerStyles.appBadges.badge.disabled : ''}`}
-                      width="156"
-                      height="48"
-                    />
-                  </a>
-                );
-              })}
+              <Button 
+                as="link"
+                href="/download#ios"
+                variant="secondary"
+                size="sm"
+                icon={{ lucide: 'Download', position: 'left' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'gentle'
+                }}
+              >
+                iOS/TestFlight
+              </Button>
+              <Button 
+                as="link"
+                href="/download#mac"
+                variant="secondary"
+                size="sm"
+                icon={{ simple: 'apple', position: 'left' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'gentle'
+                }}
+              >
+                macOS
+              </Button>
             </div>
             <p class={footerStyles.appBadges.note}>
               Actualmente disponible mediante instalación manual y TestFlight

@@ -1,0 +1,228 @@
+---
+/**
+ * @file Página demo para el componente GlassEffect.
+ * @author MKS
+ */
+
+import Layout from '../layouts/Layout.astro';
+import GlassEffect from '../components/interactive/GlassEffect/index.astro';
+
+const title = 'Glass Effect Demo - MKS IPTV';
+const description = 'Demostración interactiva del componente Glass Effect con filtros SVG avanzados';
+---
+
+<Layout title={title} description={description}>
+  <div class="demo-container">
+    <!-- Background con gradiente y patrón -->
+    <div class="background-pattern"></div>
+    
+    <!-- Contenido de fondo para demostrar el efecto -->
+    <div class="demo-content">
+      <h1 class="demo-title">Glass Effect Demo</h1>
+      <p class="demo-subtitle">Arrastra los elementos para probar el efecto</p>
+      
+      <div class="demo-grid">
+        <div class="demo-card">
+          <h2>Dock Style</h2>
+          <p>Estilo dock con múltiples elementos</p>
+        </div>
+        <div class="demo-card">
+          <h2>Pill Style</h2>
+          <p>Forma de píldora minimalista</p>
+        </div>
+        <div class="demo-card">
+          <h2>Bubble Style</h2>
+          <p>Efecto burbuja circular</p>
+        </div>
+        <div class="demo-card">
+          <h2>Free Form</h2>
+          <p>Forma libre personalizable</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Glass Effects -->
+    <GlassEffect preset="dock" initialPosition={{ x: 50, y: 20 }}>
+      <div class="dock-content">
+        <div class="dock-item" style="background: #ff6b6b;">📱</div>
+        <div class="dock-item" style="background: #4ecdc4;">💻</div>
+        <div class="dock-item" style="background: #45b7d1;">🎮</div>
+        <div class="dock-item" style="background: #f9ca24;">📺</div>
+      </div>
+    </GlassEffect>
+
+    <GlassEffect preset="pill" initialPosition={{ x: 20, y: 40 }}>
+      <span class="pill-text">Pill Shape</span>
+    </GlassEffect>
+
+    <GlassEffect preset="bubble" initialPosition={{ x: 80, y: 30 }}>
+      <div class="bubble-content">•</div>
+    </GlassEffect>
+
+    <GlassEffect preset="free" initialPosition={{ x: 60, y: 60 }}>
+      <div class="free-content">
+        <span class="free-icon">✨</span>
+        <span class="free-text">Free Form</span>
+      </div>
+    </GlassEffect>
+
+    <!-- Static element -->
+    <GlassEffect preset="bubble" draggable={false} initialPosition={{ x: 10, y: 80 }}>
+      <div class="static-content">Static</div>
+    </GlassEffect>
+  </div>
+</Layout>
+
+<style>
+  .demo-container {
+    position: relative;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    overflow: hidden;
+  }
+
+  .background-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    opacity: 0.3;
+  }
+
+  .demo-content {
+    position: relative;
+    z-index: 1;
+    padding: 4rem 2rem;
+    text-align: center;
+    color: white;
+  }
+
+  .demo-title {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .demo-subtitle {
+    font-size: 1.5rem;
+    opacity: 0.9;
+    margin-bottom: 3rem;
+  }
+
+  .demo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .demo-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 1rem;
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .demo-card h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .demo-card p {
+    opacity: 0.8;
+  }
+
+  /* Dock content - 336x96 */
+  .dock-content {
+    display: flex;
+    gap: 12px;
+    padding: 0;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+  }
+
+  .dock-item {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+  }
+
+  /* Pill content - 200x80 */
+  .pill-text {
+    color: white;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    font-size: 16px;
+  }
+
+  /* Bubble content - 140x140 */
+  .bubble-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 48px;
+  }
+
+  /* Free form content - 140x280 */
+  .free-content {
+    color: white;
+    text-align: center;
+    padding: 20px;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+  }
+
+  .free-icon {
+    display: block;
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .free-text {
+    font-size: 18px;
+  }
+
+  /* Static content */
+  .static-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+
+  @media (max-width: 768px) {
+    .demo-title {
+      font-size: 2rem;
+    }
+
+    .demo-subtitle {
+      font-size: 1.2rem;
+    }
+
+    .demo-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

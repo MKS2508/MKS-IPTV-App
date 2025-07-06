@@ -6,7 +6,9 @@
 // Contenido extraído del legacy /docs/index.md
 export const homeContent = {
   hero: {
-    tagline: "The Ultimate IPTV Experience for Apple Devices",
+    title: "MKS-IPTV",
+    description: "La experiencia IPTV definitiva para dispositivos Apple con diseño Liquid Glass",
+    tagline: "Streaming de alta calidad • Multiplatforma • Diseño nativo",
     version: "v1.0-beta",
     platforms: "iOS • macOS • tvOS",
     swift: "Swift 6.0",

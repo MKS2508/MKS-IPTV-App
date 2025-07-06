@@ -4,7 +4,7 @@
  */
 
 import type { ReactNode, ButtonHTMLAttributes, AnchorHTMLAttributes } from 'react';
-import type { Variants, Transition } from 'framer-motion';
+import type { Variants, Transition, MotionValue } from 'framer-motion';
 
 export type ButtonVariant = 
   | 'primary' 
@@ -83,21 +83,82 @@ export type SimpleIconName =
   | 'bun'
   | 'astro';
 
-export interface ButtonMotionConfig {
+/** Motor de animación disponible */
+export type AnimationEngine = 'framer' | 'gsap' | 'css' | 'auto';
+
+/** Preset de animación unificado */
+export type AnimationPreset = 
+  | 'gentle' 
+  | 'bounce' 
+  | 'elastic' 
+  | 'scale' 
+  | 'rotate' 
+  | 'magnetic' 
+  | 'oscillate' 
+  | 'morph' 
+  | 'breathe' 
+  | 'glow' 
+  | 'floating' 
+  | 'liquid' 
+  | 'none';
+
+/** Configuración de animaciones GSAP */
+export interface GSAPAnimationConfig {
+  /** Animación en hover */
+  hover?: Record<string, any>;
+  /** Animación en tap/click */
+  tap?: Record<string, any>;
+  /** Animación inicial */
+  initial?: Record<string, any>;
+  /** Animación de entrada */
+  animate?: Record<string, any>;
+  /** Timeline de referencia para scroll integration */
+  timeline?: string;
+  /** ScrollTrigger configuration */
+  scrollTrigger?: {
+    start?: string;
+    end?: string;
+    scrub?: boolean | number;
+    trigger?: string;
+  };
+}
+
+/** Configuración de animaciones Framer Motion */
+export interface FramerMotionConfig {
   /** Variantes de animación personalizada */
   variants?: Variants;
   /** Configuración de transición */
   transition?: Transition;
   /** Animación al hacer hover */
-  whileHover?: any;
+  whileHover?: MotionValue;
   /** Animación al hacer tap/click */
-  whileTap?: any;
+  whileTap?: MotionValue;
   /** Animación al entrar */
-  initial?: any;
+  initial?: MotionValue;
   /** Animación final */
-  animate?: any;
+  animate?: MotionValue;
   /** Animación al salir */
-  exit?: any;
+  exit?: MotionValue;
+  /** Layout animations */
+  layout?: boolean;
+  /** Layout ID para shared element transitions */
+  layoutId?: string;
+}
+
+/** Configuración unificada de animaciones */
+export interface ButtonMotionConfig {
+  /** Motor de animación a utilizar */
+  engine?: AnimationEngine;
+  /** Preset de animación */
+  preset?: AnimationPreset;
+  /** Configuración específica de Framer Motion */
+  framer?: FramerMotionConfig;
+  /** Configuración específica de GSAP */
+  gsap?: GSAPAnimationConfig;
+  /** Respetar prefers-reduced-motion */
+  respectReducedMotion?: boolean;
+  /** Duración global de animaciones (override) */
+  duration?: number;
 }
 
 export interface ButtonIconConfig {
@@ -159,15 +220,45 @@ export interface LinkButtonProps extends BaseButtonProps,
 // Tipo unión para ambos casos
 export type UniversalButtonProps = ButtonProps | LinkButtonProps;
 
-// Props para el wrapper de Astro
-export interface AstroButtonProps extends Omit<UniversalButtonProps, 'motion'> {
-  /** Configuración de animaciones serializable */
-  motionConfig?: {
+/** Configuración de animaciones serializable para Astro */
+export interface SerializableMotionConfig {
+  /** Motor de animación */
+  engine?: AnimationEngine;
+  /** Preset de animación */
+  preset?: AnimationPreset;
+  /** Configuración de Framer Motion serializada */
+  framer?: {
+    whileHover?: Record<string, any>;
+    whileTap?: Record<string, any>;
+    initial?: Record<string, any>;
+    animate?: Record<string, any>;
+    transition?: Record<string, any>;
+    layout?: boolean;
+    layoutId?: string;
+  };
+  /** Configuración de GSAP serializada */
+  gsap?: {
     hover?: Record<string, any>;
     tap?: Record<string, any>;
     initial?: Record<string, any>;
     animate?: Record<string, any>;
-  } | undefined;
+    timeline?: string;
+    scrollTrigger?: {
+      start?: string;
+      end?: string;
+      scrub?: boolean | number;
+      trigger?: string;
+    };
+  };
+  /** Opciones globales */
+  respectReducedMotion?: boolean;
+  duration?: number;
+}
+
+// Props para el wrapper de Astro
+export interface AstroButtonProps extends Omit<UniversalButtonProps, 'motion'> {
+  /** Configuración de animaciones serializable */
+  motionConfig?: SerializableMotionConfig;
   /** URL de destino para links */
   href?: string;
   /** Abrir en nueva pestaña */

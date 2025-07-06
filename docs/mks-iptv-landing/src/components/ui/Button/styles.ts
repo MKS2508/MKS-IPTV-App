@@ -132,6 +132,8 @@ export const buttonStyles = {
 
   // Configuraciones de animación predefinidas para Framer Motion
   motionPresets: {
+    // ===== ANIMACIONES BÁSICAS =====
+    
     // Animación suave básica
     gentle: {
       whileHover: { scale: 1.02, y: -1 },
@@ -158,6 +160,159 @@ export const buttonStyles = {
       whileHover: { scale: 1.02, rotate: 2 },
       whileTap: { scale: 0.98, rotate: -1 },
       transition: { type: "spring", stiffness: 400, damping: 17 }
+    },
+    
+    // ===== ANIMACIONES AVANZADAS FRAMER MOTION =====
+    
+    // Magnetismo sutil con physics realista
+    magnetic: {
+      whileHover: { 
+        scale: 1.03,
+        y: -2,
+        boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+      },
+      whileTap: { 
+        scale: 0.98,
+        y: 0,
+        boxShadow: "0 5px 15px rgba(0,0,0,0.1)"
+      },
+      transition: { 
+        type: "spring", 
+        stiffness: 300, 
+        damping: 10,
+        mass: 0.8
+      }
+    },
+    
+    // Oscillación elegante con rebote
+    oscillate: {
+      whileHover: { 
+        scale: [1, 1.05, 1.02],
+        rotate: [0, -1, 1, 0]
+      },
+      whileTap: { scale: 0.95 },
+      transition: {
+        scale: { 
+          duration: 0.6,
+          ease: "easeInOut",
+          repeat: Infinity,
+          repeatType: "reverse"
+        },
+        rotate: {
+          duration: 0.8,
+          ease: "easeInOut",
+          repeat: Infinity,
+          repeatType: "reverse"
+        }
+      }
+    },
+    
+    // Morphing suave con escalado complejo
+    morph: {
+      whileHover: {
+        scale: 1.04,
+        borderRadius: "50%",
+        rotate: 5
+      },
+      whileTap: {
+        scale: 0.96,
+        borderRadius: "20%",
+        rotate: -2
+      },
+      transition: {
+        type: "spring",
+        stiffness: 200,
+        damping: 12,
+        borderRadius: { duration: 0.4 }
+      }
+    },
+    
+    // Efecto de respiración orgánico
+    breathe: {
+      animate: {
+        scale: [1, 1.02, 1],
+        opacity: [1, 0.9, 1]
+      },
+      whileHover: {
+        scale: 1.05,
+        opacity: 1
+      },
+      whileTap: {
+        scale: 0.95
+      },
+      transition: {
+        duration: 2,
+        ease: "easeInOut",
+        repeat: Infinity,
+        repeatType: "loop"
+      }
+    },
+    
+    // Glow pulsante con shadows dinámicas
+    glow: {
+      whileHover: {
+        scale: 1.03,
+        boxShadow: [
+          "0 0 0 rgba(59, 130, 246, 0)",
+          "0 0 20px rgba(59, 130, 246, 0.3)",
+          "0 0 40px rgba(59, 130, 246, 0.1)"
+        ]
+      },
+      whileTap: {
+        scale: 0.98,
+        boxShadow: "0 0 10px rgba(59, 130, 246, 0.2)"
+      },
+      transition: {
+        type: "spring",
+        stiffness: 300,
+        damping: 15,
+        boxShadow: {
+          duration: 0.6,
+          ease: "easeOut"
+        }
+      }
+    },
+    
+    // Floating con movimiento vertical continuo
+    floating: {
+      animate: {
+        y: [-2, 2, -2],
+        rotate: [-0.5, 0.5, -0.5]
+      },
+      whileHover: {
+        y: -4,
+        scale: 1.03,
+        transition: { y: { duration: 0.2 } }
+      },
+      whileTap: {
+        y: 0,
+        scale: 0.97
+      },
+      transition: {
+        duration: 3,
+        ease: "easeInOut",
+        repeat: Infinity,
+        repeatType: "loop"
+      }
+    },
+    
+    // Liquid con deformación fluida
+    liquid: {
+      whileHover: {
+        scale: [1, 1.1, 0.95, 1.05],
+        skewX: [0, 2, -1, 0],
+        transition: {
+          duration: 0.8,
+          ease: "easeInOut"
+        }
+      },
+      whileTap: {
+        scale: 0.9,
+        skewX: 3,
+        transition: {
+          duration: 0.1
+        }
+      }
     },
     
     // Sin animación (para accesibilidad)

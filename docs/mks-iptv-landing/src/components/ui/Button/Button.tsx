@@ -1,17 +1,23 @@
 /**
- * @file Componente React Button universal con Framer Motion.
+ * @file Componente React Button universal con sistema de animación híbrido.
+ * @description Soporta Framer Motion, GSAP y CSS transitions
  * @author MKS
  */
 
-import React, { forwardRef, useMemo } from 'react';
+import React, { forwardRef, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import * as LucideIcons from 'lucide-react';
-import type { UniversalButtonProps } from './types';
+import type { UniversalButtonProps, ButtonMotionConfig, SerializableMotionConfig } from './types';
 import { buttonStyles } from './styles';
+import { AnimationEngineSelector } from './AnimationEngine';
+import { GSAPButtonAnimator, GSAPAnimationFactory } from './GSAPAnimations';
 
 export const Button = forwardRef<
   HTMLButtonElement | HTMLAnchorElement,
-  UniversalButtonProps & { motionConfigSerialized?: string }
+  UniversalButtonProps & { 
+    motionConfigSerialized?: string;
+    animationContext?: 'button' | 'cta' | 'form' | 'hero';
+  }
 >((props, ref) => {
   const {
     children,
@@ -25,37 +31,74 @@ export const Button = forwardRef<
     className = '',
     motion: motionConfig,
     motionConfigSerialized,
+    animationContext = 'button',
     id,
     ...restProps
   } = props;
-
-  // Determinar si es un link o botón
-  const isLink = props.as === 'link';
-  const MotionComponent = isLink ? motion.a : motion.button;
-
-  // Configuración de animaciones Framer Motion
-  const defaultMotion = buttonStyles.motionPresets.gentle;
   
-  // Deserializar motionConfig desde Astro
-  let deserializedMotionConfig;
-  try {
-    deserializedMotionConfig = motionConfigSerialized ? JSON.parse(motionConfigSerialized) : null;
-  } catch (e) {
-    deserializedMotionConfig = null;
+  // Referencias para animaciones GSAP
+  const elementRef = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
+  const gsapAnimatorRef = useRef<GSAPButtonAnimator | null>(null);
+
+  // Deserializar y procesar configuración de animación
+  const processedMotionConfig = useMemo(() => {
+    let serializedConfig: SerializableMotionConfig | null = null;
+    
+    // Deserializar desde Astro
+    if (motionConfigSerialized) {
+      try {
+        serializedConfig = JSON.parse(motionConfigSerialized);
+      } catch (e) {
+        console.warn('Failed to parse motionConfigSerialized:', e);
+      }
+    }
+    
+    // Convertir a ButtonMotionConfig
+    const baseConfig = serializedConfig 
+      ? AnimationEngineSelector.fromSerializable(serializedConfig)
+      : motionConfig || AnimationEngineSelector.getOptimalConfig(animationContext);
+    
+    // Aplicar reduced motion si es necesario
+    return AnimationEngineSelector.applyReducedMotion(baseConfig);
+  }, [motionConfigSerialized, motionConfig, animationContext]);
+  
+  // Determinar motor de animación
+  const animationEngine = AnimationEngineSelector.detectEngine(processedMotionConfig);
+  
+  // Debugging GSAP
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎭 Button Animation Debug:', {
+      engine: animationEngine,
+      config: processedMotionConfig,
+      preset: processedMotionConfig.preset,
+      hasGSAP: !!processedMotionConfig.gsap
+    });
   }
   
-  // Usar la configuración deserializada o la que viene directamente
-  const activeMotionConfig = deserializedMotionConfig || motionConfig;
+  // Determinar el componente a usar según el motor de animación
+  const isLink = props.as === 'link';
+  
+  const getComponent = () => {
+    if (animationEngine === 'framer') {
+      return isLink ? motion.a : motion.button;
+    }
+    // Para GSAP y CSS usar elementos natívos
+    return isLink ? 'a' : 'button';
+  };
+  
+  const MotionComponent = getComponent();
 
-  // Construir clases CSS
+  // Construir clases CSS basado en el motor de animación
   const classes = useMemo(() => {
     const variantStyles = buttonStyles.variants[variant];
     const sizeStyles = buttonStyles.sizes[size];
     const widthStyle = buttonStyles.widths[width];
+    
+    // Usar base sin transiciones CSS si no es CSS engine
+    const useNoTransition = animationEngine !== 'css';
 
     return [
-      // Base sin transiciones CSS si tiene motion personalizado
-      activeMotionConfig ? buttonStyles.baseNoTransition : buttonStyles.base,
+      useNoTransition ? buttonStyles.baseNoTransition : buttonStyles.base,
       variantStyles.background,
       variantStyles.text,
       variantStyles.border,
@@ -69,24 +112,45 @@ export const Button = forwardRef<
       widthStyle,
       loading ? buttonStyles.states.loading : '',
       disabled ? buttonStyles.states.disabled : '',
-      buttonStyles.effects.shimmer,
+      // Solo aplicar shimmer effect si no hay animaciones JS
+      animationEngine === 'css' ? buttonStyles.effects.shimmer : '',
       className
     ].filter(Boolean).join(' ');
-  }, [variant, size, width, loading, disabled, className, activeMotionConfig]);
-  
-  // Transformar motionConfig de Astro a formato Framer Motion
-  const transformedMotion = activeMotionConfig ? {
-    whileHover: activeMotionConfig.hover,
-    whileTap: activeMotionConfig.tap,
-    initial: activeMotionConfig.initial,
-    animate: activeMotionConfig.animate,
-    transition: { type: "spring", stiffness: 300, damping: 12 }
-  } : {};
-  
-  const finalMotionConfig = {
-    ...defaultMotion,
-    ...transformedMotion
+  }, [variant, size, width, loading, disabled, className, animationEngine]);
+  // Configuración específica según el motor de animación
+  const getAnimationConfig = () => {
+    switch (animationEngine) {
+      case 'framer':
+        const framerConfig = processedMotionConfig.framer;
+        const preset = processedMotionConfig.preset;
+        
+        // Usar preset si no hay configuración específica
+        if (!framerConfig && preset && preset !== 'none') {
+          return buttonStyles.motionPresets[preset] || buttonStyles.motionPresets.gentle;
+        }
+        
+        // Usar configuración específica
+        return {
+          whileHover: framerConfig?.whileHover,
+          whileTap: framerConfig?.whileTap,
+          initial: framerConfig?.initial,
+          animate: framerConfig?.animate,
+          transition: framerConfig?.transition || { type: "spring", stiffness: 400, damping: 17 },
+          layout: framerConfig?.layout,
+          layoutId: framerConfig?.layoutId
+        };
+        
+      case 'gsap':
+        // GSAP se maneja en useEffect
+        return {};
+        
+      case 'css':
+      default:
+        return {};
+    }
   };
+  
+  const finalMotionConfig = getAnimationConfig();
 
 
   // Renderizar icono
@@ -222,13 +286,72 @@ export const Button = forwardRef<
     </>
   );
 
+  // Setup de animaciones GSAP
+  useEffect(() => {
+    if (animationEngine === 'gsap' && elementRef.current) {
+      // Debugging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎮 GSAP Setup:', {
+          hasElement: !!elementRef.current,
+          hasGSAPConfig: !!processedMotionConfig.gsap,
+          preset: processedMotionConfig.preset,
+          fullConfig: processedMotionConfig
+        });
+      }
+      
+      // Limpiar animador anterior
+      if (gsapAnimatorRef.current) {
+        gsapAnimatorRef.current.destroy();
+      }
+      
+      // Crear nuevo animador GSAP - debe tener preset O configuración gsap
+      const gsapConfig = processedMotionConfig.preset 
+        ? GSAPAnimationFactory.fromPreset(processedMotionConfig.preset)
+        : processedMotionConfig.gsap;
+        
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 GSAP Config Final:', gsapConfig);
+      }
+      
+      // Solo crear animator si tenemos configuración válida
+      if (gsapConfig && (gsapConfig.hover || gsapConfig.tap)) {
+        gsapAnimatorRef.current = new GSAPButtonAnimator(elementRef.current, gsapConfig);
+        
+        // Conectar con timeline si está especificado
+        if (gsapConfig.timeline) {
+          gsapAnimatorRef.current.connectToTimeline(gsapConfig.timeline);
+        }
+      } else if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ GSAP Config invalid or empty:', gsapConfig);
+      }
+    }
+    
+    // Cleanup
+    return () => {
+      if (gsapAnimatorRef.current) {
+        gsapAnimatorRef.current.destroy();
+        gsapAnimatorRef.current = null;
+      }
+    };
+  }, [animationEngine, processedMotionConfig]);
+  
+  // Combinar refs
+  const combinedRef = (element: HTMLButtonElement | HTMLAnchorElement | null) => {
+    elementRef.current = element;
+    if (typeof ref === 'function') {
+      ref(element);
+    } else if (ref) {
+      ref.current = element;
+    }
+  };
+
   return (
     <MotionComponent
-      ref={ref as any}
+      ref={combinedRef as any}
       id={id}
       className={classes}
       aria-disabled={disabled || loading}
-      {...finalMotionConfig}
+      {...(animationEngine === 'framer' ? finalMotionConfig : {})}
       {...linkProps}
       {...buttonProps}
       {...cleanRestProps}

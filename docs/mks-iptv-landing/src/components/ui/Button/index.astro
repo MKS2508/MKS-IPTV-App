@@ -1,13 +1,18 @@
 ---
 /**
- * @file Wrapper Astro para el componente Button universal.
+ * @file Wrapper Astro para el componente Button universal con sistema de animación híbrido.
+ * @description Soporta Framer Motion, GSAP y CSS transitions con detección automática
  * @author MKS
  */
 
 import { Button } from './Button.tsx';
 import type { AstroButtonProps } from './types';
+import { AnimationEngineSelector } from './AnimationEngine';
 
-export interface Props extends AstroButtonProps {}
+export interface Props extends AstroButtonProps {
+  /** Contexto de animación para optimización automática */
+  animationContext?: 'button' | 'cta' | 'form' | 'hero';
+}
 
 const {
   children,
@@ -20,20 +25,37 @@ const {
   disabled = false,
   className = '',
   motionConfig,
+  animationContext = 'button',
   id,
   as = 'button',
   ...restProps
 } = Astro.props;
 
+// Procesar configuración de animación
+const processMotionConfig = () => {
+  // Si no hay configuración, usar la óptima para el contexto
+  if (!motionConfig) {
+    const optimalConfig = AnimationEngineSelector.getOptimalConfig(animationContext);
+    return {
+      engine: optimalConfig.engine,
+      preset: optimalConfig.preset,
+      respectReducedMotion: true
+    };
+  }
+  
+  return motionConfig;
+};
+
 // Serializar motionConfig para que sea compatible con React
-const serializedMotionConfig = motionConfig ? JSON.stringify(motionConfig) : undefined;
+const finalMotionConfig = processMotionConfig();
+const serializedMotionConfig = JSON.stringify(finalMotionConfig);
 
 ---
 
 {as === 'link' ? (
   <Button 
     client:visible
-    text={typeof children === 'string' ? children : 'Link'}
+    text={typeof children === 'string' ? children : text || 'Link'}
     variant={variant}
     size={size}
     width={width}
@@ -42,15 +64,17 @@ const serializedMotionConfig = motionConfig ? JSON.stringify(motionConfig) : und
     disabled={disabled}
     className={className}
     motionConfigSerialized={serializedMotionConfig}
+    animationContext={animationContext}
     id={id}
     as="link"
     href={restProps.href || '#'}
     external={restProps.external}
+    {...restProps}
   />
 ) : (
   <Button 
     client:visible
-    text={typeof children === 'string' ? children : 'Button'}
+    text={typeof children === 'string' ? children : text || 'Button'}
     variant={variant}
     size={size}
     width={width}
@@ -59,7 +83,9 @@ const serializedMotionConfig = motionConfig ? JSON.stringify(motionConfig) : und
     disabled={disabled}
     className={className}
     motionConfigSerialized={serializedMotionConfig}
+    animationContext={animationContext}
     id={id}
     as="button"
+    {...restProps}
   />
 )}

@@ -1,0 +1,1163 @@
+---
+/**
+ * @file ButtonShowcase - Sistema de Animación Híbrido Profesional
+ * @description Showcase consolidado del sistema completo de animaciones
+ * @author MKS
+ */
+
+import Button from './index.astro';
+import ConfigIndicator from './ConfigIndicator.astro';
+
+export interface Props {
+  /**
+   * Sección a mostrar del showcase
+   */
+  section?: 'all' | 'variants' | 'engines' | 'animations' | 'foundations';
+}
+
+const { section = 'all' } = Astro.props;
+
+// Grupos lógicos consolidados
+const showAll = section === 'all';
+const showFoundations = showAll || section === 'foundations' || section === 'variants';
+const showEngines = showAll || section === 'engines';
+const showAnimations = showAll || section === 'animations';
+---
+
+<div class="space-y-16 p-8 bg-app-surface rounded-xl">
+  <!-- Header del Showcase -->
+  <header class="text-center space-y-3 border-b border-app-border pb-8">
+    <h1 class="text-3xl font-bold text-app-text">Button System Showcase</h1>
+    <p class="text-app-text-secondary max-w-2xl mx-auto">
+      Sistema de animación híbrido que combina Framer Motion, GSAP y CSS Transitions 
+      con detección automática del motor óptimo según el contexto.
+    </p>
+    <div class="flex justify-center gap-2 mt-4">
+      <span class="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded text-xs">
+        Framer Motion
+      </span>
+      <span class="px-2 py-1 bg-green-500/10 text-green-400 border border-green-500/30 rounded text-xs">
+        GSAP
+      </span>
+      <span class="px-2 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/30 rounded text-xs">
+        CSS Transitions
+      </span>
+      <span class="px-2 py-1 bg-orange-500/10 text-orange-400 border border-orange-500/30 rounded text-xs">
+        Auto-detect
+      </span>
+    </div>
+  </header>
+  <!-- SECCIÓN 1: FUNDAMENTOS -->
+  {showFoundations && (
+    <section class="space-y-8">
+      <header class="text-center space-y-2">
+        <h2 class="text-2xl font-bold text-app-text">1. Fundamentos del Sistema</h2>
+        <p class="text-app-text-secondary">Variantes, tamaños, estados y configuración básica</p>
+      </header>
+      
+      <!-- Variantes Básicas -->
+      <div class="space-y-6">
+        <div>
+          <h3 class="text-lg font-semibold text-app-text mb-4">Variantes de Estilo</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <Button variant="primary">Primary</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="outline">Outline</Button>
+            <Button variant="ghost">Ghost</Button>
+            <Button variant="danger">Danger</Button>
+            <Button variant="success">Success</Button>
+            <Button variant="highlight">Highlight</Button>
+            <Button variant="primary" disabled>Disabled</Button>
+          </div>
+          
+          <!-- Configuración por defecto -->
+          <div class="p-4 bg-app-surface/50 rounded-lg border border-app-border/50">
+            <h4 class="text-sm font-medium text-app-text-secondary mb-3 flex items-center gap-2">
+              📝 Configuración Automática por Defecto
+            </h4>
+            <ConfigIndicator 
+              animationContext="button"
+              compact
+            />
+            <p class="text-xs text-app-text-muted mt-2">
+              Sin motionConfig especificado, se usa auto-detección basada en contexto
+            </p>
+          </div>
+        </div>
+        
+        <!-- Tamaños y Estados Consolidados -->
+        <div class="grid md:grid-cols-2 gap-8">
+          <!-- Tamaños -->
+          <div>
+            <h3 class="text-lg font-semibold text-app-text mb-4">Tamaños</h3>
+            <div class="flex items-end gap-3 flex-wrap mb-3">
+              <Button size="sm" variant="primary">Small</Button>
+              <Button size="md" variant="primary">Medium</Button>
+              <Button size="lg" variant="primary">Large</Button>
+              <Button size="xl" variant="primary">Extra Large</Button>
+            </div>
+          </div>
+          
+          <!-- Estados -->
+          <div>
+            <h3 class="text-lg font-semibold text-app-text mb-4">Estados Especiales</h3>
+            <div class="space-y-3">
+              <div class="flex gap-3">
+                <Button loading variant="primary">Loading</Button>
+                <Button disabled variant="primary">Disabled</Button>
+              </div>
+              <div class="p-3 bg-orange-500/5 border border-orange-500/20 rounded">
+                <div class="space-y-2">
+                  <Button 
+                    loading 
+                    variant="highlight"
+                    motionConfig={{
+                      engine: 'framer',
+                      framer: {
+                        whileHover: { scale: 1.0 }, // Deshabilitado durante loading
+                        whileTap: { scale: 1.0 }
+                      }
+                    }}
+                  >
+                    Loading Custom
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'framer',
+                      framer: {
+                        whileHover: { scale: 1.0 },
+                        whileTap: { scale: 1.0 }
+                      }
+                    }}
+                    compact
+                  />
+                </div>
+                <p class="text-xs text-orange-400 mt-2">
+                  ⏳ Durante loading, las animaciones se desactivan automáticamente
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Iconos Esenciales -->
+        <div>
+          <h3 class="text-lg font-semibold text-app-text mb-4">Iconos y Micro-interacciones</h3>
+          <div class="space-y-4">
+            <div class="flex flex-wrap gap-3">
+              <Button 
+                variant="primary" 
+                icon={{ lucide: 'Download', position: 'left' }}
+              >
+                Download
+              </Button>
+              <Button 
+                variant="outline" 
+                icon={{ lucide: 'ArrowRight', position: 'right' }}
+              >
+                Next
+              </Button>
+              <Button 
+                variant="highlight" 
+                size="md"
+                icon={{ lucide: 'Plus', position: 'only' }}
+                motionConfig={{
+                  engine: 'framer',
+                  preset: 'rotate'
+                }}
+              />
+              <Button 
+                variant="secondary" 
+                icon={{ simple: 'github', position: 'left' }}
+              >
+                GitHub
+              </Button>
+            </div>
+            
+            <!-- Ejemplo de animación para iconos -->
+            <div class="flex items-center gap-4 p-3 bg-app-surface/30 rounded border border-app-border/30">
+              <div class="space-y-2">
+                <Button 
+                  variant="highlight" 
+                  size="md"
+                  icon={{ lucide: 'Plus', position: 'only' }}
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'rotate'
+                  }}
+                />
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'rotate'
+                  }}
+                  compact
+                />
+              </div>
+              <p class="text-xs text-app-text-muted max-w-xs">
+                📍 Los botones de solo icono usan el preset <code class="text-app-accent">rotate</code> para mejores micro-interacciones
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )}
+
+
+
+
+
+  <!-- SECCIÓN 2: SISTEMA DE ANIMACIÓN -->
+  {showEngines && (
+    <section class="space-y-8">
+      <header class="text-center space-y-2">
+        <h2 class="text-2xl font-bold text-app-text">2. Sistema de Animación Híbrido</h2>
+        <p class="text-app-text-secondary">Comparativa técnica entre motores de animación y configuraciones</p>
+      </header>
+      
+      <div class="space-y-10">
+        <!-- Framer Motion -->
+        <div class="border border-app-border rounded-lg p-6 bg-app-background/50">
+          <h4 class="text-lg font-medium text-app-text mb-4 flex items-center gap-2">
+            <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+            Framer Motion
+          </h4>
+          
+          <!-- Animaciones Básicas -->
+          <div class="mb-6">
+            <h5 class="text-sm font-medium text-app-text-secondary mb-3">Básicas</h5>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Framer Gentle -->
+              <div class="space-y-2">
+                <Button 
+                  variant="primary"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'gentle'
+                  }}
+                >
+                  Gentle
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'gentle'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Framer Bounce -->
+              <div class="space-y-2">
+                <Button 
+                  variant="secondary"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'bounce'
+                  }}
+                >
+                  Bounce
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'bounce'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Framer Scale -->
+              <div class="space-y-2">
+                <Button 
+                  variant="outline"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'scale'
+                  }}
+                >
+                  Scale
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'scale'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Animaciones Avanzadas -->
+          <div>
+            <h5 class="text-sm font-medium text-blue-400 mb-3">Avanzadas Únicas</h5>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <!-- Magnetic -->
+              <div class="space-y-2">
+                <Button 
+                  variant="highlight"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'magnetic'
+                  }}
+                >
+                  Magnetic
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'magnetic'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Morph -->
+              <div class="space-y-2">
+                <Button 
+                  variant="success"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'morph'
+                  }}
+                >
+                  Morph
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'morph'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Glow -->
+              <div class="space-y-2">
+                <Button 
+                  variant="ghost"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'glow'
+                  }}
+                >
+                  Glow
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'glow'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Liquid -->
+              <div class="space-y-2">
+                <Button 
+                  variant="danger"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'liquid'
+                  }}
+                >
+                  Liquid
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'liquid'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+          
+          <p class="text-sm text-app-text-muted mt-4">
+            Óptimo para micro-interacciones y animaciones declarativas
+          </p>
+        </div>
+
+        <!-- GSAP -->
+        <div class="border border-app-border rounded-lg p-6 bg-app-background/50">
+          <h4 class="text-lg font-medium text-app-text mb-4 flex items-center gap-2">
+            <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+            GSAP
+          </h4>
+          
+          <!-- Animaciones Básicas -->
+          <div class="mb-6">
+            <h5 class="text-sm font-medium text-app-text-secondary mb-3">Básicas</h5>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- GSAP Gentle -->
+              <div class="space-y-2">
+                <Button 
+                  variant="success"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'gentle'
+                  }}
+                >
+                  Gentle
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'gentle'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- GSAP Elastic -->
+              <div class="space-y-2">
+                <Button 
+                  variant="highlight"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'elastic'
+                  }}
+                >
+                  Elastic
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'elastic'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- GSAP Rotate -->
+              <div class="space-y-2">
+                <Button 
+                  variant="primary"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'rotate'
+                  }}
+                >
+                  Rotate
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'rotate'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Animaciones Avanzadas -->
+          <div>
+            <h5 class="text-sm font-medium text-green-400 mb-3">Avanzadas de Performance</h5>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <!-- Magnetic GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="primary"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'magnetic'
+                  }}
+                >
+                  Magnetic
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'magnetic'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Oscillate GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="secondary"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'oscillate'
+                  }}
+                >
+                  Oscillate
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'oscillate'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Floating GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="ghost"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'floating'
+                  }}
+                >
+                  Floating
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'floating'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Breathe GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="outline"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'breathe'
+                  }}
+                >
+                  Breathe
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'breathe'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+          
+          <p class="text-sm text-app-text-muted mt-4">
+            Óptimo para animaciones complejas e integración con scroll
+          </p>
+        </div>
+
+        <!-- CSS Transitions -->
+        <div class="border border-app-border rounded-lg p-6 bg-app-background/50">
+          <h4 class="text-lg font-medium text-app-text mb-4 flex items-center gap-2">
+            <span class="w-3 h-3 bg-purple-500 rounded-full"></span>
+            CSS Transitions
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- CSS Hover -->
+            <div class="space-y-2">
+              <Button 
+                variant="outline"
+                motionConfig={{
+                  engine: 'css'
+                }}
+              >
+                Hover Effect
+              </Button>
+              <ConfigIndicator 
+                motionConfig={{
+                  engine: 'css'
+                }}
+                compact
+              />
+            </div>
+            
+            <!-- CSS Shimmer -->
+            <div class="space-y-2">
+              <Button 
+                variant="ghost"
+                motionConfig={{
+                  engine: 'css'
+                }}
+              >
+                Shimmer
+              </Button>
+              <ConfigIndicator 
+                motionConfig={{
+                  engine: 'css'
+                }}
+                compact
+              />
+            </div>
+            
+            <!-- CSS Glass -->
+            <div class="space-y-2">
+              <Button 
+                variant="secondary"
+                motionConfig={{
+                  engine: 'css'
+                }}
+              >
+                Glass Effect
+              </Button>
+              <ConfigIndicator 
+                motionConfig={{
+                  engine: 'css'
+                }}
+                compact
+              />
+            </div>
+          </div>
+          <p class="text-sm text-app-text-muted mt-3">
+            Óptimo para máximo rendimiento y animaciones simples
+          </p>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- SECCIÓN 3: CASOS DE USO REALES -->
+  {showAnimations && (
+    <section class="space-y-8">
+      <header class="text-center space-y-2">
+        <h2 class="text-2xl font-bold text-app-text">3. Casos de Uso Reales</h2>
+        <p class="text-app-text-secondary">Contextos optimizados con auto-detección de motor y configuraciones profesionales</p>
+      </header>
+      
+      <div class="space-y-8">
+        <!-- Hero CTAs -->
+        <div class="border border-app-border rounded-lg p-4 bg-app-background/50">
+          <h4 class="text-sm font-medium text-app-text-muted mb-3">Hero CTAs (GSAP optimizado)</h4>
+          <div class="space-y-4">
+            <div class="flex gap-3">
+              <div class="space-y-2">
+                <Button 
+                  variant="primary" 
+                  size="lg"
+                  icon={{ lucide: 'Download', position: 'left' }}
+                  animationContext="hero"
+                >
+                  Get Started
+                </Button>
+                <ConfigIndicator 
+                  animationContext="hero"
+                  compact
+                />
+              </div>
+              
+              <div class="space-y-2">
+                <Button 
+                  variant="outline" 
+                  size="lg"
+                  animationContext="hero"
+                >
+                  Learn More
+                </Button>
+                <ConfigIndicator 
+                  animationContext="hero"
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="border border-app-border rounded-lg p-4 bg-app-background/50">
+          <h4 class="text-sm font-medium text-app-text-muted mb-3">Form Actions (CSS optimizado)</h4>
+          <div class="space-y-3">
+            <div class="flex justify-end gap-2">
+              <div class="space-y-2">
+                <Button 
+                  variant="ghost" 
+                  size="md"
+                  animationContext="form"
+                >
+                  Cancel
+                </Button>
+                <ConfigIndicator 
+                  animationContext="form"
+                  compact
+                />
+              </div>
+              
+              <div class="space-y-2">
+                <Button 
+                  variant="primary" 
+                  size="md"
+                  animationContext="form"
+                >
+                  Save
+                </Button>
+                <ConfigIndicator 
+                  animationContext="form"
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Call to Actions -->
+        <div class="border border-app-border rounded-lg p-4 bg-app-background/50">
+          <h4 class="text-sm font-medium text-app-text-muted mb-3">CTAs (GSAP bounce)</h4>
+          <div class="space-y-4">
+            <div class="flex gap-3">
+              <div class="space-y-2">
+                <Button 
+                  variant="highlight" 
+                  size="lg"
+                  icon={{ lucide: 'Star', position: 'left' }}
+                  animationContext="cta"
+                >
+                  Try Premium
+                </Button>
+                <ConfigIndicator 
+                  animationContext="cta"
+                  compact
+                />
+              </div>
+              
+              <div class="space-y-2">
+                <Button 
+                  variant="success" 
+                  size="lg"
+                  icon={{ lucide: 'Check', position: 'left' }}
+                  animationContext="cta"
+                >
+                  Subscribe
+                </Button>
+                <ConfigIndicator 
+                  animationContext="cta"
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reduced Motion -->
+        <div class="border border-orange-500/20 rounded-lg p-4 bg-orange-500/5">
+          <h4 class="text-sm font-medium text-orange-400 mb-3">Reduced Motion Support</h4>
+          
+          <div class="space-y-6">
+            <!-- Comparación Before/After -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Sin Reduced Motion -->
+              <div class="space-y-2">
+                <h5 class="text-xs text-app-text-secondary font-medium">Normal Motion</h5>
+                <Button 
+                  variant="primary"
+                  motionConfig={{
+                    preset: 'bounce',
+                    respectReducedMotion: false
+                  }}
+                >
+                  Bounce Animation
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    preset: 'bounce',
+                    respectReducedMotion: false
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Con Reduced Motion -->
+              <div class="space-y-2">
+                <h5 class="text-xs text-app-text-secondary font-medium">Reduced Motion</h5>
+                <Button 
+                  variant="primary"
+                  motionConfig={{
+                    preset: 'bounce',
+                    respectReducedMotion: true
+                  }}
+                >
+                  Accessible
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    preset: 'bounce',
+                    respectReducedMotion: true
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+            
+            <!-- Auto-detect Examples -->
+            <div class="space-y-3">
+              <h5 class="text-xs text-app-text-secondary font-medium">Auto-Detection</h5>
+              <div class="flex gap-3">
+                <div class="space-y-2">
+                  <Button 
+                    variant="secondary"
+                    motionConfig={{
+                      engine: 'auto',
+                      preset: 'gentle'
+                    }}
+                  >
+                    Auto-detect
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'auto',
+                      preset: 'gentle'
+                    }}
+                    compact
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-4 p-3 bg-orange-500/10 rounded border border-orange-500/20">
+            <p class="text-xs text-orange-400">
+              💡 <strong>Tip:</strong> Las animaciones se desactivan automáticamente cuando <code>prefers-reduced-motion: reduce</code> está activo.
+            </p>
+          </div>
+        </div>
+
+        <!-- ANIMACIONES AVANZADAS ÚNICAS -->
+        <div class="border border-app-border rounded-lg p-6 bg-gradient-to-br from-app-background/50 to-app-surface/30">
+          <h4 class="text-lg font-medium text-app-text mb-4 flex items-center gap-2">
+            <span class="w-3 h-3 bg-gradient-to-r from-blue-500 to-green-500 rounded-full"></span>
+            Animaciones Avanzadas Únicas
+          </h4>
+          <p class="text-sm text-app-text-muted mb-6">
+            Animaciones distintivas y pulidas desarrolladas específicamente para cada motor
+          </p>
+          
+          <!-- Framer Motion Advanced -->
+          <div class="space-y-6">
+            <div>
+              <h5 class="text-md font-medium text-blue-400 mb-3">Framer Motion - Animaciones Distintivas</h5>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Magnetic -->
+                <div class="space-y-2">
+                  <Button 
+                    variant="primary"
+                    size="md"
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'magnetic'
+                    }}
+                  >
+                    Magnetic
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'magnetic'
+                    }}
+                    compact
+                  />
+                </div>
+                
+                <!-- Oscillate -->
+                <div class="space-y-2">
+                  <Button 
+                    variant="secondary"
+                    size="md"
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'oscillate'
+                    }}
+                  >
+                    Oscillate
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'oscillate'
+                    }}
+                    compact
+                  />
+                </div>
+                
+                <!-- Morph -->
+                <div class="space-y-2">
+                  <Button 
+                    variant="outline"
+                    size="md"
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'morph'
+                    }}
+                  >
+                    Morph
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'morph'
+                    }}
+                    compact
+                  />
+                </div>
+                
+                <!-- Breathe -->
+                <div class="space-y-2">
+                  <Button 
+                    variant="highlight"
+                    size="md"
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'breathe'
+                    }}
+                  >
+                    Breathe
+                  </Button>
+                  <ConfigIndicator 
+                    motionConfig={{
+                      engine: 'framer',
+                      preset: 'breathe'
+                    }}
+                    compact
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <!-- More Framer Motion -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <!-- Glow -->
+              <div class="space-y-2">
+                <Button 
+                  variant="success"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'glow'
+                  }}
+                >
+                  Glow
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'glow'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Floating -->
+              <div class="space-y-2">
+                <Button 
+                  variant="ghost"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'floating'
+                  }}
+                >
+                  Floating
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'floating'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Liquid -->
+              <div class="space-y-2">
+                <Button 
+                  variant="danger"
+                  size="md"
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'liquid'
+                  }}
+                >
+                  Liquid
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'framer',
+                    preset: 'liquid'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+          
+          <!-- GSAP Advanced -->
+          <div class="mt-8 pt-6 border-t border-app-border/30">
+            <h5 class="text-md font-medium text-green-400 mb-3">GSAP - Animaciones de Performance</h5>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <!-- Magnetic GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="primary"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'magnetic'
+                  }}
+                >
+                  Magnetic
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'magnetic'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Oscillate GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="secondary"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'oscillate'
+                  }}
+                >
+                  Oscillate
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'oscillate'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Morph GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="outline"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'morph'
+                  }}
+                >
+                  Morph
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'morph'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Breathe GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="highlight"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'breathe'
+                  }}
+                >
+                  Breathe
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'breathe'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+            
+            <!-- More GSAP -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <!-- Glow GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="success"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'glow'
+                  }}
+                >
+                  Glow
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'glow'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Floating GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="ghost"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'floating'
+                  }}
+                >
+                  Floating
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'floating'
+                  }}
+                  compact
+                />
+              </div>
+              
+              <!-- Liquid GSAP -->
+              <div class="space-y-2">
+                <Button 
+                  variant="danger"
+                  size="md"
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'liquid'
+                  }}
+                >
+                  Liquid
+                </Button>
+                <ConfigIndicator 
+                  motionConfig={{
+                    engine: 'gsap',
+                    preset: 'liquid'
+                  }}
+                  compact
+                />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Comparison Note -->
+          <div class="mt-6 p-4 bg-app-surface/50 rounded-lg border border-app-border/50">
+            <p class="text-sm text-app-text-secondary">
+              🔬 <strong>Comparación Técnica:</strong> Cada motor implementa las mismas animaciones con diferentes enfoques. 
+              Framer Motion destaca en declaratividad y smooth transitions, mientras que GSAP sobresale en performance y control granular.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )}
+</div>

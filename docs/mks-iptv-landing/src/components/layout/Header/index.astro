@@ -196,11 +196,12 @@ const headerClasses = [
 </header>
 
 <script>
-  import { gsap } from 'gsap';
+  // import { gsap } from 'gsap';
   
   // Funcionalidad del menú móvil y scroll
   document.addEventListener('DOMContentLoaded', () => {
     const header = document.getElementById('main-header');
+    if (!header) return;
     
     // HEADER INITIAL STATES - Será controlado por Master Timeline en Hero
     const logoContainer = header.querySelector('.logo-container');
@@ -215,27 +216,27 @@ const headerClasses = [
     }
     
     if (logoContainer) {
-      logoContainer.style.opacity = '0';
-      logoContainer.style.visibility = 'hidden';
-      logoContainer.style.transform = 'scale(0.5) translateY(-20px)';
+      (logoContainer as HTMLElement).style.opacity = '0';
+      (logoContainer as HTMLElement).style.visibility = 'hidden';
+      (logoContainer as HTMLElement).style.transform = 'scale(0.5) translateY(-20px)';
     }
     
-    navLinks.forEach(link => {
-      link.style.opacity = '0';
-      link.style.visibility = 'hidden';
-      link.style.transform = 'translateY(-30px)';
+    navLinks.forEach((link) => {
+      (link as HTMLElement).style.opacity = '0';
+      (link as HTMLElement).style.visibility = 'hidden';
+      (link as HTMLElement).style.transform = 'translateY(-30px)';
     });
     
     if (mobileButton) {
-      mobileButton.style.opacity = '0';
-      mobileButton.style.visibility = 'hidden';
-      mobileButton.style.transform = 'scale(0.3) rotate(180deg)';
+      (mobileButton as HTMLElement).style.opacity = '0';
+      (mobileButton as HTMLElement).style.visibility = 'hidden';
+      (mobileButton as HTMLElement).style.transform = 'scale(0.3) rotate(180deg)';
     }
 
     console.log('📋 Header elements prepared for Master Timeline control');
     
     // EXPONER ELEMENTOS PARA MASTER TIMELINE
-    window.headerElements = {
+    (window as any).headerElements = {
       header,
       logoContainer,
       navLinks,
@@ -253,17 +254,21 @@ const headerClasses = [
       isMenuOpen = !isMenuOpen;
       
       if (isMenuOpen) {
-        mobileMenuOverlay.style.display = 'block';
+        if (mobileMenuOverlay) (mobileMenuOverlay as HTMLElement).style.display = 'block';
         setTimeout(() => {
-          mobileMenu.classList.remove('translate-x-full');
-          mobileMenu.classList.add('translate-x-0');
+          if (mobileMenu) {
+            mobileMenu.classList.remove('translate-x-full');
+            mobileMenu.classList.add('translate-x-0');
+          }
         }, 10);
         document.body.style.overflow = 'hidden';
       } else {
-        mobileMenu.classList.remove('translate-x-0');
-        mobileMenu.classList.add('translate-x-full');
+        if (mobileMenu) {
+          mobileMenu.classList.remove('translate-x-0');
+          mobileMenu.classList.add('translate-x-full');
+        }
         setTimeout(() => {
-          mobileMenuOverlay.style.display = 'none';
+          if (mobileMenuOverlay) (mobileMenuOverlay as HTMLElement).style.display = 'none';
         }, 300);
         document.body.style.overflow = '';
       }

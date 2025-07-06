@@ -16,7 +16,7 @@ import { banners } from '../data/assets';
   <Header currentPath="/" transparent={true} />
   
   <main>
-    <Hero backgroundImage={getImagePath(banners.hero.src)} />
+    <Hero backgroundImage={getImagePath(banners.hero?.src || '/images/hero-bg.jpg')} />
     
     <!-- Contenedor para secciones que aparecen después del Hero -->
     <div id="post-hero-sections" style="opacity: 0; transform: translateY(50vh); transition: all 2s cubic-bezier(0.23, 1, 0.32, 1);">
@@ -52,7 +52,7 @@ import { banners } from '../data/assets';
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {homeContent.carousel.slides.map((slide, index) => (
+          {homeContent.carousel.slides.map((slide, _index) => (
             <div class="bg-app-surface/30 rounded-xl p-6 hover:bg-app-surface/50 transition-colors duration-200">
               <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
                 <img 

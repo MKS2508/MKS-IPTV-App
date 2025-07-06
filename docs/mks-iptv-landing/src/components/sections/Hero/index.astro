@@ -9,6 +9,7 @@ import { heroStyles, animationClasses } from './styles';
 import { strings } from '../../../i18n/strings/es-es';
 import { homeContent } from '../../../data/legacy-content';
 import SimpleFallback from '../../interactive/ParticleBackground/SimpleFallback.astro';
+import Button from '../../ui/Button/index.astro';
 
 const {
   subtitle = homeContent.hero.version,
@@ -69,27 +70,42 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
 
     <div class:list={[animationClasses.willChange, animationClasses.ctaGroup]}>
       <div class={`${heroStyles.content.ctaGroup} hero-cta-group`}>
-        <a 
+        <Button 
+          as="link"
           href={ctaPrimaryLink}
-          class={`${heroStyles.content.cta.primary} hero-cta-primary`}
+          variant="primary"
+          size="lg"
+          icon={{ lucide: 'Download', position: 'left' }}
+          motionConfig={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.95 } }}
+          className="hero-cta-primary"
           aria-label={ctaPrimaryText}
         >
           {ctaPrimaryText}
-        </a>
-        <a 
+        </Button>
+        <Button 
+          as="link"
           href={ctaSecondaryLink}
-          class={`${heroStyles.content.cta.secondary} hero-cta-secondary`}
+          variant="outline"
+          size="md"
+          icon={{ lucide: 'Image', position: 'left' }}
+          motionConfig={{ hover: { scale: 1.02, y: -1 }, tap: { scale: 0.98 } }}
+          className="hero-cta-secondary"
           aria-label={ctaSecondaryText}
         >
           {ctaSecondaryText}
-        </a>
-        <a 
+        </Button>
+        <Button 
+          as="link"
           href={ctaTertiaryLink}
-          class={`${heroStyles.content.cta.tertiary} hero-cta-tertiary`}
+          variant="ghost"
+          size="md"
+          icon={{ lucide: 'BookOpen', position: 'left' }}
+          motionConfig={{ hover: { scale: 1.02, y: -1 }, tap: { scale: 0.98 } }}
+          className="hero-cta-tertiary"
           aria-label={ctaTertiaryText}
         >
           {ctaTertiaryText}
-        </a>
+        </Button>
       </div>
     </div>
 
@@ -125,27 +141,26 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
   console.log("✨ Hero Self-Contained script loaded - Virtual scroll integrated");
 
   // Enhanced Lenis smooth scrolling for post-hero content
-  let lenis;
+  let lenis: any;
   const initLenisSmooth = () => {
     lenis = new Lenis({
       duration: 1.8,
-      easing: (t) => 1 - Math.pow(1 - t, 3), // Smooth cubic easing
-      smooth: true,
-      smoothTouch: true, // Enable on mobile
+      easing: (t: number) => 1 - Math.pow(1 - t, 3), // Smooth cubic easing
+      // smoothTouch: true, // Enable on mobile
       touchMultiplier: 1.5,
       wheelMultiplier: 1.2,
-      normalizeWheel: true,
+      // normalizeWheel: true,
       lerp: 0.05, // Very smooth interpolation
       infinite: false
     });
 
     // Connect Lenis with GSAP
-    lenis.on('scroll', (e) => {
+    lenis.on('scroll', (_e: any) => {
       ScrollTrigger.update();
     });
 
     // RAF loop for smooth animations
-    const raf = (time) => {
+    const raf = (time: number) => {
       lenis.raf(time);
       requestAnimationFrame(raf);
     };
@@ -279,7 +294,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       lastWheelTime = currentTime;
       
       // Normalize wheel delta across browsers
-      let delta = event.deltaY || event.detail || event.wheelDelta;
+      let delta = event.deltaY || (event as any).detail || (event as any).wheelDelta;
       if (event.deltaMode === 1) delta *= 16; // Line mode
       if (event.deltaMode === 2) delta *= 100; // Page mode
       
@@ -302,7 +317,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
     
     const handleTouchStart = (event: TouchEvent) => {
       if (scrollUnlocked) return;
-      touchStartY = event.touches[0].clientY;
+      touchStartY = event.touches[0]?.clientY || 0;
     };
     
     const handleTouchMove = (event: TouchEvent) => {
@@ -315,7 +330,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       }
     
       event.preventDefault();
-      const touchCurrentY = event.touches[0].clientY;
+      const touchCurrentY = event.touches[0]?.clientY || 0;
       const touchDelta = touchStartY - touchCurrentY;
       
       // Convert touch movement to progress
@@ -482,7 +497,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       paused: true,
       onComplete: () => {
         console.log('🚀 MASTER TIMELINE COMPLETE - Triggering Hero completion');
-        heroScrollSystem.completeSequence();
+        heroScrollSystem?.completeSequence();
       },
       onUpdate: () => {
         const progress = masterTimeline.progress();
@@ -571,7 +586,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       };
 
       await waitForHeaderElements().then((headerElements) => {
-        const { header, logoContainer, navLinks, mobileButton } = headerElements;
+        const { header, logoContainer, navLinks, mobileButton } = headerElements as any;
 
         // 1. HEADER SEQUENCE (0% - 20%)
         const headerSequence = gsap.timeline();
@@ -593,7 +608,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
           ease: 'back.out(1.7)'
         }, 0.03);
         
-        navLinks.forEach((link, index) => {
+        navLinks.forEach((link: any, index: number) => {
           headerSequence.to(link, {
             duration: 0.2,
             opacity: 1,
@@ -685,7 +700,7 @@ const heroClasses = [heroStyles.container, className].filter(Boolean).join(' ');
       
       // Background parallax controlled directly by virtual scroll progress
       // No external event listeners needed - handled internally by heroScrollSystem
-      const updateBackgroundParallax = (progress) => {
+      const updateBackgroundParallax = (progress: number) => {
         const progressNormalized = progress / 100; // 0-1
         gsap.set(backgroundImage, {
           y: progressNormalized * 30,

@@ -45,7 +45,7 @@ import { installationContent } from '../data/legacy-content';
             <div class="card">
               <h3 class="text-xl font-semibold text-app-accent mb-4">{strings.installation.method1}: {strings.installation.altstore} ({strings.status.recommended})</h3>
               <div class="space-y-4 text-app-text-muted">
-                {installationContent.methods.ios[0].steps.map((step, index) => (
+                {installationContent.methods.ios[0]?.steps.map((step, index) => (
                   <div class="flex items-start space-x-3">
                     <span class="flex-shrink-0 w-6 h-6 bg-app-accent text-app-text rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
                     <div>
@@ -64,7 +64,7 @@ import { installationContent } from '../data/legacy-content';
             <div class="card">
               <h3 class="text-xl font-semibold text-app-highlight mb-4">{strings.installation.method2}: {strings.installation.testflight}</h3>
               <div class="space-y-4 text-app-text-muted">
-                {installationContent.methods.ios[1].steps.map((step, index) => (
+                {installationContent.methods.ios[1]?.steps.map((step, index) => (
                   <div class="flex items-start space-x-3">
                     <span class="flex-shrink-0 w-6 h-6 bg-app-highlight text-app-background rounded-full flex items-center justify-center text-sm font-bold">{index + 1}</span>
                     <div>

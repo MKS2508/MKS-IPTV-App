@@ -1,0 +1,65 @@
+---
+/**
+ * @file Wrapper Astro para el componente Button universal.
+ * @author MKS
+ */
+
+import { Button } from './Button.tsx';
+import type { AstroButtonProps } from './types';
+
+export interface Props extends AstroButtonProps {}
+
+const {
+  children,
+  text,
+  variant = 'primary',
+  size = 'md',
+  width = 'auto',
+  icon,
+  loading = false,
+  disabled = false,
+  className = '',
+  motionConfig,
+  id,
+  as = 'button',
+  ...restProps
+} = Astro.props;
+
+// Serializar motionConfig para que sea compatible con React
+const serializedMotionConfig = motionConfig ? JSON.stringify(motionConfig) : undefined;
+
+---
+
+{as === 'link' ? (
+  <Button 
+    client:visible
+    text={typeof children === 'string' ? children : 'Link'}
+    variant={variant}
+    size={size}
+    width={width}
+    icon={icon}
+    loading={loading}
+    disabled={disabled}
+    className={className}
+    motionConfigSerialized={serializedMotionConfig}
+    id={id}
+    as="link"
+    href={restProps.href || '#'}
+    external={restProps.external}
+  />
+) : (
+  <Button 
+    client:visible
+    text={typeof children === 'string' ? children : 'Button'}
+    variant={variant}
+    size={size}
+    width={width}
+    icon={icon}
+    loading={loading}
+    disabled={disabled}
+    className={className}
+    motionConfigSerialized={serializedMotionConfig}
+    id={id}
+    as="button"
+  />
+)}

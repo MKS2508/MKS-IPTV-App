@@ -1,0 +1,157 @@
+//
+//  MediaListView+StateViews.swift
+//  mks-multiplatform-iptv
+//
+//  State views (loading, error, empty) for MediaListView
+//
+
+import SwiftUI
+
+extension MediaListView {
+    // MARK: - Loading View
+    
+    var loadingView: some View {
+        VStack(spacing: 24) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.white)
+            
+            Text("Loading \(navigationPrompt)...")
+                .font(.headline)
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.2))
+    }
+    
+    // MARK: - Error View
+    
+    func errorView(error: Error) -> some View {
+        ErrorView(error: error, retryAction: {
+            Task { await viewModel.refreshMedia(contentType: contentTypeFilter) }
+        })
+        .frame(maxHeight: .infinity)
+    }
+    
+    // MARK: - Empty State View
+    
+    var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: contentTypeFilter == .series ? "tv.slash" : "film.slash")
+                .font(.system(size: 64))
+                .foregroundColor(.white.opacity(0.7))
+                .symbolEffect(.pulse)
+            
+            Text("No \(viewTitle)")
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+            
+            if !effectiveSearchText.isEmpty || !effectiveSelectedCategories.isEmpty {
+                Text("Try adjusting your filters")
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.horizontal, 40)
+                    .multilineTextAlignment(.center)
+                
+                Button(action: {
+                    searchText = ""
+                    selectedCategories.removeAll()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Clear Filters")
+                    }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.accentColor)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                    )
+                }
+                .padding(.top, 8)
+            } else {
+                Text("Your \(navigationPrompt) will appear here")
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.8))
+            }   
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+    
+    // MARK: - Loading Detail Overlay
+    
+    var loadingDetailOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .scaleEffect(1.8)
+                    .tint(.white)
+                
+                Text("Loading details...")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            .padding(30)
+            .background(
+                .ultraThinMaterial,
+                in: RoundedRectangle(cornerRadius: 20)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(.white.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
+        }
+        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+    }
+    
+    // MARK: - Error Detail View
+    
+    var errorDetailView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundColor(.yellow)
+                
+            Text("Failed to load details")
+                .font(.title3.bold())
+                .foregroundColor(.white)
+                
+            Text("There was a problem loading the content you requested.")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button("Dismiss") {
+                dismissMediaDetail()
+            }
+            .font(.headline)
+            .foregroundColor(.black)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 30)
+            .background(
+                Capsule()
+                    .fill(Color.white)
+            )
+            .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
+        }
+        .padding(40)
+        .background(
+            .ultraThinMaterial,
+            in: RoundedRectangle(cornerRadius: 24)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(.white.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
+    }
+}

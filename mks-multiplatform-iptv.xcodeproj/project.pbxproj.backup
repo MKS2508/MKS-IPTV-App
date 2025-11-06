@@ -1,0 +1,607 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		516AB2D7A22791FB0BBFEFDF /* Pods_mks_multiplatform_iptv.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A69EC999B003DE1CD7F73229 /* Pods_mks_multiplatform_iptv.framework */; };
+		DACC58572A8F1E38DA5045C0 /* Pods_mks_multiplataforma_tvos_iptv.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9FB29E4271C770F51441D263 /* Pods_mks_multiplataforma_tvos_iptv.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplataforma-tvos-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplatform-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D2BE719CC474B56E3CFB6BE /* Pods-mks-multiplataforma-tvos-iptv.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mks-multiplataforma-tvos-iptv.release.xcconfig"; path = "Target Support Files/Pods-mks-multiplataforma-tvos-iptv/Pods-mks-multiplataforma-tvos-iptv.release.xcconfig"; sourceTree = "<group>"; };
+		989677DB456306DB77CC952C /* Pods-mks-multiplatform-iptv.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mks-multiplatform-iptv.debug.xcconfig"; path = "Target Support Files/Pods-mks-multiplatform-iptv/Pods-mks-multiplatform-iptv.debug.xcconfig"; sourceTree = "<group>"; };
+		9FB29E4271C770F51441D263 /* Pods_mks_multiplataforma_tvos_iptv.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_mks_multiplataforma_tvos_iptv.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		A69EC999B003DE1CD7F73229 /* Pods_mks_multiplatform_iptv.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_mks_multiplatform_iptv.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		AEEEAE50D46B131AF18994D5 /* Pods-mks-multiplatform-iptv.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mks-multiplatform-iptv.release.xcconfig"; path = "Target Support Files/Pods-mks-multiplatform-iptv/Pods-mks-multiplatform-iptv.release.xcconfig"; sourceTree = "<group>"; };
+		D330C9F862966B280D5498CA /* Pods-mks-multiplataforma-tvos-iptv.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mks-multiplataforma-tvos-iptv.debug.xcconfig"; path = "Target Support Files/Pods-mks-multiplataforma-tvos-iptv/Pods-mks-multiplataforma-tvos-iptv.debug.xcconfig"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		058CC0E02D39C9E9006E00BF /* Exceptions for "mks-multiplatform-iptv" folder in "mks-multiplatform-iptv" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 058CC06E2D39C8CF006E00BF /* mks-multiplatform-iptv */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = "mks-multiplataforma-tvos-iptv";
+			sourceTree = "<group>";
+		};
+		058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				058CC0E02D39C9E9006E00BF /* Exceptions for "mks-multiplatform-iptv" folder in "mks-multiplatform-iptv" target */,
+			);
+			path = "mks-multiplatform-iptv";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		057C1B982D95EAC20059601D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DACC58572A8F1E38DA5045C0 /* Pods_mks_multiplataforma_tvos_iptv.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		058CC06C2D39C8CF006E00BF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				516AB2D7A22791FB0BBFEFDF /* Pods_mks_multiplatform_iptv.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		058CC0662D39C8CF006E00BF = {
+			isa = PBXGroup;
+			children = (
+				058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */,
+				057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
+				058CC0702D39C8CF006E00BF /* Products */,
+				40E7091D29C262198E504C1D /* Pods */,
+				6ACFC5909E37EF0680BBBC19 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		058CC0702D39C8CF006E00BF /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */,
+				057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		40E7091D29C262198E504C1D /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				989677DB456306DB77CC952C /* Pods-mks-multiplatform-iptv.debug.xcconfig */,
+				AEEEAE50D46B131AF18994D5 /* Pods-mks-multiplatform-iptv.release.xcconfig */,
+				D330C9F862966B280D5498CA /* Pods-mks-multiplataforma-tvos-iptv.debug.xcconfig */,
+				8D2BE719CC474B56E3CFB6BE /* Pods-mks-multiplataforma-tvos-iptv.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		6ACFC5909E37EF0680BBBC19 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A69EC999B003DE1CD7F73229 /* Pods_mks_multiplatform_iptv.framework */,
+				9FB29E4271C770F51441D263 /* Pods_mks_multiplataforma_tvos_iptv.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		057C1B9A2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 057C1BA82D95EAC30059601D /* Build configuration list for PBXNativeTarget "mks-multiplataforma-tvos-iptv" */;
+			buildPhases = (
+				613CA1C4F9B6C7992E525248 /* [CP] Check Pods Manifest.lock */,
+				057C1B972D95EAC20059601D /* Sources */,
+				057C1B982D95EAC20059601D /* Frameworks */,
+				057C1B992D95EAC20059601D /* Resources */,
+				18C06863A221F5182774C031 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
+			);
+			name = "mks-multiplataforma-tvos-iptv";
+			productName = "mks-multiplataforma-tvos-iptv";
+			productReference = 057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */;
+			productType = "com.apple.product-type.application";
+		};
+		058CC06E2D39C8CF006E00BF /* mks-multiplatform-iptv */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 058CC07E2D39C8D0006E00BF /* Build configuration list for PBXNativeTarget "mks-multiplatform-iptv" */;
+			buildPhases = (
+				3320FC643339EC2730A439D9 /* [CP] Check Pods Manifest.lock */,
+				058CC06B2D39C8CF006E00BF /* Sources */,
+				058CC06C2D39C8CF006E00BF /* Frameworks */,
+				058CC06D2D39C8CF006E00BF /* Resources */,
+				3428DDAEB975A0AD855F5262 /* [CP] Embed Pods Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */,
+			);
+			name = "mks-multiplatform-iptv";
+			productName = "mks-multiplatform-iptv";
+			productReference = 058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		058CC0672D39C8CF006E00BF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1620;
+				LastUpgradeCheck = 1620;
+				TargetAttributes = {
+					057C1B9A2D95EAC20059601D = {
+						CreatedOnToolsVersion = 16.2;
+					};
+					058CC06E2D39C8CF006E00BF = {
+						CreatedOnToolsVersion = 16.2;
+					};
+				};
+			};
+			buildConfigurationList = 058CC06A2D39C8CF006E00BF /* Build configuration list for PBXProject "mks-multiplatform-iptv" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 058CC0662D39C8CF006E00BF;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 058CC0702D39C8CF006E00BF /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				058CC06E2D39C8CF006E00BF /* mks-multiplatform-iptv */,
+				057C1B9A2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		057C1B992D95EAC20059601D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		058CC06D2D39C8CF006E00BF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		18C06863A221F5182774C031 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-mks-multiplataforma-tvos-iptv/Pods-mks-multiplataforma-tvos-iptv-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-mks-multiplataforma-tvos-iptv/Pods-mks-multiplataforma-tvos-iptv-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-mks-multiplataforma-tvos-iptv/Pods-mks-multiplataforma-tvos-iptv-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		3320FC643339EC2730A439D9 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-mks-multiplatform-iptv-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		3428DDAEB975A0AD855F5262 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-mks-multiplatform-iptv/Pods-mks-multiplatform-iptv-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-mks-multiplatform-iptv/Pods-mks-multiplatform-iptv-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-mks-multiplatform-iptv/Pods-mks-multiplatform-iptv-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		613CA1C4F9B6C7992E525248 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-mks-multiplataforma-tvos-iptv-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		057C1B972D95EAC20059601D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		058CC06B2D39C8CF006E00BF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		057C1BA62D95EAC30059601D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = D330C9F862966B280D5498CA /* Pods-mks-multiplataforma-tvos-iptv.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplataforma-tvos-iptv/Preview Content\"";
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplataforma-tvos-iptv";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.2;
+			};
+			name = Debug;
+		};
+		057C1BA72D95EAC30059601D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 8D2BE719CC474B56E3CFB6BE /* Pods-mks-multiplataforma-tvos-iptv.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplataforma-tvos-iptv/Preview Content\"";
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplataforma-tvos-iptv";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = appletvos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 18.2;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		058CC07C2D39C8D0006E00BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		058CC07D2D39C8D0006E00BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		058CC07F2D39C8D0006E00BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 989677DB456306DB77CC952C /* Pods-mks-multiplatform-iptv.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "mks-multiplatform-iptv/mks_multiplatform_iptv.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplatform-iptv/Preview Content\"";
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "mks-multiplatform-iptv/Info.plist";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 2.2;
+			};
+			name = Debug;
+		};
+		058CC0802D39C8D0006E00BF /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = AEEEAE50D46B131AF18994D5 /* Pods-mks-multiplatform-iptv.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "mks-multiplatform-iptv/mks_multiplatform_iptv.entitlements";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplatform-iptv/Preview Content\"";
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "mks-multiplatform-iptv/Info.plist";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 2.2;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		057C1BA82D95EAC30059601D /* Build configuration list for PBXNativeTarget "mks-multiplataforma-tvos-iptv" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				057C1BA62D95EAC30059601D /* Debug */,
+				057C1BA72D95EAC30059601D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		058CC06A2D39C8CF006E00BF /* Build configuration list for PBXProject "mks-multiplatform-iptv" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				058CC07C2D39C8D0006E00BF /* Debug */,
+				058CC07D2D39C8D0006E00BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		058CC07E2D39C8D0006E00BF /* Build configuration list for PBXNativeTarget "mks-multiplatform-iptv" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				058CC07F2D39C8D0006E00BF /* Debug */,
+				058CC0802D39C8D0006E00BF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 058CC0672D39C8CF006E00BF /* Project object */;
+}

@@ -6,9 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplataforma-tvos-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplatform-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -398,6 +395,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = dev.mks2508.iptv2;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.mks2508.iptv2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -442,6 +441,8 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = dev.mks2508.iptv2;
+				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.mks2508.iptv2;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";

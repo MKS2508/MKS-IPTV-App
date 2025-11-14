@@ -17,12 +17,12 @@ struct MediaListView: View {
     }
     
     @EnvironmentObject private var profile: IPTVProfile
-    @State private var searchText = ""
+    @State var searchText = ""
     @State private var selectedMediaItemId: Int?
     @Binding var selectedView: String?
-    @State private var selectedCategories: Set<String> = []
-    @State private var sortOption: MediaListViewModel.SortOption = .addedDesc
-    @State private var contentTypeFilter: MediaListViewModel.ContentType = .all
+    @State var selectedCategories: Set<String> = []
+    @State var sortOption: MediaListViewModel.SortOption = .addedDesc
+    @State var contentTypeFilter: MediaListViewModel.ContentType = .all
     @State private var showingFullScreenDetail = false
     @State private var isLoadingDetail = false
     @State private var showFilterMenu = false
@@ -40,19 +40,19 @@ struct MediaListView: View {
     
     // Platform-specific layout constants
     #if os(iOS)
-    private let cardMinWidth: CGFloat = 150
-    private let cardMaxWidth: CGFloat = 190
-    private let gridSpacing: CGFloat = 16
-    private let categoryChipMinWidth: CGFloat = 100
-    private let horizontalPadding: CGFloat = 16
-    private let verticalPadding: CGFloat = 8
+    let cardMinWidth: CGFloat = 150
+    let cardMaxWidth: CGFloat = 190
+    let gridSpacing: CGFloat = 16
+    let categoryChipMinWidth: CGFloat = 100
+    let horizontalPadding: CGFloat = 16
+    let verticalPadding: CGFloat = 8
     #else
-    private let cardMinWidth: CGFloat = 160
-    private let cardMaxWidth: CGFloat = 220
-    private let gridSpacing: CGFloat = 20
-    private let categoryChipMinWidth: CGFloat = 150
-    private let horizontalPadding: CGFloat = 24
-    private let verticalPadding: CGFloat = 16
+    let cardMinWidth: CGFloat = 160
+    let cardMaxWidth: CGFloat = 220
+    let gridSpacing: CGFloat = 20
+    let categoryChipMinWidth: CGFloat = 150
+    let horizontalPadding: CGFloat = 24
+    let verticalPadding: CGFloat = 16
     #endif
     
     
@@ -230,6 +230,7 @@ struct MediaListView: View {
             #if os(iOS)
             PlatformSpecificSerieCardViewAdvanced(
                 serie: serie,
+                namespace: animation,
                 onViewDetails: {
                     showSerieDetail(for: serie)
                 }
@@ -244,6 +245,7 @@ struct MediaListView: View {
             // macOS: Agregar un gesto de clic explícito
             PlatformSpecificSerieCardViewAdvanced(
                 serie: serie,
+                namespace: animation,
                 onViewDetails: {
                     showSerieDetail(for: serie)
                 }
@@ -663,28 +665,28 @@ struct MediaListView: View {
     }
     
     // MARK: - Computed Properties
-    
-    private var navigationTitle: String {
+
+    var navigationTitle: String {
         switch contentTypeFilter {
         case .all: return "Media Library"
         case .movies: return "Movies"
         case .series: return "Series"
         }
     }
-    
-    private var navigationPrompt: String {
+
+    var navigationPrompt: String {
         switch contentTypeFilter {
         case .all: return "media"
         case .movies: return "movies"
         case .series: return "series"
         }
     }
-    
-    private var effectiveSearchText: String {
+
+    var effectiveSearchText: String {
         return searchText
     }
-    
-    private var effectiveSelectedCategories: Set<String> {
+
+    var effectiveSelectedCategories: Set<String> {
         #if os(macOS)
         // Use TouchBar selected categories
         return touchBarManager.selectedCategoryIDs
@@ -692,16 +694,16 @@ struct MediaListView: View {
         return selectedCategories
         #endif
     }
-    
-    private var filteredMovies: [Movie] {
+
+    var filteredMovies: [Movie] {
         viewModel.filterMovies(searchText: effectiveSearchText, categoryIds: effectiveSelectedCategories)
     }
-    
-    private var filteredSeries: [Serie] {
+
+    var filteredSeries: [Serie] {
         viewModel.filterSeries(searchText: effectiveSearchText, categoryIds: effectiveSelectedCategories)
     }
-    
-    private var filteredContent: [Any] {
+
+    var filteredContent: [Any] {
         switch contentTypeFilter {
         case .all:
             return filteredMovies + filteredSeries
@@ -811,164 +813,9 @@ struct MediaListView: View {
         return categoryId
     }
 
-    // MARK: - Loading and Error Views
-    private var loadingView: some View {
-        VStack(spacing: 24) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.white)
-            
-            Text("Loading \(navigationPrompt)...")
-                .font(.headline)
-                .foregroundColor(.white)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.2))
-    }
-    
-    private func errorView(error: Error) -> some View {
-        ErrorView(error: error, retryAction: {
-            Task { await viewModel.refreshMedia(contentType: contentTypeFilter) }
-        })
-        .frame(maxHeight: .infinity)
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: contentTypeFilter == .series ? "tv.slash" : "film.slash")
-                .font(.system(size: 64))
-                .foregroundColor(.white.opacity(0.7))
-                .symbolEffect(.pulse)
-            
-            Text("No \(navigationTitle)")
-                .font(.title2.weight(.bold))
-                .foregroundColor(.white)
-            
-            if !effectiveSearchText.isEmpty || !effectiveSelectedCategories.isEmpty {
-                Text("Try adjusting your filters")
-                    .font(.headline)
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.horizontal, 40)
-                    .multilineTextAlignment(.center)
-                
-                Button(action: {
-                    searchText = ""
-                    selectedCategories.removeAll()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Clear Filters")
-                    }
-                    .font(.subheadline.bold())
-                    .foregroundColor(.accentColor)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 20)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                    )
-                }
-                .padding(.top, 8)
-            } else {
-                Text("Your \(navigationPrompt) will appear here")
-                    .font(.headline)
-                    .foregroundColor(.white.opacity(0.8))
-            }
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-    
-    private var loadingDetailOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                ProgressView()
-                    .scaleEffect(1.8)
-                    .tint(.white)
-                
-                Text("Loading details...")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
-            .padding(30)
-            .background(
-                .ultraThinMaterial,
-                in: RoundedRectangle(cornerRadius: 20)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(.white.opacity(0.2), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.3), radius: 20, x: 0, y: 10)
-        }
-        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
-    }
-    
-    private var errorDetailView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 48))
-                .foregroundColor(.yellow)
-                
-            Text("Failed to load details")
-                .font(.title3.bold())
-                .foregroundColor(.white)
-                
-            Text("There was a problem loading the content you requested.")
-                .font(.subheadline)
-                .foregroundColor(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            // Show error details if available
-            if let movieError = movieDetailViewModel?.error {
-                Text("Error: \(movieError.localizedDescription)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            
-            if let seriesError = serieDetailViewModel?.error {
-                Text("Error: \(seriesError.localizedDescription)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-            
-            Button("Dismiss") {
-                dismissMediaDetail()
-            }
-            .font(.headline)
-            .foregroundColor(.black)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 30)
-            .background(
-                Capsule()
-                    .fill(Color.white)
-            )
-            .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
-        }
-        .padding(40)
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 24)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.3), radius: 30, x: 0, y: 15)
-    }
-    
     // MARK: - Helper Methods
-    
-    private func showMovieDetail(for movieId: Int) {
+
+    func showMovieDetail(for movieId: Int) {
         Task {
             await MainActor.run {
                 selectedMediaItemId = movieId
@@ -998,7 +845,7 @@ struct MediaListView: View {
         }
     }
     
-    private func showSerieDetail(for serie: Serie) {
+    func showSerieDetail(for serie: Serie) {
         Task {
             await MainActor.run {
                 selectedMediaItemId = serie.id
@@ -1029,7 +876,7 @@ struct MediaListView: View {
     }
     
     @MainActor
-    private func dismissMediaDetail() {
+    func dismissMediaDetail() {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
             showingFullScreenDetail = false
             

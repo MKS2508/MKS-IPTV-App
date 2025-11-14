@@ -42,7 +42,7 @@ extension MediaListView {
                 .foregroundColor(.white.opacity(0.7))
                 .symbolEffect(.pulse)
             
-            Text("No \(viewTitle)")
+            Text("No \(navigationTitle)")
                 .font(.title2.weight(.bold))
                 .foregroundColor(.white)
             

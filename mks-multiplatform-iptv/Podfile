@@ -2,13 +2,13 @@ platform :macos, '10.15'
 use_frameworks!
 
 target 'mks-multiplatform-iptv' do
-  # VLCKit for macOS
-  pod 'VLCKit', '~> 3.6.0'
-  
-  # Other dependencies (if any)
-  # pod 'Alamofire', '~> 5.7'
-  # pod 'SwiftyJSON', '~> 4.3'
+  # VLCKit for macOS (fallback player)
+  # Note: KSPlayer is installed via SPM for all platforms
+  pod 'VLCKit', '~> 3.7.0'
 end
+
+# iOS and tvOS use MobileVLCKit-SPM via Swift Package Manager:
+# https://github.com/MobileVLCKit-SPM/MobileVLCKit-SPM
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|

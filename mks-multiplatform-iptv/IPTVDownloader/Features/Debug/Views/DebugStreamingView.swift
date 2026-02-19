@@ -19,7 +19,7 @@ struct DebugStreamingView: View {
     @State private var showingCategoryURLs = false
     
     // Stream compatibility handler
-    private let streamCompatibilityHandler = StreamCompatibilityHandler(serverPort: 8889)
+    private let streamCompatibilityHandler = StreamCompatibilityHandler()
     
     enum ContentTab: String, CaseIterable {
         case movies = "Movies"

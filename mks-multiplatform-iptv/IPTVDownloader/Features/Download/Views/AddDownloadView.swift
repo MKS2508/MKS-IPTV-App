@@ -286,24 +286,18 @@ struct AddDownloadView: View {
         print("⬇️ Iniciando descarga de: \(movie.name)")
         print("📁 Carpeta: \(selectedFolder.path)")
         print("🔄 Convertir a MOV: \(shouldConvertToMOV)")
-        
-        let _ = IPTVConfiguration.buildMovieURL(
-            profile: profile,
-            vodID: String(movie.streamId),
-            vodExtension: movie.containerExtension ?? "mp4"
-        )
-        
-        let downloadItem = DownloadItem(
-            id: UUID(),
+
+        // Start download directly using DownloadManager (same pattern as series)
+        downloadManager.startDownload(
             vodID: String(movie.streamId),
             title: movie.name,
             type: mediaType,
-            status: .notStarted
+            vodExtension: movie.containerExtension ?? "mp4",
+            shouldConvertToMOV: shouldConvertToMOV,
+            downloadPathParam: selectedFolder.path
         )
-        
-        downloadManager.addDownload(downloadItem)
-        print("✅ Descarga añadida al gestor")
-        
+        print("✅ Descarga iniciada correctamente")
+
         onDismiss()
     }
 }

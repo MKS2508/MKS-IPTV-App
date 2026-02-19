@@ -689,36 +689,6 @@ extension AddDownloadViewSerie {
 
 // MARK: - Selector de Carpeta
 extension View {
-//    
-//    func playMP4ViaHTTP(mp4HTTPURL: String) {
-//        guard let url = URL(string: mp4HTTPURL) else {
-//            print("Invalid URL: \(mp4HTTPURL)")
-//            return
-//        }
-//        
-//        let playerItem = AVPlayerItem(url: url)
-//        let player = AVPlayer(playerItem: playerItem)
-//
-//        let controller = NSViewController()
-//        let avPlayerView = AVPlayerView(frame: .zero)
-//        
-//        avPlayerView.showsFullScreenToggleButton = true
-//        avPlayerView.showsSharingServiceButton = true
-//        
-//        avPlayerView.player = player
-//        controller.view = avPlayerView
-//
-//        let observer = LocalObserver()
-//        player.addObserver(observer, forKeyPath: "status", options: [.new, .initial], context: nil)
-//
-//        let window = NSWindow(contentViewController: controller)
-//        window.title = "Playing MP4 from local HTTP server"
-//        window.setFrame(NSRect(x: 0, y: 0, width: 800, height: 450), display: true)
-//        window.makeKeyAndOrderFront(nil)
-//
-//        player.play()
-//    }
-    
     func selectFolder(completion: @escaping (URL?) -> Void) {
         #if os(macOS)
         DispatchQueue.main.async {

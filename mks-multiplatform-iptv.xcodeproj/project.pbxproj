@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0509219E2F49181800C6C5B2 /* VLCKitSPM in Frameworks */ = {isa = PBXBuildFile; productRef = 0509219D2F49181800C6C5B2 /* VLCKitSPM */; };
+		050921A12F49183300C6C5B2 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = 050921A02F49183300C6C5B2 /* FlyingFox */; };
+		050921A32F49183300C6C5B2 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = 050921A22F49183300C6C5B2 /* FlyingSocks */; };
+		05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05DB74D52F47CB3900547E01 /* KSPlayer */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplataforma-tvos-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplatform-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -49,6 +56,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0509219E2F49181800C6C5B2 /* VLCKitSPM in Frameworks */,
+				050921A12F49183300C6C5B2 /* FlyingFox in Frameworks */,
+				05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */,
+				050921A32F49183300C6C5B2 /* FlyingSocks in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,6 +114,7 @@
 				058CC06B2D39C8CF006E00BF /* Sources */,
 				058CC06C2D39C8CF006E00BF /* Frameworks */,
 				058CC06D2D39C8CF006E00BF /* Resources */,
+				05FE00012F48000000547E01 /* Fix KSPlayer Frameworks */,
 			);
 			buildRules = (
 			);
@@ -144,6 +156,9 @@
 			mainGroup = 058CC0662D39C8CF006E00BF;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */,
+				0509219C2F49181800C6C5B2 /* XCRemoteSwiftPackageReference "vlckit-spm" */,
+				0509219F2F49183300C6C5B2 /* XCRemoteSwiftPackageReference "FlyingFox" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 058CC0702D39C8CF006E00BF /* Products */;
@@ -172,6 +187,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		05FE00012F48000000547E01 /* Fix KSPlayer Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Fix KSPlayer Frameworks";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"${SRCROOT}/mks-multiplatform-iptv/scripts/fix-ksplayer-frameworks.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		057C1B972D95EAC20059601D /* Sources */ = {
@@ -286,7 +323,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -347,7 +384,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -486,6 +523,56 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0509219C2F49181800C6C5B2 /* XCRemoteSwiftPackageReference "vlckit-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tylerjonesio/vlckit-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.6.0;
+			};
+		};
+		0509219F2F49183300C6C5B2 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/FlyingFox.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.26.2;
+			};
+		};
+		05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0509219D2F49181800C6C5B2 /* VLCKitSPM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0509219C2F49181800C6C5B2 /* XCRemoteSwiftPackageReference "vlckit-spm" */;
+			productName = VLCKitSPM;
+		};
+		050921A02F49183300C6C5B2 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0509219F2F49183300C6C5B2 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
+		};
+		050921A22F49183300C6C5B2 /* FlyingSocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0509219F2F49183300C6C5B2 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingSocks;
+		};
+		05DB74D52F47CB3900547E01 /* KSPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;
+			productName = KSPlayer;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 058CC0672D39C8CF006E00BF /* Project object */;
 }

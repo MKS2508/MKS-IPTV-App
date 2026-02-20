@@ -30,10 +30,9 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj \
   -configuration Debug
 ```
 
-### Install CocoaPods Dependencies
-```bash
-pod install
-```
+### SPM Dependencies
+All dependencies (KSPlayer, VLCKitSPM, FlyingFox) are managed via Swift Package Manager.
+Add new packages via Xcode: File > Add Package Dependencies.
 
 ## Project Structure
 
@@ -87,16 +86,19 @@ Reactive download system in `Features/Download/ViewModels/DownloadManager.swift`
 Multi-player system in `Core/Player/` with protocol `VideoPlayerProtocol`:
 - **AVPlayer**: Native Apple player (limited format support)
 - **KSPlayer**: Preferred for MKV with PiP/AirPlay support
-- **VLCKit**: Wide format support (via CocoaPods)
-- **FFmpeg**: Transmuxing fallback
+- **VLCKit**: Wide format support (via VLCKitSPM Swift Package)
+- **FFmpeg Transmux**: Cross-platform transmux pipeline using FFmpeg C API (Libavformat) bundled by KSPlayer. Remuxes MKV to HLS/fMP4 and plays through AVPlayer for AirPlay support.
 
-`PlayerFactory` auto-selects the best player based on format and features.
+`PlayerFactory` auto-selects the best player based on format, features, and AirPlay requirements.
+
+#### TransmuxingService
+Actor-based service in `Core/Player/TransmuxingService.swift` that remuxes non-native containers (MKV, AVI, etc.) to HLS/fMP4 using the FFmpeg C API without re-encoding.
+
+#### LocalHLSServer
+Lightweight HTTP server in `Utils/LocalHLSServer.swift` (using FlyingFox) that serves transmuxed HLS segments to AVPlayer for AirPlay compatibility.
 
 #### StreamManager
 Live stream URL resolution in `Features/Download/ViewModels/StreamManager.swift` that handles redirects and custom headers for IPTV stream compatibility.
-
-#### HTTPStreamServer
-Local HTTP proxy server in `Utils/HTTPStreamServer.swift` that transmuxes MKV to MP4 for AVPlayer compatibility using FFmpeg.
 
 #### PlatformNavigationView
 Adaptive navigation in `PlatformNavigationView.swift`:
@@ -111,7 +113,9 @@ Adaptive navigation in `PlatformNavigationView.swift`:
 
 ## Dependencies
 
-- **VLCKit 3.6.0** (via CocoaPods): Alternative video player with broad format support
+- **KSPlayer** (via SPM): Primary player for MKV/non-native formats with PiP and AirPlay support. Bundles FFmpegKit (Libavformat/Libavcodec/Libavutil).
+- **VLCKitSPM** (via SPM): VLC fallback player — `https://github.com/tylerjonesio/vlckit-spm.git`
+- **FlyingFox** (via SPM): Lightweight HTTP server for serving transmuxed HLS segments — `https://github.com/swhitty/FlyingFox.git`
 
 ## IPTV API Endpoints
 
@@ -131,7 +135,6 @@ Stream URLs: `{baseURL}/{movie|series|live}/{username}/{password}/{id}.{extensio
 
 - Xcode 16+ (for Swift 6 and latest SwiftUI features)
 - macOS 15+ (Sequoia)
-- CocoaPods for VLCKit dependency
 
 ## Code Conventions
 

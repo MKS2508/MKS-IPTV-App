@@ -129,6 +129,19 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     func makeOptions(for url: URL) -> KSOptions {
         let options = KSOptions()
 
+        // For non-native formats (MKV, AVI, etc.), use KSMEPlayer (FFmpeg) directly.
+        // Skips the KSAVPlayer attempt that always fails on MKV and wastes an IPTV
+        // server connection — critical for servers with single-connection limits.
+        let ext = url.pathExtension.lowercased()
+        let nativeFormats = ["mp4", "m4v", "mov", "m3u8"]
+        if !nativeFormats.contains(ext) {
+            KSOptions.firstPlayerType = KSMEPlayer.self
+            KSOptions.secondPlayerType = KSAVPlayer.self
+        } else {
+            KSOptions.firstPlayerType = KSAVPlayer.self
+            KSOptions.secondPlayerType = KSMEPlayer.self
+        }
+
         // IPTV reconnection
         options.formatContextOptions["reconnect"] = 1
         options.formatContextOptions["reconnect_streamed"] = 1

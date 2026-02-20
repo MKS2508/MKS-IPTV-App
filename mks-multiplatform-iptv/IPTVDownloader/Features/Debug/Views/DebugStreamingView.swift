@@ -494,10 +494,23 @@ struct DebugStreamingView: View {
                 viewModel.updateItemState(item.id, httpStatusCode: httpStatus)
             }
 
+            // If the server redirects (common with Cloudflare-fronted IPTV),
+            // resolve a fresh direct URL so KSPlayer/FFmpeg doesn't need to
+            // handle the 302 itself (FFmpeg's URL parser chokes on long token URLs)
+            var playbackURL = url
+            if preflight.wasRedirected {
+                viewModel.log("Resolving redirect for direct playback...", type: .info)
+                let resolved = await StreamPreflight.resolveRedirects(url: url)
+                if resolved != url {
+                    viewModel.log("Resolved to: \(resolved.host ?? "?"):\(resolved.port ?? 80)/...\(resolved.lastPathComponent)", type: .success)
+                    playbackURL = resolved
+                }
+            }
+
             let startTime = Date()
 
             // PlayerFactory auto-selects best player based on file extension
-            let player = PlayerFactory.shared.createPlayer(for: url)
+            let player = PlayerFactory.shared.createPlayer(for: playbackURL)
             let playerType = detectPlayerType(player)
             let initTime = Date().timeIntervalSince(startTime)
 
@@ -540,7 +553,17 @@ struct DebugStreamingView: View {
                 return
             }
 
-            let player = PlayerFactory.shared.createPlayer(type: playerType, url: url)
+            // Resolve redirect for direct playback if needed
+            var playbackURL = url
+            if preflight.wasRedirected {
+                let resolved = await StreamPreflight.resolveRedirects(url: url)
+                if resolved != url {
+                    viewModel.log("Resolved redirect → \(resolved.host ?? "?"):\(resolved.port ?? 80)", type: .info)
+                    playbackURL = resolved
+                }
+            }
+
+            let player = PlayerFactory.shared.createPlayer(type: playerType, url: playbackURL)
             let actualType = detectPlayerType(player)
 
             if actualType != playerType {
@@ -582,7 +605,13 @@ struct DebugStreamingView: View {
                 return
             }
 
-            let player = PlayerFactory.shared.createPlayer(for: url)
+            var playbackURL = url
+            if preflight.wasRedirected {
+                let resolved = await StreamPreflight.resolveRedirects(url: url)
+                if resolved != url { playbackURL = resolved }
+            }
+
+            let player = PlayerFactory.shared.createPlayer(for: playbackURL)
             let playerType = detectPlayerType(player)
             player.play()
 

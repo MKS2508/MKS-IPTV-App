@@ -134,7 +134,74 @@ final class StreamPreflight {
         return getResult
     }
 
+    // MARK: - URL Resolution
+
+    /// Resolve redirects for a stream URL without consuming the connection.
+    ///
+    /// Sends a GET request that intercepts the first redirect (302/301), captures
+    /// the `Location` header, and cancels the request immediately — so the
+    /// backend token is NOT consumed. Returns the final direct URL that players
+    /// can open without needing to handle HTTP redirects themselves.
+    ///
+    /// - Parameters:
+    ///   - url: The original stream URL (may redirect).
+    ///   - headers: Additional HTTP headers.
+    ///   - timeoutSeconds: Maximum time to wait.
+    /// - Returns: The resolved direct URL, or the original URL if no redirect occurred.
+    static func resolveRedirects(
+        url: URL,
+        headers: [String: String] = [:],
+        timeoutSeconds: TimeInterval = 10
+    ) async -> URL {
+        var allHeaders: [String: String] = [
+            "User-Agent": defaultUserAgent,
+            "Accept": "*/*",
+            "Connection": "close"
+        ]
+        for (key, value) in headers {
+            allHeaders[key] = value
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = timeoutSeconds
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        for (key, value) in allHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        // Use a delegate that captures the redirect Location and cancels
+        let interceptor = RedirectInterceptor()
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = timeoutSeconds
+        let session = URLSession(configuration: config, delegate: interceptor, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        // We expect a cancellation error because we cancel after intercepting the redirect
+        _ = try? await session.data(for: request)
+
+        return interceptor.redirectURL ?? url
+    }
+
     // MARK: - Private
+
+    /// URLSession delegate that intercepts redirects and cancels the request.
+    /// Captures the Location URL without following the redirect (preserves token).
+    private class RedirectInterceptor: NSObject, URLSessionTaskDelegate {
+        var redirectURL: URL?
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            willPerformHTTPRedirection response: HTTPURLResponse,
+            newRequest request: URLRequest,
+            completionHandler: @escaping (URLRequest?) -> Void
+        ) {
+            redirectURL = request.url
+            // Return nil to NOT follow the redirect — preserves the backend token
+            completionHandler(nil)
+        }
+    }
 
     /// URLSession delegate that tracks redirects without blocking them
     private class RedirectTracker: NSObject, URLSessionTaskDelegate {

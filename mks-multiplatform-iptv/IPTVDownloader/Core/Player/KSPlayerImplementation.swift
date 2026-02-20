@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-// KSPlayer module not installed - using canImport guard
+
 #if canImport(KSPlayer)
 import KSPlayer
 #endif
@@ -11,57 +11,41 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - KSPlayer Reference
-/*
- KSPlayer API Reference: /tmp/ksplayer-reference
- 
- Key API classes:
- - iOS: IOSVideoPlayerView 
- - macOS: MacVideoPlayerView
- - Protocol: PlayerControllerDelegate
- - Resource: KSPlayerResource(url:options:name:)
- - Options: KSOptions() with KSOptions.isAutoPlay = true
- 
- Documentation: 
- - Sources/KSPlayer/Core/PlayerView.swift
- - Sources/KSPlayer/Video/KSPlayerItem.swift
- - Demo implementations in Demo/ folder
- */
+// MARK: - KSPlayer Implementation
+
+#if canImport(KSPlayer)
 
 // MARK: - Platform-specific KSPlayer Views
 
-#if canImport(KSPlayer)
 #if os(iOS)
 struct KSPlayerViewWrapper: UIViewRepresentable {
     let url: URL
+    let options: KSOptions
     let onPlayTimeChange: (TimeInterval, TimeInterval) -> Void
     let onStateChange: (KSPlayerState) -> Void
-    
+
     func makeUIView(context: Context) -> IOSVideoPlayerView {
         let playerView = IOSVideoPlayerView()
-        
-        playerView.playTimeDidChange = { [weak playerView] currentTime, totalTime in
+
+        playerView.playTimeDidChange = { currentTime, totalTime in
             DispatchQueue.main.async {
                 onPlayTimeChange(currentTime, totalTime)
             }
         }
-        
+
         let coordinator = context.coordinator
         coordinator.onStateChange = onStateChange
         playerView.delegate = coordinator
-        
-        let options = KSOptions()
+
         KSOptions.isAutoPlay = true
-        let resource = KSPlayerResource(url: url, options: options, name: "Video")
+        let resource = KSPlayerResource(url: url, options: options, name: url.lastPathComponent)
         playerView.set(resource: resource)
-        
+
         return playerView
     }
-    
-    func updateUIView(_ uiView: IOSVideoPlayerView, context: Context) {
-        
-    }
-    
+
+    func updateUIView(_ uiView: IOSVideoPlayerView, context: Context) {}
+
     func makeCoordinator() -> PlayerCoordinator {
         PlayerCoordinator()
     }
@@ -71,34 +55,32 @@ struct KSPlayerViewWrapper: UIViewRepresentable {
 #if os(macOS)
 struct KSPlayerViewWrapper: NSViewRepresentable {
     let url: URL
+    let options: KSOptions
     let onPlayTimeChange: (TimeInterval, TimeInterval) -> Void
     let onStateChange: (KSPlayerState) -> Void
-    
+
     func makeNSView(context: Context) -> MacVideoPlayerView {
         let playerView = MacVideoPlayerView()
-        
-        playerView.playTimeDidChange = { [weak playerView] currentTime, totalTime in
+
+        playerView.playTimeDidChange = { currentTime, totalTime in
             DispatchQueue.main.async {
                 onPlayTimeChange(currentTime, totalTime)
             }
         }
-        
+
         let coordinator = context.coordinator
         coordinator.onStateChange = onStateChange
         playerView.delegate = coordinator
-        
-        let options = KSOptions()
+
         KSOptions.isAutoPlay = true
-        let resource = KSPlayerResource(url: url, options: options, name: "Video")
+        let resource = KSPlayerResource(url: url, options: options, name: url.lastPathComponent)
         playerView.set(resource: resource)
-        
+
         return playerView
     }
-    
-    func updateNSView(_ nsView: MacVideoPlayerView, context: Context) {
-        
-    }
-    
+
+    func updateNSView(_ nsView: MacVideoPlayerView, context: Context) {}
+
     func makeCoordinator() -> PlayerCoordinator {
         PlayerCoordinator()
     }
@@ -106,39 +88,24 @@ struct KSPlayerViewWrapper: NSViewRepresentable {
 #endif
 
 // MARK: - Player Coordinator
+
 class PlayerCoordinator: NSObject, PlayerControllerDelegate {
     var onStateChange: ((KSPlayerState) -> Void)?
-    
+
     func playerController(state: KSPlayerState) {
         onStateChange?(state)
     }
-    
-    func playerController(currentTime: TimeInterval, totalTime: TimeInterval) {
-        
-    }
-    
-    func playerController(finish error: Error?) {
-        
-    }
-    
-    func playerController(maskShow: Bool) {
-        
-    }
-    
-    func playerController(action: PlayerButtonType) {
-        
-    }
-    
-    func playerController(bufferedCount: Int, consumeTime: TimeInterval) {
-        
-    }
-    
-    func playerController(seek: TimeInterval) {
-        
-    }
+
+    func playerController(currentTime: TimeInterval, totalTime: TimeInterval) {}
+    func playerController(finish error: Error?) {}
+    func playerController(maskShow: Bool) {}
+    func playerController(action: PlayerButtonType) {}
+    func playerController(bufferedCount: Int, consumeTime: TimeInterval) {}
+    func playerController(seek: TimeInterval) {}
 }
 
-// MARK: - KSPlayer Implementation
+// MARK: - KSPlayer Implementation (Active)
+
 class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentTime: Double = 0
@@ -147,56 +114,92 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var rate: Float = 1.0
     @Published var isReady: Bool = false
     @Published var error: PlayerError?
-    
+
     private let progressSubject = PassthroughSubject<Double, Never>()
     private var currentURL: URL?
-    
+    private var customHeaders: [String: String] = [:]
+
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
     }
-    
-    static func isAvailable() -> Bool {
-        return true
+
+    static func isAvailable() -> Bool { true }
+
+    /// Create IPTV-optimized KSOptions for the given URL
+    func makeOptions(for url: URL) -> KSOptions {
+        let options = KSOptions()
+
+        // IPTV reconnection
+        options.formatContextOptions["reconnect"] = 1
+        options.formatContextOptions["reconnect_streamed"] = 1
+        options.formatContextOptions["reconnect_on_network_error"] = 1
+        options.formatContextOptions["reconnect_delay_max"] = 5
+        options.formatContextOptions["scan_all_pmts"] = 1
+
+        // Default headers for IPTV servers
+        var headers = [
+            "User-Agent": "VLC/3.0.18 LibVLC/3.0.18",
+            "Accept-Encoding": "identity",
+            "Connection": "Keep-Alive",
+        ]
+        // Merge custom headers (overrides defaults)
+        for (key, value) in customHeaders {
+            headers[key] = value
+        }
+        options.appendHeader(headers)
+
+        // Live stream detection
+        let path = url.path.lowercased()
+        let isLive = path.contains("/live/") || path.hasSuffix(".m3u8") || path.hasSuffix(".ts")
+        if isLive {
+            options.formatContextOptions["fflags"] = "nobuffer"
+            options.formatContextOptions["analyzeduration"] = 1_000_000  // 1s
+            options.formatContextOptions["probesize"] = 500_000
+        }
+
+        return options
     }
-    
+
+    func setCustomHeaders(_ headers: [String: String]) {
+        customHeaders = headers
+    }
+
     func load(url: URL) {
         currentURL = url
         isReady = false
         error = nil
-        print("[KSPlayerImplementation] Loading URL: \(url)")
+        print("[KSPlayer] Loading URL: \(url)")
     }
-    
+
     func play() {
         isPlaying = true
-        print("[KSPlayerImplementation] Play requested")
     }
-    
+
     func pause() {
         isPlaying = false
-        print("[KSPlayerImplementation] Pause requested")
     }
-    
+
     func stop() {
         isPlaying = false
         currentTime = 0
         duration = 0
         isReady = false
-        print("[KSPlayerImplementation] Stop requested")
     }
-    
+
     func seek(to time: Double) {
         currentTime = time
         progressSubject.send(time)
-        print("[KSPlayerImplementation] Seek to: \(time)")
     }
-    
+
     func playerView() -> AnyView {
         guard let url = currentURL else {
             return AnyView(placeholderView)
         }
-        
+
+        let options = makeOptions(for: url)
         let wrapper = KSPlayerViewWrapper(
             url: url,
+            options: options,
             onPlayTimeChange: { [weak self] currentTime, totalTime in
                 self?.currentTime = currentTime
                 self?.duration = totalTime
@@ -207,15 +210,17 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 case .readyToPlay:
                     self?.isReady = true
                     self?.error = nil
+                case .error:
+                    self?.error = .decodingError
                 default:
                     break
                 }
             }
         )
-        
+
         return AnyView(wrapper)
     }
-    
+
     private var placeholderView: some View {
         ZStack {
             Color.black
@@ -232,13 +237,16 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             }
         }
     }
-    
+
     deinit {
         stop()
     }
 }
+
 #else
-// MARK: - KSPlayer Not Available - Dummy Implementation
+
+// MARK: - KSPlayer Not Available - Fallback
+
 class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentTime: Double = 0
@@ -254,12 +262,10 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         progressSubject.eraseToAnyPublisher()
     }
 
-    static func isAvailable() -> Bool {
-        return false
-    }
+    static func isAvailable() -> Bool { false }
 
     func load(url: URL) {
-        print("[KSPlayerImplementation] Module not available - cannot load")
+        print("[KSPlayer] Module not available - cannot load")
         error = PlayerError.unsupportedFormat
     }
 
@@ -278,4 +284,5 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         )
     }
 }
+
 #endif

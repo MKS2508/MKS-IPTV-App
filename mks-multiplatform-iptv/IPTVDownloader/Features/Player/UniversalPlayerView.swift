@@ -8,6 +8,7 @@ struct UniversalPlayerView: View {
     @State private var selectedPlayerType: PlayerType = .avplayer
     @State private var showPlayerSelector = false
     @State private var playerError: PlayerError?
+    @State private var airPlayEnabled = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -37,12 +38,13 @@ struct UniversalPlayerView: View {
                 .padding()
                 .background(Color.black.opacity(0.8))
             
-            // Player Selection (if multiple available)
-            if PlayerFactory.availablePlayers().count > 1 {
-                HStack {
+            // Player Selection & AirPlay Toggle
+            HStack {
+                if PlayerFactory.availablePlayers().count > 1 {
                     Text("Player:")
                         .foregroundColor(.white)
-                    
+                        .font(.caption)
+
                     Picker("Player", selection: $selectedPlayerType) {
                         ForEach(PlayerFactory.availablePlayers(), id: \.self) { type in
                             Text(type.displayName).tag(type)
@@ -53,9 +55,23 @@ struct UniversalPlayerView: View {
                         reloadWithPlayer(type: newValue)
                     }
                 }
-                .padding()
-                .background(Color.black.opacity(0.9))
+
+                Spacer()
+
+                // AirPlay toggle — when enabled, forces transmux pipeline for non-native formats
+                Button(action: {
+                    airPlayEnabled.toggle()
+                    reloadWithAirPlay()
+                }) {
+                    Image(systemName: airPlayEnabled ? "airplayvideo.circle.fill" : "airplayvideo")
+                        .font(.title3)
+                        .foregroundColor(airPlayEnabled ? .blue : .white)
+                }
+                .help("Toggle AirPlay-compatible playback (transmuxes non-native formats)")
             }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.9))
         }
         .alert("Playback Error", isPresented: .constant(playerError != nil)) {
             Button("Try Another Player") {
@@ -82,32 +98,39 @@ struct UniversalPlayerView: View {
     }
     
     private func reloadWithPlayer(type: PlayerType) {
-        playerManager.loadVideo(url: url, preferredPlayer: type)
+        playerManager.loadVideo(url: url, preferredPlayer: type, requireAirPlay: airPlayEnabled)
+    }
+
+    private func reloadWithAirPlay() {
+        playerManager.loadVideo(url: url, requireAirPlay: airPlayEnabled)
     }
     
     private func determineOptimalPlayer() -> PlayerType {
         let format = url.pathExtension.lowercased()
-        
-        // Check available players that support this format
+
         let supportingPlayers = PlayerFactory.availablePlayers()
             .filter { $0.supports(format: format) }
-        
-        // Prefer native player for supported formats
+
+        // Prefer native AVPlayer for supported formats
         if supportingPlayers.contains(.avplayer) {
             return .avplayer
         }
-        
-        // Then VLC
+
+        // KSPlayer for non-native (best PiP + wide codec)
+        if supportingPlayers.contains(.ksplayer) {
+            return .ksplayer
+        }
+
+        // VLC fallback
         if supportingPlayers.contains(.vlc) {
             return .vlc
         }
-        
-        // Finally FFmpeg
+
+        // FFmpeg transmux pipeline
         if supportingPlayers.contains(.ffmpeg) {
             return .ffmpeg
         }
-        
-        // Default
+
         return .avplayer
     }
     

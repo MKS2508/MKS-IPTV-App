@@ -85,7 +85,7 @@ enum PlayerType: String, CaseIterable {
         case .vlc:
             return "VLC Player"
         case .ffmpeg:
-            return "FFmpeg Transcoder"
+            return "FFmpeg Transmuxer"
         }
     }
     
@@ -104,18 +104,18 @@ enum PlayerType: String, CaseIterable {
     
     var hasPiPSupport: Bool {
         switch self {
-        case .avplayer, .ksplayer:
-            return true
-        case .vlc, .ffmpeg:
+        case .avplayer, .ksplayer, .ffmpeg:
+            return true  // .ffmpeg transmuxes to AVPlayer which supports PiP
+        case .vlc:
             return false
         }
     }
-    
+
     var hasAirPlaySupport: Bool {
         switch self {
-        case .avplayer, .ksplayer:
-            return true
-        case .vlc, .ffmpeg:
+        case .avplayer, .ksplayer, .ffmpeg:
+            return true  // .ffmpeg transmuxes to AVPlayer which supports AirPlay
+        case .vlc:
             return false
         }
     }

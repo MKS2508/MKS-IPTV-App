@@ -2,41 +2,45 @@ import Foundation
 import SwiftUI
 
 // MARK: - Player Factory
+
 class PlayerFactory {
     static let shared = PlayerFactory()
-    
+
     private var configuration = PlayerConfiguration()
-    
+
     private init() {}
-    
-    /// Update player configuration
+
     func configure(_ config: PlayerConfiguration) {
         self.configuration = config
     }
-    
-    /// Create appropriate player for the given URL
+
+    // MARK: - Public API
+
+    /// Create the optimal player for a given URL using Opción B strategy:
+    ///   1. Native formats (MP4/M4V/MOV/M3U8) → AVPlayer (PiP + AirPlay)
+    ///   2. KSPlayer available + non-native → KSPlayer (PiP, no AirPlay for MKV)
+    ///   3. VLCKit available → VLC fallback
+    ///   4. Last resort → AVPlayer (may fail with MKV)
     func createPlayer(for url: URL) -> any VideoPlayerProtocol {
-        let fileExtension = url.pathExtension.lowercased()
-        
+        let format = url.pathExtension.lowercased()
+
         if configuration.autoSelectPlayer {
-            // Auto-select best player based on format
-            return createBestPlayer(for: fileExtension, url: url)
-        } else {
-            // Use preferred player if it supports the format
-            if configuration.preferredPlayer.supports(format: fileExtension) {
-                return createPlayer(type: configuration.preferredPlayer, url: url)
-            } else if configuration.fallbackPlayer.supports(format: fileExtension) {
-                print("[PlayerFactory] Preferred player doesn't support \(fileExtension), using fallback")
-                return createPlayer(type: configuration.fallbackPlayer, url: url)
-            } else {
-                print("[PlayerFactory] No player supports \(fileExtension), trying VLC")
-                return createPlayer(type: .vlc, url: url)
-            }
+            return createBestPlayer(for: format, url: url)
         }
+
+        // Manual selection with fallback chain
+        if configuration.preferredPlayer.supports(format: format) {
+            return createPlayer(type: configuration.preferredPlayer, url: url)
+        }
+        if configuration.fallbackPlayer.supports(format: format) {
+            print("[PlayerFactory] Preferred player doesn't support \(format), using fallback")
+            return createPlayer(type: configuration.fallbackPlayer, url: url)
+        }
+        print("[PlayerFactory] No preferred player supports \(format), auto-selecting")
+        return createBestPlayer(for: format, url: url)
     }
-    
-    /// Create specific player type
-    private func createPlayer(type: PlayerType, url: URL) -> any VideoPlayerProtocol {
+
+    func createPlayer(type: PlayerType, url: URL) -> any VideoPlayerProtocol {
         switch type {
         case .avplayer:
             let player = AVPlayerImplementation()
@@ -44,91 +48,148 @@ class PlayerFactory {
             return player
 
         case .ksplayer:
-            // KSPlayer module not installed - fallback to AVPlayer
-            print("[PlayerFactory] KSPlayer not available (module not installed), using AVPlayer")
+            if KSPlayerImplementation.isAvailable() {
+                let player = KSPlayerImplementation()
+                player.load(url: url)
+                return player
+            }
+            print("[PlayerFactory] KSPlayer not available, falling back to AVPlayer")
             let player = AVPlayerImplementation()
             player.load(url: url)
             return player
 
         case .vlc:
-            // VLCKit module not installed - fallback to AVPlayer
-            print("[PlayerFactory] VLCKit not available (module not installed), using AVPlayer")
+            if VLCPlayerImplementation.isAvailable() {
+                let player = VLCPlayerImplementation()
+                player.load(url: url)
+                return player
+            }
+            print("[PlayerFactory] VLCKit not available, falling back to AVPlayer")
             let player = AVPlayerImplementation()
             player.load(url: url)
             return player
 
         case .ffmpeg:
-            // FFmpeg transcoder implementation
             let player = FFmpegPlayerImplementation(configuration: configuration)
             player.load(url: url)
             return player
         }
     }
-    
-    /// Auto-select best player for format
+
+    // MARK: - Smart Player Selection (Opción B)
+
     private func createBestPlayer(for format: String, url: URL) -> any VideoPlayerProtocol {
-        // For native formats, use AVPlayer (better performance + PiP/AirPlay)
-        if PlayerType.avplayer.supports(format: format) {
-            print("[PlayerFactory] Using AVPlayer for \(format)")
+        let isNative = PlayerType.avplayer.supports(format: format)
+
+        // 1. AirPlay required + non-native → FFmpeg transmux pipeline (produces AVPlayer output)
+        if configuration.requireAirPlaySupport && !isNative && PlayerType.ffmpeg.supports(format: format) {
+            print("[PlayerFactory] AirPlay required, non-native (\(format)) → FFmpeg transmux pipeline")
+            return createPlayer(type: .ffmpeg, url: url)
+        }
+
+        // 2. Native formats → AVPlayer (best PiP + AirPlay)
+        if isNative {
+            print("[PlayerFactory] Native format (\(format)) → AVPlayer")
             return createPlayer(type: .avplayer, url: url)
         }
 
-        // Fallback to FFmpeg transcoding on macOS for unsupported formats
-        #if os(macOS)
+        // 3. Non-native but KSPlayer available → KSPlayer (PiP, wide codec support)
+        if KSPlayerImplementation.isAvailable() {
+            print("[PlayerFactory] Non-native format (\(format)) → KSPlayer")
+            return createPlayer(type: .ksplayer, url: url)
+        }
+
+        // 4. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
+        if VLCPlayerImplementation.isAvailable() {
+            print("[PlayerFactory] Non-native format (\(format)) → VLCKit fallback")
+            return createPlayer(type: .vlc, url: url)
+        }
+
+        // 5. FFmpeg transmux pipeline (cross-platform)
         if PlayerType.ffmpeg.supports(format: format) {
-            print("[PlayerFactory] Using FFmpeg transcoder for \(format)")
+            print("[PlayerFactory] Non-native format (\(format)) → FFmpeg transmux pipeline")
             return createPlayer(type: .ffmpeg, url: url)
         }
-        #endif
 
-        // Last resort: try AVPlayer anyway
-        print("[PlayerFactory] Format \(format) may not be fully supported, trying AVPlayer")
+        // 6. Last resort: AVPlayer (will likely fail with MKV)
+        print("[PlayerFactory] No suitable player for \(format), trying AVPlayer as last resort")
         return createPlayer(type: .avplayer, url: url)
     }
-    
-    /// Get available players for current platform
+
+    // MARK: - Stream Detection
+
+    private func detectLiveStream(url: URL) -> Bool {
+        let path = url.path.lowercased()
+        return path.contains("/live/") || path.hasSuffix(".m3u8") || path.hasSuffix(".ts")
+    }
+
+    // MARK: - Available Players
+
     static func availablePlayers() -> [PlayerType] {
         var players: [PlayerType] = [.avplayer]
 
-        // KSPlayer and VLCKit modules not installed
-        print("[PlayerFactory] Only AVPlayer available (KSPlayer/VLCKit not installed)")
+        if KSPlayerImplementation.isAvailable() {
+            players.append(.ksplayer)
+        }
+        if VLCPlayerImplementation.isAvailable() {
+            players.append(.vlc)
+        }
 
-        #if os(macOS)
+        // FFmpeg transmux pipeline is cross-platform (uses C API, not shell)
         players.append(.ffmpeg)
-        #endif
 
         return players
     }
 }
 
-// MARK: - Player Manager (Singleton for app-wide player)
+// MARK: - Player Manager (Singleton)
+
 class PlayerManager: ObservableObject {
     static let shared = PlayerManager()
-    
+
     @Published var currentPlayer: (any VideoPlayerProtocol)?
     @Published var currentPlayerType: PlayerType = .avplayer
-    
+
     private init() {}
-    
-    func loadVideo(url: URL, preferredPlayer: PlayerType? = nil) {
-        // Stop current player
+
+    func loadVideo(url: URL, preferredPlayer: PlayerType? = nil, requireAirPlay: Bool = false) {
         currentPlayer?.stop()
-        
-        // Create new player
+
+        // Cleanup previous transmux/HLS sessions on player switch
+        Task {
+            await TransmuxingService.shared.cleanupAll()
+            #if canImport(FlyingFox)
+            await LocalHLSServer.shared.stop()
+            #endif
+        }
+
         if let preferredPlayer = preferredPlayer {
             var config = PlayerConfiguration()
             config.preferredPlayer = preferredPlayer
             config.autoSelectPlayer = false
+            config.requireAirPlaySupport = requireAirPlay
+            PlayerFactory.shared.configure(config)
+        } else {
+            var config = PlayerConfiguration()
+            config.autoSelectPlayer = true
+            config.requireAirPlaySupport = requireAirPlay
             PlayerFactory.shared.configure(config)
         }
-        
-        currentPlayer = PlayerFactory.shared.createPlayer(for: url)
-        
-        // Determine actual player type
-        if currentPlayer is AVPlayerImplementation {
-            currentPlayerType = .avplayer
-        } else if currentPlayer is FFmpegPlayerImplementation {
+
+        let player = PlayerFactory.shared.createPlayer(for: url)
+        currentPlayer = player
+
+        // Track actual player type
+        if player is KSPlayerImplementation {
+            currentPlayerType = .ksplayer
+        } else if player is VLCPlayerImplementation {
+            currentPlayerType = .vlc
+        } else if player is FFmpegPlayerImplementation {
             currentPlayerType = .ffmpeg
+        } else {
+            currentPlayerType = .avplayer
         }
+
+        print("[PlayerManager] Loaded \(url.lastPathComponent) with \(currentPlayerType.displayName)")
     }
 }

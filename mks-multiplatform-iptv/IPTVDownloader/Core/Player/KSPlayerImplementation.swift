@@ -142,12 +142,18 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             KSOptions.secondPlayerType = KSMEPlayer.self
         }
 
-        // IPTV reconnection
+        // IPTV reconnection with bounded retries
         options.formatContextOptions["reconnect"] = 1
         options.formatContextOptions["reconnect_streamed"] = 1
         options.formatContextOptions["reconnect_on_network_error"] = 1
         options.formatContextOptions["reconnect_delay_max"] = 5
+        options.formatContextOptions["max_reconnects"] = 3
         options.formatContextOptions["scan_all_pmts"] = 1
+
+        // HTTP redirect handling — critical for IPTV servers behind
+        // Cloudflare/CDN that return 302 to a tokenized backend URL
+        options.formatContextOptions["http_seekable"] = 0
+        options.formatContextOptions["multiple_requests"] = 0
 
         // Default headers for IPTV servers
         var headers = [
@@ -161,13 +167,20 @@ class KSPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         }
         options.appendHeader(headers)
 
-        // Live stream detection
+        // Stream-type-specific probe settings
         let path = url.path.lowercased()
         let isLive = path.contains("/live/") || path.hasSuffix(".m3u8") || path.hasSuffix(".ts")
+        let isRemote = url.scheme == "http" || url.scheme == "https"
+
         if isLive {
+            // Live: aggressive low-latency probing
             options.formatContextOptions["fflags"] = "nobuffer"
             options.formatContextOptions["analyzeduration"] = 1_000_000  // 1s
             options.formatContextOptions["probesize"] = 500_000
+        } else if isRemote {
+            // Remote VOD: bounded probe to prevent indefinite hangs on bad streams
+            options.formatContextOptions["analyzeduration"] = 3_000_000  // 3s
+            options.formatContextOptions["probesize"] = 2_000_000       // 2MB
         }
 
         return options

@@ -120,7 +120,12 @@ actor TransmuxingService {
         }
         defer { avformat_close_input(&inputCtx) }
 
-        let inCtx = inputCtx!
+        guard let inCtx = inputCtx else {
+            throw TransmuxError.processStartFailure(
+                NSError(domain: "FFmpeg", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "inputCtx became nil after open"])
+            )
+        }
 
         ret = avformat_find_stream_info(inCtx, nil)
         guard ret >= 0 else {
@@ -149,7 +154,10 @@ actor TransmuxingService {
         var outputStreamIndex: Int32 = 0
 
         for i in 0..<streamCount {
-            let inStream = inCtx.pointee.streams[i]!
+            guard let inStream = inCtx.pointee.streams[i] else {
+                print("[TransmuxingService] Warning: nil stream at index \(i), skipping")
+                continue
+            }
             let codecType = inStream.pointee.codecpar.pointee.codec_type
 
             // Only copy video and audio streams
@@ -206,16 +214,25 @@ actor TransmuxingService {
             ret = av_read_frame(inCtx, packet)
             if ret < 0 { break } // EOF or error
 
-            let pkt = packet!
+            guard let pkt = packet else {
+                print("[TransmuxingService] Warning: packet became nil, ending remux loop")
+                break
+            }
             let streamIndex = Int(pkt.pointee.stream_index)
             guard streamIndex < streamCount, streamMapping[streamIndex] >= 0 else {
                 av_packet_unref(pkt)
                 continue
             }
 
-            let inStream = inCtx.pointee.streams[streamIndex]!
+            guard let inStream = inCtx.pointee.streams[streamIndex] else {
+                av_packet_unref(pkt)
+                continue
+            }
             let outStreamIdx = Int32(streamMapping[streamIndex])
-            let outStream = outCtx.pointee.streams[Int(outStreamIdx)]!
+            guard let outStream = outCtx.pointee.streams[Int(outStreamIdx)] else {
+                av_packet_unref(pkt)
+                continue
+            }
 
             pkt.pointee.stream_index = outStreamIdx
 
@@ -263,8 +280,10 @@ actor TransmuxingService {
         }
 
         // Set fMP4 movflags via the context's private options
-        av_dict_set(&ctx!.pointee.metadata, "movflags",
-                    "frag_keyframe+empty_moov+default_base_moof", 0)
+        if let outputCtx = ctx {
+            av_dict_set(&outputCtx.pointee.metadata, "movflags",
+                        "frag_keyframe+empty_moov+default_base_moof", 0)
+        }
         return (mp4Path, false)
     }
     #endif

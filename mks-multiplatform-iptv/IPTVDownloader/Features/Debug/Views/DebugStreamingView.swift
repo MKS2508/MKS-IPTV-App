@@ -474,22 +474,43 @@ struct DebugStreamingView: View {
         viewModel.log("Playing \"\(item.title)\" [\(item.fileExtension)]", type: .info)
         viewModel.updateItemState(item.id, hasBeenTested: true)
 
-        let startTime = Date()
+        Task {
+            // Preflight: validate stream reachability before creating a player
+            viewModel.log("Preflight check: \(urlString)", type: .info)
+            let preflight = await StreamPreflight.check(url: url)
+            viewModel.log("Preflight: \(preflight.summary)", type: preflight.isReachable ? .success : .error)
 
-        // PlayerFactory auto-selects best player based on file extension
-        let player = PlayerFactory.shared.createPlayer(for: url)
-        let playerType = detectPlayerType(player)
-        let initTime = Date().timeIntervalSince(startTime)
+            if preflight.wasRedirected, let finalURL = preflight.finalURL {
+                viewModel.log("Redirected to: \(finalURL.host ?? "?"):\(finalURL.port ?? 80)", type: .info)
+            }
 
-        viewModel.log("Selected player: \(playerType.displayName)", type: .success)
-        viewModel.log("Player created in \(String(format: "%.0f", initTime * 1000))ms", type: .info)
-        viewModel.updateItemState(item.id, totalLatency: initTime)
+            guard preflight.isReachable else {
+                viewModel.log("Stream unreachable — skipping player creation", type: .error)
+                viewModel.updateItemState(item.id, httpStatusCode: preflight.httpStatus)
+                return
+            }
 
-        player.play()
-        activePlayerLabel = "\(item.title) — \(playerType.displayName) — \(item.fileExtension)"
-        activePlayerView = AnyView(player.playerView())
-        showingPlayer = true
-        viewModel.log("Playback started", type: .success)
+            if let httpStatus = preflight.httpStatus {
+                viewModel.updateItemState(item.id, httpStatusCode: httpStatus)
+            }
+
+            let startTime = Date()
+
+            // PlayerFactory auto-selects best player based on file extension
+            let player = PlayerFactory.shared.createPlayer(for: url)
+            let playerType = detectPlayerType(player)
+            let initTime = Date().timeIntervalSince(startTime)
+
+            viewModel.log("Selected player: \(playerType.displayName)", type: .success)
+            viewModel.log("Player created in \(String(format: "%.0f", initTime * 1000))ms", type: .info)
+            viewModel.updateItemState(item.id, totalLatency: initTime)
+
+            player.play()
+            activePlayerLabel = "\(item.title) — \(playerType.displayName) — \(item.fileExtension)"
+            activePlayerView = AnyView(player.playerView())
+            showingPlayer = true
+            viewModel.log("Playback started", type: .success)
+        }
     }
 
     // MARK: - Force Play with Specific Player
@@ -509,18 +530,29 @@ struct DebugStreamingView: View {
         viewModel.log("Forcing \(playerType.displayName) for \"\(item.title)\"", type: .info)
         viewModel.updateItemState(item.id, hasBeenTested: true)
 
-        let player = PlayerFactory.shared.createPlayer(type: playerType, url: url)
-        let actualType = detectPlayerType(player)
+        Task {
+            // Preflight: validate stream reachability
+            let preflight = await StreamPreflight.check(url: url)
+            viewModel.log("Preflight: \(preflight.summary)", type: preflight.isReachable ? .success : .error)
 
-        if actualType != playerType {
-            viewModel.log("\(playerType.displayName) not available, fell back to \(actualType.displayName)", type: .warning)
+            guard preflight.isReachable else {
+                viewModel.log("Stream unreachable — skipping player creation", type: .error)
+                return
+            }
+
+            let player = PlayerFactory.shared.createPlayer(type: playerType, url: url)
+            let actualType = detectPlayerType(player)
+
+            if actualType != playerType {
+                viewModel.log("\(playerType.displayName) not available, fell back to \(actualType.displayName)", type: .warning)
+            }
+
+            player.play()
+            activePlayerLabel = "\(item.title) — \(actualType.displayName) (forced) — \(item.fileExtension)"
+            activePlayerView = AnyView(player.playerView())
+            showingPlayer = true
+            viewModel.log("Playback started with \(actualType.displayName)", type: .success)
         }
-
-        player.play()
-        activePlayerLabel = "\(item.title) — \(actualType.displayName) (forced) — \(item.fileExtension)"
-        activePlayerView = AnyView(player.playerView())
-        showingPlayer = true
-        viewModel.log("Playback started with \(actualType.displayName)", type: .success)
     }
 
     // MARK: - Play Episode
@@ -541,14 +573,24 @@ struct DebugStreamingView: View {
 
         viewModel.log("Episode URL: \(urlString)", type: .info)
 
-        let player = PlayerFactory.shared.createPlayer(for: url)
-        let playerType = detectPlayerType(player)
-        player.play()
+        Task {
+            let preflight = await StreamPreflight.check(url: url)
+            viewModel.log("Preflight: \(preflight.summary)", type: preflight.isReachable ? .success : .error)
 
-        activePlayerLabel = "\(serie.title) — \(episode.title) — \(playerType.displayName)"
-        activePlayerView = AnyView(player.playerView())
-        showingPlayer = true
-        viewModel.log("Episode playback started with \(playerType.displayName)", type: .success)
+            guard preflight.isReachable else {
+                viewModel.log("Episode stream unreachable — skipping", type: .error)
+                return
+            }
+
+            let player = PlayerFactory.shared.createPlayer(for: url)
+            let playerType = detectPlayerType(player)
+            player.play()
+
+            activePlayerLabel = "\(serie.title) — \(episode.title) — \(playerType.displayName)"
+            activePlayerView = AnyView(player.playerView())
+            showingPlayer = true
+            viewModel.log("Episode playback started with \(playerType.displayName)", type: .success)
+        }
     }
 
     // MARK: - FFprobe Analysis (logs only, no playback)

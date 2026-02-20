@@ -66,8 +66,15 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         print("[VLCPlayerImplementation] Loading URL: \(url)")
         
         // Create media with IPTV-optimized options
-        media = VLCMediaType(url: url)
-        
+        let newMedia = VLCMediaType(url: url)
+        guard newMedia.url != nil else {
+            error = .networkError(NSError(domain: "VLCPlayer", code: -2,
+                                         userInfo: [NSLocalizedDescriptionKey: "VLCMedia failed to initialize for URL: \(url)"]))
+            print("[VLCPlayerImplementation] VLCMedia creation returned invalid media for URL: \(url)")
+            return
+        }
+        media = newMedia
+
         // Configure media options for IPTV streaming
         let options: [String: Any] = [
             // Network caching for smoother streaming
@@ -110,12 +117,17 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         let fileExtension = url.pathExtension.lowercased()
         print("[VLCPlayerImplementation] Format: \(fileExtension)")
         
-        // Create media player
-        mediaPlayer = VLCMediaPlayerType()
-        if let media = media {
-            mediaPlayer?.media = media
+        // Create media player and assign media
+        let player = VLCMediaPlayerType()
+        guard let validMedia = media else {
+            error = .networkError(NSError(domain: "VLCPlayer", code: -3,
+                                         userInfo: [NSLocalizedDescriptionKey: "Media became nil before player assignment"]))
+            print("[VLCPlayerImplementation] Media is nil, cannot assign to player")
+            return
         }
-        mediaPlayer?.delegate = self
+        player.media = validMedia
+        player.delegate = self
+        mediaPlayer = player
         mediaPlayer?.drawable = nil // Will be set when view is created
         
         // Configure player settings

@@ -78,7 +78,13 @@ actor LocalHLSServer {
             }
         }
 
-        let url = URL(string: "http://localhost:\(port)/\(playlist)")!
+        guard let url = URL(string: "http://localhost:\(port)/\(playlist)") else {
+            throw NSError(
+                domain: "LocalHLSServer",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Failed to construct localhost URL for port \(port)/\(playlist)"]
+            )
+        }
         print("[LocalHLSServer] Serving at \(url)")
         return url
         #else

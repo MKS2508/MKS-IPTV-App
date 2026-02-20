@@ -42,6 +42,20 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         Task { @MainActor in
             do {
+                // Step 0: Preflight — validate stream reachability before transmux
+                let preflight = await StreamPreflight.check(url: url)
+                print("[FFmpegPlayer] Preflight: \(preflight.summary)")
+
+                guard preflight.isReachable else {
+                    self.isTransmuxing = false
+                    self.error = .networkError(
+                        NSError(domain: "StreamPreflight", code: preflight.httpStatus ?? -1,
+                                userInfo: [NSLocalizedDescriptionKey: "Stream unreachable: \(preflight.error ?? "unknown")"])
+                    )
+                    print("[FFmpegPlayer] Preflight failed — aborting transmux")
+                    return
+                }
+
                 // Step 1: Transmux to HLS/fMP4
                 let result = try await TransmuxingService.shared.transmux(from: url)
                 self.transmuxSessionID = result.sessionID

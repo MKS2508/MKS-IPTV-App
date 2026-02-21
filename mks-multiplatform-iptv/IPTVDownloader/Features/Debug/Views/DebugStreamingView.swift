@@ -46,7 +46,7 @@ struct DebugStreamingView: View {
 
     var body: some View {
         mainContent
-            .background(VisualEffect().ignoresSafeArea())
+            .background(.ultraThinMaterial)
             .sheet(isPresented: $showingPlayer) {
                 playerSheet
             }
@@ -348,7 +348,7 @@ struct DebugStreamingView: View {
                     }
                     .padding(8)
                 }
-                .background(VisualEffect())
+                .background(.ultraThinMaterial)
                 .onChange(of: viewModel.logs.count) {
                     if viewModel.autoScroll, let lastLog = viewModel.logs.last {
                         withAnimation {
@@ -380,7 +380,7 @@ struct DebugStreamingView: View {
                 .padding()
             }
         }
-        .background(VisualEffect())
+        .background(.ultraThinMaterial)
     }
 
     private func basicInfoSection(item: DebugStreamItem) -> some View {
@@ -447,7 +447,7 @@ struct DebugStreamingView: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(VisualEffect())
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Helper Views

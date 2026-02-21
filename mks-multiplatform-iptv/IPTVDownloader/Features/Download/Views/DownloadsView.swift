@@ -15,7 +15,7 @@ struct DownloadsView: View {
             }
         }
         .navigationTitle("Downloads")
-        .background(VisualEffect().edgesIgnoringSafeArea(.all))
+        .background(.ultraThinMaterial)
         #if os(macOS)
         .onAppear {
             updateTouchBarProgress()
@@ -72,9 +72,9 @@ struct DownloadsView: View {
                 .onDelete(perform: deleteDownloads)
             }
         }
-        .background(VisualEffect().edgesIgnoringSafeArea(.all))
+        .background(.ultraThinMaterial)
     }
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "arrow.down.circle")
@@ -90,7 +90,7 @@ struct DownloadsView: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(VisualEffect().edgesIgnoringSafeArea(.all))
+        .background(.ultraThinMaterial)
     }
     
     private func deleteDownloads(at offsets: IndexSet) {

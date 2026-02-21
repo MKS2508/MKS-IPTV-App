@@ -199,7 +199,7 @@ struct AddDownloadViewSerie: View {
             }
             .frame(minWidth: 600, minHeight: 400)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(VisualEffect().ignoresSafeArea())
+            .background(.ultraThinMaterial)
         }
         .frame(minWidth: 600, maxWidth: .infinity, minHeight: 400, maxHeight: .infinity)
         .sheet(isPresented: $isModalPresented, content: {
@@ -514,8 +514,7 @@ struct AddDownloadViewSerie: View {
         }
         .frame(width: 350)
         .padding()
-        .background(VisualEffect())
-        .cornerRadius(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
     }
     

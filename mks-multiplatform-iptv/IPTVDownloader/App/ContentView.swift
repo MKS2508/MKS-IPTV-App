@@ -4,6 +4,7 @@
 //
 //  Main content view - now a thin shell composing extracted components
 //  Refactored from ~700 lines to ~150 lines
+//  Updated: Native layout with NavigationCoordinator
 //
 
 import SwiftUI
@@ -17,7 +18,8 @@ struct ContentView: View {
     @EnvironmentObject private var profilesManager: IPTVProfilesManager
     @EnvironmentObject private var profile: IPTVProfile
 
-    // Navigation state
+    // Navigation state - uses NavigationCoordinator for type-safe navigation
+    @State private var navigationCoordinator = NavigationCoordinator()
     @State private var selectedView: String? = "Movies"
 
     // Data loading
@@ -43,6 +45,7 @@ struct ContentView: View {
             touchBarAccessor
             #endif
         }
+        .withNavigationCoordinator(navigationCoordinator)
         .onAppear {
             initializeDataLoader()
         }

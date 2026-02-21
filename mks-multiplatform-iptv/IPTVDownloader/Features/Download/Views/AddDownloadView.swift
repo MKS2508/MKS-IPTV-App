@@ -98,7 +98,7 @@ struct AddDownloadView: View {
                 }
                 .frame(minWidth: 600, minHeight: 400)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(VisualEffect().ignoresSafeArea())
+                .background(.ultraThinMaterial)
                 .ignoresSafeArea()
             }
         }

@@ -82,9 +82,7 @@ struct MediaListView: View {
                 .ignoresSafeArea()
                 
                 
-            VisualEffect(blurStyle: .dark,
-                         vibrancy: true, cornerRadius: 0,
-                         opacity: 0.35).ignoresSafeArea(edges: .all)
+            Color.black.opacity(0.35).ignoresSafeArea(edges: .all)
         }
     }
     
@@ -129,9 +127,7 @@ struct MediaListView: View {
         Group {
             if showContentTypeSelector {
                 contentTypeSelector
-                    .background(
-                        VisualEffect(blurStyle: .dark, vibrancy: true, cornerRadius: 16, opacity: 0.9)
-                    )
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                     .padding(.horizontal)
                     .padding(.top, 4)
                     .padding(.bottom, 8)
@@ -515,11 +511,7 @@ struct MediaListView: View {
                         movieDetail: movieDetail,
                         onDismiss: dismissMediaDetail
                     )
-                    .background(
-                        VisualEffect(blurStyle: .systemUltraThinMaterial,
-                                    cornerRadius: 0,
-                                    opacity: 0.3).edgesIgnoringSafeArea(.all)
-                    )
+                    .background(.ultraThinMaterial.opacity(0.3), ignoresSafeAreaEdges: .all)
                 }
                 // Display serie detail
                 else if let serieDetailViewModel = serieDetailViewModel,
@@ -530,11 +522,7 @@ struct MediaListView: View {
                         seriesId: selectedMediaItemId,
                         onDismiss: dismissMediaDetail
                     )
-                    .background(
-                        VisualEffect(blurStyle: .systemUltraThinMaterial,
-                                    cornerRadius: 0,
-                                    opacity: 0.3).edgesIgnoringSafeArea(.all)
-                    )
+                    .background(.ultraThinMaterial.opacity(0.3), ignoresSafeAreaEdges: .all)
                 }
                 // Fallback error view
                 else {
@@ -558,11 +546,7 @@ struct MediaListView: View {
                     movieDetail: movieDetail,
                     onDismiss: dismissMediaDetail
                 )
-                .background(
-                    VisualEffect(blurStyle: .dark,
-                                 cornerRadius: 0,
-                                 opacity: 0.3).edgesIgnoringSafeArea(.all)
-                )
+                .background(Color.black.opacity(0.3).ignoresSafeArea())
             }
             // Display serie detail
             else if let serieDetailViewModel = serieDetailViewModel,
@@ -573,11 +557,7 @@ struct MediaListView: View {
                     seriesId: selectedMediaItemId,
                     onDismiss: dismissMediaDetail
                 )
-                .background(
-                    VisualEffect(blurStyle: .dark,
-                                 cornerRadius: 0,
-                                 opacity: 0.3).edgesIgnoringSafeArea(.all)
-                )
+                .background(Color.black.opacity(0.3).ignoresSafeArea())
             }
             // Fallback error view
             else {
@@ -765,9 +745,7 @@ struct MediaListView: View {
             }
             .padding(.vertical, 4)
         }
-        .background(
-            VisualEffect(blurStyle: .dark, vibrancy: true, cornerRadius: 12, opacity: 0.25)
-        )
+        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // Chip component for selected categories

@@ -65,7 +65,7 @@ struct AppLoadingView: View {
             Color(red: 0.05, green: 0.05, blue: 0.05)
                 .ignoresSafeArea()
 
-            VisualEffect(blurStyle: .dark, vibrancy: true, opacity: 0.3)
+            Color.black.opacity(0.3)
                 .ignoresSafeArea()
 
             redGlowOverlay

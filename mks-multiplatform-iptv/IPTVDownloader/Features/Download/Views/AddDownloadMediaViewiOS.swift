@@ -117,11 +117,9 @@ struct AddDownloadMediaViewiOS: View {
             Image("backgroundPattern")
                 .resizable()            .aspectRatio(contentMode: .fill)  // This will make it fill the space while maintaining aspect ratio
                 .ignoresSafeArea()
-                
-                
-            VisualEffect(blurStyle: .dark,
-                         vibrancy: true, cornerRadius: 0,
-                         opacity: 0.85).ignoresSafeArea(edges: .all)
+
+
+            Color.black.opacity(0.85).ignoresSafeArea(edges: .all)
         }
     }
     var episodesForSelectedSeason: [SerieDetail.Episode] {
@@ -330,11 +328,7 @@ struct AddDownloadMediaViewiOS: View {
                     // Contenedor para el contenido con blur solo en la parte inferior
                     ZStack(alignment: .leading) {
                         // Blur con altura fija para la parte inferior
-                        VisualEffect(
-                            blurStyle: .systemThinMaterial,
-                            vibrancy: true,
-                            opacity: 0.35
-                        )
+                        Color.black.opacity(0.35)
                         .cornerRadius(16 * expandedProgress, corners: [.topLeft, .topRight])
                         
                         // Content overlay

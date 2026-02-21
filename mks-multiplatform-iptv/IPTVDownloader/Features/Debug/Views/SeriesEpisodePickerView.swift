@@ -65,7 +65,7 @@ struct SeriesEpisodePickerView: View {
             }
         }
         .frame(width: 600, height: 500)
-        .background(VisualEffect())
+        .background(.ultraThinMaterial)
         .task {
             await loadSeriesDetails()
         }

@@ -293,34 +293,34 @@ struct MediaListView: View {
                 .font(.headline.weight(.semibold))
                 .foregroundColor(.primary)
         }
-        
+
         ToolbarItemGroup(placement: .topBarTrailing) {
-            // Sort button
+            // Sort button with glass style
             Menu {
-                Button("Name A-Z") { 
+                Button("Name A-Z") {
                     applySortOption(.nameAsc)
                 }
-                Button("Name Z-A") { 
+                Button("Name Z-A") {
                     applySortOption(.nameDesc)
                 }
-                Button("Newest First") { 
+                Button("Newest First") {
                     applySortOption(.addedDesc)
                 }
-                Button("Oldest First") { 
+                Button("Oldest First") {
                     applySortOption(.addedAsc)
                 }
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            
-            // Filter button
+            .buttonStyle(.glass)
+
+            // Filter button with glass style
             Button(action: { showFilterMenu.toggle() }) {
                 Image(systemName: selectedCategories.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
             }
-            
-            // Removed ToolbarSpacer() line as per instructions
-            
-            // Refresh button as special action
+            .buttonStyle(.glass)
+
+            // Refresh button with glass style
             Button(action: {
                 Task {
                     await viewModel.refreshMedia(contentType: contentTypeFilter)
@@ -330,12 +330,13 @@ struct MediaListView: View {
                     .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
                     .animation(viewModel.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isRefreshing)
             }
+            .buttonStyle(.glass)
             .disabled(viewModel.isRefreshing || viewModel.isLoading)
         }
     }
     #endif
     
-    // macOS Toolbar Content
+    // macOS Toolbar Content with Glass Search Field
     #if os(macOS)
     @ToolbarContentBuilder
     private var macOSToolbarContent: some ToolbarContent {
@@ -344,27 +345,44 @@ struct MediaListView: View {
                 .font(.headline.weight(.semibold))
                 .foregroundColor(.primary)
         }
-        
+
+        // Native glass search field for macOS 26+
+        ToolbarItem(placement: .principal) {
+            if #available(macOS 26, *) {
+                TextField("Search \(navigationPrompt)", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .frame(minWidth: 200, idealWidth: 280, maxWidth: 400)
+                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 8))
+            } else {
+                TextField("Search \(navigationPrompt)", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 200, idealWidth: 280, maxWidth: 400)
+            }
+        }
+
         ToolbarItemGroup(placement: .primaryAction) {
-            // Sort button
+            // Sort button with glass style
             Menu {
-                Button("Name A-Z") { 
+                Button("Name A-Z") {
                     applySortOption(.nameAsc)
                 }
-                Button("Name Z-A") { 
+                Button("Name Z-A") {
                     applySortOption(.nameDesc)
                 }
-                Button("Newest First") { 
+                Button("Newest First") {
                     applySortOption(.addedDesc)
                 }
-                Button("Oldest First") { 
+                Button("Oldest First") {
                     applySortOption(.addedAsc)
                 }
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            
-            // Filter button
+            .buttonStyle(.glass)
+
+            // Filter button with glass style
             Menu {
                 if !movieCategories.isEmpty {
                     Section("Movie Categories") {
@@ -400,7 +418,7 @@ struct MediaListView: View {
                         }
                     }
                 }
-                
+
                 if !selectedCategories.isEmpty {
                     Divider()
                     Button("Clear All Filters") {
@@ -412,8 +430,9 @@ struct MediaListView: View {
             } label: {
                 Image(systemName: selectedCategories.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
             }
-            
-            // Refresh button
+            .buttonStyle(.glass)
+
+            // Refresh button with glass style
             Button(action: {
                 Task {
                     await viewModel.refreshMedia(contentType: contentTypeFilter)
@@ -423,6 +442,7 @@ struct MediaListView: View {
                     .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
                     .animation(viewModel.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isRefreshing)
             }
+            .buttonStyle(.glass)
             .disabled(viewModel.isRefreshing || viewModel.isLoading)
         }
     }
@@ -699,87 +719,29 @@ struct MediaListView: View {
     // MARK: - View Components
     
     private var contentTypeSelector: some View {
-        HStack(spacing: 0) {
-            ContentTypeButton(
-                title: "All",
-                systemImage: "play.rectangle.on.rectangle.fill",
-                isSelected: contentTypeFilter == .all,
-                action: { selectContentType(.all) }
-            )
-            
-            ContentTypeButton(
-                title: "Movies",
-                systemImage: "film.fill",
-                isSelected: contentTypeFilter == .movies,
-                action: { selectContentType(.movies) }
-            )
-            
-            ContentTypeButton(
-                title: "Series",
-                systemImage: "tv.fill",
-                isSelected: contentTypeFilter == .series,
-                action: { selectContentType(.series) }
-            )
+        GlassSegmentedControl(
+            selectedOption: $contentTypeFilter,
+            options: MediaListViewModel.ContentType.allCases,
+            titleForKeyPath: \.title,
+            systemImageForKeyPath: \.systemImage
+        )
+        .onChange(of: contentTypeFilter) { newType in
+            selectedCategories.removeAll()
+            Task {
+                await viewModel.loadMedia(contentType: newType)
+            }
         }
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 16)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-        )
     }
 
     // Visual indicator that shows which categories are selected
     private var selectedCategoriesIndicator: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(Array(selectedCategories), id: \.self) { categoryId in
-                    SelectedCategoryChip(
-                        categoryId: categoryId,
-                        categoryName: getCategoryName(for: categoryId),
-                        onRemove: { toggleCategory(categoryId) }
-                    )
-                }
-            }
-            .padding(.vertical, 4)
-        }
-        .background(.ultraThinMaterial.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+        GlassCategoryChipsContainer(
+            categories: selectedCategories,
+            categoryNameProvider: getCategoryName,
+            onRemoveCategory: toggleCategory
+        )
     }
 
-    // Chip component for selected categories
-    private struct SelectedCategoryChip: View {
-        let categoryId: String
-        let categoryName: String
-        let onRemove: () -> Void
-        
-        var body: some View {
-            Button(action: onRemove) {
-                HStack(spacing: 4) {
-                    Text(categoryName)
-                        .font(.caption.bold())
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.caption)
-                }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 10)
-                .background(
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.2))
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-        }
-    }
-    
     // Helper function to get category name
     private func getCategoryName(for categoryId: String) -> String {
         if let category = movieCategories.first(where: { $0.categoryId == categoryId }) {
@@ -871,21 +833,6 @@ struct MediaListView: View {
         }
     }
     
-    private func selectContentType(_ type: MediaListViewModel.ContentType) {
-        #if os(iOS)
-        UISelectionFeedbackGenerator().selectionChanged()
-        #endif
-        
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            contentTypeFilter = type
-            selectedCategories.removeAll()
-            
-            Task {
-                await viewModel.loadMedia(contentType: type)
-            }
-        }
-    }
-    
     private func toggleCategory(_ categoryId: String) {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -915,66 +862,8 @@ struct MediaListView: View {
 // MARK: - Supporting Components
 
 extension MediaListView {
-    struct ContentTypeButton: View {
-        let title: String
-        let systemImage: String
-        let isSelected: Bool
-        let action: () -> Void
-        
-        var body: some View {
-            Button(action: action) {
-                Text(title)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                .frame(minWidth: 80)
-                .padding(.vertical, 14)
-                .padding(.horizontal, 12)
-                .background(
-                    ZStack {
-                        if isSelected {
-                            Capsule()
-                                .fill(Color.accentColor)
-                                .shadow(color: Color.accentColor.opacity(0.3), radius: 5, x: 0, y: 3)
-                        }
-                    }
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.2), lineWidth: 1)
-                )
-                .foregroundColor(isSelected ? .white : .primary)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        }
-    }
-    
-    // Añadimos un estilo de botón personalizado para mejorar la respuesta táctil
-    struct ScaleButtonStyle: ButtonStyle {
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-                .scaleEffect(configuration.isPressed ? 0.95 : 1)
-                .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
-        }
-    }
-    
-    // Modificador para efectos de símbolo
-    struct SymbolEffectModifier: ViewModifier {
-        let isSelected: Bool
-        
-        func body(content: Content) -> some View {
-            if isSelected {
-                content
-                    .scaleEffect(1.2)
-                    .animation(.easeInOut(duration: 0.2).repeatCount(1), value: UUID())
-            } else {
-                content
-            }
-        }
-    }
-    
     // MARK: - ViewModel Initialization
-    
+
     @MainActor
     private func initializeDetailViewModelsIfNeeded() {
         if movieDetailViewModel == nil {

@@ -183,7 +183,7 @@ struct MediaCardViewiOS: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .background(.ultraThinMaterial)
+                    .background(LiquidGlassAvailability.isAvailable ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(.ultraThinMaterial))
                     .blur(radius: isDetailsExpanded ? overlayBlurRadius : 0)
                 )
                 .opacity(isDetailsExpanded ? 1 : 0)
@@ -343,11 +343,8 @@ struct MediaCardViewiOS: View {
                 .font(.system(size: detailsFontSize, weight: .semibold))
                 .padding(.vertical, 6)
                 .padding(.horizontal, 12)
-                .background(Color.red.opacity(0.9))
-                .tint(.white)
-                .cornerRadius(8)
-                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
+        .buttonStyle(.appGlassProminent)
     }
     
     private var gradientOverlay: some View {

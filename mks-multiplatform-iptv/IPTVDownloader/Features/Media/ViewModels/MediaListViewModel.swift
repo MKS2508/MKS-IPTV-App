@@ -85,11 +85,31 @@ class MediaListViewModel: ObservableObject {
     private let cacheManager = CacheManager.shared
     
     // MARK: - Public Types
-    
-    enum ContentType {
+
+    enum ContentType: CaseIterable, Identifiable {
         case all
         case movies
         case series
+
+        var id: String { title }
+
+        /// Display title for the content type
+        var title: String {
+            switch self {
+            case .all: return "All"
+            case .movies: return "Movies"
+            case .series: return "Series"
+            }
+        }
+
+        /// SF Symbol name for the content type
+        var systemImage: String {
+            switch self {
+            case .all: return "play.rectangle.on.rectangle.fill"
+            case .movies: return "film.fill"
+            case .series: return "tv.fill"
+            }
+        }
     }
     
     enum SortOption: String, CaseIterable {

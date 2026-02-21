@@ -8,6 +8,21 @@
 
 import SwiftUI
 
+// MARK: - Liquid Glass Availability Detection
+
+/// Detects native Liquid Glass API availability for iOS 26+ / macOS 26+
+enum LiquidGlassAvailability {
+    /// Returns true if running on iOS 26+ or macOS 26+ with native Liquid Glass support
+    static var isAvailable: Bool {
+        #if os(iOS)
+        if #available(iOS 26, *) { return true }
+        #elseif os(macOS)
+        if #available(macOS 26, *) { return true }
+        #endif
+        return false
+    }
+}
+
 // MARK: - App Colors
 
 /// Global color palette for the app
@@ -68,7 +83,7 @@ enum AppGlass {
 // MARK: - View Extensions
 
 extension View {
-    /// Apply standard app glass effect with red tint
+    /// Apply standard app glass effect with red tint (iOS 26+/macOS 26+ only)
     func appGlass(in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius)) -> some View {
         self.glassEffect(.regular.tint(AppColors.glassTint), in: shape)
     }
@@ -81,6 +96,40 @@ extension View {
     /// Apply prominent app glass effect (for featured content)
     func appGlassProminent(in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadiusLarge)) -> some View {
         self.glassEffect(.regular.tint(AppColors.accent.opacity(0.15)), in: shape)
+    }
+
+    // MARK: - Adaptive Glass (Backward Compatible)
+
+    /// Apply adaptive glass effect with fallback to ultraThinMaterial on older OS versions
+    /// - Parameters:
+    ///   - shape: The shape to clip the glass effect to
+    ///   - fallbackOpacity: Opacity for the fallback material (default 1.0)
+    @ViewBuilder
+    func adaptiveGlass(
+        in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius),
+        fallbackOpacity: Double = 1.0
+    ) -> some View {
+        if LiquidGlassAvailability.isAvailable {
+            self.glassEffect(.regular.tint(AppColors.glassTint), in: shape)
+        } else {
+            self.background(.ultraThinMaterial.opacity(fallbackOpacity), in: shape)
+        }
+    }
+
+    /// Apply adaptive interactive glass effect with fallback on older OS versions
+    /// - Parameters:
+    ///   - shape: The shape to clip the glass effect to
+    ///   - fallbackOpacity: Opacity for the fallback material (default 1.0)
+    @ViewBuilder
+    func adaptiveGlassInteractive(
+        in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius),
+        fallbackOpacity: Double = 1.0
+    ) -> some View {
+        if LiquidGlassAvailability.isAvailable {
+            self.glassEffect(.regular.tint(AppColors.glassTint).interactive(), in: shape)
+        } else {
+            self.background(.ultraThinMaterial.opacity(fallbackOpacity), in: shape)
+        }
     }
 }
 

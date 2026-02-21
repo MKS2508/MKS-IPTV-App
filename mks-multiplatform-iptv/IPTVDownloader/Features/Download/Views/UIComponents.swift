@@ -2135,14 +2135,6 @@ struct DocumentPicker: NSViewControllerRepresentable {
 }
 #endif
 
-// MARK: - Scroll Offset Key
-struct ScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 #if os(iOS)
 /// A reusable loading placeholder view that displays a progress indicator on a semi-transparent background
 /// Use this component whenever content is being loaded asynchronously

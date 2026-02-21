@@ -6,6 +6,29 @@ import Libavcodec
 import Libavutil
 #endif
 
+// MARK: - Transmux Error
+
+/// Errors that can occur during transmuxing operations
+enum TransmuxError: LocalizedError {
+    case ffmpegNotFound
+    case processStartFailure(Error)
+    case processFailure(status: Int)
+    case notAvailableOnPlatform
+
+    var errorDescription: String? {
+        switch self {
+        case .ffmpegNotFound:
+            return "FFmpeg C API not available. Ensure KSPlayer (with FFmpegKit) is linked."
+        case .processStartFailure(let error):
+            return "Failed to initialize transmuxing: \(error.localizedDescription)"
+        case .processFailure(let status):
+            return "Transmuxing failed with error code: \(status)"
+        case .notAvailableOnPlatform:
+            return "FFmpeg transmuxing is not available on this platform (Libavformat not linked)"
+        }
+    }
+}
+
 // MARK: - Transmux Result
 
 /// Result of a transmuxing operation containing the local HLS playlist URL and segment directory

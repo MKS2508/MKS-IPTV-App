@@ -8,6 +8,7 @@ struct UniversalPlayerView: View {
     @State private var selectedPlayerType: PlayerType = .avplayer
     @State private var showPlayerSelector = false
     @State private var playerError: PlayerError?
+    @State private var showErrorAlert = false
     @State private var airPlayEnabled = false
     
     var body: some View {
@@ -73,7 +74,7 @@ struct UniversalPlayerView: View {
             .padding(.vertical, 8)
             .background(Color.black.opacity(0.9))
         }
-        .alert("Playback Error", isPresented: .constant(playerError != nil)) {
+        .alert("Playback Error", isPresented: $showErrorAlert) {
             Button("Try Another Player") {
                 showPlayerSelector = true
                 playerError = nil
@@ -137,6 +138,7 @@ struct UniversalPlayerView: View {
     private func checkPlayerError() {
         if let error = playerManager.currentPlayer?.error {
             playerError = error
+            showErrorAlert = true
         }
     }
 }

@@ -18,6 +18,11 @@ struct DebugStreamingView: View {
     @State private var selectedSerieForEpisodes: DebugStreamItem?
     @State private var selectedLiveTVCategory: String = "all"
     @State private var showingCategoryURLs = false
+    @State private var activeProxySession: StreamProxy.ProxySession?
+
+    /// Threshold for URL length above which we use the proxy.
+    /// FFmpeg n6.1 has a buffer overflow on URLs >~500 chars.
+    private let proxyURLLengthThreshold = 500
 
     enum ContentTab: String, CaseIterable {
         case movies = "Movies"
@@ -78,6 +83,11 @@ struct DebugStreamingView: View {
                     Button("Close") {
                         showingPlayer = false
                         activePlayerView = nil
+                        // Cleanup proxy session if active
+                        if let session = activeProxySession {
+                            StreamProxy.shared.stop(sessionID: session.id)
+                            activeProxySession = nil
+                        }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -498,12 +508,30 @@ struct DebugStreamingView: View {
             // resolve a fresh direct URL so KSPlayer/FFmpeg doesn't need to
             // handle the 302 itself (FFmpeg's URL parser chokes on long token URLs)
             var playbackURL = url
+            var needsProxy = false
             if preflight.wasRedirected {
                 viewModel.log("Resolving redirect for direct playback...", type: .info)
                 let resolved = await StreamPreflight.resolveRedirects(url: url)
                 if resolved != url {
                     viewModel.log("Resolved to: \(resolved.host ?? "?"):\(resolved.port ?? 80)/...\(resolved.lastPathComponent)", type: .success)
                     playbackURL = resolved
+                    // Check if URL is too long for FFmpeg n6.1 (>500 chars causes buffer overflow)
+                    needsProxy = resolved.absoluteString.count > proxyURLLengthThreshold
+                    if needsProxy {
+                        viewModel.log("URL is long (\(resolved.absoluteString.count) chars) — using proxy", type: .info)
+                    }
+                }
+            }
+
+            // Use proxy for long URLs to avoid FFmpeg buffer overflow
+            if needsProxy {
+                do {
+                    let session = try await StreamProxy.shared.startProxy(for: playbackURL)
+                    activeProxySession = session
+                    viewModel.log("Proxy started: \(session.localURL.absoluteString)", type: .success)
+                    playbackURL = session.localURL
+                } catch {
+                    viewModel.log("Proxy failed: \(error.localizedDescription) — trying direct URL", type: .warning)
                 }
             }
 
@@ -555,11 +583,28 @@ struct DebugStreamingView: View {
 
             // Resolve redirect for direct playback if needed
             var playbackURL = url
+            var needsProxy = false
             if preflight.wasRedirected {
                 let resolved = await StreamPreflight.resolveRedirects(url: url)
                 if resolved != url {
                     viewModel.log("Resolved redirect → \(resolved.host ?? "?"):\(resolved.port ?? 80)", type: .info)
                     playbackURL = resolved
+                    needsProxy = resolved.absoluteString.count > proxyURLLengthThreshold
+                    if needsProxy {
+                        viewModel.log("URL is long (\(resolved.absoluteString.count) chars) — using proxy", type: .info)
+                    }
+                }
+            }
+
+            // Use proxy for long URLs to avoid FFmpeg buffer overflow
+            if needsProxy {
+                do {
+                    let session = try await StreamProxy.shared.startProxy(for: playbackURL)
+                    activeProxySession = session
+                    viewModel.log("Proxy started: \(session.localURL.absoluteString)", type: .success)
+                    playbackURL = session.localURL
+                } catch {
+                    viewModel.log("Proxy failed: \(error.localizedDescription) — trying direct URL", type: .warning)
                 }
             }
 
@@ -606,9 +651,28 @@ struct DebugStreamingView: View {
             }
 
             var playbackURL = url
+            var needsProxy = false
             if preflight.wasRedirected {
                 let resolved = await StreamPreflight.resolveRedirects(url: url)
-                if resolved != url { playbackURL = resolved }
+                if resolved != url {
+                    playbackURL = resolved
+                    needsProxy = resolved.absoluteString.count > proxyURLLengthThreshold
+                    if needsProxy {
+                        viewModel.log("URL is long (\(resolved.absoluteString.count) chars) — using proxy", type: .info)
+                    }
+                }
+            }
+
+            // Use proxy for long URLs to avoid FFmpeg buffer overflow
+            if needsProxy {
+                do {
+                    let session = try await StreamProxy.shared.startProxy(for: playbackURL)
+                    activeProxySession = session
+                    viewModel.log("Proxy started: \(session.localURL.absoluteString)", type: .success)
+                    playbackURL = session.localURL
+                } catch {
+                    viewModel.log("Proxy failed: \(error.localizedDescription) — trying direct URL", type: .warning)
+                }
             }
 
             let player = PlayerFactory.shared.createPlayer(for: playbackURL)

@@ -508,37 +508,46 @@ struct DebugStreamingView: View {
             // resolve a fresh direct URL so KSPlayer/FFmpeg doesn't need to
             // handle the 302 itself (FFmpeg's URL parser chokes on long token URLs)
             var playbackURL = url
-            var needsProxy = false
             if preflight.wasRedirected {
                 viewModel.log("Resolving redirect for direct playback...", type: .info)
                 let resolved = await StreamPreflight.resolveRedirects(url: url)
                 if resolved != url {
                     viewModel.log("Resolved to: \(resolved.host ?? "?"):\(resolved.port ?? 80)/...\(resolved.lastPathComponent)", type: .success)
                     playbackURL = resolved
-                    // Check if URL is too long for FFmpeg n6.1 (>500 chars causes buffer overflow)
-                    needsProxy = resolved.absoluteString.count > proxyURLLengthThreshold
-                    if needsProxy {
-                        viewModel.log("URL is long (\(resolved.absoluteString.count) chars) — using proxy", type: .info)
-                    }
                 }
             }
 
-            // Use proxy for long URLs to avoid FFmpeg buffer overflow
-            if needsProxy {
-                do {
-                    let session = try await StreamProxy.shared.startProxy(for: playbackURL)
-                    activeProxySession = session
-                    viewModel.log("Proxy started: \(session.localURL.absoluteString)", type: .success)
-                    playbackURL = session.localURL
-                } catch {
-                    viewModel.log("Proxy failed: \(error.localizedDescription) — trying direct URL", type: .warning)
-                }
-            }
+            // NOTE: Proxy is only needed for KSPlayer with long URLs.
+            // FFmpegPlayer (transmux) uses FFmpeg C API directly which doesn't have the buffer overflow.
+            // VLCPlayer also handles long URLs correctly.
+            // We'll create the player first, then decide if we need proxy.
 
             let startTime = Date()
 
+            // Determine if URL is too long for KSPlayer's FFmpeg n6.1
+            let urlIsLong = playbackURL.absoluteString.count > proxyURLLengthThreshold
+
             // PlayerFactory auto-selects best player based on file extension
-            let player = PlayerFactory.shared.createPlayer(for: playbackURL)
+            // But if URL is long, avoid KSPlayer AND FFmpeg Transmuxer (both use FFmpeg n6.1)
+            // Use VLCPlayer instead - it has its own HTTP stack without the buffer overflow
+            let player: any VideoPlayerProtocol
+            if urlIsLong {
+                let availablePlayers = PlayerFactory.availablePlayers()
+                if availablePlayers.contains(.vlc) {
+                    viewModel.log("URL is long (\(playbackURL.absoluteString.count) chars) — using VLC", type: .info)
+                    player = PlayerFactory.shared.createPlayer(type: .vlc, url: playbackURL)
+                } else if availablePlayers.contains(.ffmpeg) {
+                    viewModel.log("URL is long (\(playbackURL.absoluteString.count) chars) — trying FFmpeg Transmuxer (may fail)", type: .info)
+                    player = PlayerFactory.shared.createPlayer(type: .ffmpeg, url: playbackURL)
+                } else {
+                    // Last resort: try KSPlayer (will likely crash with EXC_BAD_ACCESS)
+                    viewModel.log("URL is long but no VLC/FFmpeg available — trying KSPlayer (may crash)", type: .warning)
+                    player = PlayerFactory.shared.createPlayer(for: playbackURL)
+                }
+            } else {
+                player = PlayerFactory.shared.createPlayer(for: playbackURL)
+            }
+
             let playerType = detectPlayerType(player)
             let initTime = Date().timeIntervalSince(startTime)
 

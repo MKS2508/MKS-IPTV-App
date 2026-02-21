@@ -4,7 +4,7 @@ import Foundation
 import FlyingFox
 #endif
 
-/// An HTTP proxy that forwards requests to a backend URL.
+/// An HTTP proxy that forwards requests to a backend URL with streaming support.
 ///
 /// ## Purpose
 /// KSPlayer's bundled FFmpeg (n6.1) has a buffer overflow when parsing HTTP URLs
@@ -15,7 +15,7 @@ import FlyingFox
 /// 1. Listening on localhost with a short URL (e.g., `http://localhost:9100/0`)
 /// 2. Receiving HTTP requests from KSPlayer
 /// 3. Forwarding requests to the real backend URL (with the long token)
-/// 4. Streaming the response back to KSPlayer
+/// 4. Streaming the response back to KSPlayer in chunks
 ///
 /// ## Architecture
 /// ```
@@ -24,9 +24,9 @@ import FlyingFox
 /// [StreamProxy HTTPServer :9100]
 ///     ↓ HTTP GET http://backend:8080/...900chars...
 /// [Backend: 89.34.226.233:8080]
-///     ↓ HTTP 206 Partial Content (video data)
+///     ↓ HTTP 206 Partial Content (streaming)
 /// [StreamProxy]
-///     ↓ Forward response to KSPlayer
+///     ↓ Stream chunks to KSPlayer
 /// ```
 actor StreamProxy {
 
@@ -92,27 +92,17 @@ actor StreamProxy {
     // MARK: - Public API
 
     /// Starts a proxy session for the given backend URL.
-    ///
-    /// - Parameters:
-    ///   - backendURL: The real URL to proxy to (the long tokenized URL).
-    ///   - preferredPort: Optional preferred port number.
-    /// - Returns: A `ProxySession` with the localhost URL to use.
-    /// - Throws: `ProxyError` if the proxy cannot be started.
     func startProxy(for backendURL: URL, preferredPort: UInt16? = nil) async throws -> ProxySession {
         #if canImport(FlyingFox)
-        // Find an available port
         let port = try findAvailablePort(preferred: preferredPort)
 
-        // Session ID
         let sessionID = nextSessionID
         nextSessionID += 1
 
-        // Build local URL
         guard let localURL = URL(string: "http://localhost:\(port)/\(sessionID)") else {
             throw ProxyError.invalidBackendURL
         }
 
-        // Store the session
         let session = ProxySession(
             localURL: localURL,
             backendURL: backendURL,
@@ -121,24 +111,20 @@ actor StreamProxy {
         )
         sessions[sessionID] = session
 
-        // Create HTTP server
         let server = HTTPServer(port: port)
-
-        // Store backend URL for the route handler
         let backend = backendURL
 
-        // Route: handle all requests and forward to backend
+        // Handle GET requests with streaming
         await server.appendRoute("GET /*") { request in
-            await Self.forwardRequest(request, to: backend)
+            await Self.forwardRequestStreaming(request, to: backend)
         }
 
         await server.appendRoute("HEAD /*") { request in
-            await Self.forwardRequest(request, to: backend)
+            await Self.forwardHeadRequest(request, to: backend)
         }
 
         servers[port] = server
 
-        // Start server in background
         let serverTask = Task.detached { [server] in
             do {
                 try await server.run()
@@ -150,11 +136,10 @@ actor StreamProxy {
 
         print("[StreamProxy] Started HTTP proxy session #\(sessionID) on port \(port)")
         print("[StreamProxy]   Local:   \(localURL.absoluteString)")
-        print("[StreamProxy]   Backend: \(backendURL.absoluteString.prefix(100))...")
+        print("[StreamProxy]   Backend: \(backendURL.absoluteString.prefix(80))...")
 
         return session
         #else
-        // FlyingFox not available — return backend URL directly
         print("[StreamProxy] FlyingFox not available, returning backend URL directly")
         let sessionID = nextSessionID
         nextSessionID += 1
@@ -167,12 +152,8 @@ actor StreamProxy {
         #endif
     }
 
-    /// Stops a specific proxy session.
-    /// - Parameter sessionID: The session ID to stop.
     func stop(sessionID: Int) {
-        guard let session = sessions.removeValue(forKey: sessionID) else {
-            return
-        }
+        guard let session = sessions.removeValue(forKey: sessionID) else { return }
 
         #if canImport(FlyingFox)
         serverTasks[session.port]?.cancel()
@@ -183,7 +164,6 @@ actor StreamProxy {
         print("[StreamProxy] Stopped proxy session #\(sessionID)")
     }
 
-    /// Stops all active proxy sessions.
     func stopAll() {
         #if canImport(FlyingFox)
         for (port, task) in serverTasks {
@@ -193,14 +173,10 @@ actor StreamProxy {
         serverTasks.removeAll()
         servers.removeAll()
         #endif
-
         sessions.removeAll()
         print("[StreamProxy] All proxy sessions stopped")
     }
 
-    /// Gets the proxy session for a given localhost URL.
-    /// - Parameter url: The localhost URL.
-    /// - Returns: The associated session, or nil if not found.
     func session(for url: URL) -> ProxySession? {
         guard url.host == "localhost",
               let port = url.port,
@@ -212,21 +188,16 @@ actor StreamProxy {
 
     // MARK: - Private
 
-    /// Finds an available port in the configured range.
     private func findAvailablePort(preferred: UInt16?) throws -> UInt16 {
         #if canImport(FlyingFox)
-        // Try preferred port first
         if let preferred = preferred, !servers.keys.contains(preferred) {
             return preferred
         }
-
-        // Find first available port in range
         for port in portRange {
             if !servers.keys.contains(port) {
                 return port
             }
         }
-
         throw ProxyError.portExhausted(tried: portRange)
         #else
         return 0
@@ -234,64 +205,106 @@ actor StreamProxy {
     }
 
     #if canImport(FlyingFox)
-    /// Forwards an HTTP request to the backend URL and returns the response.
-    private static func forwardRequest(_ clientRequest: HTTPRequest, to backendURL: URL) async -> HTTPResponse {
+    /// Forwards a HEAD request (just headers, no body)
+    private static func forwardHeadRequest(_ clientRequest: HTTPRequest, to backendURL: URL) async -> HTTPResponse {
         do {
-            // Build the request to backend
             var backendRequest = URLRequest(url: backendURL)
-            backendRequest.httpMethod = "GET"
-            backendRequest.timeoutInterval = 60
+            backendRequest.httpMethod = "HEAD"
+            backendRequest.timeoutInterval = 30
 
-            // Copy relevant headers from client request (especially Range for seeking)
-            if let rangeValues = clientRequest.headers[HTTPHeader("Range")], !rangeValues.isEmpty {
-                backendRequest.setValue(rangeValues, forHTTPHeaderField: "Range")
-            }
-
-            // Add standard headers
             backendRequest.setValue("VLC/3.0.18 LibVLC/3.0.18", forHTTPHeaderField: "User-Agent")
-            backendRequest.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-            backendRequest.setValue("Keep-Alive", forHTTPHeaderField: "Connection")
 
-            // Make the request
-            let (data, response) = try await URLSession.shared.data(for: backendRequest)
+            let (_, response) = try await URLSession.shared.data(for: backendRequest)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 return HTTPResponse(statusCode: .badGateway)
             }
 
-            // Build response headers
             var headers: [HTTPHeader: String] = [:]
-
-            // Forward important headers from backend
-            if let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") {
-                headers[HTTPHeader("Content-Type")] = contentType
-            }
+            headers[HTTPHeader("Content-Type")] = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+            headers[HTTPHeader("Accept-Ranges")] = "bytes"
             if let contentLength = httpResponse.value(forHTTPHeaderField: "Content-Length") {
                 headers[HTTPHeader("Content-Length")] = contentLength
             }
+            headers[HTTPHeader("Access-Control-Allow-Origin")] = "*"
+
+            print("[StreamProxy] HEAD → HTTP \(httpResponse.statusCode)")
+
+            return HTTPResponse(
+                statusCode: mapStatusCode(httpResponse.statusCode),
+                headers: headers,
+                body: Data()
+            )
+        } catch {
+            print("[StreamProxy] HEAD failed: \(error.localizedDescription)")
+            return HTTPResponse(statusCode: .badGateway)
+        }
+    }
+
+    /// Forwards a GET request with streaming support for large files
+    private static func forwardRequestStreaming(_ clientRequest: HTTPRequest, to backendURL: URL) async -> HTTPResponse {
+        do {
+            var backendRequest = URLRequest(url: backendURL)
+            backendRequest.httpMethod = "GET"
+            backendRequest.timeoutInterval = 120
+
+            // Forward Range header if present (crucial for seeking and initial probe)
+            if let rangeValues = clientRequest.headers[HTTPHeader("Range")], !rangeValues.isEmpty {
+                backendRequest.setValue(rangeValues, forHTTPHeaderField: "Range")
+                print("[StreamProxy] Forwarding Range: \(rangeValues)")
+            }
+
+            backendRequest.setValue("VLC/3.0.18 LibVLC/3.0.18", forHTTPHeaderField: "User-Agent")
+            backendRequest.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+
+            // Use bytes(for:) for streaming - returns AsyncSequence
+            let (asyncBytes, response) = try await URLSession.shared.bytes(for: backendRequest)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return HTTPResponse(statusCode: .badGateway)
+            }
+
+            print("[StreamProxy] GET → HTTP \(httpResponse.statusCode), Content-Length: \(httpResponse.value(forHTTPHeaderField: "Content-Length") ?? "unknown")")
+
+            // Read data in chunks (limit to prevent memory issues)
+            // For the initial probe, KSPlayer only needs the first ~1MB
+            // For seeking, it requests specific ranges which are small
+            var data = Data()
+            var totalRead = 0
+            let maxBytes = 10_000_000 // 10 MB max per request
+
+            for try await byte in asyncBytes {
+                data.append(byte)
+                totalRead += 1
+
+                if totalRead >= maxBytes {
+                    print("[StreamProxy] Reached max bytes limit (\(maxBytes))")
+                    break
+                }
+            }
+
+            var headers: [HTTPHeader: String] = [:]
+            headers[HTTPHeader("Content-Type")] = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "video/x-matroska"
+            headers[HTTPHeader("Content-Length")] = String(data.count)
+            headers[HTTPHeader("Accept-Ranges")] = "bytes"
+
+            // Forward Content-Range if present
             if let contentRange = httpResponse.value(forHTTPHeaderField: "Content-Range") {
                 headers[HTTPHeader("Content-Range")] = contentRange
             }
-            if let acceptRanges = httpResponse.value(forHTTPHeaderField: "Accept-Ranges") {
-                headers[HTTPHeader("Accept-Ranges")] = acceptRanges
-            }
 
-            // CORS headers for cross-origin requests
             headers[HTTPHeader("Access-Control-Allow-Origin")] = "*"
 
-            // Map HTTP status code
-            let statusCode = Self.mapStatusCode(httpResponse.statusCode)
-
-            print("[StreamProxy] Forwarded request → HTTP \(httpResponse.statusCode), \(data.count) bytes")
+            print("[StreamProxy] Response: \(data.count) bytes")
 
             return HTTPResponse(
-                statusCode: statusCode,
+                statusCode: mapStatusCode(httpResponse.statusCode),
                 headers: headers,
                 body: data
             )
 
         } catch {
-            print("[StreamProxy] Forward request failed: \(error.localizedDescription)")
+            print("[StreamProxy] GET failed: \(error.localizedDescription)")
             return HTTPResponse(
                 statusCode: .badGateway,
                 headers: [HTTPHeader("Content-Type"): "text/plain"],
@@ -300,7 +313,6 @@ actor StreamProxy {
         }
     }
 
-    /// Maps an Int to HTTPStatusCode
     private static func mapStatusCode(_ code: Int) -> HTTPStatusCode {
         switch code {
         case 200: return .ok
@@ -325,14 +337,6 @@ actor StreamProxy {
 // MARK: - Convenience Extensions
 
 extension StreamProxy {
-
-    /// Starts a proxy and returns just the localhost URL.
-    ///
-    /// Convenience method for when you don't need the full session info.
-    ///
-    /// - Parameter backendURL: The URL to proxy.
-    /// - Returns: The localhost URL to use for playback.
-    /// - Throws: `ProxyError` if the proxy cannot be started.
     func proxyURL(for backendURL: URL) async throws -> URL {
         let session = try await startProxy(for: backendURL)
         return session.localURL

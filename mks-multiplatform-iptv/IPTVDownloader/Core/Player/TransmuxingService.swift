@@ -181,7 +181,11 @@ actor TransmuxingService {
                 print("[TransmuxingService] Warning: nil stream at index \(i), skipping")
                 continue
             }
-            let codecType = inStream.pointee.codecpar.pointee.codec_type
+            guard let codecPar = inStream.pointee.codecpar else {
+                print("[TransmuxingService] Warning: nil codecpar at stream \(i), skipping")
+                continue
+            }
+            let codecType = codecPar.pointee.codec_type
 
             // Only copy video and audio streams
             guard codecType == AVMEDIA_TYPE_VIDEO || codecType == AVMEDIA_TYPE_AUDIO else {

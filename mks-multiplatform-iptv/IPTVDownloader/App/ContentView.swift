@@ -72,16 +72,42 @@ struct ContentView: View {
     // MARK: - View Components
 
     private var backgroundPattern: some View {
-        Image("backgroundPattern")
-            .resizable(resizingMode: .tile)
+        ZStack {
+            // Native dark gradient background
+            Color.black.ignoresSafeArea()
+
+            // Subtle gradient for depth
+            LinearGradient(
+                colors: [
+                    Color.black,
+                    Color(red: 0.04, green: 0.01, blue: 0.01),
+                    Color.black
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
             .ignoresSafeArea()
+
+            // Subtle accent glow
+            RadialGradient(
+                colors: [
+                    Color(red: 0.863, green: 0.165, blue: 0.157).opacity(0.04),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 100,
+                endRadius: 600
+            )
+            .ignoresSafeArea()
+        }
     }
 
     @ViewBuilder
     private var mainContent: some View {
         if let loader = dataLoader, loader.isLoading {
-            AppLoadingView(loadingStatus: loader.loadingStatus.displayText)
-                .transition(.opacity)
+            // Native launch screen following Apple HIG
+            NativeLaunchScreen(loadingStatus: loader.loadingStatus.displayText)
+                .transition(.opacity.animation(.easeInOut(duration: 0.25)))
         } else if let loader = dataLoader {
             PlatformNavigationView(
                 sidebarContent: { sidebarContent },

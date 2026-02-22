@@ -9,5 +9,11 @@
 		<key>NSExceptionDomains</key>
 		<dict/>
 	</dict>
+	<!-- Native Launch Screen Configuration for iOS 14+ -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchScreenBackground</string>
+	</dict>
 </dict>
 </plist>

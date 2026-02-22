@@ -74,15 +74,32 @@ struct MediaListView: View {
     
     // MARK: - View Components para el Body
     
-    // Background View
+    // Background View - Native gradient (no pattern image)
     private var backgroundView: some View {
         ZStack {
-            Image("backgroundPattern")
-                .resizable()            .aspectRatio(contentMode: .fill)  // This will make it fill the space while maintaining aspect ratio
-                .ignoresSafeArea()
-                
-                
-            Color.black.opacity(0.35).ignoresSafeArea(edges: .all)
+            // Native dark gradient background
+            LinearGradient(
+                colors: [
+                    Color.black,
+                    Color(red: 0.03, green: 0.01, blue: 0.01),
+                    Color.black
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            // Subtle accent glow at center
+            RadialGradient(
+                colors: [
+                    Color(red: 0.863, green: 0.165, blue: 0.157).opacity(0.05),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 100,
+                endRadius: 500
+            )
+            .ignoresSafeArea()
         }
     }
     
@@ -122,15 +139,25 @@ struct MediaListView: View {
         }
     }
     
-    // Content Type Selector Section
+    // Content Type Selector Section - Native pill picker
     private var contentTypeSelectorSection: some View {
         Group {
             if showContentTypeSelector {
-                contentTypeSelector
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .padding(.horizontal)
-                    .padding(.top, 4)
-                    .padding(.bottom, 8)
+                Picker("Content Type", selection: $contentTypeFilter) {
+                    ForEach(MediaListViewModel.ContentType.allCases) { type in
+                        Text(type.title).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .onChange(of: contentTypeFilter) { newType in
+                    selectedCategories.removeAll()
+                    Task {
+                        await viewModel.loadMedia(contentType: newType)
+                    }
+                }
             }
         }
     }
@@ -284,18 +311,17 @@ struct MediaListView: View {
         }
     }
     
-    // iOS Toolbar Content - Liquid Glass Style
+    // iOS Toolbar Content - Native Style
     #if os(iOS)
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .principal) {
             Text(navigationTitle)
                 .font(.headline.weight(.semibold))
-                .foregroundColor(.primary)
         }
 
         ToolbarItemGroup(placement: .topBarTrailing) {
-            // Sort button with glass style
+            // Sort menu
             Menu {
                 Button("Name A-Z") {
                     applySortOption(.nameAsc)
@@ -312,58 +338,37 @@ struct MediaListView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            .buttonStyle(.glass)
 
-            // Filter button with glass style
+            // Filter button
             Button(action: { showFilterMenu.toggle() }) {
                 Image(systemName: selectedCategories.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
             }
-            .buttonStyle(.glass)
 
-            // Refresh button with glass style
+            // Refresh button
             Button(action: {
                 Task {
                     await viewModel.refreshMedia(contentType: contentTypeFilter)
                 }
             }) {
                 Image(systemName: viewModel.isRefreshing ? "arrow.clockwise.circle.fill" : "arrow.clockwise")
-                    .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
-                    .animation(viewModel.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isRefreshing)
+                    .symbolEffect(.rotate, options: .repeating.speed(1.5), isActive: viewModel.isRefreshing)
             }
-            .buttonStyle(.glass)
             .disabled(viewModel.isRefreshing || viewModel.isLoading)
         }
     }
     #endif
-    
-    // macOS Toolbar Content with Glass Search Field
+
+    // macOS Toolbar Content - Native Style (NO duplicated search)
     #if os(macOS)
     @ToolbarContentBuilder
     private var macOSToolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             Text(navigationTitle)
                 .font(.headline.weight(.semibold))
-                .foregroundColor(.primary)
-        }
-
-        // Native glass search field for macOS 26+
-        ToolbarItem(placement: .principal) {
-            if #available(macOS 26, *) {
-                TextField("Search \(navigationPrompt)", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(minWidth: 200, idealWidth: 280, maxWidth: 400)
-                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 8))
-            } else {
-                TextField("Search \(navigationPrompt)", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 200, idealWidth: 280, maxWidth: 400)
-            }
         }
 
         ToolbarItemGroup(placement: .primaryAction) {
-            // Sort button with glass style
+            // Sort menu
             Menu {
                 Button("Name A-Z") {
                     applySortOption(.nameAsc)
@@ -380,9 +385,8 @@ struct MediaListView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
             }
-            .buttonStyle(.glass)
 
-            // Filter button with glass style
+            // Filter menu
             Menu {
                 if !movieCategories.isEmpty {
                     Section("Movie Categories") {
@@ -430,19 +434,16 @@ struct MediaListView: View {
             } label: {
                 Image(systemName: selectedCategories.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
             }
-            .buttonStyle(.glass)
 
-            // Refresh button with glass style
+            // Refresh button
             Button(action: {
                 Task {
                     await viewModel.refreshMedia(contentType: contentTypeFilter)
                 }
             }) {
                 Image(systemName: viewModel.isRefreshing ? "arrow.clockwise.circle.fill" : "arrow.clockwise")
-                    .rotationEffect(.degrees(viewModel.isRefreshing ? 360 : 0))
-                    .animation(viewModel.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: viewModel.isRefreshing)
+                    .symbolEffect(.rotate, options: .repeating.speed(1.5), isActive: viewModel.isRefreshing)
             }
-            .buttonStyle(.glass)
             .disabled(viewModel.isRefreshing || viewModel.isLoading)
         }
     }
@@ -713,33 +714,28 @@ struct MediaListView: View {
             return filteredSeries
         }
     }
-    
-    // Removed private var applicableCategories entirely per instructions
 
-    // MARK: - View Components
-    
-    private var contentTypeSelector: some View {
-        GlassSegmentedControl(
-            selectedOption: $contentTypeFilter,
-            options: MediaListViewModel.ContentType.allCases,
-            titleForKeyPath: \.title,
-            systemImageForKeyPath: \.systemImage
-        )
-        .onChange(of: contentTypeFilter) { newType in
-            selectedCategories.removeAll()
-            Task {
-                await viewModel.loadMedia(contentType: newType)
-            }
-        }
-    }
-
-    // Visual indicator that shows which categories are selected
+    // Visual indicator that shows which categories are selected - native style
     private var selectedCategoriesIndicator: some View {
-        GlassCategoryChipsContainer(
-            categories: selectedCategories,
-            categoryNameProvider: getCategoryName,
-            onRemoveCategory: toggleCategory
-        )
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(selectedCategories), id: \.self) { categoryId in
+                    Button(action: { toggleCategory(categoryId) }) {
+                        HStack(spacing: 4) {
+                            Text(getCategoryName(for: categoryId))
+                                .font(.subheadline.weight(.medium))
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(.secondary.opacity(0.2)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     // Helper function to get category name

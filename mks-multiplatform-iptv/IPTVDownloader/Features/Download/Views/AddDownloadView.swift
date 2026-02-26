@@ -27,7 +27,8 @@ struct AddDownloadView: View {
     @State private var customFolder: URL? = nil
     @State private var skipFetching: Bool = false
     @State private var showInlinePlayer = false
-    @State private var player: AVPlayer?
+    @State private var activePlayer: (any VideoPlayerProtocol)?
+    @State private var showMetadataPicker = false
     
     // Constructor original para Movie
     init(selectedView: Binding<String?>, movie: Movie, onDismiss: @escaping () -> Void) {
@@ -109,7 +110,12 @@ struct AddDownloadView: View {
                 selectedFolder: $selectedFolder,
                 shouldConvertToMOV: $shouldConvertToMOV,
                 availableFolders: availableFolders,
-                onDownload: startDownload
+                onDownload: startDownload,
+                metadata: viewModel?.enrichedMetadata,
+                metadataCandidates: viewModel?.metadataCandidates ?? [],
+                onMetadataSelected: { chosen in
+                    viewModel?.selectMetadata(chosen)
+                }
             )
         }
         .onAppear {
@@ -161,33 +167,34 @@ struct AddDownloadView: View {
             VStack(spacing: 0) {
                 // Inline player (when active)
                 if showInlinePlayer {
-                    VStack {
-                        if let player = player {
-                            VStack(spacing: 8) {
-                                Text("Reproduciendo: \(movieDetail.movieData.name)")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                VideoPlayer(player: player)
-                                    .frame(height: 250)
-                                    .cornerRadius(8)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                                    )
-                                
-                                Button(action: closePlayer) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "stop.fill")
-                                            .foregroundColor(.white)
-                                        Text("Cerrar Reproducción")
-                                            .foregroundColor(.white)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(Color.red)
-                                    .cornerRadius(8)
+                    VStack(spacing: 8) {
+                        if let player = activePlayer {
+                            Text("Reproduciendo: \(movieDetail.movieData.name)")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+
+                            MKSPlayerView(
+                                player: player,
+                                metadata: viewModel.enrichedMetadata
+                            )
+                            .frame(height: 250)
+                            .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall)
+                                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                            )
+
+                            Button(action: closePlayer) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "stop.fill")
+                                        .foregroundColor(.white)
+                                    Text("Cerrar Reproducción")
+                                        .foregroundColor(.white)
                                 }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.red)
+                                .cornerRadius(8)
                             }
                         } else {
                             VStack {
@@ -270,15 +277,24 @@ struct AddDownloadView: View {
     // MARK: - Actions
     
     private func startMoviePlayback(movieDetail: MovieDetail) {
-        DownloadActions.playAction(movieDetail: movieDetail, profile: profile) { player in
-            self.player = player
-            self.showInlinePlayer = true
+        let urlString = IPTVConfiguration.buildMovieURL(
+            profile: profile,
+            vodID: String(movieDetail.movieData.streamId),
+            vodExtension: movieDetail.movieData.containerExtension ?? "mp4"
+        )
+        guard let url = URL(string: urlString) else {
+            print("[AddDownloadView] Invalid movie URL: \(urlString)")
+            return
         }
+        let player = PlayerFactory.shared.createPlayer(for: url)
+        player.play()
+        self.activePlayer = player
+        self.showInlinePlayer = true
     }
-    
+
     private func closePlayer() {
-        player?.pause()
-        player = nil
+        activePlayer?.stop()
+        activePlayer = nil
         showInlinePlayer = false
     }
     
@@ -287,14 +303,18 @@ struct AddDownloadView: View {
         print("📁 Carpeta: \(selectedFolder.path)")
         print("🔄 Convertir a MOV: \(shouldConvertToMOV)")
 
-        // Start download directly using DownloadManager (same pattern as series)
         downloadManager.startDownload(
             vodID: String(movie.streamId),
             title: movie.name,
             type: mediaType,
             vodExtension: movie.containerExtension ?? "mp4",
             shouldConvertToMOV: shouldConvertToMOV,
-            downloadPathParam: selectedFolder.path
+            downloadPathParam: selectedFolder.path,
+            tmdbId: Int(movie.tmdbId ?? "") ?? viewModel?.movieDetail?.tmdbId,
+            genre: viewModel?.movieDetail?.genre,
+            runtimeMinutes: viewModel?.movieDetail.map { $0.durationSecs / 60 },
+            preResolvedMetadata: viewModel?.enrichedMetadata,
+            metadataCandidates: viewModel?.metadataCandidates
         )
         print("✅ Descarga iniciada correctamente")
 
@@ -310,6 +330,7 @@ struct AddDownloadView_Previews: PreviewProvider {
             name: "Si yo fuera rico (2019)",
             streamType: nil,
             streamId: 1007,
+            tmdbId: nil,
             streamIcon: nil,
             rating: "5.9",
             rating5Based: 5.9,

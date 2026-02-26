@@ -57,17 +57,18 @@ class StreamManager {
             "Range": "bytes=0-"
         ]])
         
-        asset.loadValuesAsynchronously(forKeys: ["playable"]) { [weak self] in
-            var error: NSError?
-            let status = asset.statusOfValue(forKey: "playable", error: &error)
-            
-            switch status {
-            case .loaded:
+        Task { [weak self] in
+            do {
+                let isPlayable = try await asset.load(.isPlayable)
+                guard isPlayable else {
+                    LiveLogger.error("Asset is not playable")
+                    completion(nil)
+                    return
+                }
                 let playerItem = AVPlayerItem(asset: asset)
                 self?.setupPlayerItemObservers(playerItem: playerItem, completion: completion)
-                
-            default:
-                LiveLogger.error("Asset loading failed: \(error?.localizedDescription ?? "Unknown error")")
+            } catch {
+                LiveLogger.error("Asset loading failed: \(error.localizedDescription)")
                 completion(nil)
             }
         }

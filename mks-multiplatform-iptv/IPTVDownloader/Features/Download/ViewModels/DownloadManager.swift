@@ -64,69 +64,138 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    func startDownload(vodID: String, title: String, type: MediaType, vodExtension: String, shouldConvertToMOV: Bool, downloadPathParam: String) {
-        let download = DownloadItem(
+    func startDownload(vodID: String, title: String, type: MediaType, vodExtension: String, shouldConvertToMOV: Bool, downloadPathParam: String, tmdbId: Int? = nil, genre: String? = nil, runtimeMinutes: Int? = nil, preResolvedMetadata: MetadataResult? = nil, metadataCandidates: [ScoredMetadataResult]? = nil) {
+        var download = DownloadItem(
             id: UUID(),
             vodID: vodID,
             title: title,
             type: type,
             status: .notStarted
         )
-        
-        DispatchQueue.main.async {
-            self.downloads.append(download)
+
+        // Attach pre-resolved metadata if provided
+        if let metadata = preResolvedMetadata {
+            download.metadataResult = metadata
         }
-        
+        if let candidates = metadataCandidates {
+            download.metadataCandidates = candidates
+        }
+
+        // Capture immutable copy before concurrent use
+        let finalDownload = download
+
+        DispatchQueue.main.async {
+            self.downloads.append(finalDownload)
+        }
+
         // Create a new downloader for this download
         let downloader = VideoDownloader(profile: profile)
         downloader.shouldConvertToMOV = true
-        downloaders[download.id] = downloader
-        
+        let downloadId = finalDownload.id
+        downloaders[downloadId] = downloader
+
         // Set up a new progress subscription for this download
         let progressSubscription = downloader.progressPublisher
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { [weak self] completion in
-                self?.handleCompletion(for: download.id, completion: completion)
+                self?.handleCompletion(for: downloadId, completion: completion)
             }, receiveValue: { [weak self] progress in
-                self?.updateProgress(for: download.id, progress: progress)
+                self?.updateProgress(for: downloadId, progress: progress)
             })
-        progressSubscriptions[download.id] = progressSubscription
-        
+        progressSubscriptions[downloadId] = progressSubscription
+
         Task {
             do {
                 var downloadPath = ""
-                // Usa la ruta definida en las configuraciones, o un valor por defecto si no está configurada
                 if (downloadPathParam != "") {
                     downloadPath = downloadPathParam
                 } else {
                     downloadPath = UserDefaults.downloadPath
                 }
-                
+
                 let destinationPath = URL(fileURLWithPath: downloadPath)
                     .appendingPathComponent("\(title).\(vodExtension)")
                     .path
-                
+
                 if type == .movie {
                     try await downloader.downloadMovie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
                 } else {
                     try await downloader.downloadSerie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
                 }
-                
-                // Mark as completed when the download function completes
+
+                // Mark as completed
                 await MainActor.run {
-                    if let index = self.downloads.firstIndex(where: { $0.id == download.id }) {
+                    if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
                         self.downloads[index].status = .completed
                         self.downloads[index].progress = 100.0
-                        
+                        self.downloads[index].filePath = destinationPath
+
                         // Clean up
-                        self.downloaders[download.id] = nil
-                        self.progressSubscriptions[download.id]?.cancel()
-                        self.progressSubscriptions[download.id] = nil
+                        self.downloaders[downloadId] = nil
+                        self.progressSubscriptions[downloadId]?.cancel()
+                        self.progressSubscriptions[downloadId] = nil
+                    }
+                }
+
+                // Post-download metadata writing
+                let fileURL = URL(fileURLWithPath: destinationPath)
+                if let metadata = preResolvedMetadata {
+                    // Pre-resolved metadata: write tags directly
+                    Task { [weak self] in
+                        guard let self = self else { return }
+                        do {
+                            try await MetadataEnrichmentService.shared.writeChosenMetadata(
+                                to: fileURL,
+                                metadata: metadata
+                            ) { status in
+                                Task { @MainActor in
+                                    if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
+                                        self.downloads[index].metadataStatus = status
+                                    }
+                                }
+                            }
+                        } catch {
+                            await MainActor.run {
+                                if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
+                                    self.downloads[index].metadataStatus = .failed(error.localizedDescription)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // No pre-resolved metadata: fetch candidates for later selection
+                    let metadataQuery = MetadataSearchQuery(
+                        title: title,
+                        year: StringSimilarity.extractYear(from: title),
+                        tmdbId: tmdbId,
+                        genre: genre,
+                        runtimeMinutes: runtimeMinutes,
+                        mediaType: type == .movie ? .movie : .series
+                    )
+                    Task { [weak self] in
+                        guard let self = self else { return }
+                        await MainActor.run {
+                            if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
+                                self.downloads[index].metadataStatus = .enriching
+                            }
+                        }
+                        let candidates = await MetadataEnrichmentService.shared.fetchAllCandidates(query: metadataQuery)
+                        await MainActor.run {
+                            if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
+                                self.downloads[index].metadataCandidates = candidates
+                                if let best = candidates.first {
+                                    self.downloads[index].metadataResult = best.result
+                                    self.downloads[index].metadataStatus = .pending
+                                } else {
+                                    self.downloads[index].metadataStatus = .failed("No metadata found")
+                                }
+                            }
+                        }
                     }
                 }
             } catch {
                 await MainActor.run {
-                    self.handleError(for: download.id, error: error)
+                    self.handleError(for: downloadId, error: error)
                 }
             }
         }
@@ -167,6 +236,76 @@ class DownloadManager: ObservableObject {
         }
     }
     
+    /// Write user-chosen metadata to a completed download's file.
+    ///
+    /// Call this after the user selects a candidate and optionally edits it.
+    /// The metadata is written to the file via FFmpeg and the status updates.
+    func writeMetadataForDownload(id: UUID, metadata: MetadataResult) {
+        guard let index = downloads.firstIndex(where: { $0.id == id }),
+              let filePath = downloads[index].filePath else { return }
+
+        downloads[index].metadataResult = metadata
+
+        let fileURL = URL(fileURLWithPath: filePath)
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                try await MetadataEnrichmentService.shared.writeChosenMetadata(
+                    to: fileURL,
+                    metadata: metadata
+                ) { status in
+                    Task { @MainActor in
+                        if let index = self.downloads.firstIndex(where: { $0.id == id }) {
+                            self.downloads[index].metadataStatus = status
+                        }
+                    }
+                }
+                await MainActor.run {
+                    if let index = self.downloads.firstIndex(where: { $0.id == id }) {
+                        self.downloads[index].metadataResult = metadata
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    if let index = self.downloads.firstIndex(where: { $0.id == id }) {
+                        self.downloads[index].metadataStatus = .failed(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Retry metadata resolution for a download that failed enrichment.
+    func retryMetadata(id: UUID) {
+        guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
+        let item = downloads[index]
+        guard item.status == .completed else { return }
+
+        downloads[index].metadataStatus = .enriching
+
+        let query = MetadataSearchQuery(
+            title: item.title,
+            year: StringSimilarity.extractYear(from: item.title),
+            mediaType: item.type == .movie ? .movie : .series
+        )
+
+        Task { [weak self] in
+            guard let self = self else { return }
+            let candidates = await MetadataEnrichmentService.shared.fetchAllCandidates(query: query)
+            await MainActor.run {
+                if let index = self.downloads.firstIndex(where: { $0.id == id }) {
+                    self.downloads[index].metadataCandidates = candidates
+                    if let best = candidates.first {
+                        self.downloads[index].metadataResult = best.result
+                        self.downloads[index].metadataStatus = .pending
+                    } else {
+                        self.downloads[index].metadataStatus = .failed("No metadata found")
+                    }
+                }
+            }
+        }
+    }
+
     private func handleCompletion(for id: UUID, completion: Subscribers.Completion<Never>) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
         

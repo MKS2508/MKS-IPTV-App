@@ -233,7 +233,7 @@ class DebugStreamingViewModel: ObservableObject {
                     let categoriesWithChannels = Dictionary(grouping: allChannels, by: { $0.categoryId })
                     
                     // Get up to 4 channels from each of the first 5 categories
-                    for (index, (categoryId, channels)) in categoriesWithChannels.enumerated() {
+                    for (index, (_, channels)) in categoriesWithChannels.enumerated() {
                         if index >= 5 { break }
                         let channelsToAdd = Array(channels.prefix(4))
                         selectedChannels.append(contentsOf: channelsToAdd)
@@ -545,7 +545,7 @@ class DebugStreamingViewModel: ObservableObject {
     
     private func combineJSONArrays(movies: String, series: String, live: String) -> String {
         // This is a simplified combination - in production, you'd parse and merge properly
-        var combined = "{\n  \"movies\": \(movies),\n  \"series\": \(series),\n  \"live_channels\": \(live)\n}"
+        let combined = "{\n  \"movies\": \(movies),\n  \"series\": \(series),\n  \"live_channels\": \(live)\n}"
         return combined
     }
     

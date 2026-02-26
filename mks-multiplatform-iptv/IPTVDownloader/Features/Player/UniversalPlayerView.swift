@@ -1,248 +1,78 @@
 import SwiftUI
 import Combine
 
-// MARK: - Universal Player View
-struct UniversalPlayerView: View {
-    let url: URL
-    @StateObject private var playerManager = PlayerManager.shared
-    @State private var selectedPlayerType: PlayerType = .avplayer
-    @State private var showPlayerSelector = false
-    @State private var playerError: PlayerError?
-    @State private var showErrorAlert = false
-    @State private var airPlayEnabled = false
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            // Player View
-            if let player = playerManager.currentPlayer {
-                player.playerView()
-                    .background(Color.black)
-                    .onAppear {
-                        // Check for errors periodically or use a different approach
-                        checkPlayerError()
-                    }
-            } else {
-                ZStack {
-                    Color.black
-                    VStack {
-                        Image(systemName: "tv")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No player loaded")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            
-            // Player Controls
-            PlayerControlsView(player: playerManager.currentPlayer)
-                .padding()
-                .background(Color.black.opacity(0.8))
-            
-            // Player Selection & AirPlay Toggle
-            HStack {
-                if PlayerFactory.availablePlayers().count > 1 {
-                    Text("Player:")
-                        .foregroundColor(.white)
-                        .font(.caption)
+// MARK: - Metadata Overlay View
 
-                    Picker("Player", selection: $selectedPlayerType) {
-                        ForEach(PlayerFactory.availablePlayers(), id: \.self) { type in
-                            Text(type.displayName).tag(type)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: selectedPlayerType) { newValue in
-                        reloadWithPlayer(type: newValue)
-                    }
+/// Collapsible info panel displayed over the player showing enriched metadata.
+/// Used by MKSPlayerView and inline player views throughout the app.
+struct MetadataOverlayView: View {
+    let metadata: MetadataResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Title and year
+            HStack {
+                Text(metadata.title)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+
+                if let year = metadata.year {
+                    Text("(\(String(year)))")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.8))
                 }
 
                 Spacer()
 
-                // AirPlay toggle — when enabled, forces transmux pipeline for non-native formats
-                Button(action: {
-                    airPlayEnabled.toggle()
-                    reloadWithAirPlay()
-                }) {
-                    Image(systemName: airPlayEnabled ? "airplayvideo.circle.fill" : "airplayvideo")
-                        .font(.title3)
-                        .foregroundColor(airPlayEnabled ? .blue : .white)
+                // Rating badge
+                if let rating = metadata.rating {
+                    HStack(spacing: 3) {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundColor(.yellow)
+                        Text(String(format: "%.1f", rating))
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.2))
+                    .cornerRadius(6)
                 }
-                .help("Toggle AirPlay-compatible playback (transmuxes non-native formats)")
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(Color.black.opacity(0.9))
-        }
-        .alert("Playback Error", isPresented: $showErrorAlert) {
-            Button("Try Another Player") {
-                showPlayerSelector = true
-                playerError = nil
-            }
-            Button("OK") {
-                playerError = nil
-            }
-        } message: {
-            Text(playerError?.errorDescription ?? "Unknown error")
-        }
-        .onAppear {
-            loadVideo()
-        }
-        .onDisappear {
-            playerManager.currentPlayer?.stop()
-        }
-    }
-    
-    private func loadVideo() {
-        selectedPlayerType = determineOptimalPlayer()
-        playerManager.loadVideo(url: url, preferredPlayer: selectedPlayerType)
-    }
-    
-    private func reloadWithPlayer(type: PlayerType) {
-        playerManager.loadVideo(url: url, preferredPlayer: type, requireAirPlay: airPlayEnabled)
-    }
 
-    private func reloadWithAirPlay() {
-        playerManager.loadVideo(url: url, requireAirPlay: airPlayEnabled)
-    }
-    
-    private func determineOptimalPlayer() -> PlayerType {
-        let format = url.pathExtension.lowercased()
-
-        let supportingPlayers = PlayerFactory.availablePlayers()
-            .filter { $0.supports(format: format) }
-
-        // Prefer native AVPlayer for supported formats
-        if supportingPlayers.contains(.avplayer) {
-            return .avplayer
-        }
-
-        // KSPlayer for non-native (best PiP + wide codec)
-        if supportingPlayers.contains(.ksplayer) {
-            return .ksplayer
-        }
-
-        // VLC fallback
-        if supportingPlayers.contains(.vlc) {
-            return .vlc
-        }
-
-        // FFmpeg transmux pipeline
-        if supportingPlayers.contains(.ffmpeg) {
-            return .ffmpeg
-        }
-
-        return .avplayer
-    }
-    
-    private func checkPlayerError() {
-        if let error = playerManager.currentPlayer?.error {
-            playerError = error
-            showErrorAlert = true
-        }
-    }
-}
-
-// MARK: - Player Controls View
-struct PlayerControlsView: View {
-    let player: (any VideoPlayerProtocol)?
-    @State private var isSliding = false
-    @State private var sliderValue: Double = 0
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            // Progress Bar
-            if let player = player {
-                HStack {
-                    Text(formatTime(player.currentTime))
+            // Director and genre
+            HStack(spacing: 12) {
+                if let director = metadata.director, !director.isEmpty {
+                    Label(director, systemImage: "person.fill")
                         .font(.caption)
-                        .foregroundColor(.white)
-                    
-                    Slider(
-                        value: isSliding ? $sliderValue : .constant(player.currentTime),
-                        in: 0...max(player.duration, 1)
-                    ) { editing in
-                        isSliding = editing
-                        if !editing {
-                            player.seek(to: sliderValue)
-                        }
-                    }
-                    .accentColor(.red)
-                    
-                    Text(formatTime(player.duration))
-                        .font(.caption)
-                        .foregroundColor(.white)
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
                 }
-            }
-            
-            // Playback Controls
-            HStack(spacing: 30) {
-                // Play/Pause
-                Button(action: {
-                    if player?.isPlaying == true {
-                        player?.pause()
-                    } else {
-                        player?.play()
-                    }
-                }) {
-                    Image(systemName: player?.isPlaying == true ? "pause.fill" : "play.fill")
-                        .font(.title)
-                        .foregroundColor(.white)
-                }
-                
-                // Volume
-                HStack {
-                    Image(systemName: "speaker.fill")
-                        .foregroundColor(.white)
-                    
-                    Slider(value: Binding(
-                        get: { player?.volume ?? 1.0 },
-                        set: { player?.volume = $0 }
-                    ), in: 0...1)
-                    .frame(width: 100)
-                    .accentColor(.red)
-                }
-                
-                // Playback Speed
-                Menu {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
-                        Button("\(speed)x") {
-                            player?.rate = Float(speed)
-                        }
-                    }
-                } label: {
-                    Text("\(String(format: "%.1fx", player?.rate ?? 1.0))")
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(4)
-                }
-            }
-        }
-    }
-    
-    private func formatTime(_ seconds: Double) -> String {
-        if seconds.isNaN || seconds.isInfinite {
-            return "00:00"
-        }
-        
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        let seconds = Int(seconds) % 60
-        
-        if hours > 0 {
-            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%02d:%02d", minutes, seconds)
-        }
-    }
-}
 
-// MARK: - Preview
-struct UniversalPlayerView_Previews: PreviewProvider {
-    static var previews: some View {
-        UniversalPlayerView(url: URL(string: "https://example.com/video.mkv")!)
-            .previewLayout(.sizeThatFits)
+                if !metadata.genre.isEmpty {
+                    Text(metadata.genre.prefix(3).joined(separator: ", "))
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+
+            // Plot (first 2 lines)
+            if let plot = metadata.plot, !plot.isEmpty {
+                Text(plot)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+            }
+        }
+        .padding(12)
+        .background(
+            LinearGradient(
+                colors: [Color.black.opacity(0.85), Color.black.opacity(0.6)],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        )
     }
 }

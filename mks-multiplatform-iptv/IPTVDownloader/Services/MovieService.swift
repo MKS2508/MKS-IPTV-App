@@ -3,7 +3,7 @@ import Foundation
 // NOTE: This service must always use the currently active profile.
 actor MovieService {
     private let session: URLSession
-    let profile: IPTVProfile
+    nonisolated let profile: IPTVProfile
     
     init(profile: IPTVProfile, session: URLSession = .shared) {
         self.profile = profile

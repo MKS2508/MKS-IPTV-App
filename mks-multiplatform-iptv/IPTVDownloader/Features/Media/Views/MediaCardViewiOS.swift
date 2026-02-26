@@ -212,7 +212,7 @@ struct MediaCardViewiOS: View {
             removal: .opacity
         ))
         .onAppear(perform: handleAppear)
-        .onChange(of: isDetailsExpanded) { newValue in
+        .onChange(of: isDetailsExpanded) { _, newValue in
             handleDetailsExpansionChange(newValue)
         }
     }
@@ -532,6 +532,7 @@ struct MediaCardViewiOS_Previews: PreviewProvider {
         name: "The Matrix (1999) 4K",
         streamType: "movie",
         streamId: 101,
+        tmdbId: nil,
         streamIcon: "https://image.tmdb.org/t/p/w600_and_h900_bestv2/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
         rating: "8.7",
         rating5Based: 4.35,

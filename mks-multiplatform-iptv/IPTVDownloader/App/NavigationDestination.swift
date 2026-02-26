@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Type-safe navigation destinations for the main app
 enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
+    case home = "Home"
     case movies = "Movies"
     case series = "Series"
     case liveChannels = "LiveChannels"
@@ -22,6 +23,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
     /// Display name for UI
     var displayName: String {
         switch self {
+        case .home: return "Home"
         case .movies: return "Movies"
         case .series: return "Series"
         case .liveChannels: return "Live TV"
@@ -35,6 +37,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
     /// SF Symbol icon name
     var iconName: String {
         switch self {
+        case .home: return "house.fill"
         case .movies: return "film"
         case .series: return "tv"
         case .liveChannels: return "antenna.radiowaves.left.and.right"
@@ -58,7 +61,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
 @MainActor
 @Observable
 final class NavigationState {
-    var selectedDestination: NavigationDestination? = .movies
+    var selectedDestination: NavigationDestination? = .home
 
     func select(_ destination: NavigationDestination) {
         selectedDestination = destination

@@ -7,7 +7,7 @@ import os
 extension VideoDownloader {
     func convertToMOVAsync(inputPath: String, outputPath: String, completion: @escaping (Result<Void, Error>) -> Void) {
         // Construimos el comando FFmpeg
-        let command = "-y -i \"\(inputPath)\" -c copy \"\(outputPath)\""
+        let _ = "-y -i \"\(inputPath)\" -c copy \"\(outputPath)\""
         
         // Llamada ASÍNCRONA
 //        FFmpegKit.executeAsync(command) { session in
@@ -121,7 +121,7 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         configuration.httpMaximumConnectionsPerHost = 1
         configuration.timeoutIntervalForRequest = 60
         configuration.timeoutIntervalForResource = 3600
-        configuration.httpShouldUsePipelining = true
+        configuration.httpShouldUsePipelining = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
         

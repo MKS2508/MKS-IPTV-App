@@ -64,33 +64,22 @@ struct PlatformNavigationView<SidebarContent: View, DetailContent: View>: View {
                     max: Platform.macOS.maxSidebarWidth
                 )
                 .listStyle(.sidebar)
-                .toolbar {
-                    ToolbarItem(placement: .navigation) {
-                        sidebarToggle
-                    }
-                }
         } detail: {
             detailContent()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .toolbar {
-                    ToolbarItem(placement: .automatic) {
-                        // macOS toolbar items go here
-                    }
-                }
         }
         .navigationSplitViewStyle(.balanced)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .onKeyDown(.escape) {
             // Escape to toggle sidebar on macOS
             toggleSidebar()
         }
-    }
-
-    private var sidebarToggle: some View {
-        Button(action: toggleSidebar) {
-            Image(systemName: "sidebar.left")
-                .help("Toggle Sidebar (⌘+S)")
+        .background {
+            // Hidden button to register Cmd+S keyboard shortcut for sidebar toggle
+            Button(action: toggleSidebar) {}
+                .keyboardShortcut("s", modifiers: .command)
+                .hidden()
         }
-        .keyboardShortcut("s", modifiers: .command)
     }
 
     private func toggleSidebar() {
@@ -200,9 +189,9 @@ extension NavigationDestination {
     /// Destinations that should be displayed in TabView (excludes debug)
     static var displayable: [NavigationDestination] {
         #if DEBUG
-        return [.movies, .series, .liveChannels, .downloads, .debugStream]
+        return [.home, .movies, .series, .liveChannels, .downloads, .debugStream]
         #else
-        return [.movies, .series, .liveChannels, .downloads]
+        return [.home, .movies, .series, .liveChannels, .downloads]
         #endif
     }
 }

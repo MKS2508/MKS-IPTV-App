@@ -133,6 +133,28 @@ extension View {
     }
 }
 
+// MARK: - Glass Effect Container Wrapper
+
+/// Wraps content in a GlassEffectContainer on iOS 26+ / macOS 26+ for proper
+/// glass blending between adjacent glass elements. Falls back to plain content on older OS.
+struct AdaptiveGlassContainer<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        if LiquidGlassAvailability.isAvailable {
+            GlassEffectContainer {
+                content
+            }
+        } else {
+            content
+        }
+    }
+}
+
 // MARK: - Button Styles
 
 /// Custom glass button style with app accent

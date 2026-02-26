@@ -10,7 +10,11 @@ struct DownloadItem: Identifiable {
     var progress: Double = 0
     var speed: Double = 0
     var eta: TimeInterval = 0
-    var error: Error? = nil // Add this line to store errors
+    var error: Error? = nil
+    var metadataStatus: MetadataTaggingStatus = .pending
+    var metadataResult: MetadataResult?
+    var metadataCandidates: [ScoredMetadataResult] = []
+    var filePath: String?
 }
 
 enum MediaType {

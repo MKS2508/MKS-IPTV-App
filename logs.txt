@@ -1,0 +1,480 @@
+[KSPlayer] Engine configured: KSMEPlayer enabled for MKV/TS/AVI
+📱 TouchBar: Creating TouchBarAccessor NSView
+📱 TouchBar: Initializing TouchBarHostingView
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: View moved to window
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+🟢 LiveChannelListViewModel initialized with profile: casamar
+TouchBar: Successfully became first responder
+TouchBar: Updating TouchBar...
+TouchBar: makeTouchBar called with context: mediaList
+TouchBar: Available categories: 0
+TouchBar: Configured for media list context (loading)
+TouchBar: TouchBar created successfully
+[AppDataLoader] Categories loaded: 16 movies, 12 series, 46 live channels
+🔄 Starting to load live channels...
+📡 Fetching channels from API...
+🚀 MovieService: Starting live channels fetch...
+📍 Server URL: http://28092025chaybaty00.latv1.com:8080
+🌐 Request URL: http://28092025chaybaty00.latv1.com:8080/player_api.php?username=6YB93620RX223202K&password=bn8hZB8Sk4Hr&action=get_live_streams
+📊 HTTP Status Code: 200
+📦 Response data size: 352515 bytes
+🔍 Response preview: [{"num":1,"name":"M+ Liga de Campeones FHD","stream_type":"live","stream_id":122113,"stream_icon":"https:\/\/r2.thesportsdb.com\/images\/media\/channel\/logo\/au4y2m1726843280.png","epg_channel_id":nu
+✅ Successfully decoded 732 live channels
+📺 First channels: ["M+ Liga de Campeones FHD", "M+ Liga de Campeones FHD ?", "M+ Liga de Campeones HD"]
+✅ Fetched 732 channels successfully
+📊 Channels sorted by added date
+🏁 Channel loading completed
+[EPGService] Fetching EPG from https://raw.githubusercontent.com/davidmuma/EPG_dobleM/master/guiatv.xml...
+[EPGService] Downloaded 32.4 MB
+[EPGService] Parsed EPG: 647 channels, 14627 programmes
+[Debug Stream] 13:44:52.450 🔄 Loading Movies...
+[Debug Stream] 13:44:56.151 ✅ Loaded 10 movies
+Unable to obtain a task name port right for pid 422: (os/kern) failure (0x5)
+[Debug Stream] 13:45:05.535 Forcing FFmpeg Transmuxer for "Álex Palou, a fondo (2026) 1080p"
+[Debug Stream] 13:45:07.127 Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 1507ms | redirected
+[Debug Stream] 13:45:08.148 Resolved redirect → 89.34.226.233:8080
+[Debug Stream] 13:45:08.149 URL is long (904 chars) — using proxy
+[StreamProxy] Started streaming proxy session #0 on port 9100
+[StreamProxy]   Local:   http://localhost:9100/0
+[StreamProxy]   Backend: http://89.34.226.233:8080/play/vod/eyJpdiI6Ik9JeWxjcmNQbUc0QVlGY0lPWkZJeXc9PSIsI...
+[StreamProxy] NWListener ready on port 9100
+[Debug Stream] 13:45:08.195 Proxy started: http://localhost:9100/0
+[FFmpegPlayer] Loading URL: http://localhost:9100/0
+[Debug Stream] 13:45:08.197 Playback started with FFmpeg Transmuxer
+tcp_input [C9.1.1:2] flags=[R] seq=2133607770, ack=0, win=0 state=LAST_ACK rcv_nxt=2133607770, snd_una=151652267
+[StreamProxy] Connection accepted
+[StreamProxy] HEAD /0 Range: none
+[StreamProxy] HEAD -> HTTP 200
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=0-1023
+[StreamProxy] GET forwarding Range: bytes=0-1023
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1024
+[StreamProxy]   Content-Range: bytes 0-1023/1969521907
+[StreamProxy] Backend transfer completed (1024 bytes sent)
+[StreamProxy] Backend cancelled (1024 bytes sent to client)
+[FFmpegPlayer] Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 273ms
+[TransmuxingService] Starting progressive transmux session CF0CB7FE-263E-4059-BE69-3E3FA512A782
+[TransmuxingService] Input: http://localhost:9100/0
+[TransmuxingService] Output dir: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=0-
+[StreamProxy] GET forwarding Range: bytes=0-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1969521907
+[StreamProxy]   Content-Range: bytes 0-1969521906/1969521907
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=1969521246-
+[StreamProxy] GET forwarding Range: bytes=1969521246-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 661
+[StreamProxy]   Content-Range: bytes 1969521246-1969521906/1969521907
+[StreamProxy] Backend transfer completed (661 bytes sent)
+[StreamProxy] Backend cancelled (661 bytes sent to client)
+nw_socket_handle_socket_event [C16:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C16] Send failed with error "Broken pipe"
+nw_write_request_report [C16] Send failed with error "Broken pipe"
+nw_write_request_report [C16] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (970811 bytes sent to client)
+nw_write_request_report [C16] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C16:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=32732-
+[StreamProxy] GET forwarding Range: bytes=32732-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1969489175
+[StreamProxy]   Content-Range: bytes 32732-1969521906/1969521907
+[TransmuxingService] avformat_open_input OK, nb_streams=3
+;35m[matroska,webm @ 0x7f2826800] m;33mCould not find codec parameters for stream 2 (Video: png, none): unspecified size
+Consider increasing the value for the 'analyzeduration' (30000000) and 'probesize' (33554432) options
+mInput #0, matroska,webm, from 'http://localhost:9100/0':
+  Metadata:
+    title           : BY_d22 - Para eXvagos.org
+    encoder         : libebml v1.4.5 + libmatroska v1.7.1
+    creation_time   : 2026-02-20T08:49:22.000000Z
+  Duration: 00:51:16.42, start: 0.000000, bitrate: 5121 kb/s
+  Stream #0:0: Video: h264 (Main), yuv420p(tv, bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], 50 fps, 50 tbr, 1k tbn (default)
+    Metadata:
+      title           : BY_d22 - Para eXvagos.org
+      BPS             : 4990210
+      DURATION        : 00:51:16.020000000
+      NUMBER_OF_FRAMES: 153801
+      NUMBER_OF_BYTES : 1918748322
+      _STATISTICS_WRITING_APP: mkvmerge v92.0 ('Everglow') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2026-02-20 08:49:22
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+  Stream #0:1(spa): Audio: aac (LC), 48000 Hz, stereo, fltp (default)
+    Metadata:
+      title           : BY_d22 - Para eXvagos.org
+      BPS             : 128001
+      DURATION        : 00:51:16.416000000
+      NUMBER_OF_FRAMES: 144207
+      NUMBER_OF_BYTES : 49223073
+      _STATISTICS_WRITING_APP: mkvmerge v92.0 ('Everglow') 64-bit
+      _STATISTICS_WRITING_DATE_UTC: 2026-02-20 08:49:22
+      _STATISTICS_TAGS: BPS DURATION NUMBER_OF_FRAMES NUMBER_OF_BYTES
+  Stream #0:2: Video: png, none, 90k tbr, 90k tbn (attached pic)
+    Metadata:
+      filename        : eXvagos.org.png
+      mimetype        : image/png
+[TransmuxingService] Duration: 3076.4s, bitrate: 5121600bps, expectedSize: 2008911953
+[TransmuxingService] Best streams: video=0 audio=1
+[FFmpegHelper] detect_field_shifts: nb_streams=3 header codecpar_off=16 codec_type_off=0
+[FFmpegHelper] AVStream[0] ptr at off 16 (header) = 0x7f29df6c0
+[FFmpegHelper] candidate raw: 000000001b000000 0000000000000000 80f1c5e307000000 3500000000000000 
+[FFmpegHelper] validate_codecpar(cp_shift=0): ct_off=0 codec_type=0 codec_id=27
+[FFmpegHelper] DETECTED via header: stream_shift=0 cp_shift=0
+[FFmpegHelper] output AVStream codecpar: at_off8=0x0 at_off16=0x7f29dcd80 resolved=0x7f29dcd80
+[FFmpegHelper] copy_codecpar: src=0x7f29df6c0 dst=0x7f29dcd80 src_type=0 src_id=27 stream_shift=0 cp_shift=0
+[FFmpegHelper] avcodec_parameters_copy returned 0
+[FFmpegHelper] post-copy verify: dst_type=0 dst_id=27
+[FFmpegHelper] avcodec_parameters_copy verified OK
+[TransmuxingService] Mapped video stream[0] -> output[0]
+[FFmpegHelper] output AVStream codecpar: at_off8=0x1 at_off16=0x7f29dce40 resolved=0x7f29dce40
+[FFmpegHelper] copy_codecpar: src=0x7f29df600 dst=0x7f29dce40 src_type=1 src_id=86018 stream_shift=0 cp_shift=0
+[FFmpegHelper] avcodec_parameters_copy returned 0
+[FFmpegHelper] post-copy verify: dst_type=1 dst_id=86018
+[FFmpegHelper] avcodec_parameters_copy verified OK
+[TransmuxingService] Mapped audio stream[1] -> output[1]
+[TransmuxingService] Mapped 2 output stream(s)
+[FFmpegHelper] aac_adtstoasc BSF created for stream 1
+[TransmuxingService] aac_adtstoasc BSF enabled for audio stream 1
+[TransmuxingService] Opening output: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4
+[TransmuxingService] Calling avformat_write_header...
+[TransmuxingService] Header written and flushed to disk (1261 bytes on disk)
+[HLSSegmenter] Created: fmp4=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4, playlist=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.m3u8, initSize=1261
+[HLSSegmenter] Parsed timescale from moov/trak/mdia/mdhd: 90000
+[HLSSegmenter] Started scanning (timescale=90000)
+[TransmuxingService] HLS segmenter started, resuming caller for progressive playback
+[TransmuxingService] Starting remux loop...
+[FFmpegPlayer] expectedSize=2008911953, session.expectedSize=2008911953
+[TransmuxServer] Listening on port 8100
+[TransmuxServer] Serving HLS at http://localhost:8100/stream.m3u8 (mp4: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4)
+[FFmpegPlayer] Loading HLS playlist: http://localhost:8100/stream.m3u8
+[AVPlayerImplementation] Loading URL: http://localhost:8100/stream.m3u8
+[TransmuxingService] Progress: 1000 packets, 6 MB on disk
+[TransmuxingService] Progress: 2000 packets, 12 MB on disk
+[TransmuxingService] Progress: 3000 packets, 19 MB on disk
+[AVPlayerImplementation] Unknown status — itemError=nil, playerError=nil
+[FFmpegPlayer] Auto-playing to trigger buffering...
+AddInstanceForFactory: No factory registered for id <CFUUID 0x7e3c3eca0> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<<< FigStreamPlayer >>>> fpfsi_PausePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29775
+<<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
+<<<< FigStreamPlayer >>>> fpfsi_PausePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29775
+<<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
+<<<< FigStreamPlayer >>>> fpfsi_PausePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29775
+<<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
+[HLSSegmenter] Segment 0: offset=1261, size=1947, duration=0.020s
+[HLSSegmenter] Segment 1: offset=3208, size=335776, duration=1.000s
+[HLSSegmenter] Segment 2: offset=338984, size=602223, duration=1.000s
+[HLSSegmenter] Segment 3: offset=941207, size=647999, duration=1.000s
+[HLSSegmenter] Segment 4: offset=1589206, size=687600, duration=1.000s
+[HLSSegmenter] Segment 5: offset=2276806, size=704935, duration=1.000s
+[HLSSegmenter] Segment 6: offset=2981741, size=732602, duration=1.000s
+[HLSSegmenter] Segment 7: offset=3714343, size=648739, duration=1.000s
+[HLSSegmenter] Segment 8: offset=4363082, size=853211, duration=1.000s
+[HLSSegmenter] Segment 9: offset=5216293, size=1016210, duration=1.000s
+[HLSSegmenter] Segment 10: offset=6232503, size=857088, duration=1.000s
+[HLSSegmenter] Segment 11: offset=7089591, size=628905, duration=1.000s
+[HLSSegmenter] Segment 12: offset=7718496, size=634284, duration=1.000s
+[HLSSegmenter] Segment 13: offset=8352780, size=572133, duration=1.000s
+[HLSSegmenter] Segment 14: offset=8924913, size=644634, duration=1.000s
+[HLSSegmenter] Segment 15: offset=9569547, size=765287, duration=1.000s
+[HLSSegmenter] Segment 16: offset=10334834, size=707444, duration=1.000s
+[HLSSegmenter] Segment 17: offset=11042278, size=557366, duration=1.000s
+[HLSSegmenter] Segment 18: offset=11599644, size=592553, duration=1.000s
+[HLSSegmenter] Segment 19: offset=12192197, size=610516, duration=1.000s
+[HLSSegmenter] Segment 20: offset=12802713, size=593541, duration=1.000s
+[HLSSegmenter] Segment 21: offset=13396254, size=572537, duration=1.000s
+[HLSSegmenter] Segment 22: offset=13968791, size=549603, duration=1.000s
+[HLSSegmenter] Segment 23: offset=14518394, size=697473, duration=1.000s
+[HLSSegmenter] Segment 24: offset=15215867, size=581355, duration=1.000s
+[HLSSegmenter] Segment 25: offset=15797222, size=544561, duration=1.000s
+[HLSSegmenter] Segment 26: offset=16341783, size=603507, duration=1.000s
+[HLSSegmenter] Segment 27: offset=16945290, size=816200, duration=1.000s
+[HLSSegmenter] Segment 28: offset=17761490, size=754954, duration=1.000s
+[HLSSegmenter] Segment 29: offset=18516444, size=657769, duration=1.000s
+[HLSSegmenter] Segment 30: offset=19174213, size=775926, duration=1.000s
+[HLSSegmenter] Segment 31: offset=19950139, size=738240, duration=1.000s
+[HLSSegmenter] Segment 32: offset=20688379, size=695756, duration=1.000s
+[TransmuxServer] Playlist ready after 1 polls (2078 bytes)
+[TransmuxServer] GET /stream.m3u8 -> 200 (2078 bytes)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (boss is not initialized) at FigAlternateSelectionBoss.c:1053
+[TransmuxServer] GET 206 bytes=0-1260/2008911953 CL=1261 (file: 22571579, complete=false)
+[TransmuxServer] GET /stream.m3u8 -> 200 (2078 bytes)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=12802713-13396253/2008911953 CL=593541 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=13396254-13968790/2008911953 CL=572537 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=13968791-14518393/2008911953 CL=549603 (file: 22571579, complete=false)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+metricevent_subscriber pss_didReceiveEvent signalled err=-19772 (kFigMetricEventSubscriberError_InternalError) (variant NULL) at FigMetricEventSubscribers.c:364
+cannot open file at line 51044 of [f0ca7bba1c]
+os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory
+         HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+Reporter disconnected. { function=sendMessage, reporterID=3938485010433 }
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[AVPlayerImplementation] Ready to play, duration: nan
+[TransmuxServer] GET 206 bytes=14518394-15215866/2008911953 CL=697473 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=15215867-15797221/2008911953 CL=581355 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=15797222-16341782/2008911953 CL=544561 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+nw_path_necp_check_for_updates Failed to copy updated result (22)
+[TransmuxServer] GET 206 bytes=16341783-16945289/2008911953 CL=603507 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=16945290-17761489/2008911953 CL=816200 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=17761490-18516443/2008911953 CL=754954 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=18516444-19174212/2008911953 CL=657769 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=19174213-19950138/2008911953 CL=775926 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=19950139-20688378/2008911953 CL=738240 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=20688379-21384134/2008911953 CL=695756 (file: 22571579, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxingService] Progress: 4000 packets, 25 MB on disk
+[HLSSegmenter] Segment 33: offset=21384135, size=662177, duration=1.000s
+[HLSSegmenter] Segment 34: offset=22046312, size=657444, duration=1.000s
+[HLSSegmenter] Segment 35: offset=22703756, size=622424, duration=1.000s
+[HLSSegmenter] Segment 36: offset=23326180, size=758735, duration=1.000s
+[HLSSegmenter] Segment 37: offset=24084915, size=416112, duration=1.000s
+[HLSSegmenter] Segment 38: offset=24501027, size=517002, duration=1.000s
+[HLSSegmenter] Segment 39: offset=25018029, size=550755, duration=1.000s
+[HLSSegmenter] Segment 40: offset=25568784, size=516545, duration=1.000s
+[HLSSegmenter] Segment 41: offset=26085329, size=547323, duration=1.000s
+[HLSSegmenter] Segment 42: offset=26632652, size=610848, duration=1.000s
+[HLSSegmenter] Segment 43: offset=27243500, size=646286, duration=1.000s
+[HLSSegmenter] Segment 44: offset=27889786, size=639377, duration=1.000s
+[HLSSegmenter] Segment 45: offset=28529163, size=861561, duration=1.000s
+[TransmuxServer] GET /stream.m3u8 -> 200 (2858 bytes)
+[TransmuxServer] GET 206 bytes=21384135-22046311/2008911953 CL=662177 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=22046312-22703755/2008911953 CL=657444 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=22703756-23326179/2008911953 CL=622424 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=23326180-24084914/2008911953 CL=758735 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=24084915-24501026/2008911953 CL=416112 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=24501027-25018028/2008911953 CL=517002 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=25018029-25568783/2008911953 CL=550755 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=25568784-26085328/2008911953 CL=516545 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=26085329-26632651/2008911953 CL=547323 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+nw_path_necp_check_for_updates Failed to copy updated result (22)
+[TransmuxServer] GET 206 bytes=26632652-27243499/2008911953 CL=610848 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=27243500-27889785/2008911953 CL=646286 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=27889786-28529162/2008911953 CL=639377 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=28529163-29390723/2008911953 CL=861561 (file: 30339811, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET /stream.m3u8 -> 200 (2858 bytes)
+[HLSSegmenter] Segment 46: offset=29390724, size=949087, duration=1.000s
+[HLSSegmenter] Segment 47: offset=30339811, size=943843, duration=1.000s
+[HLSSegmenter] Segment 48: offset=31283654, size=792948, duration=1.000s
+[HLSSegmenter] Segment 49: offset=32076602, size=751674, duration=1.000s
+[TransmuxingService] Progress: 5000 packets, 32 MB on disk
+[TransmuxServer] GET /stream.m3u8 -> 200 (3098 bytes)
+[TransmuxServer] GET 206 bytes=29390724-30339810/2008911953 CL=949087 (file: 37776850, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+nw_path_necp_check_for_updates Failed to copy updated result (22)
+[TransmuxServer] GET 206 bytes=30339811-31283653/2008911953 CL=943843 (file: 37776850, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=31283654-32076601/2008911953 CL=792948 (file: 37776850, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET 206 bytes=32076602-32828275/2008911953 CL=751674 (file: 37776850, complete=false)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[HLSSegmenter] Segment 50: offset=32828276, size=777433, duration=1.000s
+[HLSSegmenter] Segment 51: offset=33605709, size=732150, duration=1.000s
+[HLSSegmenter] Segment 52: offset=34337859, size=620125, duration=1.000s
+[HLSSegmenter] Segment 53: offset=34957984, size=467301, duration=1.000s
+[HLSSegmenter] Segment 54: offset=35425285, size=599365, duration=1.000s
+[HLSSegmenter] Segment 55: offset=36024650, size=666157, duration=1.000s

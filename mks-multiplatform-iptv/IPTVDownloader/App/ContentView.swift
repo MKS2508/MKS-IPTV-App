@@ -20,10 +20,17 @@ struct ContentView: View {
 
     // Navigation state - uses NavigationCoordinator for type-safe navigation
     @State private var navigationCoordinator = NavigationCoordinator()
-    @State private var selectedView: String? = "Movies"
+    @State private var selectedView: String? = "Home"
 
     // Data loading
     @State private var dataLoader: AppDataLoader?
+
+    // Sidebar category filter (macOS sectioned sidebar)
+    #if os(macOS)
+    @State private var selectedCategoryFilter: String?
+    @State private var moviesExpanded: Bool = true
+    @State private var seriesExpanded: Bool = false
+    #endif
 
     #if os(macOS)
     @StateObject private var touchBarManager = TouchBarManager()
@@ -39,7 +46,9 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
+            #if !os(macOS)
             backgroundPattern
+            #endif
             mainContent
             #if os(macOS)
             touchBarAccessor
@@ -129,6 +138,17 @@ struct ContentView: View {
     // MARK: - Sidebar
 
     private var sidebarContent: some View {
+        #if os(macOS)
+        macOSSidebarContent
+        #else
+        iOSSidebarContent
+        #endif
+    }
+
+    // MARK: - iOS Sidebar (flat list)
+
+    #if os(iOS)
+    private var iOSSidebarContent: some View {
         List(selection: $selectedView) {
             ForEach(NavigationDestination.allCases) { destination in
                 #if DEBUG
@@ -152,6 +172,119 @@ struct ContentView: View {
         }
         .accessibilityLabel("Main Navigation")
     }
+    #endif
+
+    // MARK: - macOS Sidebar (sectioned with categories)
+
+    #if os(macOS)
+    private var macOSSidebarContent: some View {
+        List(selection: $selectedView) {
+            // HOME section
+            navigationLink(for: .home)
+
+            // LIBRARY section: Movies and Series with expandable categories
+            Section("Library") {
+                DisclosureGroup(isExpanded: $moviesExpanded) {
+                    // "All Movies" item
+                    Button {
+                        selectedView = NavigationDestination.movies.rawValue
+                        selectedCategoryFilter = nil
+                    } label: {
+                        Label("All Movies", systemImage: "square.grid.2x2")
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Category sub-items
+                    if let loader = dataLoader {
+                        ForEach(loader.movieCategories) { category in
+                            Button {
+                                selectedView = NavigationDestination.movies.rawValue
+                                selectedCategoryFilter = category.categoryId
+                            } label: {
+                                HStack {
+                                    Text(category.categoryName)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    if selectedCategoryFilter == category.categoryId && selectedView == NavigationDestination.movies.rawValue {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 4)
+                        }
+                    }
+                } label: {
+                    Label("Movies", systemImage: NavigationDestination.movies.iconName)
+                }
+
+                DisclosureGroup(isExpanded: $seriesExpanded) {
+                    // "All Series" item
+                    Button {
+                        selectedView = NavigationDestination.series.rawValue
+                        selectedCategoryFilter = nil
+                    } label: {
+                        Label("All Series", systemImage: "square.grid.2x2")
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Category sub-items
+                    if let loader = dataLoader {
+                        ForEach(loader.seriesCategories) { category in
+                            Button {
+                                selectedView = NavigationDestination.series.rawValue
+                                selectedCategoryFilter = category.categoryId
+                            } label: {
+                                HStack {
+                                    Text(category.categoryName)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    if selectedCategoryFilter == category.categoryId && selectedView == NavigationDestination.series.rawValue {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 4)
+                        }
+                    }
+                } label: {
+                    Label("Series", systemImage: NavigationDestination.series.iconName)
+                }
+            }
+
+            // LIVE section
+            Section("Live") {
+                navigationLink(for: .liveChannels)
+            }
+
+            // MY CONTENT section
+            Section("My Content") {
+                navigationLink(for: .downloads)
+            }
+
+            #if DEBUG
+            // DEVELOPMENT section
+            Section("Development") {
+                navigationLink(for: .debugStream)
+            }
+            #endif
+        }
+        .accessibilityLabel("Main Navigation")
+        .onChange(of: selectedView) { _, newValue in
+            // Clear category filter when switching to a non-media destination
+            if newValue != NavigationDestination.movies.rawValue && newValue != NavigationDestination.series.rawValue {
+                selectedCategoryFilter = nil
+            }
+        }
+    }
+    #endif
 
     @ViewBuilder
     private func navigationLink(for destination: NavigationDestination) -> some View {
@@ -177,6 +310,16 @@ struct ContentView: View {
     @ViewBuilder
     private func destinationView(for destination: NavigationDestination, loader: AppDataLoader) -> some View {
         switch destination {
+        case .home:
+            if let homeViewModel = loader.homeViewModel {
+                HomeView(
+                    homeViewModel: homeViewModel,
+                    selectedView: $selectedView
+                )
+            } else {
+                loadingPlaceholder
+            }
+
         case .movies:
             if let mediaViewModel = loader.mediaViewModel {
                 MediaListView(
@@ -185,9 +328,11 @@ struct ContentView: View {
                     movieCategories: loader.movieCategories,
                     seriesCategories: [],
                     initialContentType: .movies,
-                    showContentTypeSelector: false
+                    showContentTypeSelector: false,
+                    sidebarCategoryFilter: macOSCategoryFilter
                 )
                 #if os(macOS)
+                .id("movies-\(selectedCategoryFilter ?? "all")")
                 .environmentObject(touchBarManager)
                 #endif
             } else {
@@ -202,9 +347,11 @@ struct ContentView: View {
                     movieCategories: [],
                     seriesCategories: loader.seriesCategories,
                     initialContentType: .series,
-                    showContentTypeSelector: false
+                    showContentTypeSelector: false,
+                    sidebarCategoryFilter: macOSCategoryFilter
                 )
                 #if os(macOS)
+                .id("series-\(selectedCategoryFilter ?? "all")")
                 .environmentObject(touchBarManager)
                 #endif
             } else {
@@ -241,6 +388,15 @@ struct ContentView: View {
             }
         #endif
         }
+    }
+
+    /// Returns the sidebar category filter on macOS, nil on other platforms
+    private var macOSCategoryFilter: String? {
+        #if os(macOS)
+        return selectedCategoryFilter
+        #else
+        return nil
+        #endif
     }
 
     private var loadingPlaceholder: some View {
@@ -280,6 +436,9 @@ struct ContentView: View {
         }
 
         switch view {
+        case "Home":
+            // Home doesn't need a specific TouchBar context
+            break
         case "Movies", "Series":
             touchBarManager.switchToContext(.mediaList)
             updateTouchBarCategories()

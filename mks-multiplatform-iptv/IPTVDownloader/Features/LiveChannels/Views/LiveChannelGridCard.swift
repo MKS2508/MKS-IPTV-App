@@ -93,7 +93,7 @@ struct LiveChannelGridCard: View {
                     .minimumScaleFactor(0.8)
                 
                 // Category Badge
-                Text("Cat \(channel.categoryId)")
+                Text("Cat \(channel.categoryId ?? "")")
                     .font(badgeFont)
                     .foregroundColor(.white)
                     .padding(.horizontal, 6)

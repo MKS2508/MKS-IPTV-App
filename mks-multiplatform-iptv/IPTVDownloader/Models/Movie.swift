@@ -10,6 +10,7 @@ struct Movie: Identifiable, Codable, Equatable {
     let name: String
     let streamType: String?
     let streamId: Int
+    let tmdbId: String?
     let streamIcon: String?
     let rating: String?
     let rating5Based: Double?
@@ -26,6 +27,7 @@ struct Movie: Identifiable, Codable, Equatable {
         case name
         case streamType = "stream_type"
         case streamId = "stream_id"
+        case tmdbId = "tmdb_id"
         case streamIcon = "stream_icon"
         case rating5Based = "rating_5based"
         case added
@@ -36,9 +38,47 @@ struct Movie: Identifiable, Codable, Equatable {
         case customSid = "custom_sid"
         case directSource = "direct_source"
     }
-    
 
-    
+    init(name: String, streamType: String?, streamId: Int, tmdbId: String?, streamIcon: String?, rating: String?, rating5Based: Double?, added: String?, isAdult: String?, categoryId: String, containerExtension: String?, customSid: String?, directSource: String?) {
+        self.name = name
+        self.streamType = streamType
+        self.streamId = streamId
+        self.tmdbId = tmdbId
+        self.streamIcon = streamIcon
+        self.rating = rating
+        self.rating5Based = rating5Based
+        self.added = added
+        self.isAdult = isAdult
+        self.categoryId = categoryId
+        self.containerExtension = containerExtension
+        self.customSid = customSid
+        self.directSource = directSource
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+        streamType = try container.decodeIfPresent(String.self, forKey: .streamType)
+        streamId = try container.decode(Int.self, forKey: .streamId)
+        // tmdb_id comes as String or Int from the API
+        if let str = try? container.decodeIfPresent(String.self, forKey: .tmdbId) {
+            tmdbId = str
+        } else if let num = try? container.decodeIfPresent(Int.self, forKey: .tmdbId) {
+            tmdbId = String(num)
+        } else {
+            tmdbId = nil
+        }
+        streamIcon = try container.decodeIfPresent(String.self, forKey: .streamIcon)
+        rating = try container.decodeIfPresent(String.self, forKey: .rating)
+        rating5Based = try container.decodeIfPresent(Double.self, forKey: .rating5Based)
+        added = try container.decodeIfPresent(String.self, forKey: .added)
+        isAdult = try container.decodeIfPresent(String.self, forKey: .isAdult)
+        categoryId = try container.decode(String.self, forKey: .categoryId)
+        containerExtension = try container.decodeIfPresent(String.self, forKey: .containerExtension)
+        customSid = try container.decodeIfPresent(String.self, forKey: .customSid)
+        directSource = try container.decodeIfPresent(String.self, forKey: .directSource)
+    }
+
     var quality: String? {
         if let match = name.firstMatch(of: /\d{3,4}[pi]/) {
             return String(match.0)
@@ -56,6 +96,7 @@ extension Movie {
         Movie(name: "Placeholder Movie",
               streamType: "movie",
               streamId: 0,
+              tmdbId: nil,
               streamIcon: nil,
               rating: "0.0",
               rating5Based: 0.0,

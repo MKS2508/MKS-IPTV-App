@@ -510,7 +510,7 @@ extension TouchBarHostingView: NSTouchBarDelegate {
         let item = NSCustomTouchBarItem(identifier: .mediaListFullView)
         
         // Use native TouchBar implementation for better scrolling
-        let nativeTouchBar = MediaListTouchBarView.createNativeTouchBar(
+        let _ = MediaListTouchBarView.createNativeTouchBar(
             availableCategories: touchBarManager.availableCategories,
             selectedCategories: touchBarManager.selectedCategories,
             isRefreshing: touchBarManager.isRefreshing,

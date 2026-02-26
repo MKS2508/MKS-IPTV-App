@@ -310,12 +310,10 @@ struct LiveChannelDetailSheet: View {
     
     @EnvironmentObject var profile: IPTVProfile
     @State private var showInlinePlayer = false
-    @State private var player: AVPlayer?
+    @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var isLoading = false
     @State private var showKSPlayerView = false
     @State private var ksPlayerURL: URL?
-    
-    private let streamManager = StreamManager()
     
     var body: some View {
         NavigationView {
@@ -378,12 +376,12 @@ struct LiveChannelDetailSheet: View {
                 // Video player area
                 VStack(spacing: 16) {
                     if showInlinePlayer {
-                        if let player = player {
-                            VideoPlayer(player: player)
+                        if let player = activePlayer {
+                            MKSPlayerView(player: player)
                                 .frame(height: 250)
-                                .cornerRadius(12)
+                                .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
+                                    RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall)
                                         .stroke(Color.accentColor, lineWidth: 2)
                                 )
                         } else if isLoading {
@@ -405,7 +403,7 @@ struct LiveChannelDetailSheet: View {
                             Image(systemName: "play.tv")
                                 .font(.system(size: 48))
                                 .foregroundColor(.accentColor)
-                            
+
                             Text("Toca reproducir para ver el canal en vivo")
                                 .font(.headline)
                                 .multilineTextAlignment(.center)
@@ -534,46 +532,30 @@ struct LiveChannelDetailSheet: View {
     private func startPlayback() {
         isLoading = true
         LiveLogger.debug("Starting playback for channel: \(channel.name)")
-        
+
         guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
                 .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let originalUrl = URL(string: urlString) else {
+              let url = URL(string: urlString) else {
             LiveLogger.error("Failed to generate valid stream URL")
             isLoading = false
             return
         }
-        
-        streamManager.resolveStreamURL(from: originalUrl) { resolvedUrl in
-            guard let resolvedUrl = resolvedUrl else {
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                }
-                LiveLogger.error("Failed to resolve stream URL")
-                return
-            }
-            
-            streamManager.setupStreamPlayer(with: resolvedUrl) { player in
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                    if let player = player {
-                        self.player = player
-                        self.showInlinePlayer = true
-                        player.play()
-                    } else {
-                        LiveLogger.error("Failed to set up player")
-                    }
-                }
-            }
-        }
+
+        let player = PlayerFactory.shared.createPlayer(for: url)
+        player.play()
+        self.activePlayer = player
+        self.showInlinePlayer = true
+        self.isLoading = false
+        LiveLogger.debug("Playback started via PlayerFactory")
     }
     
     private func stopPlayback() {
         cleanUpPlayer()
     }
-    
+
     private func cleanUpPlayer() {
-        streamManager.cleanUpPlayer()
-        player = nil
+        activePlayer?.stop()
+        activePlayer = nil
         showInlinePlayer = false
         isLoading = false
     }
@@ -615,62 +597,38 @@ struct LiveChannelDetailSheet: View {
 struct KSPlayerFullScreenView: View {
     let url: URL
     let onClose: () -> Void
-    
-    @StateObject private var playerManager = PlayerManager.shared
-    @State private var isLoading = true
-    
+
+    @State private var activePlayer: (any VideoPlayerProtocol)?
+
     var body: some View {
         ZStack {
             Color.black
                 .ignoresSafeArea()
-            
-            VStack {
-                if isLoading {
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.5)
-                            .tint(.white)
-                        Text("Cargando KSPlayer...")
-                            .foregroundColor(.white)
-                            .font(.headline)
-                    }
-                } else {
-                    // Use UniversalPlayerView with KSPlayer
-                    UniversalPlayerView(url: url)
-                        .onAppear {
-                            // Force KSPlayer as preferred player
-                            PlayerManager.shared.loadVideo(url: url, preferredPlayer: .ksplayer)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                PlayerManager.shared.currentPlayer?.play()
-                            }
-                        }
+
+            if let player = activePlayer {
+                MKSPlayerView(
+                    player: player,
+                    onDismiss: onClose
+                )
+            } else {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .tint(.white)
+                    Text("Cargando KSPlayer...")
+                        .foregroundColor(.white)
+                        .font(.headline)
                 }
-            }
-            
-            // Close button overlay
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: onClose) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white)
-                            .background(Circle().fill(Color.black.opacity(0.6)))
-                    }
-                    .padding()
-                }
-                Spacer()
             }
         }
         .onAppear {
-            // Start loading
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isLoading = false
-            }
+            let player = PlayerFactory.shared.createPlayer(type: .ksplayer, url: url)
+            player.play()
+            activePlayer = player
         }
         .onDisappear {
-            // Clean up when closing
-            PlayerManager.shared.currentPlayer?.stop()
+            activePlayer?.stop()
+            activePlayer = nil
         }
     }
 }

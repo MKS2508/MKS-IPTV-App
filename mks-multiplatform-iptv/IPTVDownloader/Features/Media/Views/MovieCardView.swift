@@ -138,7 +138,7 @@ struct MovieCardView: View {
     private var enhancedMovieDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Enhanced title with better typography
-            Text(movie.formattedTitle ?? movie.name)
+            Text(movie.formattedTitle)
                 .font(.system(size: titleFontSize, weight: .semibold, design: .rounded))
                 .lineLimit(2)
                 .foregroundColor(.primary)
@@ -351,6 +351,7 @@ struct MovieCardView_Previews: PreviewProvider {
         name: "Casino",
         streamType: "movie",
         streamId: 1,
+        tmdbId: nil,
         streamIcon: "https://cdn11.bigcommerce.com/s-yzgoj/images/stencil/500x659/products/2891345/5947614/MOVCF5676__59910.1679593031.jpg?c=2", // Reemplaza con la URL real de la imagen de Casino
         rating: "7.8",
         rating5Based: 4.0,
@@ -366,6 +367,7 @@ struct MovieCardView_Previews: PreviewProvider {
         name: "El Pico",
         streamType: "movie",
         streamId: 2,
+        tmdbId: nil,
         streamIcon: "https://m.media-amazon.com/images/M/MV5BMTJkOTNhNjAtNzgzNy00ODAwLWE5N2EtNzZiNzNiNmVjNmFhXkEyXkFqcGc@._V1_.jpg", // Reemplaza con la URL real de la imagen de El Pico
         rating: "6.5",
         rating5Based: 3.25,
@@ -381,6 +383,7 @@ struct MovieCardView_Previews: PreviewProvider {
         name: "Navajeros",
         streamType: "movie",
         streamId: 3,
+        tmdbId: nil,
         streamIcon: "https://image.tmdb.org/t/p/original/qRLLhYcctqlVCMdNGP85erTbSqI.jpg", // Si tienes una URL, puedes incluirla aquí
         rating: "7.0",
         rating5Based: 3.5,

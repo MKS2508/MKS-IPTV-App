@@ -22,7 +22,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var isReady: Bool = false
     @Published var error: PlayerError?
     
-    private var player: AVPlayer?
+    private(set) var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -31,20 +31,43 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
     }
-    
+
+    var underlyingAVPlayer: AVPlayer? { player }
+
     deinit {
         stop()
     }
     
     func load(url: URL) {
         stop()
-        
+
         print("[AVPlayerImplementation] Loading URL: \(url)")
-        
+
         playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
-        
+
+        setupObservers()
+    }
+
+    func load(asset: AVURLAsset) {
+        stop()
+
+        print("[AVPlayerImplementation] Loading asset with resource loader, URL: \(asset.url)")
+        print("[AVPlayerImplementation] Asset resourceLoader delegate: \(String(describing: asset.resourceLoader.delegate))")
+
+        // Only require "playable" — NOT "duration". For fragmented MP4 with
+        // empty_moov, the moov atom has duration=0 and there's no mfra box until
+        // transmux finishes. If we require "duration", AVPlayer waits forever
+        // (can't determine duration of a growing file) and never reaches .readyToPlay.
+        playerItem = AVPlayerItem(asset: asset, automaticallyLoadedAssetKeys: ["playable"])
+        player = AVPlayer(playerItem: playerItem)
+        player?.volume = volume
+        // Don't wait for large buffer — start playback as soon as first frames are available
+        player?.automaticallyWaitsToMinimizeStalling = false
+
+        print("[AVPlayerImplementation] AVPlayer created, playerItem.status=\(playerItem?.status.rawValue ?? -1), waitToMinimizeStalling=false")
+
         setupObservers()
     }
     
@@ -108,9 +131,15 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                     if let error = self?.playerItem?.error {
                         self?.error = .unknown(error)
                         print("[AVPlayerImplementation] Failed to load: \(error)")
+                        print("[AVPlayerImplementation] Error details: \((error as NSError).domain) code=\((error as NSError).code) \((error as NSError).localizedDescription)")
+                        if let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError {
+                            print("[AVPlayerImplementation] Underlying error: \(underlying.domain) code=\(underlying.code) \(underlying.localizedDescription)")
+                        }
                     }
                 case .unknown:
-                    print("[AVPlayerImplementation] Unknown status")
+                    let itemError = self?.playerItem?.error
+                    let playerError = self?.player?.error
+                    print("[AVPlayerImplementation] Unknown status — itemError=\(String(describing: itemError)), playerError=\(String(describing: playerError))")
                 @unknown default:
                     break
                 }

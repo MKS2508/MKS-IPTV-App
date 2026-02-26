@@ -4,9 +4,13 @@ import Combine
 
 // MARK: - FFmpeg Player Implementation
 /// Transmux pipeline player: remuxes non-native formats (MKV, AVI, etc.) to
-/// fragmented MP4 / HLS via TransmuxingService, then plays through AVPlayer.
+/// fragmented MP4 via TransmuxingService, then plays through AVPlayer.
 /// This enables AirPlay and PiP for content that AVPlayer cannot handle directly.
-/// Cross-platform — works on iOS, macOS, and tvOS (no shell dependency).
+///
+/// ## Progressive Playback
+/// Playback begins as soon as the fMP4 header is written. The remux loop
+/// continues in the background, writing to a growing file that TransmuxServer
+/// serves over localhost HTTP with Range request support.
 class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var currentTime: Double = 0
@@ -21,7 +25,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     private let progressSubject = PassthroughSubject<Double, Never>()
     private var cancellables = Set<AnyCancellable>()
     private var transmuxSessionID: String?
-    @Published private var isTransmuxing: Bool = false
+    @Published private(set) var isTransmuxing: Bool = false
 
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
@@ -42,7 +46,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         Task { @MainActor in
             do {
-                // Step 0: Preflight — validate stream reachability before transmux
+                // Step 0: Preflight -- validate stream reachability before transmux
                 let preflight = await StreamPreflight.check(url: url)
                 print("[FFmpegPlayer] Preflight: \(preflight.summary)")
 
@@ -52,32 +56,43 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                         NSError(domain: "StreamPreflight", code: preflight.httpStatus ?? -1,
                                 userInfo: [NSLocalizedDescriptionKey: "Stream unreachable: \(preflight.error ?? "unknown")"])
                     )
-                    print("[FFmpegPlayer] Preflight failed — aborting transmux")
+                    print("[FFmpegPlayer] Preflight failed -- aborting transmux")
                     return
                 }
 
-                // Step 1: Transmux to HLS/fMP4
-                let result = try await TransmuxingService.shared.transmux(from: url)
-                self.transmuxSessionID = result.sessionID
+                // Step 1: Start progressive transmux (returns after header written)
+                let session = try await TransmuxingService.shared.startTransmux(from: url)
+                self.transmuxSessionID = session.sessionID
 
-                // Step 2: Start local HLS server (if available)
-                let playbackURL: URL
-                #if canImport(FlyingFox)
-                playbackURL = try await LocalHLSServer.shared.serve(
-                    directory: result.segmentDirectory,
-                    playlist: result.playlistURL.lastPathComponent
+                // Step 2: Start HTTP server serving both m3u8 playlist and mp4 byte ranges.
+                // HLSSegmenter (created by TransmuxingService) generates a byte-range HLS
+                // playlist as the fMP4 grows. TransmuxServer serves both files so AVPlayer
+                // can consume HLS natively — no custom resource loader needed.
+                var effectiveSize = session.expectedSize
+                if effectiveSize <= 0, let preflightSize = preflight.contentLength, preflightSize > 0 {
+                    effectiveSize = preflightSize
+                    print("[FFmpegPlayer] Using preflight contentLength as expectedSize: \(effectiveSize)")
+                }
+                print("[FFmpegPlayer] expectedSize=\(effectiveSize), session.expectedSize=\(session.expectedSize)")
+
+                let serverSession = try await TransmuxServer.shared.start(
+                    filePath: session.outputPath,
+                    playlistPath: session.playlistPath,
+                    expectedSize: effectiveSize
                 )
-                #else
-                playbackURL = result.playlistURL
-                #endif
 
-                print("[FFmpegPlayer] Transmux complete, playing: \(playbackURL)")
-
-                // Step 3: Feed to AVPlayer
+                // Step 3: Load the HLS playlist URL — AVPlayer handles HLS natively
+                let hlsURL = serverSession.localURL
+                print("[FFmpegPlayer] Loading HLS playlist: \(hlsURL)")
                 self.isTransmuxing = false
                 self.avPlayer = AVPlayerImplementation()
-                self.avPlayer?.load(url: playbackURL)
+                self.avPlayer?.load(url: hlsURL)
                 self.setupBindings()
+
+                // Step 4: Auto-play to trigger AVPlayer buffering
+                print("[FFmpegPlayer] Auto-playing to trigger buffering...")
+                self.avPlayer?.play()
+                self.isPlaying = true
             } catch {
                 self.isTransmuxing = false
                 self.error = .unknown(error)
@@ -99,13 +114,10 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         avPlayer = nil
         cancellables.removeAll()
 
-        // Cleanup transmux session and local server
         if let sessionID = transmuxSessionID {
             Task {
-                await TransmuxingService.shared.cleanup(sessionID: sessionID)
-                #if canImport(FlyingFox)
-                await LocalHLSServer.shared.stop()
-                #endif
+                await TransmuxingService.shared.cancelTransmux(sessionID: sessionID)
+                await TransmuxServer.shared.stop()
             }
             transmuxSessionID = nil
         }
@@ -115,46 +127,19 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         avPlayer?.seek(to: time)
     }
 
+    /// Returns the inner AVPlayer's view when transmux is complete.
+    /// Used by FFmpegPlayerContentView to reactively switch from spinner to video.
+    func innerPlayerView() -> AnyView? {
+        avPlayer?.playerView()
+    }
+
     func playerView() -> AnyView {
-        if isTransmuxing {
-            return AnyView(
-                ZStack {
-                    Color.black
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                        Text("Preparing video for playback...")
-                            .foregroundColor(.white)
-                            .font(.callout)
-                        Text("Transmuxing to compatible format")
-                            .foregroundColor(.gray)
-                            .font(.caption)
-                    }
-                }
-            )
-        }
+        AnyView(FFmpegPlayerContentView(player: self))
+    }
 
-        if let avPlayer = avPlayer {
-            return avPlayer.playerView()
-        }
-
-        return AnyView(
-            ZStack {
-                Color.black
-                VStack {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray)
-                    Text("FFmpeg Transmux Player")
-                        .foregroundColor(.gray)
-                        .padding(.top, 8)
-                    Text("Load a non-native format to start")
-                        .font(.caption)
-                        .foregroundColor(.gray.opacity(0.7))
-                }
-            }
-        )
+    /// The underlying AVPlayer instance, if the transmux pipeline has produced one.
+    var underlyingAVPlayer: AVPlayer? {
+        avPlayer?.underlyingAVPlayer
     }
 
     // MARK: - Private Methods
@@ -194,5 +179,50 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 self?.progressSubject.send(progress)
             }
             .store(in: &cancellables)
+    }
+}
+
+// MARK: - Reactive Content View
+
+/// Observes @Published properties on FFmpegPlayerImplementation so the view
+/// re-evaluates when `isTransmuxing` / `avPlayer` change. This fixes the stale
+/// AnyView problem where the spinner was captured once and never updated.
+fileprivate struct FFmpegPlayerContentView: View {
+    @ObservedObject var player: FFmpegPlayerImplementation
+
+    var body: some View {
+        if player.isTransmuxing {
+            ZStack {
+                Color.black
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                    Text("Preparing video for playback...")
+                        .foregroundColor(.white)
+                        .font(.callout)
+                    Text("Transmuxing to compatible format")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                }
+            }
+        } else if let innerView = player.innerPlayerView() {
+            innerView
+        } else {
+            ZStack {
+                Color.black
+                VStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray)
+                    Text("FFmpeg Transmux Player")
+                        .foregroundColor(.gray)
+                        .padding(.top, 8)
+                    Text("Load a non-native format to start")
+                        .font(.caption)
+                        .foregroundColor(.gray.opacity(0.7))
+                }
+            }
+        }
     }
 }

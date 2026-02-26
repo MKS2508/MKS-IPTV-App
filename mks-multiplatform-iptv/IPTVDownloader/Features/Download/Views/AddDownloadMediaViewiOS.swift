@@ -67,6 +67,11 @@ struct AddDownloadMediaViewiOS: View {
     @State private var imageLoaded = false
     @State private var initialScrollOffset: CGFloat?
     
+    // Metadata enrichment state
+    @State private var enrichedMetadata: MetadataResult?
+    @State private var metadataCandidates: [ScoredMetadataResult] = []
+    @State private var isEnrichingMetadata = false
+
     // Estado para la modal de descarga
     @EnvironmentObject private var downloadManager: DownloadManager
     @State private var isModalPresented = false
@@ -233,6 +238,38 @@ struct AddDownloadMediaViewiOS: View {
                 self.serieDetail = serie
                 self.selectedSeason = serie.seasons.first?.id ?? "1"
             }
+
+            // Auto-enrich metadata
+            if !isEnrichingMetadata && enrichedMetadata == nil {
+                isEnrichingMetadata = true
+                Task {
+                    let query: MetadataSearchQuery
+                    if let movie = mediaItem as? MovieDetail {
+                        query = MetadataSearchQuery(
+                            title: movie.movieData.name,
+                            year: StringSimilarity.extractYear(from: movie.movieData.name),
+                            tmdbId: movie.tmdbId,
+                            genre: movie.genre,
+                            runtimeMinutes: movie.durationSecs / 60,
+                            mediaType: .movie
+                        )
+                    } else {
+                        query = MetadataSearchQuery(
+                            title: mediaItem.title,
+                            year: StringSimilarity.extractYear(from: mediaItem.releaseDateText),
+                            genre: mediaItem.genreText,
+                            runtimeMinutes: Int(mediaItem.durationText) ?? 0,
+                            mediaType: mediaItem.mediaType == .series ? .series : .movie
+                        )
+                    }
+                    let candidates = await MetadataEnrichmentService.shared.fetchAllCandidates(query: query)
+                    await MainActor.run {
+                        self.metadataCandidates = candidates
+                        self.enrichedMetadata = candidates.first?.result
+                        self.isEnrichingMetadata = false
+                    }
+                }
+            }
         }
     }
 
@@ -303,7 +340,6 @@ struct AddDownloadMediaViewiOS: View {
     var metadataOverlayView: some View {
         let isCollapsed = headerHeight <= minHeaderHeight * 1.1
         let isExpanded = headerHeight >= minHeaderHeight * 1.5
-        let isTransitioning = !isCollapsed && !isExpanded
         
         // Calculate progress for expanded state elements with smoother transition
         let expandedProgress = isExpanded ?
@@ -386,7 +422,6 @@ struct AddDownloadMediaViewiOS: View {
     var headerBackgroundView: some View {
         let isCollapsed = headerHeight <= minHeaderHeight * 1.1 // Slightly higher threshold
         let isExpanded = headerHeight >= minHeaderHeight * 1.5
-        let isTransitioning = !isCollapsed && !isExpanded
         
         // Calculate dynamic width with snapping behavior
         let dynamicWidth: CGFloat
@@ -439,7 +474,7 @@ struct AddDownloadMediaViewiOS: View {
             let isCollapsed = headerHeight <= minHeaderHeight * 1.1
             let isExpanded = headerHeight >= minHeaderHeight * 1.5
             let isTransitioning = !isCollapsed && !isExpanded
-            
+
             // Mostrar el título colapsado cuando estamos cerca o en estado colapsado
             if isCollapsed || (isTransitioning && headerHeight < minHeaderHeight * 1.3) {
                 // Calcular opacidad basada en qué tan cerca estamos del estado colapsado
@@ -910,7 +945,11 @@ struct AddDownloadMediaViewiOS: View {
                                 type: mediaItem.mediaType,
                                 vodExtension: episode.containerExtension,
                                 shouldConvertToMOV: shouldConvertToMOV,
-                                downloadPathParam: selectedFolder.path
+                                downloadPathParam: selectedFolder.path,
+                                genre: mediaItem.genreText,
+                                runtimeMinutes: Int(mediaItem.durationText) ?? 0,
+                                preResolvedMetadata: enrichedMetadata,
+                                metadataCandidates: metadataCandidates
                             )
                             selectedView = "Downloads"
                             isModalPresented = false
@@ -926,7 +965,12 @@ struct AddDownloadMediaViewiOS: View {
                             type: mediaItem.mediaType,
                             vodExtension: movie.movieData.containerExtension ?? "mkv",
                             shouldConvertToMOV: shouldConvertToMOV,
-                            downloadPathParam: selectedFolder.path
+                            downloadPathParam: selectedFolder.path,
+                            tmdbId: movie.tmdbId,
+                            genre: movie.genre,
+                            runtimeMinutes: movie.durationSecs / 60,
+                            preResolvedMetadata: enrichedMetadata,
+                            metadataCandidates: metadataCandidates
                         )
                         selectedView = "Downloads"
                         isModalPresented = false
@@ -1078,6 +1122,7 @@ struct AddDownloadMediaViewiOS_Previews: PreviewProvider {
                 name: "The Matrix",
                 streamType: "movie",
                 streamId: 603,
+                tmdbId: nil,
                 streamIcon: "https://image.tmdb.org/t/p/w600_and_h900_bestv2/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg",
                 rating: "8.7",
                 rating5Based: 4.35,

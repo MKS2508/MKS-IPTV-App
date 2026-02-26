@@ -22,7 +22,8 @@ struct DownloadRowView: View {
     let item: DownloadItem
     let progress: Double  // Accept progress as a parameter
     @EnvironmentObject private var downloadManager: DownloadManager
-    
+    @State private var showMetadataPicker = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -46,7 +47,7 @@ struct DownloadRowView: View {
                     HStack {
                         AnimatedProgressText(progress: progress)
                             .padding(.trailing, 8)
-                        
+
                         Spacer()
                         if item.totalBytes > 0 {
                             Text(String(format: "%.1f/%.1f MB", Double(item.bytesDownloaded) / 1_048_576, Double(item.totalBytes) / 1_048_576))
@@ -62,7 +63,7 @@ struct DownloadRowView: View {
                                 .font(.caption)
                         }
                     }
-                    
+
                     if item.status == .downloading {
                         HStack {
                             if item.speed > 0 {
@@ -80,7 +81,7 @@ struct DownloadRowView: View {
                         .foregroundColor(.secondary)
                         .font(.caption)
                     }
-                    
+
                     // Control buttons
                     HStack {
                         Spacer()
@@ -93,7 +94,7 @@ struct DownloadRowView: View {
                                     .foregroundColor(.green)
                             }
                         }
-                        
+
                         Button {
                             downloadManager.cancelDownload(id: item.id)
                         } label: {
@@ -105,9 +106,25 @@ struct DownloadRowView: View {
                     .font(.title3)
                 }
             } else {
-                Text(statusText)
-                    .font(.subheadline)
-                    .foregroundColor(statusColor)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(statusText)
+                            .font(.subheadline)
+                            .foregroundColor(statusColor)
+
+                        Spacer()
+
+                        // Metadata status badge
+                        if item.status == .completed {
+                            metadataStatusBadge
+                        }
+                    }
+
+                    // Metadata preview for completed downloads
+                    if item.status == .completed, let metadata = item.metadataResult {
+                        metadataPreview(metadata: metadata)
+                    }
+                }
             }
         }
         .padding(.vertical, 12)
@@ -122,7 +139,7 @@ struct DownloadRowView: View {
                 } label: {
                     Label("Pause", systemImage: "pause.circle")
                 }
-                
+
                 Button(role: .destructive) {
                     downloadManager.cancelDownload(id: item.id)
                 } label: {
@@ -134,19 +151,197 @@ struct DownloadRowView: View {
                 } label: {
                     Label("Resume", systemImage: "play.circle")
                 }
-                
+
                 Button(role: .destructive) {
                     downloadManager.cancelDownload(id: item.id)
                 } label: {
                     Label("Cancel", systemImage: "xmark.circle")
                 }
             }
+
+            if item.status == .completed {
+                Divider()
+
+                if !item.metadataCandidates.isEmpty {
+                    Button {
+                        showMetadataPicker = true
+                    } label: {
+                        Label("Choose & Edit Metadata", systemImage: "tag")
+                    }
+                }
+
+                if case .failed = item.metadataStatus {
+                    Button {
+                        downloadManager.retryMetadata(id: item.id)
+                    } label: {
+                        Label("Retry Metadata", systemImage: "arrow.clockwise")
+                    }
+                }
+
+                if let metadata = item.metadataResult, item.metadataStatus == .pending {
+                    Button {
+                        downloadManager.writeMetadataForDownload(id: item.id, metadata: metadata)
+                    } label: {
+                        Label("Write Tags Now", systemImage: "square.and.pencil")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showMetadataPicker) {
+            MetadataPickerView(
+                downloadItem: item,
+                onConfirm: { chosenMetadata in
+                    downloadManager.writeMetadataForDownload(id: item.id, metadata: chosenMetadata)
+                    showMetadataPicker = false
+                },
+                onDismiss: {
+                    showMetadataPicker = false
+                }
+            )
         }
     }
     
-    // The rest of the code for statusIcon, statusText, statusColor, and formatETA remain the same.
+    // MARK: - Metadata Status Badge
 
+    @ViewBuilder
+    private var metadataStatusBadge: some View {
+        switch item.metadataStatus {
+        case .enriching:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("Enriching...")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.blue.opacity(0.15))
+            .cornerRadius(8)
+        case .tagging:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("Writing tags...")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.purple.opacity(0.15))
+            .cornerRadius(8)
+        case .completed:
+            HStack(spacing: 3) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+                Text("Tagged")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.green.opacity(0.15))
+            .cornerRadius(8)
+        case .failed:
+            Button {
+                downloadManager.retryMetadata(id: item.id)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                    Text("Retry")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.orange.opacity(0.15))
+                .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+        case .pending:
+            if !item.metadataCandidates.isEmpty {
+                Button {
+                    showMetadataPicker = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "tag")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                        Text("Choose & Write")
+                            .font(.caption2)
+                            .foregroundColor(.accentColor)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor.opacity(0.15))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                EmptyView()
+            }
+        case .skipped:
+            EmptyView()
+        }
+    }
 
+    // MARK: - Metadata Preview
+
+    @ViewBuilder
+    private func metadataPreview(metadata: MetadataResult) -> some View {
+        HStack(spacing: 8) {
+            // Genre tags
+            if !metadata.genre.isEmpty {
+                Text(metadata.genre.prefix(2).joined(separator: ", "))
+                    .font(.caption2)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.7))
+                    .cornerRadius(4)
+            }
+
+            // Year
+            if let year = metadata.year {
+                Text(String(year))
+                    .font(.caption2)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.gray.opacity(0.6))
+                    .cornerRadius(4)
+            }
+
+            // Rating
+            if let rating = metadata.rating {
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 8))
+                    Text(String(format: "%.1f", rating))
+                        .font(.caption2)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.yellow.opacity(0.7))
+                .cornerRadius(4)
+            }
+
+            // Content advisory rating
+            if let advisory = metadata.contentAdvisoryRating, !advisory.isEmpty {
+                Text(advisory)
+                    .font(.caption2)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.6))
+                    .cornerRadius(4)
+            }
+        }
+    }
 
     private var statusIcon: some View {
         Group {

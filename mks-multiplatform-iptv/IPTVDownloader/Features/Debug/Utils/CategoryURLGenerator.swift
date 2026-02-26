@@ -286,7 +286,7 @@ class CategoryURLGenerator {
             result += "--- Season \(season.seasonNumber) ---\n"
             
             if let episodes = details.episodes[season.id] {
-                for (index, episode) in episodes.sorted(by: { $0.episodeNum < $1.episodeNum }).enumerated() {
+                for episode in episodes.sorted(by: { $0.episodeNum < $1.episodeNum }) {
                     let url = IPTVConfiguration.buildSeriesURL(
                         profile: profile,
                         vodID: episode.id,

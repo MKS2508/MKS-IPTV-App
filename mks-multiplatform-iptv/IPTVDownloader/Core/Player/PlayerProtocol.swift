@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AVKit
 import Combine
 
 // MARK: - Player Protocol
@@ -46,6 +47,16 @@ protocol VideoPlayerProtocol: ObservableObject {
     
     /// Get a SwiftUI view for the player
     func playerView() -> AnyView
+
+    /// The underlying AVPlayer instance, if the implementation uses one.
+    /// Used by MKSPlayerView to provide native system controls (Liquid Glass on iOS 26).
+    var underlyingAVPlayer: AVPlayer? { get }
+}
+
+// MARK: - Default Protocol Implementations
+
+extension VideoPlayerProtocol {
+    var underlyingAVPlayer: AVPlayer? { nil }
 }
 
 // MARK: - Player Errors

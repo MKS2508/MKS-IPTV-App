@@ -12,8 +12,8 @@ struct DebugStreamingView: View {
     @State private var selectedTab = ContentTab.movies
     @State private var selectedItem: DebugStreamItem?
     @State private var showingPlayer = false
-    @State private var activePlayerView: AnyView?
     @State private var activePlayerLabel: String = ""
+    @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var showingEpisodePicker = false
     @State private var selectedSerieForEpisodes: DebugStreamItem?
     @State private var selectedLiveTVCategory: String = "all"
@@ -73,31 +73,20 @@ struct DebugStreamingView: View {
 
     @ViewBuilder
     private var playerSheet: some View {
-        if let playerView = activePlayerView {
-            VStack(spacing: 0) {
-                HStack {
-                    Text(activePlayerLabel)
-                        .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Button("Close") {
-                        showingPlayer = false
-                        activePlayerView = nil
-                        // Cleanup proxy session if active
-                        if let session = activeProxySession {
-                            StreamProxy.shared.stop(sessionID: session.id)
-                            activeProxySession = nil
-                        }
+        if let player = activePlayer {
+            MKSPlayerView(
+                player: player,
+                title: activePlayerLabel,
+                onDismiss: {
+                    activePlayer?.stop()
+                    activePlayer = nil
+                    showingPlayer = false
+                    if let session = activeProxySession {
+                        Task { await StreamProxy.shared.stop(sessionID: session.id) }
+                        activeProxySession = nil
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.9))
-
-                playerView
-            }
+            )
             .frame(width: 800, height: 600)
         }
     }
@@ -517,36 +506,27 @@ struct DebugStreamingView: View {
                 }
             }
 
-            // NOTE: Proxy is only needed for KSPlayer with long URLs.
-            // FFmpegPlayer (transmux) uses FFmpeg C API directly which doesn't have the buffer overflow.
-            // VLCPlayer also handles long URLs correctly.
-            // We'll create the player first, then decide if we need proxy.
+            // NOTE: KSPlayer and FFmpeg Transmuxer both use FFmpegKit n6.1 which has a
+            // buffer overflow on URLs >~500 chars. Route long URLs through StreamProxy
+            // to shorten them to a localhost URL before handing to the player.
+
+            let urlIsLong = playbackURL.absoluteString.count > proxyURLLengthThreshold
+            if urlIsLong {
+                viewModel.log("URL is long (\(playbackURL.absoluteString.count) chars) — routing through proxy", type: .info)
+                do {
+                    let session = try await StreamProxy.shared.startProxy(for: playbackURL)
+                    activeProxySession = session
+                    viewModel.log("Proxy started: \(session.localURL.absoluteString)", type: .success)
+                    playbackURL = session.localURL
+                } catch {
+                    viewModel.log("Proxy failed: \(error.localizedDescription) — trying direct URL", type: .warning)
+                }
+            }
 
             let startTime = Date()
 
-            // Determine if URL is too long for KSPlayer's FFmpeg n6.1
-            let urlIsLong = playbackURL.absoluteString.count > proxyURLLengthThreshold
-
             // PlayerFactory auto-selects best player based on file extension
-            // But if URL is long, avoid KSPlayer AND FFmpeg Transmuxer (both use FFmpeg n6.1)
-            // Use VLCPlayer instead - it has its own HTTP stack without the buffer overflow
-            let player: any VideoPlayerProtocol
-            if urlIsLong {
-                let availablePlayers = PlayerFactory.availablePlayers()
-                if availablePlayers.contains(.vlc) {
-                    viewModel.log("URL is long (\(playbackURL.absoluteString.count) chars) — using VLC", type: .info)
-                    player = PlayerFactory.shared.createPlayer(type: .vlc, url: playbackURL)
-                } else if availablePlayers.contains(.ffmpeg) {
-                    viewModel.log("URL is long (\(playbackURL.absoluteString.count) chars) — trying FFmpeg Transmuxer (may fail)", type: .info)
-                    player = PlayerFactory.shared.createPlayer(type: .ffmpeg, url: playbackURL)
-                } else {
-                    // Last resort: try KSPlayer (will likely crash with EXC_BAD_ACCESS)
-                    viewModel.log("URL is long but no VLC/FFmpeg available — trying KSPlayer (may crash)", type: .warning)
-                    player = PlayerFactory.shared.createPlayer(for: playbackURL)
-                }
-            } else {
-                player = PlayerFactory.shared.createPlayer(for: playbackURL)
-            }
+            let player: any VideoPlayerProtocol = PlayerFactory.shared.createPlayer(for: playbackURL)
 
             let playerType = detectPlayerType(player)
             let initTime = Date().timeIntervalSince(startTime)
@@ -556,8 +536,8 @@ struct DebugStreamingView: View {
             viewModel.updateItemState(item.id, totalLatency: initTime)
 
             player.play()
+            activePlayer = player
             activePlayerLabel = "\(item.title) — \(playerType.displayName) — \(item.fileExtension)"
-            activePlayerView = AnyView(player.playerView())
             showingPlayer = true
             viewModel.log("Playback started", type: .success)
         }
@@ -605,7 +585,8 @@ struct DebugStreamingView: View {
                 }
             }
 
-            // Use proxy for long URLs to avoid FFmpeg buffer overflow
+            // Use proxy for long URLs — KSPlayer and FFmpeg Transmuxer both use FFmpegKit n6.1
+            // which has a buffer overflow on URLs >~500 chars.
             if needsProxy {
                 do {
                     let session = try await StreamProxy.shared.startProxy(for: playbackURL)
@@ -625,8 +606,8 @@ struct DebugStreamingView: View {
             }
 
             player.play()
+            activePlayer = player
             activePlayerLabel = "\(item.title) — \(actualType.displayName) (forced) — \(item.fileExtension)"
-            activePlayerView = AnyView(player.playerView())
             showingPlayer = true
             viewModel.log("Playback started with \(actualType.displayName)", type: .success)
         }
@@ -688,8 +669,8 @@ struct DebugStreamingView: View {
             let playerType = detectPlayerType(player)
             player.play()
 
+            activePlayer = player
             activePlayerLabel = "\(serie.title) — \(episode.title) — \(playerType.displayName)"
-            activePlayerView = AnyView(player.playerView())
             showingPlayer = true
             viewModel.log("Episode playback started with \(playerType.displayName)", type: .success)
         }

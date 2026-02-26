@@ -41,10 +41,8 @@ struct AddDownloadViewSerie: View {
     @State private var customFolder: URL? = nil
     private let otherFolderKey = URL(string: "other")!
     @State private var showInlinePlayer = false
-    @State private var player: AVPlayer?
+    @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var currentStreamingEpisode: SerieDetail.Episode?
-    
-    private let streamManager = StreamManager()
 
     enum ButtonType {
         case primary
@@ -205,7 +203,7 @@ struct AddDownloadViewSerie: View {
         .sheet(isPresented: $isModalPresented, content: {
             downloadOptionsModal
         })
-        .onChange(of: selectedSeason) { _ in
+        .onChange(of: selectedSeason) { _, _ in
             selectedEpisodes.removeAll()
         }
     }
@@ -455,7 +453,7 @@ struct AddDownloadViewSerie: View {
                 .pickerStyle(MenuPickerStyle())
                 .padding(8)
                 .cornerRadius(10)
-                .onChange(of: selectedFolder) { newValue in
+                .onChange(of: selectedFolder) { _, newValue in
                     if newValue == URL(string: "other")! {
                         selectFolder { folderPath in
                             DispatchQueue.main.async {
@@ -498,7 +496,11 @@ struct AddDownloadViewSerie: View {
                             type: mediaType,
                             vodExtension: episode.containerExtension,
                             shouldConvertToMOV: shouldConvertToMOV,
-                            downloadPathParam: selectedFolder.path
+                            downloadPathParam: selectedFolder.path,
+                            genre: seriesDetail.info.genre,
+                            runtimeMinutes: Int(seriesDetail.info.episodeRunTime) ?? 0,
+                            preResolvedMetadata: viewModel?.enrichedMetadata,
+                            metadataCandidates: viewModel?.metadataCandidates
                         )
                         selectedView = "Downloads"
                         isModalPresented = false
@@ -569,90 +571,61 @@ struct AddDownloadViewSerie: View {
     }
 }
 
-class LocalObserver: NSObject {
-    @objc override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        if keyPath == "status", let player = object as? AVPlayer {
-            if player.status == .failed {
-                if let error = player.error as NSError?, error.domain == AVFoundationErrorDomain {
-                    print("Server connection failed, retrying in 5 seconds...")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                        player.replaceCurrentItem(with: player.currentItem)
-                        player.play()
-                    }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Streaming Functions
 extension AddDownloadViewSerie {
     private func playEpisode(episode: SerieDetail.Episode) {
         showInlinePlayer ? closePlayer() : initializeEpisodePlayback(episode: episode)
     }
-    
+
     private func initializeEpisodePlayback(episode: SerieDetail.Episode) {
         LiveLogger.debug("Initializing stream for episode: \(episode.title)")
-        
-        guard let urlString = IPTVConfiguration.buildSeriesURL(
+
+        let urlString = IPTVConfiguration.buildSeriesURL(
             profile: profile,
             vodID: episode.id,
             vodExtension: episode.containerExtension
-        ).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let originalUrl = URL(string: urlString) else {
+        )
+        guard let url = URL(string: urlString) else {
             LiveLogger.error("Failed to generate valid stream URL for episode")
             return
         }
-        
-        LiveLogger.debug("Initial Episode Stream URL: \(originalUrl.absoluteString)")
-        
+
+        LiveLogger.debug("Episode Stream URL: \(url.absoluteString)")
         currentStreamingEpisode = episode
-        
-        streamManager.resolveStreamURL(from: originalUrl) { resolvedUrl in
-            guard let resolvedUrl = resolvedUrl else {
-                LiveLogger.error("Failed to resolve episode stream URL")
-                return
-            }
-            
-            streamManager.setupStreamPlayer(with: resolvedUrl) { player in
-                DispatchQueue.main.async {
-                    if let player = player {
-                        self.player = player
-                        self.showInlinePlayer = true
-                        player.play()
-                        LiveLogger.debug("✅ Episode stream started successfully")
-                    } else {
-                        LiveLogger.error("Failed to set up player for episode")
-                        self.closePlayer()
-                    }
-                }
-            }
-        }
+
+        let player = PlayerFactory.shared.createPlayer(for: url)
+        player.play()
+        self.activePlayer = player
+        self.showInlinePlayer = true
+        LiveLogger.debug("Episode stream started via PlayerFactory")
     }
-    
+
     private func closePlayer() {
         LiveLogger.debug("Stopping episode stream playback")
-        streamManager.cleanUpPlayer()
-        player = nil
+        activePlayer?.stop()
+        activePlayer = nil
         showInlinePlayer = false
         currentStreamingEpisode = nil
     }
     
     private var inlineEpisodePlayerView: some View {
         VStack {
-            if let player = player, let episode = currentStreamingEpisode {
+            if let player = activePlayer, let episode = currentStreamingEpisode {
                 VStack(spacing: 8) {
                     Text("Episode \(episode.episodeNum): \(episode.title)")
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
-                    VideoPlayer(player: player)
-                        .frame(height: 250)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
-                        )
+
+                    MKSPlayerView(
+                        player: player,
+                        metadata: viewModel?.enrichedMetadata
+                    )
+                    .frame(height: 250)
+                    .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall)
+                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                    )
                 }
             } else {
                 VStack {
@@ -668,7 +641,7 @@ extension AddDownloadViewSerie {
                         .fill(Color.secondary.opacity(0.1))
                 )
             }
-            
+
             Button(action: closePlayer) {
                 HStack(spacing: 8) {
                     Image(systemName: "stop.fill")

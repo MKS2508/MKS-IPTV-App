@@ -17,14 +17,17 @@ struct mks_iptv_downloaderApp: App {
     var body: some Scene {
         WindowGroup {
             // Profile selection gating: blocks app until a profile is chosen.
-            if let profile = activeProfile {
-                ContentView(showingSettings: $showingSettings)
-                    .environmentObject(DownloadManager(profile: profile))
-                    .environmentObject(profilesManager)
-                    .environmentObject(profile)
-            } else {
-                IPTVProfilesView(manager: profilesManager)
+            Group {
+                if let profile = activeProfile {
+                    ContentView(showingSettings: $showingSettings)
+                        .environmentObject(DownloadManager(profile: profile))
+                        .environmentObject(profilesManager)
+                        .environmentObject(profile)
+                } else {
+                    IPTVProfilesView(manager: profilesManager)
+                }
             }
+            .preferredColorScheme(.dark)
         }
         #if os(macOS)
         .commands {

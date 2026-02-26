@@ -127,8 +127,189 @@ class CacheManager {
         }
     }
     
+    // MARK: - Metadata Cache
+
+    /// Longer TTL for metadata (24 hours) since it's more stable than content lists
+    private let metadataCacheExpiration: TimeInterval = 86400
+
+    func getCachedMetadata(key: String) -> MetadataResult? {
+        return queue.sync {
+            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                return nil
+            }
+
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                if let modificationDate = attributes[.modificationDate] as? Date {
+                    let age = Date().timeIntervalSince(modificationDate)
+                    if age > metadataCacheExpiration {
+                        return nil
+                    }
+                }
+
+                let data = try Data(contentsOf: fileURL)
+                return try JSONDecoder().decode(MetadataResult.self, from: data)
+            } catch {
+                print("Metadata cache read error for key \(key): \(error)")
+                return nil
+            }
+        }
+    }
+
+    func cacheMetadata(_ result: MetadataResult, key: String) {
+        queue.async(flags: .barrier) {
+            let fileURL = self.cacheDirectory.appendingPathComponent("\(key).json")
+
+            do {
+                let data = try JSONEncoder().encode(result)
+                try data.write(to: fileURL)
+            } catch {
+                print("Metadata cache write error for key \(key): \(error)")
+            }
+        }
+    }
+
+    // MARK: - EPG Cache (Binary PropertyList)
+
+    /// Longer TTL for EPG data (4 hours) since it changes less frequently
+    private let epgCacheExpiration: TimeInterval = 14400
+
+    func getCachedEPG() -> EPGData? {
+        return queue.sync {
+            let fileURL = cacheDirectory.appendingPathComponent("epg_data.plist")
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                return nil
+            }
+
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                if let modificationDate = attributes[.modificationDate] as? Date {
+                    let age = Date().timeIntervalSince(modificationDate)
+                    if age > epgCacheExpiration {
+                        return nil
+                    }
+                }
+
+                let data = try Data(contentsOf: fileURL)
+                let decoder = PropertyListDecoder()
+                return try decoder.decode(EPGData.self, from: data)
+            } catch {
+                print("EPG plist cache read error: \(error)")
+                return nil
+            }
+        }
+    }
+
+    func cacheEPG(_ data: EPGData) {
+        queue.async(flags: .barrier) {
+            let fileURL = self.cacheDirectory.appendingPathComponent("epg_data.plist")
+
+            do {
+                let encoder = PropertyListEncoder()
+                encoder.outputFormat = .binary
+                let plistData = try encoder.encode(data)
+                try plistData.write(to: fileURL)
+            } catch {
+                print("EPG plist cache write error: \(error)")
+            }
+
+            // Remove legacy JSON cache if it exists
+            let legacyURL = self.cacheDirectory.appendingPathComponent("epg_data.json")
+            try? FileManager.default.removeItem(at: legacyURL)
+        }
+    }
+
+    // MARK: - EPG Match Table Cache (Binary PropertyList)
+
+    /// TTL for match table (4 hours) — same as EPG data
+    private let matchTableCacheExpiration: TimeInterval = 14400
+
+    func getCachedMatchTable() -> [Int: String]? {
+        return queue.sync {
+            let fileURL = cacheDirectory.appendingPathComponent("epg_match_table.plist")
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                return nil
+            }
+
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                if let modificationDate = attributes[.modificationDate] as? Date {
+                    let age = Date().timeIntervalSince(modificationDate)
+                    if age > matchTableCacheExpiration {
+                        return nil
+                    }
+                }
+
+                let data = try Data(contentsOf: fileURL)
+                let decoder = PropertyListDecoder()
+                // PropertyList keys must be strings, so decode as [String: String] and convert
+                let stringKeyed = try decoder.decode([String: String].self, from: data)
+                var result: [Int: String] = [:]
+                for (key, value) in stringKeyed {
+                    if let intKey = Int(key) {
+                        result[intKey] = value
+                    }
+                }
+                return result
+            } catch {
+                print("Match table plist cache read error: \(error)")
+                return nil
+            }
+        }
+    }
+
+    func cacheMatchTable(_ table: [Int: String]) {
+        queue.async(flags: .barrier) {
+            let fileURL = self.cacheDirectory.appendingPathComponent("epg_match_table.plist")
+
+            do {
+                // Convert Int keys to String for PropertyList compatibility
+                let stringKeyed = Dictionary(uniqueKeysWithValues: table.map { (String($0.key), $0.value) })
+                let encoder = PropertyListEncoder()
+                encoder.outputFormat = .binary
+                let data = try encoder.encode(stringKeyed)
+                try data.write(to: fileURL)
+            } catch {
+                print("Match table plist cache write error: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Generic Cache with Custom TTL
+
+    private func getCache<T: Decodable>(key: String, type: T.Type, expiration: TimeInterval) -> T? {
+        return queue.sync {
+            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                return nil
+            }
+
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                if let modificationDate = attributes[.modificationDate] as? Date {
+                    let age = Date().timeIntervalSince(modificationDate)
+                    if age > expiration {
+                        return nil
+                    }
+                }
+
+                let data = try Data(contentsOf: fileURL)
+                let decoder = JSONDecoder()
+                return try decoder.decode(type, from: data)
+            } catch {
+                print("Cache read error for key \(key): \(error)")
+                return nil
+            }
+        }
+    }
+
     // MARK: - Cache Management
-    
+
     func clearCache() {
         queue.async(flags: .barrier) {
             do {

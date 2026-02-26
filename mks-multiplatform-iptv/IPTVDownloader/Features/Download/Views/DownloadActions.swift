@@ -103,7 +103,12 @@ struct DownloadOptionsModal: View {
     @Binding var shouldConvertToMOV: Bool
     let availableFolders: [URL]
     let onDownload: () -> Void
-    
+    var metadata: MetadataResult? = nil
+    var metadataCandidates: [ScoredMetadataResult] = []
+    var onMetadataSelected: ((MetadataResult) -> Void)? = nil
+
+    @State private var showMetadataPicker = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -111,9 +116,9 @@ struct DownloadOptionsModal: View {
                 Text("Opciones de descarga")
                     .font(.headline)
                     .foregroundColor(.primary)
-                
+
                 Spacer()
-                
+
                 Button("Cerrar") {
                     isModalPresented = false
                 }
@@ -122,74 +127,152 @@ struct DownloadOptionsModal: View {
             }
             .padding()
             .background(Color.secondarySystemBackground)
-            
+
             Divider()
-            
-            // Opciones
-            VStack(spacing: 16) {
-                // Selector de carpeta
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Carpeta de destino")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    HStack {
-                        Text(selectedFolder.lastPathComponent)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        Button("Cambiar") {
-                            DownloadActions.selectFolder { url in
-                                if let url = url {
-                                    selectedFolder = url
+
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Metadata preview section
+                    if let metadata = metadata {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Metadata")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                if !metadataCandidates.isEmpty {
+                                    Button("Cambiar") {
+                                        showMetadataPicker = true
+                                    }
+                                    .font(.caption)
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
                                 }
                             }
+
+                            HStack(spacing: 10) {
+                                // Poster
+                                if let posterURL = metadata.posterURL, let url = URL(string: posterURL) {
+                                    AsyncImage(url: url) { phase in
+                                        if let image = phase.image {
+                                            image.resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 40, height: 60)
+                                                .cornerRadius(4)
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(Color.secondary.opacity(0.2))
+                                                .frame(width: 40, height: 60)
+                                        }
+                                    }
+                                }
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(metadata.title)
+                                        .font(.caption.bold())
+                                        .lineLimit(1)
+
+                                    HStack(spacing: 6) {
+                                        if let year = metadata.year {
+                                            Text(String(year))
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        if !metadata.genre.isEmpty {
+                                            Text(metadata.genre.prefix(2).joined(separator: ", "))
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        if let rating = metadata.rating {
+                                            HStack(spacing: 2) {
+                                                Image(systemName: "star.fill")
+                                                    .font(.system(size: 7))
+                                                    .foregroundColor(.yellow)
+                                                Text(String(format: "%.1f", rating))
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                    }
+
+                                    Text("via \(metadata.providerName)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary.opacity(0.7))
+                                }
+
+                                Spacer()
+                            }
+                            .padding(8)
+                            .background(Color.secondary.opacity(0.05))
+                            .cornerRadius(8)
                         }
-                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
                     }
-                }
-                .padding(.horizontal)
-                
-                // Opción de conversión
-                Toggle("Convertir a MOV", isOn: $shouldConvertToMOV)
-                    .padding(.horizontal)
-                
-                Divider()
-                
-                // Carpetas disponibles
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Carpetas rápidas")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 8) {
-                        ForEach(availableFolders, id: \.self) { folder in
-                            Button(folder.lastPathComponent) {
-                                selectedFolder = folder
+
+                    // Selector de carpeta
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Carpeta de destino")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        HStack {
+                            Text(selectedFolder.lastPathComponent)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Button("Cambiar") {
+                                DownloadActions.selectFolder { url in
+                                    if let url = url {
+                                        selectedFolder = url
+                                    }
+                                }
                             }
                             .buttonStyle(.bordered)
-                            .controlSize(.small)
                         }
                     }
+                    .padding(.horizontal)
+
+                    // Opción de conversión
+                    Toggle("Convertir a MOV", isOn: $shouldConvertToMOV)
+                        .padding(.horizontal)
+
+                    Divider()
+
+                    // Carpetas disponibles
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Carpetas rápidas")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 8) {
+                            ForEach(availableFolders, id: \.self) { folder in
+                                Button(folder.lastPathComponent) {
+                                    selectedFolder = folder
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
+                .padding(.vertical)
             }
-            .padding()
-            
+
             Divider()
-            
+
             // Botones de acción
             HStack(spacing: 12) {
                 Button("Cancelar") {
                     isModalPresented = false
                 }
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
-                
+
                 Button("Descargar") {
                     onDownload()
                     isModalPresented = false
@@ -198,7 +281,24 @@ struct DownloadOptionsModal: View {
             }
             .padding()
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 480)
+        .sheet(isPresented: $showMetadataPicker) {
+            if !metadataCandidates.isEmpty {
+                let dummyItem = DownloadItem(
+                    id: UUID(), vodID: "", title: metadata?.title ?? "",
+                    type: .movie, status: .completed,
+                    metadataCandidates: metadataCandidates
+                )
+                MetadataPickerView(
+                    downloadItem: dummyItem,
+                    onConfirm: { chosen in
+                        onMetadataSelected?(chosen)
+                        showMetadataPicker = false
+                    },
+                    onDismiss: { showMetadataPicker = false }
+                )
+            }
+        }
     }
 }
 

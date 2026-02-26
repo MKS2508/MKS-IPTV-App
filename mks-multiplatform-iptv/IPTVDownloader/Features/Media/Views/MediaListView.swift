@@ -35,6 +35,7 @@ struct MediaListView: View {
     let movieCategories: [MovieCategory]
     let seriesCategories: [SeriesCategory]
     let showContentTypeSelector: Bool
+    let sidebarCategoryFilter: String?
     
     @Namespace private var animation
     
@@ -63,13 +64,19 @@ struct MediaListView: View {
          movieCategories: [MovieCategory] = [],
          seriesCategories: [SeriesCategory] = [],
          initialContentType: MediaListViewModel.ContentType = .all,
-         showContentTypeSelector: Bool = true) {
+         showContentTypeSelector: Bool = true,
+         sidebarCategoryFilter: String? = nil) {
         self.viewModel = viewModel
         self._selectedView = selectedView
         self.movieCategories = movieCategories
         self.seriesCategories = seriesCategories
         self._contentTypeFilter = State(initialValue: initialContentType)
         self.showContentTypeSelector = showContentTypeSelector
+        self.sidebarCategoryFilter = sidebarCategoryFilter
+        // Sync sidebar category filter into selectedCategories at init
+        if let categoryId = sidebarCategoryFilter {
+            self._selectedCategories = State(initialValue: [categoryId])
+        }
     }
     
     // MARK: - View Components para el Body
@@ -106,12 +113,6 @@ struct MediaListView: View {
     // Main Content Container
     private var mainContentContainer: some View {
         VStack(spacing: 0) {
-            #if os(macOS)
-            // Add spacer to push content below toolbar on macOS
-            Color.clear
-                .frame(height: 100)
-            #endif
-            
             // Categories indicator section
             categoriesIndicatorSection
             
@@ -152,7 +153,7 @@ struct MediaListView: View {
                 .padding(.horizontal)
                 .padding(.top, 4)
                 .padding(.bottom, 8)
-                .onChange(of: contentTypeFilter) { newType in
+                .onChange(of: contentTypeFilter) { _, newType in
                     selectedCategories.removeAll()
                     Task {
                         await viewModel.loadMedia(contentType: newType)
@@ -594,9 +595,11 @@ struct MediaListView: View {
     // MARK: - Body
     var body: some View {
         ZStack(alignment: .top) {
-            // Background
+            // Background - skip on macOS to preserve native sidebar/toolbar materials
+            #if !os(macOS)
             backgroundView
-            
+            #endif
+
             // Main content
             mainContentContainer
             
@@ -634,11 +637,11 @@ struct MediaListView: View {
 #endif
         #if os(macOS)
         // Sync internal changes to TouchBarManager
-        .onChange(of: searchText) { newValue in
+        .onChange(of: searchText) { _, newValue in
             print("[MediaListView] Internal searchText changed to: '\(newValue)'")
             touchBarManager.searchText = newValue
         }
-        .onChange(of: selectedCategories) { newValue in
+        .onChange(of: selectedCategories) { _, newValue in
             print("[MediaListView] Internal selectedCategories changed to: \(newValue)")
             touchBarManager.selectedCategoryIDs = newValue
             // Update category names in TouchBarManager
@@ -650,16 +653,25 @@ struct MediaListView: View {
             touchBarManager.selectedCategories = categoryNames
         }
         // Sync TouchBarManager changes to internal state
-        .onChange(of: touchBarManager.searchText) { newValue in
+        .onChange(of: touchBarManager.searchText) { _, newValue in
             print("[MediaListView] TouchBarManager searchText changed to: '\(newValue)'")
             if newValue != searchText {
                 searchText = newValue
             }
         }
-        .onChange(of: touchBarManager.selectedCategoryIDs) { newValue in
+        .onChange(of: touchBarManager.selectedCategoryIDs) { _, newValue in
             print("[MediaListView] TouchBarManager selectedCategoryIDs changed to: \(newValue)")
             if newValue != selectedCategories {
                 selectedCategories = newValue
+            }
+        }
+        .onChange(of: sidebarCategoryFilter) { _, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                if let categoryId = newValue {
+                    selectedCategories = [categoryId]
+                } else {
+                    selectedCategories.removeAll()
+                }
             }
         }
         #endif

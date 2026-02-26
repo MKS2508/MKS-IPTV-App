@@ -153,18 +153,13 @@ class PlayerManager: ObservableObject {
     private init() {}
 
     func loadVideo(url: URL, preferredPlayer: PlayerType? = nil, requireAirPlay: Bool = false) {
-        // Stop previous player synchronously to release connections immediately
+        // Stop previous player synchronously to release connections immediately.
+        // FFmpegPlayerImplementation.stop() handles its own cleanup (cancelTransmux,
+        // cleanup session, stop TransmuxServer). Do NOT schedule a separate cleanup
+        // Task here — it races with the new player's startTransmux/TransmuxServer.start
+        // and can destroy the newly created server session.
         currentPlayer?.stop()
         currentPlayer = nil
-
-        // Cleanup previous transmux/HLS sessions — awaited to prevent race
-        // where new player starts while old resources are still held
-        Task { @MainActor in
-            await TransmuxingService.shared.cleanupAll()
-            #if canImport(FlyingFox)
-            await LocalHLSServer.shared.stop()
-            #endif
-        }
 
         if let preferredPlayer = preferredPlayer {
             var config = PlayerConfiguration()

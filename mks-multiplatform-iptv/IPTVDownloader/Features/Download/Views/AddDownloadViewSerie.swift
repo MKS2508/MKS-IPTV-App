@@ -42,6 +42,7 @@ struct AddDownloadViewSerie: View {
     private let otherFolderKey = URL(string: "other")!
     @State private var showInlinePlayer = false
     @State private var activePlayer: (any VideoPlayerProtocol)?
+    @State private var showFullscreenPlayer = false
     @State private var currentStreamingEpisode: SerieDetail.Episode?
 
     enum ButtonType {
@@ -203,6 +204,13 @@ struct AddDownloadViewSerie: View {
         .sheet(isPresented: $isModalPresented, content: {
             downloadOptionsModal
         })
+        .fullscreenPlayer(
+            isPresented: $showFullscreenPlayer,
+            player: activePlayer,
+            title: currentStreamingEpisode?.title ?? seriesDetail.info.name,
+            metadata: viewModel.enrichedMetadata,
+            stopOnDismiss: false
+        )
         .onChange(of: selectedSeason) { _, _ in
             selectedEpisodes.removeAll()
         }
@@ -618,7 +626,8 @@ extension AddDownloadViewSerie {
 
                     MKSPlayerView(
                         player: player,
-                        metadata: viewModel?.enrichedMetadata
+                        metadata: viewModel?.enrichedMetadata,
+                        onRequestFullscreen: { showFullscreenPlayer = true }
                     )
                     .frame(height: 250)
                     .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))

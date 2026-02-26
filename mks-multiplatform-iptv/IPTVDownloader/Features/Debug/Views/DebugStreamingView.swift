@@ -47,8 +47,20 @@ struct DebugStreamingView: View {
     var body: some View {
         mainContent
             .background(.ultraThinMaterial)
-            .sheet(isPresented: $showingPlayer) {
-                playerSheet
+            .fullscreenPlayer(
+                isPresented: $showingPlayer,
+                player: activePlayer,
+                title: activePlayerLabel
+            )
+            .onChange(of: showingPlayer) { _, isShowing in
+                if !isShowing {
+                    activePlayer?.stop()
+                    activePlayer = nil
+                    if let session = activeProxySession {
+                        Task { await StreamProxy.shared.stop(sessionID: session.id) }
+                        activeProxySession = nil
+                    }
+                }
             }
             .task {
                 await viewModel.loadContent(type: selectedTab, liveTVCategory: selectedLiveTVCategory)
@@ -67,28 +79,6 @@ struct DebugStreamingView: View {
             .sheet(isPresented: $showingCategoryURLs) {
                 CategorySelectionView(viewModel: viewModel)
             }
-    }
-
-    // MARK: - Player Sheet
-
-    @ViewBuilder
-    private var playerSheet: some View {
-        if let player = activePlayer {
-            MKSPlayerView(
-                player: player,
-                title: activePlayerLabel,
-                onDismiss: {
-                    activePlayer?.stop()
-                    activePlayer = nil
-                    showingPlayer = false
-                    if let session = activeProxySession {
-                        Task { await StreamProxy.shared.stop(sessionID: session.id) }
-                        activeProxySession = nil
-                    }
-                }
-            )
-            .frame(width: 800, height: 600)
-        }
     }
 
     // MARK: - Main Content

@@ -1,21 +1,48 @@
 import SwiftUI
 import AVKit
 
+// MARK: - Presentation Mode
+
+/// How MKSPlayerView renders the player surface.
+enum MKSPlayerPresentationMode {
+    /// Inline preview within another view (e.g. 250pt in download views).
+    /// Uses `VideoPlayer(player:)` with basic controls. Shows a fullscreen expand button.
+    case inline
+
+    /// Fullscreen native player presentation.
+    /// Uses `AVPlayerViewController` (iOS) / `AVPlayerView` (macOS) for all system controls:
+    /// scrub bar, play/pause/skip, volume, AirPlay, PiP, fullscreen, subtitle picker.
+    /// Falls back to `playerView()` for non-AVPlayer backends (KSPlayer, VLC).
+    case fullscreen
+}
+
 // MARK: - MKSPlayerView
 
 /// Unified player component used across the entire app.
 ///
-/// Uses the player protocol's `playerView()` for all rendering — reactive for FFmpeg
-/// (spinner → VideoPlayer transition via @ObservedObject), native for AVPlayer/KSPlayer/VLC.
-/// On iOS 26+, `VideoPlayer(player:)` automatically uses Liquid Glass transport controls.
+/// Two modes:
+/// - **inline**: `VideoPlayer(player:)` with optional metadata overlay + fullscreen button
+/// - **fullscreen**: Native `AVPlayerViewController`/`AVPlayerView` with complete system controls
+///
+/// On iOS 26+, `AVPlayerViewController` automatically uses Liquid Glass transport controls.
+/// AirPlay, PiP, seeking, and all native controls are provided by the system.
 ///
 /// ## Usage
 /// ```swift
+/// // Inline preview with fullscreen button
+/// MKSPlayerView(
+///     player: player,
+///     metadata: enrichedMetadata,
+///     onRequestFullscreen: { showFullscreen = true }
+/// )
+/// .frame(height: 250)
+///
+/// // Fullscreen (via FullscreenPlayerPresenter)
 /// MKSPlayerView(
 ///     player: player,
 ///     title: "Movie Title",
-///     metadata: enrichedMetadata,
-///     onDismiss: { player.stop() }
+///     onDismiss: { player.stop() },
+///     presentationMode: .fullscreen
 /// )
 /// ```
 struct MKSPlayerView: View {
@@ -23,45 +50,76 @@ struct MKSPlayerView: View {
     var title: String = ""
     var metadata: MetadataResult? = nil
     var onDismiss: (() -> Void)? = nil
+    var onRequestFullscreen: (() -> Void)? = nil
+    var presentationMode: MKSPlayerPresentationMode = .inline
 
     @State private var showMetadata = true
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Video surface — playerView() handles all state transitions reactively
-            player.playerView()
+            // Video surface — mode-dependent rendering
+            playerSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
 
-            // Metadata overlay (Liquid Glass on iOS 26+)
-            if let metadata, showMetadata {
-                VStack {
-                    Spacer()
-                    metadataOverlay(metadata)
+            // Overlays only for inline mode (fullscreen has native controls)
+            if presentationMode == .inline {
+                // Metadata overlay (Liquid Glass on iOS 26+)
+                if let metadata, showMetadata {
+                    VStack {
+                        Spacer()
+                        metadataOverlay(metadata)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+
+                // Title bar (when no metadata but title provided)
+                if metadata == nil, !title.isEmpty {
+                    VStack {
+                        titleBar
+                        Spacer()
+                    }
+                }
+
+                // Fullscreen expand button (bottom-trailing)
+                if onRequestFullscreen != nil {
+                    fullscreenButton
+                }
             }
 
-            // Dismiss button (Liquid Glass on iOS 26+)
-            if let onDismiss {
+            // macOS fullscreen: dismiss at top-leading (floating controls are at bottom)
+            #if os(macOS)
+            if let onDismiss, presentationMode == .fullscreen {
+                VStack {
+                    HStack {
+                        dismissButton(action: onDismiss)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
+            #endif
+
+            if let onDismiss, presentationMode == .inline {
                 dismissButton(action: onDismiss)
-            }
-
-            // Title bar (when no metadata but title provided)
-            if metadata == nil, !title.isEmpty {
-                VStack {
-                    titleBar
-                    Spacer()
-                }
             }
         }
         .ignoresSafeArea(.all, edges: .bottom)
-        .onTapGesture {
-            if metadata != nil {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showMetadata.toggle()
-                }
-            }
+    }
+
+    // MARK: - Player Surface
+
+    @ViewBuilder
+    private var playerSurface: some View {
+        switch presentationMode {
+        case .fullscreen:
+            // Reactive surface that polls for underlyingAVPlayer becoming available.
+            // Critical for FFmpeg transmux where AVPlayer is nil during transmux,
+            // then becomes available once the HLS pipeline is ready.
+            ReactiveFullscreenSurface(player: player, onDismiss: onDismiss)
+
+        case .inline:
+            player.playerView()
         }
     }
 
@@ -93,6 +151,11 @@ struct MKSPlayerView: View {
         MetadataOverlayView(metadata: metadata)
             .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadius))
             .padding()
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    showMetadata.toggle()
+                }
+            }
     }
 
     // MARK: - Dismiss Button
@@ -107,5 +170,65 @@ struct MKSPlayerView: View {
         }
         .adaptiveGlass(in: Circle())
         .padding()
+    }
+
+    // MARK: - Fullscreen Button
+
+    @ViewBuilder
+    private var fullscreenButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button(action: { onRequestFullscreen?() }) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(10)
+                }
+                .adaptiveGlass(in: Circle())
+                .padding(.trailing, 12)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+}
+
+// MARK: - Reactive Fullscreen Surface
+
+/// Polls for `underlyingAVPlayer` becoming available, then transitions from the
+/// player's own view to native system controls (`NativeAVPlayerView` / `NativeAVPlayerViewController`).
+///
+/// - **AVPlayer**: `underlyingAVPlayer` is available immediately → native controls from the start.
+/// - **FFmpeg**: `underlyingAVPlayer` is nil during transmux → shows the player's own view
+///   (spinner), then transitions to native controls once the HLS pipeline produces an AVPlayer.
+/// - **KSPlayer / VLC**: `underlyingAVPlayer` is always nil → permanently uses their own player view.
+private struct ReactiveFullscreenSurface: View {
+    let player: any VideoPlayerProtocol
+    var onDismiss: (() -> Void)?
+
+    @State private var avPlayer: AVPlayer?
+
+    var body: some View {
+        Group {
+            if let avPlayer {
+                #if os(iOS) || os(tvOS)
+                NativeAVPlayerViewController(player: avPlayer, onDismiss: onDismiss)
+                #elseif os(macOS)
+                NativeAVPlayerView(player: avPlayer)
+                #endif
+            } else {
+                // Fallback: player's own view (spinner for FFmpeg, native view for KSPlayer/VLC)
+                player.playerView()
+            }
+        }
+        .onAppear {
+            avPlayer = player.underlyingAVPlayer
+        }
+        .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { _ in
+            if avPlayer == nil {
+                avPlayer = player.underlyingAVPlayer
+            }
+        }
     }
 }

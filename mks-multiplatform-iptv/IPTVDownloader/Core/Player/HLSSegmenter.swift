@@ -384,7 +384,7 @@ class HLSSegmenter {
         var m3u8 = "#EXTM3U\n"
         m3u8 += "#EXT-X-VERSION:7\n"
         m3u8 += "#EXT-X-TARGETDURATION:\(targetDuration)\n"
-        m3u8 += "#EXT-X-PLAYLIST-TYPE:EVENT\n"
+        m3u8 += "#EXT-X-PLAYLIST-TYPE:VOD\n"
         m3u8 += "#EXT-X-MAP:URI=\"stream.mp4\",BYTERANGE=\"\(initSegmentSize)@0\"\n"
 
         for segment in segments {

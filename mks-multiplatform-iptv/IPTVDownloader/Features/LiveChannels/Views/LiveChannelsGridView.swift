@@ -311,6 +311,7 @@ struct LiveChannelDetailSheet: View {
     @EnvironmentObject var profile: IPTVProfile
     @State private var showInlinePlayer = false
     @State private var activePlayer: (any VideoPlayerProtocol)?
+    @State private var showFullscreenPlayer = false
     @State private var isLoading = false
     @State private var showKSPlayerView = false
     @State private var ksPlayerURL: URL?
@@ -377,7 +378,10 @@ struct LiveChannelDetailSheet: View {
                 VStack(spacing: 16) {
                     if showInlinePlayer {
                         if let player = activePlayer {
-                            MKSPlayerView(player: player)
+                            MKSPlayerView(
+                                player: player,
+                                onRequestFullscreen: { showFullscreenPlayer = true }
+                            )
                                 .frame(height: 250)
                                 .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))
                                 .overlay(
@@ -518,8 +522,14 @@ struct LiveChannelDetailSheet: View {
             }
         }
         #endif
+        .fullscreenPlayer(
+            isPresented: $showFullscreenPlayer,
+            player: activePlayer,
+            title: channel.name,
+            stopOnDismiss: false
+        )
     }
-    
+
     // MARK: - Functions
     private func togglePlayback() {
         if showInlinePlayer {
@@ -608,7 +618,8 @@ struct KSPlayerFullScreenView: View {
             if let player = activePlayer {
                 MKSPlayerView(
                     player: player,
-                    onDismiss: onClose
+                    onDismiss: onClose,
+                    presentationMode: .fullscreen
                 )
             } else {
                 VStack(spacing: 16) {

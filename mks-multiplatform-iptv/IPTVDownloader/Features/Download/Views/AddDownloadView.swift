@@ -28,6 +28,7 @@ struct AddDownloadView: View {
     @State private var skipFetching: Bool = false
     @State private var showInlinePlayer = false
     @State private var activePlayer: (any VideoPlayerProtocol)?
+    @State private var showFullscreenPlayer = false
     @State private var showMetadataPicker = false
     
     // Constructor original para Movie
@@ -118,6 +119,13 @@ struct AddDownloadView: View {
                 }
             )
         }
+        .fullscreenPlayer(
+            isPresented: $showFullscreenPlayer,
+            player: activePlayer,
+            title: viewModel?.movieDetail?.movieData.name ?? movie.name,
+            metadata: viewModel?.enrichedMetadata,
+            stopOnDismiss: false
+        )
         .onAppear {
             print("🚀 AddDownloadView onAppear - movie: \(movie.name)")
             print("🔍 Estado inicial - viewModel: \(viewModel != nil), skipFetching: \(skipFetching)")
@@ -175,7 +183,8 @@ struct AddDownloadView: View {
 
                             MKSPlayerView(
                                 player: player,
-                                metadata: viewModel.enrichedMetadata
+                                metadata: viewModel.enrichedMetadata,
+                                onRequestFullscreen: { showFullscreenPlayer = true }
                             )
                             .frame(height: 250)
                             .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))

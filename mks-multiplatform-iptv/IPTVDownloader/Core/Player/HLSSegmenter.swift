@@ -2,14 +2,18 @@ import Foundation
 
 // MARK: - HLSSegmenter
 
-/// Monitors a growing fMP4 file produced by TransmuxingService and generates
-/// a byte-range HLS playlist (m3u8) that AVPlayer can consume natively.
+/// Generates a static VOD HLS playlist upfront and tracks real fMP4 segments
+/// as they are transmuxed, enabling full seeking from the very start of playback.
 ///
 /// ## How it works
-/// The segmenter scans the fMP4 file for moof+mdat box pairs (media segments),
-/// extracts timing from tfdt atoms, and writes a byte-range HLS v7 playlist.
-/// AVPlayer polls the EVENT playlist for new segments and fetches them via
-/// Range requests from TransmuxServer.
+/// On `start()`, writes a complete VOD playlist (with `#EXT-X-ENDLIST`) that declares
+/// all virtual segments for the full duration using URL-based segment references
+/// (`seg_000.mp4`, `seg_001.mp4`, etc.). AVPlayer sees the full duration immediately
+/// and allows seeking to any position.
+///
+/// In parallel, the segmenter scans the growing fMP4 file for moof+mdat box pairs,
+/// extracting timing from tfdt atoms to track which byte ranges correspond to which
+/// time ranges. TransmuxServer uses this mapping to serve segment data on demand.
 ///
 /// ## Buffered segment approach
 /// Each raw moof+mdat pair is buffered until the NEXT pair arrives. This lets
@@ -31,6 +35,8 @@ class HLSSegmenter {
         let byteOffset: Int64
         let byteLength: Int64
         let duration: Double
+        let startTime: Double       // output decode time in seconds (rebased tfdt)
+        let sourceStartTime: Double // source time in seconds (for virtual segment lookups)
     }
 
     // MARK: - Properties
@@ -38,6 +44,9 @@ class HLSSegmenter {
     let fmp4Path: String
     let playlistPath: String
     let initSegmentSize: Int64
+    let totalDuration: Double
+    let targetSegmentDuration: Double = 6.0
+    private(set) var totalSegmentCount: Int
 
     private var segments: [Segment] = []
     private var scanOffset: Int64 = 0
@@ -52,17 +61,27 @@ class HLSSegmenter {
     /// its accurate duration. Emitted when the following segment arrives.
     private var bufferedRawSegment: (byteOffset: Int64, byteLength: Int64, decodeTime: UInt64)?
 
+    /// Source-to-output time offset. After a seek, output timestamps are rebased
+    /// to continue monotonically. This offset maps: sourceTime + offset = outputTime.
+    /// Updated when the first segment after a seek is detected.
+    private var sourceToOutputOffset: Double = 0.0
+    /// When a seek occurs, records the target source time so the first post-seek
+    /// segment can compute the new sourceToOutputOffset.
+    private var pendingSeekSourceTime: Double?
+
     private var scanTimer: DispatchSourceTimer?
     private let scanQueue = DispatchQueue(label: "HLSSegmenter.scan", qos: .userInitiated)
 
     // MARK: - Init
 
-    init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64) {
+    init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64, duration: Double) {
         self.fmp4Path = fmp4Path
         self.playlistPath = playlistPath
         self.initSegmentSize = initSegmentSize
+        self.totalDuration = duration
+        self.totalSegmentCount = max(1, Int(ceil(duration / 6.0)))
         self.scanOffset = initSegmentSize
-        print("[HLSSegmenter] Created: fmp4=\(fmp4Path), playlist=\(playlistPath), initSize=\(initSegmentSize)")
+        print("[HLSSegmenter] Created: fmp4=\(fmp4Path), playlist=\(playlistPath), initSize=\(initSegmentSize), duration=\(String(format: "%.1f", duration))s, virtualSegments=\(totalSegmentCount)")
     }
 
     // MARK: - Public API
@@ -73,9 +92,9 @@ class HLSSegmenter {
         // Parse timescale from the moov atom before starting the scan loop
         parseTimescaleFromMoov()
 
-        // Write initial playlist with just the init segment (no media segments yet).
-        // TransmuxServer will wait for #EXTINF entries before serving to AVPlayer.
-        writePlaylist()
+        // Write the complete VOD playlist with all virtual segments from the start.
+        // This is written ONCE and never changes — AVPlayer sees full duration immediately.
+        writeVODPlaylist()
 
         // Scan every 300ms with 200ms initial delay — fast enough that the first
         // segments are detected before AVPlayer times out, but not so fast that
@@ -97,8 +116,29 @@ class HLSSegmenter {
         print("[HLSSegmenter] Stopped")
     }
 
-    /// Mark the transmux as complete. Flushes the last buffered segment,
-    /// writes the final playlist with #EXT-X-ENDLIST, and stops the timer.
+    /// Notify the segmenter that a seek discontinuity is about to occur.
+    /// Called by the remux loop just before `av_seek_frame` on the input.
+    /// Flushes the AVIO buffer and emits the currently buffered segment
+    /// with an estimated duration (since the next tfdt will be from the new position).
+    /// - Parameter seekTargetTime: The source time (seconds) that the input will seek to.
+    func notifySeekDiscontinuity(seekTargetTime: Double) {
+        scanQueue.sync {
+            let prevSegCount = self.segments.count
+            let prevOffset = self.sourceToOutputOffset
+            self.scanForNewSegments()      // pick up any data flushed before seek
+            self.flushBufferedSegment()    // emit buffered segment with estimated duration
+            // Reset pending moof state — any partially scanned moof is from before seek
+            self.pendingMoofOffset = -1
+            self.pendingMoofSize = 0
+            self.pendingDecodeTime = 0
+            // Record the seek target so the first post-seek segment can compute the mapping
+            self.pendingSeekSourceTime = seekTargetTime
+            TransmuxLog.segmenter("Seek discontinuity: target=\(String(format: "%.1f", seekTargetTime))s, segments=\(prevSegCount)->\(self.segments.count), prevSrcToOutOffset=\(String(format: "%.3f", prevOffset)), buffered=\(self.bufferedRawSegment != nil)")
+        }
+    }
+
+    /// Mark the transmux as complete. Flushes the last buffered segment and stops the timer.
+    /// No playlist rewrite needed — the VOD playlist was written once on start().
     func markComplete() {
         scanQueue.async { [weak self] in
             guard let self else { return }
@@ -110,13 +150,11 @@ class HLSSegmenter {
             // Flush the last buffered segment (no next tfdt, use average duration)
             self.flushBufferedSegment()
 
-            // Write final playlist with ENDLIST
-            self.writeFinalPlaylist()
-
             self.scanTimer?.cancel()
             self.scanTimer = nil
 
-            print("[HLSSegmenter] Marked complete, \(self.segments.count) segments total")
+            let lastSrc = self.segments.last.map { String(format: "%.1f", $0.sourceStartTime + $0.duration) } ?? "0"
+            TransmuxLog.segmenter("Marked COMPLETE: \(self.segments.count) real segments, latestSrcTime=\(lastSrc)s")
         }
     }
 
@@ -234,26 +272,59 @@ class HLSSegmenter {
                     let rawSize = pendingMoofSize + Int64(boxSize)
                     let rawDecodeTime = pendingDecodeTime
 
-                    // Emit the previously buffered segment using current tfdt for duration
+                    // Emit the previously buffered segment using current tfdt for duration.
+                    // With timestamp rebasing, output tfdt values should be monotonically
+                    // increasing. Keep discontinuity detection as a safety net.
                     if let buffered = bufferedRawSegment {
                         let duration: Double
+                        let startTimeSec: Double
                         if timescale > 0 {
-                            let dtDelta = rawDecodeTime - buffered.decodeTime
-                            duration = dtDelta > 0 ? Double(dtDelta) / Double(timescale) : 0.1
+                            let maxDeltaTicks = UInt64(2.0 * targetSegmentDuration * Double(timescale))
+                            let isBackwardSeek = rawDecodeTime < buffered.decodeTime
+                            let dtDelta = isBackwardSeek ? UInt64(0) : (rawDecodeTime - buffered.decodeTime)
+                            let isDiscontinuity = isBackwardSeek || dtDelta > maxDeltaTicks
+
+                            if isDiscontinuity {
+                                if !segments.isEmpty {
+                                    duration = segments.map(\.duration).reduce(0, +) / Double(segments.count)
+                                } else {
+                                    duration = targetSegmentDuration
+                                }
+                                TransmuxLog.segmenter("DISCONTINUITY (safety net): dtDelta=\(dtDelta) ticks, backward=\(isBackwardSeek), est duration=\(String(format: "%.3f", duration))s, rawDT=\(rawDecodeTime) bufferedDT=\(buffered.decodeTime)", level: .warn)
+                            } else {
+                                duration = dtDelta > 0 ? Double(dtDelta) / Double(timescale) : 0.1
+                            }
+                            startTimeSec = Double(buffered.decodeTime) / Double(timescale)
                         } else {
                             duration = 1.0
+                            startTimeSec = Double(segments.count)
+                        }
+
+                        // Compute sourceStartTime: maps rebased output time back to source time
+                        let sourceStartTimeSec: Double
+                        if let seekTarget = pendingSeekSourceTime {
+                            // First segment after a seek: establish the new mapping
+                            sourceToOutputOffset = startTimeSec - seekTarget
+                            sourceStartTimeSec = seekTarget
+                            pendingSeekSourceTime = nil
+                            TransmuxLog.segmenter("SEEK MAPPING: source \(String(format: "%.1f", seekTarget))s -> output \(String(format: "%.3f", startTimeSec))s (srcToOutOffset=\(String(format: "%.3f", sourceToOutputOffset)))")
+                        } else {
+                            // Normal segment: reverse the mapping
+                            sourceStartTimeSec = startTimeSec - sourceToOutputOffset
                         }
 
                         let segment = Segment(
                             index: segments.count,
                             byteOffset: buffered.byteOffset,
                             byteLength: buffered.byteLength,
-                            duration: duration
+                            duration: duration,
+                            startTime: startTimeSec,
+                            sourceStartTime: sourceStartTimeSec
                         )
                         segments.append(segment)
                         if duration > maxDuration { maxDuration = duration }
 
-                        print("[HLSSegmenter] Segment \(segment.index): offset=\(buffered.byteOffset), size=\(buffered.byteLength), duration=\(String(format: "%.3f", duration))s")
+                        TransmuxLog.segmenter("Segment[\(segment.index)]: bytes=\(buffered.byteOffset)+\(buffered.byteLength) dur=\(String(format: "%.3f", duration))s srcTime=\(String(format: "%.3f", sourceStartTimeSec))s outTime=\(String(format: "%.3f", startTimeSec))s decodeTicks=\(buffered.decodeTime)")
                         newSegmentsFound = true
                     }
 
@@ -273,8 +344,10 @@ class HLSSegmenter {
 
         scanOffset = Int64(offset)
 
+        // No playlist rewrite needed — VOD playlist was written once on start().
+        // We only track real segments for byte-range lookups by TransmuxServer.
         if newSegmentsFound {
-            writePlaylist()
+            TransmuxLog.segmenter("\(segments.count) real segments tracked so far (scanOffset=\(scanOffset))")
         }
     }
 
@@ -291,16 +364,35 @@ class HLSSegmenter {
             duration = 1.0
         }
 
+        let startTimeSec: Double
+        if timescale > 0 {
+            startTimeSec = Double(buffered.decodeTime) / Double(timescale)
+        } else {
+            startTimeSec = Double(segments.count)
+        }
+
+        // Compute sourceStartTime using the current mapping
+        let sourceStartTimeSec: Double
+        if let seekTarget = pendingSeekSourceTime {
+            sourceToOutputOffset = startTimeSec - seekTarget
+            sourceStartTimeSec = seekTarget
+            pendingSeekSourceTime = nil
+        } else {
+            sourceStartTimeSec = startTimeSec - sourceToOutputOffset
+        }
+
         let segment = Segment(
             index: segments.count,
             byteOffset: buffered.byteOffset,
             byteLength: buffered.byteLength,
-            duration: duration
+            duration: duration,
+            startTime: startTimeSec,
+            sourceStartTime: sourceStartTimeSec
         )
         segments.append(segment)
         if duration > maxDuration { maxDuration = duration }
 
-        print("[HLSSegmenter] Segment \(segment.index) (final): offset=\(buffered.byteOffset), size=\(buffered.byteLength), duration=\(String(format: "%.3f", duration))s")
+        TransmuxLog.segmenter("Segment[\(segment.index)] (FLUSH): bytes=\(buffered.byteOffset)+\(buffered.byteLength) dur=\(String(format: "%.3f", duration))s srcTime=\(String(format: "%.3f", sourceStartTimeSec))s outTime=\(String(format: "%.3f", startTimeSec))s")
         bufferedRawSegment = nil
     }
 
@@ -352,54 +444,97 @@ class HLSSegmenter {
         return 0
     }
 
-    // MARK: - Playlist Generation
+    // MARK: - Public Lookup API
 
-    /// Write the byte-range HLS playlist to disk.
-    private func writePlaylist() {
-        let targetDuration = max(Int(ceil(maxDuration)), 6)
-
-        var m3u8 = "#EXTM3U\n"
-        m3u8 += "#EXT-X-VERSION:7\n"
-        m3u8 += "#EXT-X-TARGETDURATION:\(targetDuration)\n"
-        m3u8 += "#EXT-X-PLAYLIST-TYPE:EVENT\n"
-        m3u8 += "#EXT-X-MAP:URI=\"stream.mp4\",BYTERANGE=\"\(initSegmentSize)@0\"\n"
-
-        for segment in segments {
-            m3u8 += "\n#EXTINF:\(String(format: "%.3f", segment.duration)),\n"
-            m3u8 += "#EXT-X-BYTERANGE:\(segment.byteLength)@\(segment.byteOffset)\n"
-            m3u8 += "stream.mp4\n"
-        }
-
-        do {
-            try m3u8.write(toFile: playlistPath, atomically: true, encoding: .utf8)
-        } catch {
-            print("[HLSSegmenter] ERROR: Failed to write playlist: \(error)")
+    /// Returns real moof+mdat byte ranges from stream.mp4 that cover the given time range.
+    /// The time range is in source time (matching the virtual HLS playlist).
+    /// Only returns segments that have actually been transmuxed (scanned from the file).
+    /// Returns empty array if those segments haven't been transmuxed yet.
+    func realSegments(inTimeRange start: Double, end: Double) -> [(offset: Int64, length: Int64)] {
+        return scanQueue.sync {
+            var result: [(offset: Int64, length: Int64)] = []
+            var matchDetails: [String] = []
+            for seg in segments {
+                let segEnd = seg.sourceStartTime + seg.duration
+                // Segment overlaps with requested source time range
+                if segEnd > start && seg.sourceStartTime < end {
+                    result.append((offset: seg.byteOffset, length: seg.byteLength))
+                    matchDetails.append("idx\(seg.index):[src=\(String(format: "%.1f-%.1f", seg.sourceStartTime, segEnd))s out=\(String(format: "%.1f", seg.startTime))s off=\(seg.byteOffset) len=\(seg.byteLength)]")
+                }
+            }
+            if !result.isEmpty {
+                TransmuxLog.segmenter("realSegments(\(String(format: "%.1f-%.1f", start, end))s): \(result.count) matches: \(matchDetails.joined(separator: ", "))", level: .debug)
+            }
+            return result
         }
     }
 
-    /// Write the final playlist with #EXT-X-ENDLIST.
-    private func writeFinalPlaylist() {
-        let targetDuration = max(Int(ceil(maxDuration)), 6)
+    /// The latest source time (seconds) that has been transmuxed.
+    func latestTransmuxedTime() -> Double {
+        return scanQueue.sync {
+            guard let lastSeg = segments.last else { return 0 }
+            return lastSeg.sourceStartTime + lastSeg.duration
+        }
+    }
 
+    /// Force an immediate fMP4 scan for new segments.
+    /// Called by TransmuxServer during polling instead of waiting for the 300ms timer.
+    func triggerScan() {
+        scanQueue.sync {
+            self.scanForNewSegments()
+        }
+    }
+
+    /// Latest source time with visibility into the buffered (not-yet-emitted) segment.
+    /// This is always >= latestTransmuxedTime() and reflects actual data on disk,
+    /// including the current moof+mdat pair waiting for the next tfdt to compute duration.
+    func latestBufferedSourceTime() -> Double {
+        return scanQueue.sync {
+            self.scanForNewSegments()
+            if let buf = self.bufferedRawSegment, self.timescale > 0 {
+                let outTime = Double(buf.decodeTime) / Double(self.timescale)
+                let srcTime = outTime - self.sourceToOutputOffset
+                // Add estimated 1s duration for the buffered segment
+                return srcTime + 1.0
+            }
+            guard let last = self.segments.last else { return 0 }
+            return last.sourceStartTime + last.duration
+        }
+    }
+
+    // MARK: - Playlist Generation
+
+    /// Write the complete VOD playlist with all virtual segments declared upfront.
+    /// Written ONCE on start() and never changed. All segment durations are 6.0s
+    /// except the last which covers the remainder. AVPlayer sees full duration immediately.
+    private func writeVODPlaylist() {
         var m3u8 = "#EXTM3U\n"
         m3u8 += "#EXT-X-VERSION:7\n"
-        m3u8 += "#EXT-X-TARGETDURATION:\(targetDuration)\n"
+        m3u8 += "#EXT-X-TARGETDURATION:6\n"
+        m3u8 += "#EXT-X-MEDIA-SEQUENCE:0\n"
         m3u8 += "#EXT-X-PLAYLIST-TYPE:VOD\n"
-        m3u8 += "#EXT-X-MAP:URI=\"stream.mp4\",BYTERANGE=\"\(initSegmentSize)@0\"\n"
+        m3u8 += "#EXT-X-MAP:URI=\"init.mp4\"\n"
 
-        for segment in segments {
-            m3u8 += "\n#EXTINF:\(String(format: "%.3f", segment.duration)),\n"
-            m3u8 += "#EXT-X-BYTERANGE:\(segment.byteLength)@\(segment.byteOffset)\n"
-            m3u8 += "stream.mp4\n"
+        for i in 0..<totalSegmentCount {
+            let segStart = Double(i) * targetSegmentDuration
+            let segDuration: Double
+            if i == totalSegmentCount - 1 {
+                // Last segment covers the remainder
+                segDuration = max(totalDuration - segStart, 0.001)
+            } else {
+                segDuration = targetSegmentDuration
+            }
+            m3u8 += "\n#EXTINF:\(String(format: "%.3f", segDuration)),\n"
+            m3u8 += "seg_\(String(format: "%03d", i)).mp4\n"
         }
 
         m3u8 += "\n#EXT-X-ENDLIST\n"
 
         do {
             try m3u8.write(toFile: playlistPath, atomically: true, encoding: .utf8)
-            print("[HLSSegmenter] Final playlist written with \(segments.count) segments and ENDLIST")
+            print("[HLSSegmenter] Created VOD playlist with \(totalSegmentCount) segments, duration \(String(format: "%.1f", totalDuration))s")
         } catch {
-            print("[HLSSegmenter] ERROR: Failed to write final playlist: \(error)")
+            print("[HLSSegmenter] ERROR: Failed to write VOD playlist: \(error)")
         }
     }
 

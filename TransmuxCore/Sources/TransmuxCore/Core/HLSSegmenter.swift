@@ -26,11 +26,11 @@ import Foundation
 /// [ftyp][moov]                     <- init segment (bytes 0..initSize)
 /// [moof][mdat][moof][mdat]...      <- media segments (one moof+mdat = one HLS segment)
 /// ```
-class HLSSegmenter {
+public class HLSSegmenter {
 
     // MARK: - Types
 
-    struct Segment {
+    public struct Segment {
         let index: Int
         let byteOffset: Int64
         let byteLength: Int64
@@ -45,7 +45,7 @@ class HLSSegmenter {
     let playlistPath: String
     let initSegmentSize: Int64
     let totalDuration: Double
-    let targetSegmentDuration: Double = 6.0
+    public let targetSegmentDuration: Double = 6.0
     private(set) var totalSegmentCount: Int
 
     private var segments: [Segment] = []
@@ -74,7 +74,7 @@ class HLSSegmenter {
 
     // MARK: - Init
 
-    init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64, duration: Double) {
+    public init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64, duration: Double) {
         self.fmp4Path = fmp4Path
         self.playlistPath = playlistPath
         self.initSegmentSize = initSegmentSize
@@ -88,7 +88,7 @@ class HLSSegmenter {
 
     /// Start scanning the fMP4 file for new segments. Call after the fMP4 header
     /// is flushed to disk.
-    func start() {
+    public func start() {
         // Parse timescale from the moov atom before starting the scan loop
         parseTimescaleFromMoov()
 
@@ -110,7 +110,7 @@ class HLSSegmenter {
     }
 
     /// Stop the scanning timer.
-    func stop() {
+    public func stop() {
         scanTimer?.cancel()
         scanTimer = nil
         TransmuxLog.segmenter("Stopped")
@@ -121,7 +121,7 @@ class HLSSegmenter {
     /// Flushes the AVIO buffer and emits the currently buffered segment
     /// with an estimated duration (since the next tfdt will be from the new position).
     /// - Parameter seekTargetTime: The source time (seconds) that the input will seek to.
-    func notifySeekDiscontinuity(seekTargetTime: Double) {
+    public func notifySeekDiscontinuity(seekTargetTime: Double) {
         scanQueue.sync {
             let prevSegCount = self.segments.count
             let prevOffset = self.sourceToOutputOffset
@@ -139,7 +139,7 @@ class HLSSegmenter {
 
     /// Mark the transmux as complete. Flushes the last buffered segment and stops the timer.
     /// No playlist rewrite needed — the VOD playlist was written once on start().
-    func markComplete() {
+    public func markComplete() {
         scanQueue.async { [weak self] in
             guard let self else { return }
             self.isCompleted = true
@@ -450,7 +450,7 @@ class HLSSegmenter {
     /// The time range is in source time (matching the virtual HLS playlist).
     /// Only returns segments that have actually been transmuxed (scanned from the file).
     /// Returns empty array if those segments haven't been transmuxed yet.
-    func realSegments(inTimeRange start: Double, end: Double) -> [(offset: Int64, length: Int64)] {
+    public func realSegments(inTimeRange start: Double, end: Double) -> [(offset: Int64, length: Int64)] {
         return scanQueue.sync {
             var result: [(offset: Int64, length: Int64)] = []
             var matchDetails: [String] = []
@@ -470,7 +470,7 @@ class HLSSegmenter {
     }
 
     /// The latest source time (seconds) that has been transmuxed.
-    func latestTransmuxedTime() -> Double {
+    public func latestTransmuxedTime() -> Double {
         return scanQueue.sync {
             guard let lastSeg = segments.last else { return 0 }
             return lastSeg.sourceStartTime + lastSeg.duration
@@ -479,7 +479,7 @@ class HLSSegmenter {
 
     /// Force an immediate fMP4 scan for new segments.
     /// Called by TransmuxServer during polling instead of waiting for the 300ms timer.
-    func triggerScan() {
+    public func triggerScan() {
         scanQueue.sync {
             self.scanForNewSegments()
         }
@@ -489,7 +489,7 @@ class HLSSegmenter {
     /// Does NOT include estimated duration for buffered segment - this ensures
     /// the fullness gate only passes when segments are 100% complete on disk.
     /// This prevents serving incomplete segments that cause A/V artifacts.
-    func latestBufferedSourceTime() -> Double {
+    public func latestBufferedSourceTime() -> Double {
         return scanQueue.sync {
             self.scanForNewSegments()
             // Only count completed segments - don't estimate buffered segment duration

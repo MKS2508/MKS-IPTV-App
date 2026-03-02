@@ -9,7 +9,7 @@ import Libavutil
 // MARK: - Transmux Error
 
 /// Errors that can occur during transmuxing operations
-enum TransmuxError: LocalizedError {
+public enum TransmuxError: LocalizedError {
     case ffmpegNotFound
     case processStartFailure(Error)
     case processFailure(status: Int)
@@ -33,75 +33,20 @@ enum TransmuxError: LocalizedError {
 
 /// Result returned immediately after the fMP4 header is written.
 /// Playback can begin while the remux loop continues in the background.
-struct ProgressiveTransmuxSession {
-    let sessionID: String
-    let outputPath: String
-    let playlistPath: String
-    let expectedSize: Int64
-    let duration: Double
-    let segmenter: HLSSegmenter
-    let initSegmentSize: Int64
-    let seekHandle: ActiveTransmux
-}
-
-// MARK: - Active Transmux Handle
-
-/// Thread-safe cancellation and seek handle for an in-progress transmux.
-/// The seek signal allows TransmuxServer to redirect the sequential transmux
-/// to a new input position without creating a separate FFmpeg output context.
-class ActiveTransmux {
-    private let lock = NSLock()
-    private var _cancelled = false
-    private var _seekRequest: Double? = nil
-    private var _lastSeekTarget: Double?
-    var segmenter: HLSSegmenter?
-
-    var isCancelled: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _cancelled
-    }
-
-    /// The most recent seek target time (source seconds).
-    /// Used by TransmuxServer to decide whether to wait for sequential data
-    /// instead of triggering a new seek for nearby segments.
-    var lastSeekTarget: Double? {
-        lock.lock()
-        defer { lock.unlock() }
-        return _lastSeekTarget
-    }
-
-    func cancel() {
-        lock.lock()
-        _cancelled = true
-        lock.unlock()
-        segmenter?.stop()
-    }
-
-    /// Request the remux loop to seek the INPUT to a new time (non-blocking).
-    /// The output context stays the same, so all moof+mdat remain compatible.
-    func requestSeek(to timeSeconds: Double) {
-        lock.lock()
-        _seekRequest = timeSeconds
-        _lastSeekTarget = timeSeconds
-        lock.unlock()
-        TransmuxLog.service("Seek requested to \(String(format: "%.1f", timeSeconds))s")
-    }
-
-    /// Consume a pending seek request (called by the remux loop).
-    /// Returns the requested time in seconds, or nil if no seek is pending.
-    func consumeSeekRequest() -> Double? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let req = _seekRequest else { return nil }
-        _seekRequest = nil
-        return req
-    }
+public struct ProgressiveTransmuxSession {
+    public let sessionID: String
+    public let outputPath: String
+    public let playlistPath: String
+    public let expectedSize: Int64
+    public let duration: Double
+    public let segmenter: HLSSegmenter
+    public let initSegmentSize: Int64
+    public let seekHandle: ActiveTransmux
 }
 
 // MARK: - Transmux Completion Notification
 
-extension Notification.Name {
+public extension Notification.Name {
     /// Posted when a transmux session completes successfully.
     /// The notification's `object` is the session ID (`String`).
     static let transmuxDidComplete = Notification.Name("com.mks.iptv.transmuxDidComplete")
@@ -122,13 +67,15 @@ extension Notification.Name {
 /// (FFmpegStreamHelper.c) because Swift's import of AVStream has a layout
 /// mismatch -- av_class is omitted, shifting all field offsets by 8 bytes.
 /// The C compiler sees the correct struct layout.
-actor TransmuxingService {
-    static let shared = TransmuxingService()
+public actor TransmuxingService {
+    public static let shared = TransmuxingService()
 
     private var activeSessions: [String: URL] = [:]
     private var activeTransmuxes: [String: ActiveTransmux] = [:]
+    private let streamProxy: StreamProxyProvider?
 
-    private init() {
+    public init(streamProxy: StreamProxyProvider? = nil) {
+        self.streamProxy = streamProxy
         #if canImport(Libavformat)
         // av_register_all() is no longer needed in FFmpeg 4+; formats are auto-registered.
         #endif
@@ -139,7 +86,7 @@ actor TransmuxingService {
     /// Start transmuxing and return immediately after the fMP4 header is written.
     /// The remux loop continues in the background. Use `cancelTransmux(sessionID:)`
     /// to stop it early.
-    func startTransmux(from sourceURL: URL) async throws -> ProgressiveTransmuxSession {
+    public func startTransmux(from sourceURL: URL) async throws -> ProgressiveTransmuxSession {
         #if canImport(Libavformat)
         let sessionID = UUID().uuidString
         let outputDir = FileManager.default.temporaryDirectory
@@ -151,15 +98,21 @@ actor TransmuxingService {
         let handle = ActiveTransmux()
         activeTransmuxes[sessionID] = handle
 
-        // FFmpeg's bundled build lacks HTTPS protocol support.
-        // Route HTTPS URLs through StreamProxy (URLSession -> http://localhost)
+        // FFmpeg's bundled build may lack HTTPS protocol support.
+        // Route HTTPS URLs through StreamProxy (URLSession -> http://localhost) if available.
         var proxySessionID: Int?
         let inputPath: String
         if sourceURL.scheme?.lowercased() == "https" {
-            let proxySession = try await StreamProxy.shared.startProxy(for: sourceURL)
-            proxySessionID = proxySession.id
-            inputPath = proxySession.localURL.absoluteString
-            TransmuxLog.service("Proxied HTTPS -> \(inputPath)")
+            if let proxy = streamProxy {
+                let proxySession = try await proxy.startProxy(for: sourceURL)
+                proxySessionID = proxySession.id
+                inputPath = proxySession.localURL.absoluteString
+                TransmuxLog.service("Proxied HTTPS -> \(inputPath)")
+            } else {
+                // No proxy available - try direct HTTPS (may fail)
+                inputPath = sourceURL.absoluteString
+                TransmuxLog.service("WARNING: No StreamProxy provided for HTTPS URL, attempting direct (may fail if FFmpeg lacks HTTPS support)", level: .warn)
+            }
         } else {
             inputPath = sourceURL.absoluteString
         }
@@ -177,6 +130,7 @@ actor TransmuxingService {
                         sessionID: sessionID,
                         handle: handle,
                         proxySessionID: proxySessionID,
+                        streamProxy: self.streamProxy,
                         continuation: continuation
                     )
                 }
@@ -184,8 +138,8 @@ actor TransmuxingService {
             return session
         } catch {
             // Stop proxy on failure
-            if let pid = proxySessionID {
-                await StreamProxy.shared.stop(sessionID: pid)
+            if let pid = proxySessionID, let proxy = streamProxy {
+                await proxy.stop(sessionID: pid)
             }
             activeTransmuxes.removeValue(forKey: sessionID)
             throw error
@@ -196,14 +150,14 @@ actor TransmuxingService {
     }
 
     /// Cancel an active transmux session.
-    func cancelTransmux(sessionID: String) {
+    public func cancelTransmux(sessionID: String) {
         guard let handle = activeTransmuxes[sessionID] else { return }
         handle.cancel()
         TransmuxLog.service("Cancellation requested for session \(sessionID)")
     }
 
     /// Clean up a specific transmux session's temp files.
-    func cleanup(sessionID: String) {
+    public func cleanup(sessionID: String) {
         activeTransmuxes.removeValue(forKey: sessionID)
         guard let dir = activeSessions.removeValue(forKey: sessionID) else { return }
         try? FileManager.default.removeItem(at: dir)
@@ -211,7 +165,7 @@ actor TransmuxingService {
     }
 
     /// Clean up all transmux sessions.
-    func cleanupAll() {
+    public func cleanupAll() {
         for handle in activeTransmuxes.values {
             handle.cancel()
         }
@@ -235,6 +189,7 @@ actor TransmuxingService {
         sessionID: String,
         handle: ActiveTransmux,
         proxySessionID: Int?,
+        streamProxy: StreamProxyProvider?,
         continuation: CheckedContinuation<ProgressiveTransmuxSession, Error>
     ) {
         var inputCtx: UnsafeMutablePointer<AVFormatContext>?
@@ -286,7 +241,7 @@ actor TransmuxingService {
         // Extract duration and expected size
         let durationSeconds = Double(inCtx.pointee.duration) / Double(AV_TIME_BASE)
         let bitrate = inCtx.pointee.bit_rate
-        let expectedSize: Int64
+        public let expectedSize: Int64
         if bitrate > 0 && durationSeconds > 0 {
             expectedSize = Int64(Double(bitrate) / 8.0 * durationSeconds * 1.02)
         } else {
@@ -1014,9 +969,9 @@ actor TransmuxingService {
         avformat_close_input(&inputCtx)
 
         // Stop StreamProxy if we were using it
-        if let pid = proxySessionID {
+        if let pid = proxySessionID, let proxy = streamProxy {
             Task {
-                await StreamProxy.shared.stop(sessionID: pid)
+                await proxy.stop(sessionID: pid)
             }
         }
 

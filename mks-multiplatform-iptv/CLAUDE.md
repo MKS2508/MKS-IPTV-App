@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🎯 PRIMARY MISSION: PERFECT VOD SEEKING
+
+**THE ENTIRE REASON THIS APP EXISTS IS TO ACHIEVE PERFECT SEEKING IN VOD PLAYBACK.**
+
+All other IPTV apps have broken or slow seeking on VOD content. This app's sole purpose is to solve that problem with a flawless transmux pipeline that enables:
+
+- **Instant seeking** (<2 seconds to any position in multi-hour movies)
+- **Frame-accurate positioning** (no timestamp desync or A/V drift)
+- **Zero stuttering** (smooth playback after seeks)
+- **Full AVPlayer native integration** (AirPlay, PiP, native UI)
+
+When making ANY decision about the transmux system (`TransmuxingService`, `HLSSegmenter`, `TransmuxServer`):
+
+1. **Seeking performance is the #1 priority** - sacrificing any other feature to improve seeking is acceptable
+2. **Test with multi-hour movies** - short clips hide seeking problems
+3. **Verify A/V sync after seeks** - timestamp rebasing must be perfect
+4. **Support all codecs** - H.264/H.265 video, AAC/AC3/EAC3/DTS audio, all containers (MKV, MP4, AVI)
+
+The transmux architecture uses:
+- **Progressive fMP4 output** with fragmented moof+mdat boxes
+- **Static VOD playlist** (full duration known upfront, enables instant seeking)
+- **GLOBAL OFFSET timestamp rebasing** (single video keyframe determines offset for ALL streams, preserving A/V sync)
+- **Audio packet buffering** (no data loss during seek transitions)
+- **Fullness gate in TransmuxServer** (only serves segments when data is complete)
+
+**If seeking is broken, the app has no reason to exist.**
+
 ## Project Overview
 
 MKS-IPTV is a native Apple multiplatform IPTV streaming client built with Swift 6 and SwiftUI, targeting iOS, macOS, and tvOS. The app connects to IPTV servers using the Xtream Codes API protocol to stream movies, series, and live TV channels.

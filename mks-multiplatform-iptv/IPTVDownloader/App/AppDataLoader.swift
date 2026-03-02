@@ -127,6 +127,11 @@ final class AppDataLoader {
                 await self?.loadEPGInBackground()
             }
 
+            // Prefetch enriched metadata for Home-visible items (non-blocking)
+            Task.detached { [weak self] in
+                await self?.homeViewModel?.prefetchMetadata()
+            }
+
         } catch {
             print("[AppDataLoader] Error loading data: \(error.localizedDescription)")
             loadingStatus = .error("Connection error. Please check your internet.")

@@ -396,4 +396,35 @@ final class HomeViewModel {
             )
         }
     }
+
+    // MARK: - Metadata Prefetch
+
+    /// Prefetch enriched metadata for Home-visible items in background.
+    ///
+    /// Priority order:
+    /// 1. Hero banner item (single, highest visibility)
+    /// 2. First 10 items of each media carousel section
+    ///
+    /// Uses ``EnrichedMediaStore`` which deduplicates and caches results.
+    func prefetchMetadata() async {
+        let store = EnrichedMediaStore.shared
+
+        // Priority 1: Hero banner
+        for section in sections {
+            if case .heroBanner(let item) = section.type {
+                let tmdbId = (item as? Movie)?.tmdbId.flatMap { Int($0) }
+                _ = await store.getEnrichedMetadata(for: item, tmdbId: tmdbId)
+                break
+            }
+        }
+
+        // Priority 2: Carousel items (first 10 per section, concurrent)
+        for section in sections {
+            if case .mediaCarousel(let items) = section.type {
+                await store.prefetch(items: Array(items.prefix(10)))
+            }
+        }
+
+        print("[HomeViewModel] Metadata prefetch completed")
+    }
 }

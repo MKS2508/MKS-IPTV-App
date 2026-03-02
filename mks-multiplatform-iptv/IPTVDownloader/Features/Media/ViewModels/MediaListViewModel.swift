@@ -19,6 +19,9 @@ protocol LibraryItem {
     var source: String? { get }
     var isHDR: Bool { get }
     var is3D: Bool { get }
+
+    // TMDB ID for enriched metadata lookup (nil if not available)
+    var tmdbIdInt: Int? { get }
 }
 
 // Enum to identify media type
@@ -32,18 +35,22 @@ extension Movie: LibraryItem {
     var coverImage: String? {
         return streamIcon
     }
-    
+
     // Renamed properties to avoid conflicts
     var displayRating: String {
         return rating ?? "0"
     }
-    
+
     var displayRating5Based: Double {
         return rating5Based ?? 0.0
     }
-    
+
     var libraryType: LibraryMediaType {
         return .movie
+    }
+
+    var tmdbIdInt: Int? {
+        tmdbId.flatMap { Int($0) }
     }
 }
 
@@ -52,26 +59,32 @@ extension Serie: LibraryItem {
     var streamId: Int {
         return seriesId
     }
-    
+
     var coverImage: String? {
         return cover
     }
-    
+
     var added: String? {
         return lastModified
     }
-    
+
     // Renamed properties to avoid conflicts
     var displayRating: String {
         return rating
     }
-    
+
     var displayRating5Based: Double {
         return rating5Based
     }
-    
+
     var libraryType: LibraryMediaType {
         return .series
+    }
+
+    /// Serie model does not carry a TMDB ID from the Xtream Codes API.
+    /// Enrichment falls back to title+year search in metadata providers.
+    var tmdbIdInt: Int? {
+        nil
     }
 }
 

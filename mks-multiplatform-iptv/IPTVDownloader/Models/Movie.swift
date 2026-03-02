@@ -79,11 +79,32 @@ struct Movie: Identifiable, Codable, Equatable {
         directSource = try container.decodeIfPresent(String.self, forKey: .directSource)
     }
 
+    var parsedMetadata: TitleMetadata {
+        TitleParser.parse(name)
+    }
+    
     var quality: String? {
-        if let match = name.firstMatch(of: /\d{3,4}[pi]/) {
-            return String(match.0)
-        }
-        return nil
+        parsedMetadata.quality
+    }
+    
+    var codec: String? {
+        parsedMetadata.codec
+    }
+    
+    var source: String? {
+        parsedMetadata.source
+    }
+    
+    var cleanTitle: String {
+        parsedMetadata.cleanTitle
+    }
+    
+    var isHDR: Bool {
+        parsedMetadata.isHDR
+    }
+    
+    var is3D: Bool {
+        parsedMetadata.is3D
     }
     
     static func == (lhs: Movie, rhs: Movie) -> Bool {

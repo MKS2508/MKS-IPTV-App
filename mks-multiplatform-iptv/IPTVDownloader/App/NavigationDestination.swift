@@ -16,6 +16,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
     case downloads = "Downloads"
     #if DEBUG
     case debugStream = "DebugStream"
+    case cacheDebug = "CacheDebug"
     #endif
 
     var id: String { rawValue }
@@ -30,6 +31,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
         case .downloads: return "Downloads"
         #if DEBUG
         case .debugStream: return "Debug Stream"
+        case .cacheDebug: return "Cache Inspector"
         #endif
         }
     }
@@ -44,6 +46,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
         case .downloads: return "arrow.down.circle"
         #if DEBUG
         case .debugStream: return "ant.circle"
+        case .cacheDebug: return "internaldrive"
         #endif
         }
     }

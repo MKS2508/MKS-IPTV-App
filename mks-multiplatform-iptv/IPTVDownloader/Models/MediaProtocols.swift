@@ -158,23 +158,3 @@ extension SerieDetail: TitleParseable, MediaDetailItem {
     var detailPosterURL: String? { info.cover }
 }
 
-// MARK: - Legacy Property Names (Backward Compatibility)
-
-/// These computed properties map old `MediaItem` property names used by
-/// `AddDownloadMediaViewiOS` to the new `MediaDetailItem` properties.
-/// Remove this extension once `MediaDetailSheet` fully replaces `AddDownloadMediaViewiOS`.
-extension MediaDetailItem {
-    var title: String { cleanTitle }
-    var coverImageUrl: String { detailPosterURL ?? "" }
-    var plotSummary: String { detailPlot }
-    var genreText: String { detailGenre }
-    var releaseDateText: String { detailReleaseDate }
-    var castText: String { detailCast.joined(separator: ", ") }
-    var ratingValue: String { displayRating }
-    var rating5BasedValue: Double { displayRating5Based }
-    var backdropPaths: [String] { detailBackdropPaths }
-    var durationText: String {
-        let mins = detailDurationSeconds / 60
-        return mins > 0 ? "\(mins)" : "0"
-    }
-}

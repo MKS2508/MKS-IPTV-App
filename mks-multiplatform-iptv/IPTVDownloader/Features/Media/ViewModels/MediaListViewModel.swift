@@ -71,91 +71,81 @@ class MediaListViewModel: ObservableObject {
             if contentType == .series && didLoadSeries { return }
             if contentType == .all && didLoadMovies && didLoadSeries { return }
         }
-        
+
         isLoading = !forceRefresh
         isRefreshing = forceRefresh
         error = nil
         loadedFromCache = false
-        
+
         do {
-            if (contentType == .movies || contentType == .all) {
-                // Try cache first if not forcing refresh
-                if !forceRefresh, let cachedMovies = cacheManager.getCachedMovies(categoryId: categoryId) {
-                    movies = orderByAddedDesc(cachedMovies)
+            if contentType == .movies || contentType == .all {
+                // SWR: Try cache first with staleness info
+                if !forceRefresh,
+                   let cached = cacheManager.getCachedMoviesSWR(categoryId: categoryId) {
+                    movies = orderByAddedDesc(cached.value)
                     didLoadMovies = true
                     loadedFromCache = true
-                    
-                    // Background refresh if cache is old
-                    Task {
-                        await refreshMoviesInBackground(categoryId: categoryId)
+
+                    // Only background-refresh when stale (> 30min), not on every cache hit
+                    if cached.isStale {
+                        Task { await refreshMoviesInBackground(categoryId: categoryId) }
                     }
                 } else {
-                    // Load from network
-                    movies = try await movieService.fetchMovies()
-                    movies = orderByAddedDesc(movies)
+                    let freshMovies = try await movieService.fetchMovies()
+                    movies = orderByAddedDesc(freshMovies)
                     didLoadMovies = true
-                    
-                    // Cache the result
-                    cacheManager.cacheMovies(movies, categoryId: categoryId)
+                    cacheManager.cacheMovies(freshMovies, categoryId: categoryId)
                 }
             }
-            
-            if (contentType == .series || contentType == .all) {
-                // Try cache first if not forcing refresh
-                if !forceRefresh, let cachedSeries = cacheManager.getCachedSeries(categoryId: categoryId) {
-                    series = orderByAddedDesc(cachedSeries)
+
+            if contentType == .series || contentType == .all {
+                if !forceRefresh,
+                   let cached = cacheManager.getCachedSeriesSWR(categoryId: categoryId) {
+                    series = orderByAddedDesc(cached.value)
                     didLoadSeries = true
                     loadedFromCache = true
-                    
-                    // Background refresh if cache is old
-                    Task {
-                        await refreshSeriesInBackground(categoryId: categoryId)
+
+                    if cached.isStale {
+                        Task { await refreshSeriesInBackground(categoryId: categoryId) }
                     }
                 } else {
-                    // Load from network
-                    series = try await movieService.fetchSeries()
-                    series = orderByAddedDesc(series)
+                    let freshSeries = try await movieService.fetchSeries()
+                    series = orderByAddedDesc(freshSeries)
                     didLoadSeries = true
-                    
-                    // Cache the result
-                    cacheManager.cacheSeries(series, categoryId: categoryId)
+                    cacheManager.cacheSeries(freshSeries, categoryId: categoryId)
                 }
             }
         } catch {
             self.error = error
         }
-        
+
         isLoading = false
         isRefreshing = false
     }
-    
+
     private func refreshMoviesInBackground(categoryId: String?) async {
         do {
             let freshMovies = try await movieService.fetchMovies()
             cacheManager.cacheMovies(freshMovies, categoryId: categoryId)
-            
-            // Update UI if still showing same content
+
             if didLoadMovies {
                 movies = orderByAddedDesc(freshMovies)
             }
         } catch {
-            // Silent failure for background refresh
-            print("Background refresh for movies failed: \(error)")
+            print("[MediaListVM] Background movie refresh failed: \(error)")
         }
     }
-    
+
     private func refreshSeriesInBackground(categoryId: String?) async {
         do {
             let freshSeries = try await movieService.fetchSeries()
             cacheManager.cacheSeries(freshSeries, categoryId: categoryId)
-            
-            // Update UI if still showing same content
+
             if didLoadSeries {
                 series = orderByAddedDesc(freshSeries)
             }
         } catch {
-            // Silent failure for background refresh
-            print("Background refresh for series failed: \(error)")
+            print("[MediaListVM] Background series refresh failed: \(error)")
         }
     }
     

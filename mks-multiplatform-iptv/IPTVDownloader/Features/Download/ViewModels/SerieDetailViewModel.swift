@@ -20,50 +20,43 @@ class SerieDetailViewModel: ObservableObject {
     }
 
     func fetchSerieDetails(for seriesId: Int, forceRefresh: Bool = false) async {
-        // Reset error state
         self.error = nil
 
-        // Try to load from cache first if not forcing refresh
-        if !forceRefresh, let cachedDetail = cacheManager.getCachedSerieDetail(id: seriesId) {
-            self.serieDetail = cachedDetail
+        // SWR: try cache with staleness info
+        if !forceRefresh, let cached = cacheManager.getCachedSerieDetailSWR(id: seriesId) {
+            var detail = cached.value
+            detail.seriesId = seriesId
+            self.serieDetail = detail
             self.loadedFromCache = true
 
-            // Auto-enrich metadata from cache
             if enrichedMetadata == nil {
                 Task { await self.enrichMetadata() }
             }
 
-            // Refresh in background if cache is older than 30 minutes
-            if let cacheAge = cacheManager.getCacheAge(serieId: seriesId), cacheAge > 1800 {
-                Task {
-                    await refreshInBackground(seriesId: seriesId)
-                }
+            // Only background-refresh when stale
+            if cached.isStale {
+                Task { await refreshInBackground(seriesId: seriesId) }
             }
             return
         }
 
         // Load from network
-        await MainActor.run {
-            isLoading = !forceRefresh
-            isRefreshing = forceRefresh
-            loadedFromCache = false
-        }
+        isLoading = !forceRefresh
+        isRefreshing = forceRefresh
+        loadedFromCache = false
 
         do {
             var detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
             detail.seriesId = seriesId
             self.serieDetail = detail
             self.error = nil
-
-            // Cache the result
             cacheManager.cacheSerieDetail(detail, id: seriesId)
 
-            // Auto-enrich metadata after loading
             Task { await self.enrichMetadata() }
         } catch {
             self.error = error
             self.serieDetail = nil
-            print("Error fetching series details: \(error)")
+            print("[SerieDetailVM] Error fetching details: \(error)")
         }
 
         isLoading = false
@@ -74,18 +67,14 @@ class SerieDetailViewModel: ObservableObject {
         do {
             var detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
             detail.seriesId = seriesId
-
-            // Update cache
             cacheManager.cacheSerieDetail(detail, id: seriesId)
 
-            // Update UI if it's still showing the same series
             if let currentDetail = self.serieDetail,
                currentDetail.seasons.first?.id == detail.seasons.first?.id {
                 self.serieDetail = detail
             }
         } catch {
-            // Silent failure for background refresh
-            print("Background refresh failed: \(error)")
+            print("[SerieDetailVM] Background refresh failed: \(error)")
         }
     }
 

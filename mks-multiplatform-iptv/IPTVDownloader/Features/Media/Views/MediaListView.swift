@@ -520,34 +520,26 @@ struct MediaListView: View {
     }
     #endif
     
-    // Full Screen Cover Content
+    // Full Screen Cover Content — uses unified MediaDetailSheet
     #if os(iOS)
     private var fullScreenCoverContent: some View {
         Group {
             if selectedMediaItemId != nil {
-                // Display movie detail
-                if let movieDetailViewModel = movieDetailViewModel, 
+                if let movieDetailViewModel = movieDetailViewModel,
                    let movieDetail = movieDetailViewModel.movieDetail {
-                    PlatformSpecificAddDownloadViewMovie(
-                        selectedView: $selectedView,
-                        movieDetail: movieDetail,
-                        onDismiss: dismissMediaDetail
+                    MediaDetailSheet(
+                        detail: movieDetail,
+                        onDismiss: dismissMediaDetail,
+                        selectedView: $selectedView
                     )
-                    .background(.ultraThinMaterial.opacity(0.3), ignoresSafeAreaEdges: .all)
-                }
-                // Display serie detail
-                else if let serieDetailViewModel = serieDetailViewModel,
-                        let serieDetail = serieDetailViewModel.serieDetail {
-                    PlatformSpecificAddDownloadViewSerie(
-                        selectedView: $selectedView,
-                        seriesDetail: serieDetail,
-                        seriesId: selectedMediaItemId,
-                        onDismiss: dismissMediaDetail
+                } else if let serieDetailViewModel = serieDetailViewModel,
+                          let serieDetail = serieDetailViewModel.serieDetail {
+                    MediaDetailSheet(
+                        detail: serieDetail,
+                        onDismiss: dismissMediaDetail,
+                        selectedView: $selectedView
                     )
-                    .background(.ultraThinMaterial.opacity(0.3), ignoresSafeAreaEdges: .all)
-                }
-                // Fallback error view
-                else {
+                } else {
                     errorDetailView
                 }
             } else {
@@ -556,41 +548,34 @@ struct MediaListView: View {
         }
     }
     #endif
+
     #if os(macOS)
     private var macOSDetailContent: some View {
         Group {
             if selectedMediaItemId != nil {
-                // Display movie detail
                 if let movieDetailViewModel = movieDetailViewModel,
                    let movieDetail = movieDetailViewModel.movieDetail {
-                PlatformSpecificAddDownloadViewMovie(
-                    selectedView: $selectedView,
-                    movieDetail: movieDetail,
-                    onDismiss: dismissMediaDetail
-                )
-                .background(Color.black.opacity(0.3).ignoresSafeArea())
-            }
-            // Display serie detail
-            else if let serieDetailViewModel = serieDetailViewModel,
-                     let serieDetail = serieDetailViewModel.serieDetail {
-                PlatformSpecificAddDownloadViewSerie(
-                    selectedView: $selectedView,
-                    seriesDetail: serieDetail,
-                    seriesId: selectedMediaItemId,
-                    onDismiss: dismissMediaDetail
-                )
-                .background(Color.black.opacity(0.3).ignoresSafeArea())
-            }
-            // Fallback error view
-            else {
+                    MediaDetailSheet(
+                        detail: movieDetail,
+                        onDismiss: dismissMediaDetail,
+                        selectedView: $selectedView
+                    )
+                } else if let serieDetailViewModel = serieDetailViewModel,
+                          let serieDetail = serieDetailViewModel.serieDetail {
+                    MediaDetailSheet(
+                        detail: serieDetail,
+                        onDismiss: dismissMediaDetail,
+                        selectedView: $selectedView
+                    )
+                } else {
+                    errorDetailView
+                }
+            } else {
                 errorDetailView
             }
-        } else {
-            errorDetailView
         }
     }
-}
-#endif
+    #endif
 
     // MARK: - Body
     var body: some View {

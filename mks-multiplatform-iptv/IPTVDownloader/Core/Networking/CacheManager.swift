@@ -1,183 +1,307 @@
 import Foundation
 
+// MARK: - Cache TTL Configuration
+
+/// Centralized TTL configuration for all cache data types.
+///
+/// Each type defines two thresholds:
+/// - `freshTTL`: Data younger than this is **fresh** (no background refresh needed).
+/// - `staleTTL`: Data younger than this is **stale but usable** (return immediately, refresh in background).
+///   Data older than `staleTTL` is considered **expired** and is not returned.
+enum CacheTTL: String, CaseIterable, Sendable {
+    case mediaList
+    case mediaDetail
+    case metadata
+    case epg
+    case matchTable
+
+    var freshTTL: TimeInterval {
+        switch self {
+        case .mediaList:    return 1800    // 30 minutes
+        case .mediaDetail:  return 1800    // 30 minutes
+        case .metadata:     return 86400   // 24 hours
+        case .epg:          return 14400   // 4 hours
+        case .matchTable:   return 14400   // 4 hours
+        }
+    }
+
+    var staleTTL: TimeInterval {
+        switch self {
+        case .mediaList:    return 86400   // 24 hours
+        case .mediaDetail:  return 86400   // 24 hours
+        case .metadata:     return 259200  // 72 hours
+        case .epg:          return 43200   // 12 hours
+        case .matchTable:   return 43200   // 12 hours
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .mediaList:    return "Media Lists"
+        case .mediaDetail:  return "Media Details"
+        case .metadata:     return "Metadata"
+        case .epg:          return "EPG"
+        case .matchTable:   return "Match Table"
+        }
+    }
+
+    /// File name prefix used to classify cache files by type.
+    var keyPrefix: String {
+        switch self {
+        case .mediaList:    return "media_list_"
+        case .mediaDetail:  return "movie_detail_,serie_detail_"
+        case .metadata:     return "metadata_,enriched_"
+        case .epg:          return "epg_data"
+        case .matchTable:   return "epg_match_table"
+        }
+    }
+
+    /// Determine the CacheTTL for a given cache file name.
+    static func ttlForFile(named name: String) -> CacheTTL? {
+        if name.hasPrefix("media_list_") { return .mediaList }
+        if name.hasPrefix("movie_detail_") || name.hasPrefix("serie_detail_") { return .mediaDetail }
+        if name.hasPrefix("metadata_") || name.hasPrefix("enriched_") { return .metadata }
+        if name.hasPrefix("epg_data") { return .epg }
+        if name.hasPrefix("epg_match_table") { return .matchTable }
+        return nil
+    }
+}
+
+// MARK: - Cache Result (SWR)
+
+/// Result of a stale-while-revalidate cache lookup.
+///
+/// Contains the deserialized value plus staleness metadata so callers
+/// can decide whether to trigger a background refresh.
+struct CacheResult<T> {
+    let value: T
+    let age: TimeInterval
+    let isStale: Bool
+    let key: String
+}
+
+// MARK: - Cache Statistics
+
+/// Snapshot of cache state for the debug view.
+struct CacheStats {
+    struct Entry: Identifiable {
+        let id: String // file name
+        let key: String
+        let sizeBytes: Int64
+        let age: TimeInterval
+        let ttlType: CacheTTL?
+        let isStale: Bool
+        let isExpired: Bool
+    }
+
+    let totalSizeBytes: Int64
+    let entries: [Entry]
+
+    var entryCount: Int { entries.count }
+
+    func count(for type: CacheTTL) -> Int {
+        entries.filter { $0.ttlType == type }.count
+    }
+
+    func freshCount(for type: CacheTTL) -> Int {
+        entries.filter { $0.ttlType == type && !$0.isStale && !$0.isExpired }.count
+    }
+
+    func staleCount(for type: CacheTTL) -> Int {
+        entries.filter { $0.ttlType == type && $0.isStale && !$0.isExpired }.count
+    }
+
+    func expiredCount(for type: CacheTTL) -> Int {
+        entries.filter { $0.ttlType == type && $0.isExpired }.count
+    }
+
+    func sizeBytes(for type: CacheTTL) -> Int64 {
+        entries.filter { $0.ttlType == type }.reduce(0) { $0 + $1.sizeBytes }
+    }
+
+    /// Human-readable total size.
+    var formattedTotalSize: String {
+        ByteCountFormatter.string(fromByteCount: totalSizeBytes, countStyle: .file)
+    }
+}
+
+// MARK: - CacheManager
+
 class CacheManager {
     static let shared = CacheManager()
-    
-    private var cacheDirectory: URL
-    private let cacheExpiration: TimeInterval = 3600 // 1 hour
+
+    private(set) var cacheDirectory: URL
     private let queue = DispatchQueue(label: "com.iptv.cachemanager", attributes: .concurrent)
-    
+
     private init() {
         let paths = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
         cacheDirectory = paths[0].appendingPathComponent("IPTVCache")
-        
-        // Create cache directory if it doesn't exist
+
         do {
             try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
         } catch {
-            print("Failed to create cache directory: \(error)")
-            // Fall back to a temporary directory if cache creation fails
+            print("[CacheManager] Failed to create cache directory: \(error)")
             cacheDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("IPTVCache")
             do {
                 try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
             } catch {
-                print("Failed to create temporary cache directory: \(error)")
-                // Use app's documents directory as last resort
+                print("[CacheManager] Failed to create temp cache directory: \(error)")
                 let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 cacheDirectory = documentsPath.appendingPathComponent("IPTVCache")
                 try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
             }
         }
     }
-    
+
     // MARK: - Cache Keys
-    
+
     private func movieDetailKey(id: Int) -> String {
-        return "movie_detail_\(id)"
+        "movie_detail_\(id)"
     }
-    
+
     private func serieDetailKey(id: Int) -> String {
-        return "serie_detail_\(id)"
+        "serie_detail_\(id)"
     }
-    
+
     private func mediaListKey(type: String, categoryId: String?) -> String {
         let category = categoryId ?? "all"
         return "media_list_\(type)_\(category)"
     }
-    
-    // MARK: - Movie Details Cache
-    
-    func getCachedMovieDetail(id: Int) -> MovieDetail? {
-        return getCache(key: movieDetailKey(id: id), type: MovieDetail.self)
+
+    // MARK: - Stale-While-Revalidate Generic
+
+    /// Read from disk cache with stale-while-revalidate semantics.
+    ///
+    /// - Returns cached data if within `staleTTL`, annotated with freshness.
+    /// - Returns `nil` only if file is missing or older than `staleTTL`.
+    /// - Callers should check `result.isStale` to decide on background refresh.
+    func getCacheWithStaleness<T: Decodable>(
+        key: String,
+        type: T.Type,
+        ttl: CacheTTL
+    ) -> CacheResult<T>? {
+        queue.sync {
+            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                return nil
+            }
+
+            do {
+                let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
+                let age = Date().timeIntervalSince(modDate)
+
+                // Beyond stale TTL: truly expired, don't return
+                if age > ttl.staleTTL { return nil }
+
+                let data = try Data(contentsOf: fileURL)
+                let value = try JSONDecoder().decode(type, from: data)
+
+                return CacheResult(
+                    value: value,
+                    age: age,
+                    isStale: age > ttl.freshTTL,
+                    key: key
+                )
+            } catch {
+                print("[CacheManager] SWR read error for \(key): \(error)")
+                return nil
+            }
+        }
     }
-    
+
+    // MARK: - Typed SWR Convenience Methods
+
+    func getCachedMovieDetailSWR(id: Int) -> CacheResult<MovieDetail>? {
+        getCacheWithStaleness(key: movieDetailKey(id: id), type: MovieDetail.self, ttl: .mediaDetail)
+    }
+
+    func getCachedSerieDetailSWR(id: Int) -> CacheResult<SerieDetail>? {
+        getCacheWithStaleness(key: serieDetailKey(id: id), type: SerieDetail.self, ttl: .mediaDetail)
+    }
+
+    func getCachedMoviesSWR(categoryId: String? = nil) -> CacheResult<[Movie]>? {
+        getCacheWithStaleness(
+            key: mediaListKey(type: "movies", categoryId: categoryId),
+            type: [Movie].self,
+            ttl: .mediaList
+        )
+    }
+
+    func getCachedSeriesSWR(categoryId: String? = nil) -> CacheResult<[Serie]>? {
+        getCacheWithStaleness(
+            key: mediaListKey(type: "series", categoryId: categoryId),
+            type: [Serie].self,
+            ttl: .mediaList
+        )
+    }
+
+    // MARK: - Legacy Accessors (Binary TTL — kept for backward compatibility)
+
+    func getCachedMovieDetail(id: Int) -> MovieDetail? {
+        getCachedMovieDetailSWR(id: id)?.value
+    }
+
+    func getCachedSerieDetail(id: Int) -> SerieDetail? {
+        getCachedSerieDetailSWR(id: id)?.value
+    }
+
+    func getCachedMovies(categoryId: String? = nil) -> [Movie]? {
+        getCachedMoviesSWR(categoryId: categoryId)?.value
+    }
+
+    func getCachedSeries(categoryId: String? = nil) -> [Serie]? {
+        getCachedSeriesSWR(categoryId: categoryId)?.value
+    }
+
+    // MARK: - Write Operations
+
     func cacheMovieDetail(_ detail: MovieDetail, id: Int) {
         saveCache(detail, key: movieDetailKey(id: id))
     }
-    
-    // MARK: - Serie Details Cache
-    
-    func getCachedSerieDetail(id: Int) -> SerieDetail? {
-        return getCache(key: serieDetailKey(id: id), type: SerieDetail.self)
-    }
-    
+
     func cacheSerieDetail(_ detail: SerieDetail, id: Int) {
         saveCache(detail, key: serieDetailKey(id: id))
     }
-    
-    // MARK: - Media List Cache
-    
-    func getCachedMovies(categoryId: String? = nil) -> [Movie]? {
-        return getCache(key: mediaListKey(type: "movies", categoryId: categoryId), type: [Movie].self)
-    }
-    
+
     func cacheMovies(_ movies: [Movie], categoryId: String? = nil) {
         saveCache(movies, key: mediaListKey(type: "movies", categoryId: categoryId))
     }
-    
-    func getCachedSeries(categoryId: String? = nil) -> [Serie]? {
-        return getCache(key: mediaListKey(type: "series", categoryId: categoryId), type: [Serie].self)
-    }
-    
+
     func cacheSeries(_ series: [Serie], categoryId: String? = nil) {
         saveCache(series, key: mediaListKey(type: "series", categoryId: categoryId))
     }
-    
+
     // MARK: - Generic Cache Operations
-    
-    private func getCache<T: Decodable>(key: String, type: T.Type) -> T? {
-        return queue.sync {
-            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
-            
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                return nil
-            }
-            
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                if let modificationDate = attributes[.modificationDate] as? Date {
-                    let age = Date().timeIntervalSince(modificationDate)
-                    if age > cacheExpiration {
-                        // Cache is expired
-                        return nil
-                    }
-                }
-                
-                let data = try Data(contentsOf: fileURL)
-                let decoder = JSONDecoder()
-                return try decoder.decode(type, from: data)
-            } catch {
-                print("Cache read error for key \(key): \(error)")
-                return nil
-            }
-        }
-    }
-    
+
     private func saveCache<T: Encodable>(_ object: T, key: String) {
         queue.async(flags: .barrier) {
             let fileURL = self.cacheDirectory.appendingPathComponent("\(key).json")
-            
+
             do {
-                let encoder = JSONEncoder()
-                let data = try encoder.encode(object)
+                let data = try JSONEncoder().encode(object)
                 try data.write(to: fileURL)
             } catch {
-                print("Cache write error for key \(key): \(error)")
+                print("[CacheManager] Write error for \(key): \(error)")
             }
         }
     }
-    
+
     // MARK: - Metadata Cache
 
-    /// Longer TTL for metadata (24 hours) since it's more stable than content lists
-    private let metadataCacheExpiration: TimeInterval = 86400
-
     func getCachedMetadata(key: String) -> MetadataResult? {
-        return queue.sync {
-            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
-
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                return nil
-            }
-
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                if let modificationDate = attributes[.modificationDate] as? Date {
-                    let age = Date().timeIntervalSince(modificationDate)
-                    if age > metadataCacheExpiration {
-                        return nil
-                    }
-                }
-
-                let data = try Data(contentsOf: fileURL)
-                return try JSONDecoder().decode(MetadataResult.self, from: data)
-            } catch {
-                print("Metadata cache read error for key \(key): \(error)")
-                return nil
-            }
-        }
+        getCacheWithStaleness(key: key, type: MetadataResult.self, ttl: .metadata)?.value
     }
 
     func cacheMetadata(_ result: MetadataResult, key: String) {
-        queue.async(flags: .barrier) {
-            let fileURL = self.cacheDirectory.appendingPathComponent("\(key).json")
-
-            do {
-                let data = try JSONEncoder().encode(result)
-                try data.write(to: fileURL)
-            } catch {
-                print("Metadata cache write error for key \(key): \(error)")
-            }
-        }
+        saveCache(result, key: key)
     }
 
     // MARK: - EPG Cache (Binary PropertyList)
 
-    /// Longer TTL for EPG data (4 hours) since it changes less frequently
-    private let epgCacheExpiration: TimeInterval = 14400
-
     func getCachedEPG() -> EPGData? {
-        return queue.sync {
+        queue.sync {
             let fileURL = cacheDirectory.appendingPathComponent("epg_data.plist")
 
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -185,19 +309,15 @@ class CacheManager {
             }
 
             do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                if let modificationDate = attributes[.modificationDate] as? Date {
-                    let age = Date().timeIntervalSince(modificationDate)
-                    if age > epgCacheExpiration {
-                        return nil
-                    }
-                }
+                let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
+                let age = Date().timeIntervalSince(modDate)
+                if age > CacheTTL.epg.staleTTL { return nil }
 
                 let data = try Data(contentsOf: fileURL)
-                let decoder = PropertyListDecoder()
-                return try decoder.decode(EPGData.self, from: data)
+                return try PropertyListDecoder().decode(EPGData.self, from: data)
             } catch {
-                print("EPG plist cache read error: \(error)")
+                print("[CacheManager] EPG plist read error: \(error)")
                 return nil
             }
         }
@@ -213,10 +333,10 @@ class CacheManager {
                 let plistData = try encoder.encode(data)
                 try plistData.write(to: fileURL)
             } catch {
-                print("EPG plist cache write error: \(error)")
+                print("[CacheManager] EPG plist write error: \(error)")
             }
 
-            // Remove legacy JSON cache if it exists
+            // Remove legacy JSON cache
             let legacyURL = self.cacheDirectory.appendingPathComponent("epg_data.json")
             try? FileManager.default.removeItem(at: legacyURL)
         }
@@ -224,11 +344,8 @@ class CacheManager {
 
     // MARK: - EPG Match Table Cache (Binary PropertyList)
 
-    /// TTL for match table (4 hours) — same as EPG data
-    private let matchTableCacheExpiration: TimeInterval = 14400
-
     func getCachedMatchTable() -> [Int: String]? {
-        return queue.sync {
+        queue.sync {
             let fileURL = cacheDirectory.appendingPathComponent("epg_match_table.plist")
 
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -236,18 +353,13 @@ class CacheManager {
             }
 
             do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                if let modificationDate = attributes[.modificationDate] as? Date {
-                    let age = Date().timeIntervalSince(modificationDate)
-                    if age > matchTableCacheExpiration {
-                        return nil
-                    }
-                }
+                let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+                let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
+                let age = Date().timeIntervalSince(modDate)
+                if age > CacheTTL.matchTable.staleTTL { return nil }
 
                 let data = try Data(contentsOf: fileURL)
-                let decoder = PropertyListDecoder()
-                // PropertyList keys must be strings, so decode as [String: String] and convert
-                let stringKeyed = try decoder.decode([String: String].self, from: data)
+                let stringKeyed = try PropertyListDecoder().decode([String: String].self, from: data)
                 var result: [Int: String] = [:]
                 for (key, value) in stringKeyed {
                     if let intKey = Int(key) {
@@ -256,7 +368,7 @@ class CacheManager {
                 }
                 return result
             } catch {
-                print("Match table plist cache read error: \(error)")
+                print("[CacheManager] Match table plist read error: \(error)")
                 return nil
             }
         }
@@ -267,43 +379,13 @@ class CacheManager {
             let fileURL = self.cacheDirectory.appendingPathComponent("epg_match_table.plist")
 
             do {
-                // Convert Int keys to String for PropertyList compatibility
                 let stringKeyed = Dictionary(uniqueKeysWithValues: table.map { (String($0.key), $0.value) })
                 let encoder = PropertyListEncoder()
                 encoder.outputFormat = .binary
                 let data = try encoder.encode(stringKeyed)
                 try data.write(to: fileURL)
             } catch {
-                print("Match table plist cache write error: \(error)")
-            }
-        }
-    }
-
-    // MARK: - Generic Cache with Custom TTL
-
-    private func getCache<T: Decodable>(key: String, type: T.Type, expiration: TimeInterval) -> T? {
-        return queue.sync {
-            let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
-
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                return nil
-            }
-
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-                if let modificationDate = attributes[.modificationDate] as? Date {
-                    let age = Date().timeIntervalSince(modificationDate)
-                    if age > expiration {
-                        return nil
-                    }
-                }
-
-                let data = try Data(contentsOf: fileURL)
-                let decoder = JSONDecoder()
-                return try decoder.decode(type, from: data)
-            } catch {
-                print("Cache read error for key \(key): \(error)")
-                return nil
+                print("[CacheManager] Match table plist write error: \(error)")
             }
         }
     }
@@ -313,73 +395,162 @@ class CacheManager {
     func clearCache() {
         queue.async(flags: .barrier) {
             do {
-                let files = try FileManager.default.contentsOfDirectory(at: self.cacheDirectory, includingPropertiesForKeys: nil)
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: self.cacheDirectory, includingPropertiesForKeys: nil
+                )
                 for file in files {
                     try FileManager.default.removeItem(at: file)
                 }
+                print("[CacheManager] Cleared all cache (\(files.count) files)")
             } catch {
-                print("Error clearing cache: \(error)")
+                print("[CacheManager] Error clearing cache: \(error)")
             }
         }
     }
-    
+
+    /// Remove files that exceed their type-specific stale TTL.
+    ///
+    /// Unlike the previous implementation which used a single 1-hour TTL,
+    /// this respects each data type's `staleTTL` (e.g. 24h for media, 72h for metadata).
     func clearExpiredCache() {
         queue.async(flags: .barrier) {
             do {
-                let files = try FileManager.default.contentsOfDirectory(at: self.cacheDirectory, includingPropertiesForKeys: [.contentModificationDateKey])
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: self.cacheDirectory,
+                    includingPropertiesForKeys: [.contentModificationDateKey]
+                )
                 let now = Date()
-                
+                var removedCount = 0
+
                 for file in files {
-                    let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
-                    if let modificationDate = attributes[.modificationDate] as? Date {
-                        let age = now.timeIntervalSince(modificationDate)
-                        if age > self.cacheExpiration {
-                            try FileManager.default.removeItem(at: file)
-                        }
+                    let attrs = try FileManager.default.attributesOfItem(atPath: file.path)
+                    guard let modDate = attrs[.modificationDate] as? Date else { continue }
+                    let age = now.timeIntervalSince(modDate)
+
+                    let fileName = file.lastPathComponent
+                    let ttl = CacheTTL.ttlForFile(named: fileName)
+                    let maxAge = ttl?.staleTTL ?? 3600 // Default 1h for unknown files
+
+                    if age > maxAge {
+                        try FileManager.default.removeItem(at: file)
+                        removedCount += 1
                     }
                 }
+
+                if removedCount > 0 {
+                    print("[CacheManager] Cleared \(removedCount) expired files")
+                }
             } catch {
-                print("Error clearing expired cache: \(error)")
+                print("[CacheManager] Error clearing expired cache: \(error)")
             }
         }
     }
-    
+
+    /// Clear cache files for a specific data type only.
+    func clearCache(type: CacheTTL) {
+        queue.async(flags: .barrier) {
+            do {
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: self.cacheDirectory, includingPropertiesForKeys: nil
+                )
+                var removedCount = 0
+                for file in files {
+                    if CacheTTL.ttlForFile(named: file.lastPathComponent) == type {
+                        try FileManager.default.removeItem(at: file)
+                        removedCount += 1
+                    }
+                }
+                print("[CacheManager] Cleared \(removedCount) \(type.displayName) files")
+            } catch {
+                print("[CacheManager] Error clearing \(type.displayName) cache: \(error)")
+            }
+        }
+    }
+
     // MARK: - Cache Info
-    
+
     func isCached(movieId: Int) -> Bool {
         let fileURL = cacheDirectory.appendingPathComponent("\(movieDetailKey(id: movieId)).json")
         return FileManager.default.fileExists(atPath: fileURL.path)
     }
-    
+
     func isCached(serieId: Int) -> Bool {
         let fileURL = cacheDirectory.appendingPathComponent("\(serieDetailKey(id: serieId)).json")
         return FileManager.default.fileExists(atPath: fileURL.path)
     }
-    
+
     func getCacheAge(movieId: Int) -> TimeInterval? {
-        return getCacheAge(key: movieDetailKey(id: movieId))
+        getCacheAge(key: movieDetailKey(id: movieId))
     }
-    
+
     func getCacheAge(serieId: Int) -> TimeInterval? {
-        return getCacheAge(key: serieDetailKey(id: serieId))
+        getCacheAge(key: serieDetailKey(id: serieId))
     }
-    
+
     private func getCacheAge(key: String) -> TimeInterval? {
         let fileURL = cacheDirectory.appendingPathComponent("\(key).json")
-        
+
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return nil
         }
-        
+
         do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
-            if let modificationDate = attributes[.modificationDate] as? Date {
-                return Date().timeIntervalSince(modificationDate)
+            let attrs = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+            if let modDate = attrs[.modificationDate] as? Date {
+                return Date().timeIntervalSince(modDate)
             }
         } catch {
-            print("Error getting cache age for key \(key): \(error)")
+            print("[CacheManager] Error getting cache age for \(key): \(error)")
         }
-        
         return nil
+    }
+
+    // MARK: - Cache Statistics
+
+    /// Compute a snapshot of all cache entries with size, age, and staleness info.
+    func getCacheStats() -> CacheStats {
+        queue.sync {
+            do {
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: cacheDirectory,
+                    includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
+                )
+                let now = Date()
+                var totalSize: Int64 = 0
+                var entries: [CacheStats.Entry] = []
+
+                for file in files {
+                    let attrs = try FileManager.default.attributesOfItem(atPath: file.path)
+                    let size = (attrs[.size] as? Int64) ?? 0
+                    let modDate = attrs[.modificationDate] as? Date ?? Date.distantPast
+                    let age = now.timeIntervalSince(modDate)
+
+                    let fileName = file.lastPathComponent
+                    let keyName = fileName
+                        .replacingOccurrences(of: ".json", with: "")
+                        .replacingOccurrences(of: ".plist", with: "")
+                    let ttl = CacheTTL.ttlForFile(named: fileName)
+
+                    totalSize += size
+                    entries.append(CacheStats.Entry(
+                        id: fileName,
+                        key: keyName,
+                        sizeBytes: size,
+                        age: age,
+                        ttlType: ttl,
+                        isStale: ttl.map { age > $0.freshTTL } ?? false,
+                        isExpired: ttl.map { age > $0.staleTTL } ?? (age > 3600)
+                    ))
+                }
+
+                // Sort by most recent first
+                entries.sort { $0.age < $1.age }
+
+                return CacheStats(totalSizeBytes: totalSize, entries: entries)
+            } catch {
+                print("[CacheManager] Error computing stats: \(error)")
+                return CacheStats(totalSizeBytes: 0, entries: [])
+            }
+        }
     }
 }

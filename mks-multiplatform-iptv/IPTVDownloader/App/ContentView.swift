@@ -386,6 +386,10 @@ struct ContentView: View {
             } else {
                 loadingPlaceholder
             }
+
+        case .cacheDebug:
+            CacheDebugView()
+                .navigationTitle("Cache Inspector")
         #endif
         }
     }

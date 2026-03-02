@@ -125,15 +125,13 @@ final class MediaDetailViewModel {
 
         error = nil
 
-        // Try cache first if not forcing refresh
-        if !forceRefresh && loadFromCache(for: type) {
+        // SWR: try cache first with staleness info
+        if !forceRefresh, let cached = loadFromCacheSWR(for: type) {
             loadedFromCache = true
 
-            // Background refresh if cache is old (> 30 minutes)
-            if let cacheAge = getCacheAge(for: type), cacheAge > 1800 {
-                Task {
-                    await refreshInBackground(type: type)
-                }
+            // Only background-refresh when stale, not on every cache hit
+            if cached.isStale {
+                Task { await refreshInBackground(type: type) }
             }
             return
         }
@@ -160,38 +158,30 @@ final class MediaDetailViewModel {
             }
         } catch {
             self.error = error
-            print("[MediaDetailViewModel] Error fetching details: \(error)")
+            print("[MediaDetailVM] Error fetching details: \(error)")
         }
 
         isLoading = false
         isRefreshing = false
     }
 
-    private func loadFromCache(for type: MediaDetailType) -> Bool {
+    /// SWR cache lookup: returns CacheResult with staleness info, or nil if miss/expired.
+    private func loadFromCacheSWR(for type: MediaDetailType) -> CacheResult<Bool>? {
         switch type {
         case .movie(let id):
-            if let cached = cacheManager.getCachedMovieDetail(id: id) {
-                movieDetail = cached
+            if let cached = cacheManager.getCachedMovieDetailSWR(id: id) {
+                movieDetail = cached.value
                 serieDetail = nil
-                return true
+                return CacheResult(value: true, age: cached.age, isStale: cached.isStale, key: cached.key)
             }
         case .serie(let id):
-            if let cached = cacheManager.getCachedSerieDetail(id: id) {
-                serieDetail = cached
+            if let cached = cacheManager.getCachedSerieDetailSWR(id: id) {
+                serieDetail = cached.value
                 movieDetail = nil
-                return true
+                return CacheResult(value: true, age: cached.age, isStale: cached.isStale, key: cached.key)
             }
         }
-        return false
-    }
-
-    private func getCacheAge(for type: MediaDetailType) -> TimeInterval? {
-        switch type {
-        case .movie(let id):
-            return cacheManager.getCacheAge(movieId: id)
-        case .serie(let id):
-            return cacheManager.getCacheAge(serieId: id)
-        }
+        return nil
     }
 
     private func refreshInBackground(type: MediaDetailType) async {

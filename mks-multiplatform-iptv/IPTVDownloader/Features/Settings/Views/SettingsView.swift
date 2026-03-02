@@ -7,11 +7,13 @@ struct SettingsView: View {
     
     enum SettingsTab: String, CaseIterable {
         case profiles = "Profiles"
+        case cache = "Cache"
         case general = "General"
-        
+
         var systemImage: String {
             switch self {
             case .profiles: return "person.2.badge.key"
+            case .cache: return "internaldrive"
             case .general: return "gearshape"
             }
         }
@@ -32,6 +34,8 @@ struct SettingsView: View {
                 switch selectedTab {
                 case .profiles:
                     ProfilesSettingsView()
+                case .cache:
+                    CacheDebugView()
                 case .general:
                     GeneralSettingsView()
                 }

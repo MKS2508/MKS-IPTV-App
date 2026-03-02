@@ -7,10 +7,11 @@
 | **Fase 0** | ✅ COMPLETADA | `57f612c` | Quick fixes: cleanTitle en HeroBanner y HomeMediaCard |
 | **Fase 1** | ✅ COMPLETADA | `5a652bb` | EnrichedMediaStore actor + prefetch en Home + tmdbIdInt |
 | **Fase 2** | ✅ COMPLETADA | pendiente commit | Hero Banner enriquecido con metadata TMDB |
-| **Fase 3** | 🔲 PENDIENTE | — | MediaDetailSheet (Apple TV+/Netflix style) |
-| **Fase 4** | 🔲 PENDIENTE | — | SWR generico en CacheManager |
-| **Fase 5** | 🔲 PENDIENTE | — | Liquid Glass UI enhancements |
-| **Fase 6** | 🔲 PENDIENTE | — | Serie Detail con episodes tab |
+| **Fase P** | ✅ COMPLETADA | `43bb15d` | Protocol unification: MediaProtocols.swift, TitleParseable, LibraryItem, MediaDetailItem |
+| **Fase 3** | ✅ COMPLETADA | — | MediaDetailSheet (Apple TV+/Netflix style) + wired into MediaListView |
+| **Fase 4** | ✅ COMPLETADA | — | SWR generico en CacheManager + CacheDebugView + all VMs updated |
+| **Fase 5** | 🔲 PARCIAL | — | Liquid Glass UI enhancements (glass tabs done in MediaDetailSheet) |
+| **Fase 6** | ✅ COMPLETADA | — | Serie Detail con episodes tab (built into MediaDetailSheet) |
 
 ---
 
@@ -1131,14 +1132,14 @@ private var episodesContent: some View {
 │                                                                      │
 │  MediaListView                                                      │
 │  ├── MovieCardView / SerieCardView (✅ formattedTitle = cleanTitle) │
-│  └── .fullScreenCover → 🔲 MediaDetailSheet (F3, actualmente usa   │
-│      │                    AddDownloadMediaViewiOS / AddDownloadView) │
-│      ├── 🔲 Collapsing header (backdrop HD + poster TMDB)          │
-│      ├── 🔲 GlassSegmentedControl tabs                             │
-│      ├── 🔲 Overview (plot, cast, director, technical badges)      │
-│      ├── 🔲 Episodes (para series, con season picker)              │
-│      ├── 🔲 Action buttons (play, download SIN navegar)            │
-│      └── 🔲 Download modal (in-place, no pierde el detalle)        │
+│  └── .fullScreenCover → ✅ MediaDetailSheet (unified via            │
+│      │                    MediaDetailItem protocol)                  │
+│      ├── ✅ Collapsing header (backdrop HD + poster TMDB)           │
+│      ├── ✅ GlassSegmentedControl tabs                              │
+│      ├── ✅ Overview (plot, cast, director, trailer link)           │
+│      ├── ✅ Episodes (para series, con season picker)               │
+│      ├── ✅ Action buttons (play, download SIN navegar)             │
+│      └── ✅ Download modal (in-place, no pierde el detalle)         │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1160,21 +1161,35 @@ Fase 1: Enriquecimiento Proactivo ✅ COMPLETADA (5a652bb)
 Fase 2: Hero Banner Enriquecido ✅ COMPLETADA
   └── 2.1 HeroBannerView con metadata enriquecida   ✅ backdrop HD, subtitle, plot, rating
 
-Fase 3: Vista de Detalle               ← Requiere Fase 1 ✅
-  ├── 3.1 MediaDetailSheet (nuevo)
-  ├── 3.2 Integrar en MediaListView    ← Requiere 3.1
-  └── 3.3 Download sin perder detalle  ← Requiere 3.1
+Fase P: Protocol Unification ✅ COMPLETADA (43bb15d)
+  ├── MediaProtocols.swift (TitleParseable, LibraryItem, MediaDetailItem)
+  ├── Removed duplicate protocols from MediaListViewModel, AddDownloadMediaViewiOS
+  ├── Removed duplicate MediaType from DownloadItem
+  └── Unified Movie/Serie/MovieDetail/SerieDetail conformance
 
-Fase 4: SWR en CacheManager            ← Independiente (puede ir en paralelo con Fase 2/3)
-  ├── 4.1 getCacheWithStaleness generico
-  └── 4.2 Usar en MediaListViewModel
+Fase 3: Vista de Detalle ✅ COMPLETADA  ← Requiere Fase 1 ✅ + Fase P ✅
+  ├── 3.1 MediaDetailSheet (nuevo)                      ✅
+  ├── 3.2 Integrar en MediaListView                     ✅ (fullScreenCover + macOS sheet)
+  └── 3.3 Download sin perder detalle                   ✅ (in-place download sheet)
+
+Fase 4: SWR en CacheManager ✅ COMPLETADA
+  ├── 4.1 CacheTTL enum + CacheResult<T> + getCacheWithStaleness()  ✅
+  ├── 4.2 Typed SWR methods + legacy backward-compat               ✅
+  ├── 4.3 MediaListViewModel uses SWR                               ✅
+  ├── 4.4 MediaDetailViewModel uses SWR                             ✅
+  ├── 4.5 MovieDetailViewModel uses SWR                             ✅
+  ├── 4.6 SerieDetailViewModel uses SWR                             ✅
+  ├── 4.7 clearExpiredCache respects per-type TTLs                  ✅
+  ├── 4.8 CacheStats + getCacheStats()                              ✅
+  ├── 4.9 CacheDebugView (entries, type breakdown, controls)        ✅
+  └── 4.10 Wired into SettingsView + NavigationDestination          ✅
 
 Fase 5: Liquid Glass UI                ← Requiere Fase 2 y 3
-  ├── 5.1 Glass en Hero Banner
-  └── 5.2 Glass tabs en detail
+  ├── 5.1 Glass en Hero Banner                          🔲
+  └── 5.2 Glass tabs en detail                          ✅ (GlassSegmentedControl in MediaDetailSheet)
 
-Fase 6: Serie Detail con episodios     ← Requiere Fase 3
-  └── 6.1 Tab Episodes con season picker
+Fase 6: Serie Detail con episodios ✅ COMPLETADA  ← Requiere Fase 3 ✅
+  └── 6.1 Tab Episodes con season picker                ✅ (built into MediaDetailSheet)
 ```
 
 ---
@@ -1185,8 +1200,8 @@ Fase 6: Serie Detail con episodios     ← Requiere Fase 3
 | Archivo | Fase | Estado | Descripcion |
 |---------|------|--------|-------------|
 | `Core/Metadata/EnrichedMediaStore.swift` | 1.1 | ✅ CREADO | Actor para metadata enriquecida con SWR y dedup |
-| `Features/Media/Views/MediaDetailSheet.swift` | 3.1 | 🔲 PENDIENTE | Vista de detalle rediseñada |
-| `Features/Media/Views/EpisodeRow.swift` | 6.1 | 🔲 PENDIENTE | Fila de episodio para series |
+| `Models/MediaProtocols.swift` | P | ✅ CREADO | Unified protocol hierarchy (TitleParseable, LibraryItem, MediaDetailItem) |
+| `Features/Media/Views/MediaDetailSheet.swift` | 3.1 | ✅ CREADO | Vista de detalle rediseñada con tabs, episodes, download in-place |
 
 ### Archivos MODIFICADOS:
 | Archivo | Fase | Estado | Cambio |
@@ -1196,10 +1211,22 @@ Fase 6: Serie Detail con episodios     ← Requiere Fase 3
 | `HomeMediaCard.swift` | 0.2 | ✅ HECHO | `item.name` → `item.cleanTitle` en placeholder |
 | `HomeViewModel.swift` | 1.2 | ✅ HECHO | `prefetchMetadata()` method added |
 | `AppDataLoader.swift` | 1.2 | ✅ HECHO | Non-blocking `Task.detached` prefetch call |
-| `MediaListViewModel.swift` | 1.3 | ✅ HECHO | `tmdbIdInt` en LibraryItem protocol + conformances |
-| `MediaListViewModel.swift` | 4.2 | 🔲 PENDIENTE | SWR generico en loadMedia() |
-| `MediaListView.swift` | 3.2 | 🔲 PENDIENTE | Reemplazar fullScreenCover → MediaDetailSheet |
-| `CacheManager.swift` | 4.1 | 🔲 PENDIENTE | `getCacheWithStaleness()` generico |
+| `MediaListViewModel.swift` | P | ✅ HECHO | Removed LibraryItem/LibraryMediaType (moved to MediaProtocols.swift) |
+| `AddDownloadMediaViewiOS.swift` | P | ✅ HECHO | Removed MediaItem protocol, uses `any MediaDetailItem` |
+| `Movie.swift` | P | ✅ HECHO | TitleParseable conformance, removed duplicate computed props |
+| `Serie.swift` | P | ✅ HECHO | TitleParseable conformance, removed duplicate computed props |
+| `DownloadItem.swift` | P | ✅ HECHO | Removed duplicate MediaType enum |
+| `MediaCardViewUtilities.swift` | P | ✅ HECHO | Removed duplicate year/formattedTitle extensions |
+| `MediaListView.swift` | 3.2 | ✅ HECHO | fullScreenCover + macOS sheet → MediaDetailSheet |
+| `MediaListViewModel.swift` | 4.3 | ✅ HECHO | Uses getCachedMoviesSWR/getCachedSeriesSWR, only refreshes when stale |
+| `MediaDetailViewModel.swift` | 4.4 | ✅ HECHO | Uses loadFromCacheSWR, removed getCacheAge helper |
+| `MovieDetailViewModel.swift` | 4.5 | ✅ HECHO | Uses getCachedMovieDetailSWR, cleaned debug prints |
+| `SerieDetailViewModel.swift` | 4.6 | ✅ HECHO | Uses getCachedSerieDetailSWR |
+| `CacheManager.swift` | 4.1-4.8 | ✅ HECHO | CacheTTL, CacheResult, SWR generics, stats, per-type clear |
+| `CacheDebugView.swift` | 4.9 | ✅ NUEVO | Debug view with stats, entries, type breakdown, controls |
+| `NavigationDestination.swift` | 4.10 | ✅ HECHO | Added .cacheDebug case |
+| `ContentView.swift` | 4.10 | ✅ HECHO | Added CacheDebugView case in sidebar |
+| `SettingsView.swift` | 4.10 | ✅ HECHO | Added cache tab |
 
 ---
 
@@ -1253,10 +1280,10 @@ contentAdvisoryRating, itunesTrackId, confidence
 | 3 | parsedMetadata no cacheado | Decision: mantener computed (regex rapido) | 0.3 | ✅ |
 | 4 | No hay prefetch de metadata | EnrichedMediaStore + prefetchMetadata() | 1.x | ✅ |
 | 5 | Hero banner sin backdrop HD | Usar metadata enriquecida en HeroBanner | 2.1 | ✅ |
-| 6 | Detalle tipo dialogo basico | MediaDetailSheet con tabs y glass | 3.1 | 🔲 |
-| 7 | Download cierra el detalle | Modal in-place sin navegacion | 3.3 | 🔲 |
-| 8 | No hay SWR real en cache | getCacheWithStaleness() generico | 4.x | 🔲 |
-| 9 | No hay glass en detalle | Liquid Glass tabs y background | 5.x | 🔲 |
-| 10 | No hay tab Episodes en series | EpisodeRow + season picker | 6.1 | 🔲 |
+| 6 | Detalle tipo dialogo basico | MediaDetailSheet con tabs y glass | 3.1 | ✅ |
+| 7 | Download cierra el detalle | Modal in-place sin navegacion | 3.3 | ✅ |
+| 8 | No hay SWR real en cache | CacheTTL + CacheResult + getCacheWithStaleness() + CacheDebugView | 4.x | ✅ |
+| 9 | No hay glass en detalle | Liquid Glass tabs y background | 5.x | ✅ parcial (tabs done) |
+| 10 | No hay tab Episodes en series | EpisodeRow + season picker | 6.1 | ✅ |
 | 11 | Requests duplicados | Dedup via inFlightRequests en Store | 1.1 | ✅ |
 | 12 | Serie no tiene tmdbId | Buscar por cleanTitle + year en TMDB | 1.1 | ✅ |

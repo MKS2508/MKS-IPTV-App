@@ -30,6 +30,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
 
     let filePath: String
     let expectedSize: Int64
+    let duration: Double
     private(set) var isComplete = false
 
     private let delegateQueue = DispatchQueue(
@@ -39,8 +40,9 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
     private var pendingRequests: [AVAssetResourceLoadingRequest] = []
     private var pollingTimer: DispatchSourceTimer?
 
-    init(filePath: String, expectedSize: Int64) {
+    init(filePath: String, expectedSize: Int64, duration: Double = 0) {
         self.filePath = filePath
+        self.duration = duration
         // Ensure we always report a non-zero size to AVPlayer.
         // Zero contentLength causes AVPlayer to skip loading entirely.
         if expectedSize > 0 {
@@ -53,7 +55,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         }
         super.init()
         startPolling()
-        print("[TransmuxResourceLoader] Created for \(filePath), expectedSize=\(self.expectedSize)")
+        print("[TransmuxResourceLoader] Created for \(filePath), expectedSize=\(self.expectedSize), duration=\(duration)s")
     }
 
     deinit {

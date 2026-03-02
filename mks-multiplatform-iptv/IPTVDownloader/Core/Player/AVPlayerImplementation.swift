@@ -20,6 +20,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         }
     }
     @Published var isReady: Bool = false
+    @Published var isBuffering: Bool = false
     @Published var error: PlayerError?
     
     private(set) var player: AVPlayer?
@@ -103,7 +104,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 1000)
-        player?.seek(to: cmTime) { [weak self] _ in
+        player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             self?.currentTime = time
         }
     }
@@ -117,6 +118,58 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         )
     }
     
+    /// Replace the current AVPlayer with a completely NEW instance.
+    /// Forces AVPlayer to re-parse the HLS playlist from scratch (EVENT -> VOD transition),
+    /// enabling full duration display and arbitrary seeking.
+    ///
+    /// - Important: `replaceCurrentItem(with:)` does NOT work because AVPlayer's HLS
+    ///   state machine is tied to the AVPlayer instance, not the AVPlayerItem. When
+    ///   AVPlayer first loads an EVENT playlist (no ENDLIST), it internally classifies
+    ///   the stream as "live/sliding" and `replaceCurrentItem` doesn't reset this.
+    ///   Only creating a NEW AVPlayer forces a fresh HLS playlist parse.
+    func reloadCurrentItem() {
+        guard let currentItem = playerItem,
+              let urlAsset = currentItem.asset as? AVURLAsset else { return }
+
+        let position = player?.currentTime() ?? .zero
+        let wasPlaying = rate > 0
+
+        print("[AVPlayerImplementation] Reloading with NEW AVPlayer instance — URL: \(urlAsset.url)")
+        print("[AVPlayerImplementation] Current position: \(position.seconds)s, wasPlaying: \(wasPlaying)")
+
+        // Tear down old observers
+        if let timeObserver = timeObserver {
+            player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        NotificationCenter.default.removeObserver(self)
+        cancellables.removeAll()
+
+        // Create NEW AVPlayer and AVPlayerItem — forces fresh HLS playlist parse
+        // This is the key: replaceCurrentItem(with:) doesn't reset HLS state machine
+        playerItem = AVPlayerItem(url: urlAsset.url)
+        player = AVPlayer(playerItem: playerItem)
+        player?.volume = volume
+        player?.automaticallyWaitsToMinimizeStalling = false
+
+        print("[AVPlayerImplementation] New AVPlayer created, re-attaching observers...")
+
+        // Re-attach observers to new player/item
+        setupObservers()
+
+        // Restore position and playback state
+        if position.seconds > 0 {
+            player?.seek(to: position, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+                print("[AVPlayerImplementation] Seek to \(position.seconds)s complete, resuming: \(wasPlaying)")
+                if wasPlaying {
+                    self?.play()
+                }
+            }
+        } else if wasPlaying {
+            play()
+        }
+    }
+
     // MARK: - Private Methods
     private func setupObservers() {
         // Observe player item status
@@ -125,8 +178,10 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 switch status {
                 case .readyToPlay:
                     self?.isReady = true
-                    self?.duration = self?.playerItem?.duration.seconds ?? 0
-                    print("[AVPlayerImplementation] Ready to play, duration: \(self?.duration ?? 0)")
+                    let dur = self?.playerItem?.duration.seconds ?? 0
+                    let isIndefinite = self?.playerItem?.duration.isIndefinite ?? false
+                    self?.duration = dur
+                    print("[AVPlayerImplementation] Ready to play, duration: \(dur)s, indefinite: \(isIndefinite)")
                 case .failed:
                     if let error = self?.playerItem?.error {
                         self?.error = .unknown(error)
@@ -164,6 +219,25 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Observe buffering state via timeControlStatus
+        player?.publisher(for: \.timeControlStatus)
+            .sink { [weak self] status in
+                guard let self else { return }
+                switch status {
+                case .waitingToPlayAtSpecifiedRate:
+                    let reason = self.player?.reasonForWaitingToPlay
+                    self.isBuffering = true
+                    print("[AVPlayerImplementation] Buffering — reason: \(reason?.rawValue ?? "unknown")")
+                case .playing:
+                    self.isBuffering = false
+                case .paused:
+                    self.isBuffering = false
+                @unknown default:
+                    break
+                }
+            }
+            .store(in: &cancellables)
+
         // Observe errors
         playerItem?.publisher(for: \.error)
             .compactMap { $0 }

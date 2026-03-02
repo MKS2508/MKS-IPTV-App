@@ -18,6 +18,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var volume: Float = 1.0
     @Published var rate: Float = 1.0
     @Published var isReady: Bool = false
+    @Published var isBuffering: Bool = false
     @Published var error: PlayerError?
 
     private var avPlayer: AVPlayerImplementation?
@@ -78,16 +79,33 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 let serverSession = try await TransmuxServer.shared.start(
                     filePath: session.outputPath,
                     playlistPath: session.playlistPath,
-                    expectedSize: effectiveSize
+                    expectedSize: effectiveSize,
+                    segmenter: session.segmenter,
+                    initSegmentSize: session.initSegmentSize,
+                    seekHandle: session.seekHandle
                 )
 
-                // Step 3: Load the HLS playlist URL — AVPlayer handles HLS natively
+                // Step 3: Load the HLS playlist URL — AVPlayer handles HLS natively.
+                // The playlist is VOD+ENDLIST from the start, so AVPlayer sees full
+                // duration immediately and allows seeking to any position.
                 let hlsURL = serverSession.localURL
-                print("[FFmpegPlayer] Loading HLS playlist: \(hlsURL)")
+                print("[FFmpegPlayer] Loading VOD HLS playlist: \(hlsURL)")
                 self.isTransmuxing = false
                 self.avPlayer = AVPlayerImplementation()
                 self.avPlayer?.load(url: hlsURL)
                 self.setupBindings()
+
+                // Observe transmux completion for logging/cleanup only.
+                // No reloadAsVOD needed — playlist is already VOD from the start.
+                NotificationCenter.default.publisher(for: .transmuxDidComplete)
+                    .compactMap { $0.object as? String }
+                    .filter { [weak self] id in id == self?.transmuxSessionID }
+                    .first()
+                    .receive(on: DispatchQueue.main)
+                    .sink { _ in
+                        print("[FFmpegPlayer] Transmux complete — sequential transmux finished (VOD playlist was already active)")
+                    }
+                    .store(in: &self.cancellables)
 
                 // Step 4: Auto-play to trigger AVPlayer buffering
                 print("[FFmpegPlayer] Auto-playing to trigger buffering...")
@@ -118,6 +136,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             Task {
                 await TransmuxingService.shared.cancelTransmux(sessionID: sessionID)
                 await TransmuxServer.shared.stop()
+                await TransmuxingService.shared.cleanup(sessionID: sessionID)
             }
             transmuxSessionID = nil
         }
@@ -161,6 +180,9 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         avPlayer.$error
             .assign(to: &$error)
+
+        avPlayer.$isBuffering
+            .assign(to: &$isBuffering)
 
         $volume
             .sink { [weak avPlayer] volume in
@@ -207,7 +229,16 @@ fileprivate struct FFmpegPlayerContentView: View {
                 }
             }
         } else if let innerView = player.innerPlayerView() {
-            innerView
+            ZStack {
+                innerView
+                if player.isBuffering {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+            }
         } else {
             ZStack {
                 Color.black

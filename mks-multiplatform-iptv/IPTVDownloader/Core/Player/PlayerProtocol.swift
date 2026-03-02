@@ -26,7 +26,10 @@ protocol VideoPlayerProtocol: ObservableObject {
     
     /// Current error if any
     var error: PlayerError? { get }
-    
+
+    /// Whether the player is currently buffering (waiting for data to resume playback)
+    var isBuffering: Bool { get }
+
     /// Progress publisher for UI updates
     var progressPublisher: AnyPublisher<Double, Never> { get }
     
@@ -57,6 +60,7 @@ protocol VideoPlayerProtocol: ObservableObject {
 
 extension VideoPlayerProtocol {
     var underlyingAVPlayer: AVPlayer? { nil }
+    var isBuffering: Bool { false }
 }
 
 // MARK: - Player Errors

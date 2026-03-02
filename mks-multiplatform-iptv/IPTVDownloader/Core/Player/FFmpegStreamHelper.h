@@ -80,6 +80,32 @@ int mks_bsf_filter_packet(void * _Nonnull bsfCtx, void * _Nonnull pkt);
 /// Free a BSF context created by mks_bsf_create_aac_adtstoasc.
 void mks_bsf_free(void * _Nullable bsfCtx);
 
+// --- Seek support ---
+
+/// Flush the input demuxer's internal buffers after a seek.
+/// Clears stale PES packets so av_read_frame returns fresh data.
+/// @param fmtCtx  INPUT format context (the demuxer)
+void mks_format_flush_input(void * _Nonnull fmtCtx);
+
+/// Flush BSF internal state after a seek.
+/// Sends NULL to drain any partial ADTS frames from before the seek.
+/// @param bsfCtx  BSF context (opaque pointer from mks_bsf_create_aac_adtstoasc)
+void mks_bsf_flush(void * _Nullable bsfCtx);
+
+/// Check if a packet has the KEY_FRAME flag set.
+/// @return 1 if keyframe, 0 otherwise
+int mks_packet_is_keyframe(const void * _Nonnull pkt);
+
+/// Add an offset to packet DTS and PTS for timestamp rebasing.
+/// Skips AV_NOPTS_VALUE timestamps.
+void mks_packet_adjust_ts(void * _Nonnull pkt, int64_t dtsOffset);
+
+/// Get packet DTS. Returns AV_NOPTS_VALUE if not set.
+int64_t mks_packet_get_dts(const void * _Nonnull pkt);
+
+/// Get packet PTS. Returns AV_NOPTS_VALUE if not set.
+int64_t mks_packet_get_pts(const void * _Nonnull pkt);
+
 // --- Diagnostics ---
 
 /// Print struct layout info and pointer chain for a stream.

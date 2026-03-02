@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05CF93D92F50E665006EBEDE /* KSPlayer */; };
 		05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05DB74D52F47CB3900547E01 /* KSPlayer */; };
 /* End PBXBuildFile section */
 
@@ -54,6 +55,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */,
+				05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -530,6 +532,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		05CF93D92F50E665006EBEDE /* KSPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;
+			productName = KSPlayer;
+		};
 		05DB74D52F47CB3900547E01 /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;

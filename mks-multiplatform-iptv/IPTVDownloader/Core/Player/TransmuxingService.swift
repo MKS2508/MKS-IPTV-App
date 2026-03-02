@@ -39,14 +39,21 @@ struct ProgressiveTransmuxSession {
     let playlistPath: String
     let expectedSize: Int64
     let duration: Double
+    let segmenter: HLSSegmenter
+    let initSegmentSize: Int64
+    let seekHandle: ActiveTransmux
 }
 
 // MARK: - Active Transmux Handle
 
-/// Thread-safe cancellation handle for an in-progress transmux.
-private class ActiveTransmux {
+/// Thread-safe cancellation and seek handle for an in-progress transmux.
+/// The seek signal allows TransmuxServer to redirect the sequential transmux
+/// to a new input position without creating a separate FFmpeg output context.
+class ActiveTransmux {
     private let lock = NSLock()
     private var _cancelled = false
+    private var _seekRequest: Double? = nil
+    private var _lastSeekTarget: Double?
     var segmenter: HLSSegmenter?
 
     var isCancelled: Bool {
@@ -55,12 +62,49 @@ private class ActiveTransmux {
         return _cancelled
     }
 
+    /// The most recent seek target time (source seconds).
+    /// Used by TransmuxServer to decide whether to wait for sequential data
+    /// instead of triggering a new seek for nearby segments.
+    var lastSeekTarget: Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        return _lastSeekTarget
+    }
+
     func cancel() {
         lock.lock()
         _cancelled = true
         lock.unlock()
         segmenter?.stop()
     }
+
+    /// Request the remux loop to seek the INPUT to a new time (non-blocking).
+    /// The output context stays the same, so all moof+mdat remain compatible.
+    func requestSeek(to timeSeconds: Double) {
+        lock.lock()
+        _seekRequest = timeSeconds
+        _lastSeekTarget = timeSeconds
+        lock.unlock()
+        print("[ActiveTransmux] Seek requested to \(String(format: "%.1f", timeSeconds))s")
+    }
+
+    /// Consume a pending seek request (called by the remux loop).
+    /// Returns the requested time in seconds, or nil if no seek is pending.
+    func consumeSeekRequest() -> Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let req = _seekRequest else { return nil }
+        _seekRequest = nil
+        return req
+    }
+}
+
+// MARK: - Transmux Completion Notification
+
+extension Notification.Name {
+    /// Posted when a transmux session completes successfully.
+    /// The notification's `object` is the session ID (`String`).
+    static let transmuxDidComplete = Notification.Name("com.mks.iptv.transmuxDidComplete")
 }
 
 // MARK: - Transmuxing Service
@@ -304,6 +348,15 @@ actor TransmuxingService {
         }
         print("[TransmuxingService] Mapped \(outputStreamIndex) output stream(s)")
 
+        // Set the overall container duration for seeking support during progressive transmux.
+        // This allows AVPlayer to know the duration immediately, enabling seeking.
+        // Note: We set container duration only - stream durations will be derived from it.
+        if durationSeconds > 0 && durationSeconds.isFinite {
+            let containerDuration = Int64(durationSeconds * Double(AV_TIME_BASE))
+            outCtx.pointee.duration = containerDuration
+            print("[TransmuxingService] Set container duration: \(containerDuration) (\(durationSeconds)s)")
+        }
+
         // --- Create aac_adtstoasc BSF for AAC audio from MPEG-TS ---
         // MPEG-TS wraps AAC in ADTS format. The MP4 muxer requires raw AAC (ASC).
         // The aac_adtstoasc BSF strips ADTS headers, fixing "Malformed AAC bitstream".
@@ -323,6 +376,8 @@ actor TransmuxingService {
         }
 
         // --- Set fragmented MP4 muxer options ---
+        // Must use empty_moov for progressive streaming - allows writing header before
+        // knowing final sample positions. Without it, FFmpeg can't write a valid moov.
         var options: OpaquePointer?
         av_dict_set(&options, "movflags", "frag_keyframe+empty_moov+default_base_moof", 0)
 
@@ -362,44 +417,131 @@ actor TransmuxingService {
         let headerFileSize = Self.fileSize(at: mp4Path)
         print("[TransmuxingService] Header written and flushed to disk (\(headerFileSize) bytes on disk)")
 
-        // Create HLS segmenter to generate byte-range m3u8 from the growing fMP4
+        // Create HLS segmenter with known duration to generate a VOD playlist upfront
         let playlistPath = outputDir.appendingPathComponent("stream.m3u8").path
         let segmenter = HLSSegmenter(
             fmp4Path: mp4Path,
             playlistPath: playlistPath,
-            initSegmentSize: headerFileSize
+            initSegmentSize: headerFileSize,
+            duration: durationSeconds
         )
         segmenter.start()
         handle.segmenter = segmenter
 
-        print("[TransmuxingService] HLS segmenter started, resuming caller for progressive playback")
+        print("[TransmuxingService] HLS segmenter started with VOD playlist, resuming caller for progressive playback")
 
-        // Resume the continuation: caller gets the session and can start AVPlayer
+        // Resume the continuation: caller gets the session and can start AVPlayer.
+        // Pass the ActiveTransmux handle so TransmuxServer can request seek-redirects.
         let session = ProgressiveTransmuxSession(
             sessionID: sessionID,
             outputPath: mp4Path,
             playlistPath: playlistPath,
             expectedSize: expectedSize,
-            duration: durationSeconds
+            duration: durationSeconds,
+            segmenter: segmenter,
+            initSegmentSize: headerFileSize,
+            seekHandle: handle
         )
         continuation.resume(returning: session)
         continuationResumed = true
 
         // --- Phase 2: Remux loop (continues on this background thread) ---
-        print("[TransmuxingService] Starting remux loop...")
+        TransmuxLog.remux("Starting remux loop (videoOut=\(bestVideo) audioOut=\(bestAudio) streams=\(outputStreamIndex))")
         var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
         var packetCount = 0
         var lastProgressLog = 0
+        var totalSeekCount = 0
+
+        // --- Timestamp rebasing state ---
+        // After each seek, an offset is added to all packet DTS/PTS to maintain
+        // monotonically increasing output timestamps.
+        var dtsRebaseOffset: [Int32: Int64] = [:]
+        var lastWrittenDts: [Int32: Int64] = [:]
+        let AV_NOPTS = Int64(bitPattern: UInt64(0x8000000000000000))
+
+        // After a seek: skip packets until first video keyframe, then compute rebase offsets.
+        var seekPending = false
+        var videoKeyframeReceived = false
+        var streamsNeedingRebase: Set<Int32> = []
+        var skippedPacketsAfterSeek = 0
+
+        // Map output stream index to whether it's the video stream
+        let videoOutputIdx: Int32 = bestVideo >= 0 ? Int32(streamMapping[Int(bestVideo)]) : -1
 
         while !handle.isCancelled {
+            // Check for seek request BEFORE reading next packet.
+            // This redirects the INPUT to a new position while keeping the
+            // SAME output context — all moof+mdat remain compatible with the init segment.
+            // Timestamp rebasing ensures output DTS stays monotonically increasing.
+            //
+            // CRITICAL: Only accept a new seek when the previous seek's rebase is
+            // fully complete (all streams have their offsets). Without this guard,
+            // seeks cascade faster than audio can be rebased, leaving audio at a
+            // stale DTS offset → permanent A/V desync.
+            if !seekPending, let seekTime = handle.consumeSeekRequest() {
+                totalSeekCount += 1
+                let preSeekDts = lastWrittenDts.map { "stream\($0.key)=\($0.value)" }.joined(separator: ", ")
+                TransmuxLog.remux("===== SEEK #\(totalSeekCount) to \(String(format: "%.1f", seekTime))s =====")
+                TransmuxLog.remux("Pre-seek state: packetCount=\(packetCount) lastWrittenDts=[\(preSeekDts)]")
+                TransmuxLog.remux("Pre-seek rebaseOffsets=\(dtsRebaseOffset)")
+
+                // 1. Flush the interleaver queue — writes any buffered packets
+                av_interleaved_write_frame(outCtx, nil)
+                avio_flush(outCtx.pointee.pb)
+                TransmuxLog.remux("Flushed interleaver + AVIO before seek")
+
+                // 2. Flush input demuxer buffers (stale MPEG-TS PES packets)
+                mks_format_flush_input(inCtx)
+
+                // 3. Seek the input — CHECK return value
+                let seekTS = Int64(seekTime * Double(AV_TIME_BASE))
+                let seekRet = av_seek_frame(inCtx, -1, seekTS, AVSEEK_FLAG_BACKWARD)
+                if seekRet < 0 {
+                    TransmuxLog.remux("WARNING: av_seek_frame failed (\(seekRet)), continuing from current position", level: .warn)
+                    continue
+                }
+                TransmuxLog.remux("av_seek_frame OK (ts=\(seekTS), ret=\(seekRet))")
+
+                // 4. Flush AAC BSF state (partial ADTS frames from before seek)
+                if let bsf = aacBsfCtx {
+                    mks_bsf_flush(bsf)
+                    TransmuxLog.remux("AAC BSF flushed")
+                }
+
+                // 5. Set seek-pending: skip until video keyframe, then compute rebase offsets
+                seekPending = true
+                videoKeyframeReceived = false
+                skippedPacketsAfterSeek = 0
+                streamsNeedingRebase = Set(lastWrittenDts.keys)
+                // Also include streams that haven't had any packets yet
+                for i in 0..<Int(outputStreamIndex) {
+                    streamsNeedingRebase.insert(Int32(i))
+                }
+
+                // 6. Notify segmenter with source time for virtual-to-real mapping
+                segmenter.notifySeekDiscontinuity(seekTargetTime: seekTime)
+
+                packetCount = 0  // reset for aggressive flushing after seek
+                TransmuxLog.remux("Seek #\(totalSeekCount) prepared: awaiting keyframe, rebase for \(streamsNeedingRebase.sorted()) streams")
+                continue
+            }
+
+            // Safety valve: if seekPending for too many packets, force-clear to prevent lockout.
+            // This can happen if a stream has no packets after seek (e.g., video-only source).
+            if seekPending && packetCount > 500 {
+                TransmuxLog.remux("WARNING: force-clearing seekPending after \(packetCount) packets (streams still pending: \(streamsNeedingRebase.sorted()))", level: .warn)
+                seekPending = false
+                streamsNeedingRebase.removeAll()
+            }
+
             ret = av_read_frame(inCtx, packet)
             if ret < 0 {
-                print("[TransmuxingService] av_read_frame ended: ret=\(ret) (EOF or error)")
+                TransmuxLog.remux("av_read_frame ended: ret=\(ret) (EOF or error)")
                 break
             }
 
             guard let pkt = packet else {
-                print("[TransmuxingService] Warning: packet became nil, ending remux loop")
+                TransmuxLog.remux("Warning: packet became nil, ending remux loop", level: .warn)
                 break
             }
             let streamIndex = Int(pkt.pointee.stream_index)
@@ -409,12 +551,39 @@ actor TransmuxingService {
             }
 
             let outStreamIdx = Int32(streamMapping[streamIndex])
+            let isVideo = outStreamIdx == videoOutputIdx
+            let rawDtsBefore = mks_packet_get_dts(pkt)
+            let rawPtsBefore = mks_packet_get_pts(pkt)
 
             // Filter AAC audio packets through aac_adtstoasc BSF BEFORE rescaling.
             // The BSF expects packets in the input stream's time_base.
             if let bsf = aacBsfCtx, Int32(streamIndex) == audioInputStreamIndex {
                 let bsfRet = mks_bsf_filter_packet(bsf, pkt)
                 if bsfRet < 0 {
+                    if seekPending {
+                        TransmuxLog.remux("BSF filter failed (ret=\(bsfRet)) during seek-pending, skipping", level: .warn)
+                    }
+                    av_packet_unref(pkt)
+                    packetCount += 1
+                    continue
+                }
+            }
+
+            // --- Keyframe skipping after seek ---
+            // Skip all packets until the first video keyframe arrives.
+            // Also skip audio before video keyframe to prevent A/V desync.
+            if seekPending && !videoKeyframeReceived {
+                skippedPacketsAfterSeek += 1
+                if outStreamIdx == videoOutputIdx {
+                    if mks_packet_is_keyframe(pkt) == 0 {
+                        av_packet_unref(pkt)
+                        packetCount += 1
+                        continue
+                    }
+                    videoKeyframeReceived = true
+                    TransmuxLog.remux("First video KEYFRAME after seek #\(totalSeekCount) at packet \(packetCount), skipped \(skippedPacketsAfterSeek) packets, rawDts=\(rawDtsBefore) rawPts=\(rawPtsBefore)")
+                } else {
+                    // Skip audio until video keyframe is received
                     av_packet_unref(pkt)
                     packetCount += 1
                     continue
@@ -425,9 +594,62 @@ actor TransmuxingService {
             mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
             mks_packet_clear_pos(pkt)
 
+            let rescaledDtsBeforeRebase = mks_packet_get_dts(pkt)
+            let rescaledPtsBeforeRebase = mks_packet_get_pts(pkt)
+
+            // --- Timestamp rebasing after seek ---
+            // Compute rebase offset on first packet per stream after seek.
+            if streamsNeedingRebase.contains(outStreamIdx) {
+                let newDts = mks_packet_get_dts(pkt)
+                if newDts != AV_NOPTS {
+                    let streamLabel = isVideo ? "VIDEO" : "AUDIO"
+                    if let lastDts = lastWrittenDts[outStreamIdx] {
+                        // Make this packet continue monotonically after the last written DTS
+                        let offset = lastDts + 1 - newDts
+                        dtsRebaseOffset[outStreamIdx] = offset
+                        TransmuxLog.remux("REBASE \(streamLabel) stream[\(outStreamIdx)]: lastWrittenDts=\(lastDts) newDts=\(newDts) offset=\(offset) (gap=\(newDts - lastDts))")
+                    } else {
+                        // First packet ever for this stream — no rebase needed
+                        dtsRebaseOffset[outStreamIdx] = 0
+                        TransmuxLog.remux("REBASE \(streamLabel) stream[\(outStreamIdx)]: first packet ever, no rebase (dts=\(newDts))")
+                    }
+                    streamsNeedingRebase.remove(outStreamIdx)
+                    if streamsNeedingRebase.isEmpty {
+                        seekPending = false
+                        TransmuxLog.remux("All streams rebased after seek #\(totalSeekCount), seek handling COMPLETE. offsets=\(dtsRebaseOffset)")
+                    } else {
+                        TransmuxLog.remux("Still waiting for rebase on streams: \(streamsNeedingRebase.sorted())")
+                    }
+                }
+            }
+
+            // Apply rebase offset (persists for all packets after a seek)
+            if let offset = dtsRebaseOffset[outStreamIdx], offset != 0 {
+                mks_packet_adjust_ts(pkt, offset)
+            }
+
+            let rescaledDts = mks_packet_get_dts(pkt)
+            let rescaledPts = mks_packet_get_pts(pkt)
+
+            // Log first few packets after each seek for debugging A/V sync
+            if totalSeekCount > 0 && packetCount < 10 {
+                let streamLabel = isVideo ? "VIDEO" : "AUDIO"
+                let kf = isVideo ? (mks_packet_is_keyframe(pkt) != 0 ? " KF" : "") : ""
+                TransmuxLog.remux(
+                    "POST-SEEK pkt[\(packetCount)] \(streamLabel)\(kf): rawDts=\(rawDtsBefore) rescaledPre=\(rescaledDtsBeforeRebase)/\(rescaledPtsBeforeRebase) final=\(rescaledDts)/\(rescaledPts) offset=\(dtsRebaseOffset[outStreamIdx] ?? 0)"
+                )
+            }
+
             ret = av_interleaved_write_frame(outCtx, pkt)
             if ret < 0 {
-                print("[TransmuxingService] Warning: write_frame error (\(ret)) at packet \(packetCount)")
+                TransmuxLog.remux("write_frame ERROR (\(ret)) at packet \(packetCount), stream=\(outStreamIdx) dts=\(rescaledDts)", level: .error)
+            } else if rescaledDts != AV_NOPTS {
+                // Detect non-monotonic DTS (critical for A/V sync)
+                if let prevDts = lastWrittenDts[outStreamIdx], rescaledDts <= prevDts {
+                    let streamLabel = isVideo ? "VIDEO" : "AUDIO"
+                    TransmuxLog.remux("NON-MONOTONIC DTS \(streamLabel) stream[\(outStreamIdx)]: prev=\(prevDts) curr=\(rescaledDts) delta=\(rescaledDts - prevDts)", level: .error)
+                }
+                lastWrittenDts[outStreamIdx] = rescaledDts
             }
             packetCount += 1
 
@@ -445,7 +667,8 @@ actor TransmuxingService {
             if packetCount / 1000 > lastProgressLog {
                 lastProgressLog = packetCount / 1000
                 let currentSize = Self.fileSize(at: mp4Path)
-                print("[TransmuxingService] Progress: \(packetCount) packets, \(currentSize / 1_048_576) MB on disk")
+                let dtsState = lastWrittenDts.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " ")
+                TransmuxLog.remux("Progress: \(packetCount) packets, \(currentSize / 1_048_576) MB, seeks=\(totalSeekCount), dts=[\(dtsState)]")
             }
         }
 
@@ -458,12 +681,13 @@ actor TransmuxingService {
         }
 
         // --- Finalize ---
+        let finalDtsState = lastWrittenDts.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " ")
         if handle.isCancelled {
-            print("[TransmuxingService] Transmux cancelled for session \(sessionID) after \(packetCount) packets")
+            TransmuxLog.remux("Transmux CANCELLED for session \(sessionID) after \(packetCount) packets, \(totalSeekCount) seeks, finalDts=[\(finalDtsState)]")
         } else {
-            print("[TransmuxingService] Writing trailer...")
+            TransmuxLog.remux("Writing trailer...")
             av_write_trailer(outCtx)
-            print("[TransmuxingService] Transmux complete for session \(sessionID), \(packetCount) packets written")
+            TransmuxLog.remux("Transmux COMPLETE for session \(sessionID), \(packetCount) packets, \(totalSeekCount) seeks, finalDts=[\(finalDtsState)]")
         }
 
         // Finalize HLS segmenter — writes #EXT-X-ENDLIST
@@ -476,6 +700,14 @@ actor TransmuxingService {
         // Notify TransmuxServer
         Task {
             await TransmuxServer.shared.setComplete()
+        }
+
+        // Notify FFmpegPlayerImplementation so it can reload AVPlayerItem as VOD
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .transmuxDidComplete,
+                object: sessionID
+            )
         }
 
         // Cleanup FFmpeg contexts
@@ -492,12 +724,9 @@ actor TransmuxingService {
             }
         }
 
-        // Self-cleanup: remove temp files now that the loop has exited
-        // and all FFmpeg contexts are freed. This is safe because nothing
-        // is reading/writing the output file anymore.
-        Task {
-            await TransmuxingService.shared.cleanup(sessionID: sessionID)
-        }
+        // NOTE: Do NOT self-cleanup here. AVPlayer is still reading the
+        // fMP4 and HLS playlist from disk. Cleanup happens in
+        // FFmpegPlayerImplementation.stop() -> cancelTransmux() -> cleanup().
     }
 
     /// Quick file size check for logging.

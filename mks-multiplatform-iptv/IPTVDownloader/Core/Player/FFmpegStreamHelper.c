@@ -535,6 +535,59 @@ void mks_bsf_free(void *bsfCtx) {
     fprintf(stderr, "[FFmpegHelper] BSF freed\n");
 }
 
+// --- Seek support ---
+
+void mks_format_flush_input(void *fmtCtx) {
+    AVFormatContext *ctx = (AVFormatContext *)fmtCtx;
+    if (!ctx) return;
+
+    int ret = avformat_flush(ctx);
+    fprintf(stderr, "[FFmpegHelper] avformat_flush returned %d\n", ret);
+}
+
+void mks_bsf_flush(void *bsfCtx) {
+    AVBSFContext *ctx = (AVBSFContext *)bsfCtx;
+    if (!ctx) return;
+
+    // av_bsf_flush resets the BSF to its initial state, ready for new packets.
+    // DO NOT use av_bsf_send_packet(NULL) — that puts the BSF into permanent
+    // EOF/drain mode, causing all subsequent audio packets to be rejected with
+    // "A non-NULL packet sent after an EOF".
+    av_bsf_flush(ctx);
+
+    fprintf(stderr, "[FFmpegHelper] BSF flushed after seek\n");
+}
+
+int mks_packet_is_keyframe(const void *pkt) {
+    const AVPacket *p = (const AVPacket *)pkt;
+    if (!p) return 0;
+    return (p->flags & AV_PKT_FLAG_KEY) ? 1 : 0;
+}
+
+void mks_packet_adjust_ts(void *pkt, int64_t dtsOffset) {
+    AVPacket *p = (AVPacket *)pkt;
+    if (!p) return;
+
+    if (p->dts != AV_NOPTS_VALUE) {
+        p->dts += dtsOffset;
+    }
+    if (p->pts != AV_NOPTS_VALUE) {
+        p->pts += dtsOffset;
+    }
+}
+
+int64_t mks_packet_get_dts(const void *pkt) {
+    const AVPacket *p = (const AVPacket *)pkt;
+    if (!p) return AV_NOPTS_VALUE;
+    return p->dts;
+}
+
+int64_t mks_packet_get_pts(const void *pkt) {
+    const AVPacket *p = (const AVPacket *)pkt;
+    if (!p) return AV_NOPTS_VALUE;
+    return p->pts;
+}
+
 // --- Diagnostics ---
 
 void mks_debug_stream_layout(const void *fmtCtx, int streamIndex) {

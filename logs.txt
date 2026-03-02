@@ -55,27 +55,39 @@ TouchBar: TouchBar created successfully
 ✅ Fetched 732 channels successfully
 📊 Channels sorted by added date
 🏁 Channel loading completed
-[EPGService] Fetching EPG from https://raw.githubusercontent.com/davidmuma/EPG_dobleM/master/guiatv.xml...
-[EPGService] Downloaded 32.4 MB
-[EPGService] Parsed EPG: 647 channels, 14627 programmes
-[Debug Stream] 13:44:52.450 🔄 Loading Movies...
-[Debug Stream] 13:44:56.151 ✅ Loaded 10 movies
+[EPGService] Loaded EPG from disk cache (647 channels, 14545 programmes)
+[EPGMatchingService] Loaded cached match table: 397 entries
+[EPGService] Match table loaded from cache (397 entries)
+[AppDataLoader] EPG loaded in background. Matched channels: 397
+nw_connection_copy_protocol_metadata_internal_block_invoke [C5] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_protocol_metadata_internal_block_invoke [C5] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_protocol_metadata_internal_block_invoke [C5] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_connected_local_endpoint_block_invoke [C5] Client called nw_connection_copy_connected_local_endpoint on unconnected nw_connection
+nw_connection_copy_connected_remote_endpoint_block_invoke [C5] Client called nw_connection_copy_connected_remote_endpoint on unconnected nw_connection
+nw_connection_copy_protocol_metadata_internal_block_invoke [C6] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_protocol_metadata_internal_block_invoke [C6] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_protocol_metadata_internal_block_invoke [C6] Client called nw_connection_copy_protocol_metadata_internal on unconnected nw_connection
+nw_connection_copy_connected_local_endpoint_block_invoke [C6] Client called nw_connection_copy_connected_local_endpoint on unconnected nw_connection
+nw_connection_copy_connected_remote_endpoint_block_invoke [C6] Client called nw_connection_copy_connected_remote_endpoint on unconnected nw_connection
+[HomeViewModel] Inserted 2 EPG sections
+[Debug Stream] 22:39:56.179 🔄 Loading Movies...
+[Debug Stream] 22:39:58.032 ✅ Loaded 10 movies
 Unable to obtain a task name port right for pid 422: (os/kern) failure (0x5)
-[Debug Stream] 13:45:05.535 Forcing FFmpeg Transmuxer for "Álex Palou, a fondo (2026) 1080p"
-[Debug Stream] 13:45:07.127 Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 1507ms | redirected
-[Debug Stream] 13:45:08.148 Resolved redirect → 89.34.226.233:8080
-[Debug Stream] 13:45:08.149 URL is long (904 chars) — using proxy
+[Debug Stream] 22:40:02.705 Forcing FFmpeg Transmuxer for "Álex Palou, a fondo (2026) 1080p"
+[Debug Stream] 22:40:06.602 Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 3733ms | redirected
+[Debug Stream] 22:40:07.645 Resolved redirect → 89.34.226.233:8080
+[Debug Stream] 22:40:07.645 URL is long (904 chars) — using proxy
 [StreamProxy] Started streaming proxy session #0 on port 9100
 [StreamProxy]   Local:   http://localhost:9100/0
-[StreamProxy]   Backend: http://89.34.226.233:8080/play/vod/eyJpdiI6Ik9JeWxjcmNQbUc0QVlGY0lPWkZJeXc9PSIsI...
+[StreamProxy]   Backend: http://89.34.226.233:8080/play/vod/eyJpdiI6IkJUR25TeG9UcWFIU0p2ekNZVW9hQWc9PSIsI...
 [StreamProxy] NWListener ready on port 9100
-[Debug Stream] 13:45:08.195 Proxy started: http://localhost:9100/0
+[Debug Stream] 22:40:07.708 Proxy started: http://localhost:9100/0
 [FFmpegPlayer] Loading URL: http://localhost:9100/0
-[Debug Stream] 13:45:08.197 Playback started with FFmpeg Transmuxer
-tcp_input [C9.1.1:2] flags=[R] seq=2133607770, ack=0, win=0 state=LAST_ACK rcv_nxt=2133607770, snd_una=151652267
+[Debug Stream] 22:40:07.710 Playback started with FFmpeg Transmuxer
 [StreamProxy] Connection accepted
 [StreamProxy] HEAD /0 Range: none
 [StreamProxy] HEAD -> HTTP 200
+nw_path_necp_check_for_updates Failed to copy updated result (22)
 [StreamProxy] Connection accepted
 [StreamProxy] GET /0 Range: bytes=0-1023
 [StreamProxy] GET forwarding Range: bytes=0-1023
@@ -85,10 +97,10 @@ tcp_input [C9.1.1:2] flags=[R] seq=2133607770, ack=0, win=0 state=LAST_ACK rcv_n
 [StreamProxy]   Content-Range: bytes 0-1023/1969521907
 [StreamProxy] Backend transfer completed (1024 bytes sent)
 [StreamProxy] Backend cancelled (1024 bytes sent to client)
-[FFmpegPlayer] Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 273ms
-[TransmuxingService] Starting progressive transmux session CF0CB7FE-263E-4059-BE69-3E3FA512A782
+[FFmpegPlayer] Preflight: HTTP 206 | video/x-matroska | 1.97 GB | 960ms
+[TransmuxingService] Starting progressive transmux session A8646310-CBC5-41DA-94BA-152B4E94DE2B
 [TransmuxingService] Input: http://localhost:9100/0
-[TransmuxingService] Output dir: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782
+[TransmuxingService] Output dir: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-A8646310-CBC5-41DA-94BA-152B4E94DE2B
 [StreamProxy] Connection accepted
 [StreamProxy] GET /0 Range: bytes=0-
 [StreamProxy] GET forwarding Range: bytes=0-
@@ -105,14 +117,18 @@ tcp_input [C9.1.1:2] flags=[R] seq=2133607770, ack=0, win=0 state=LAST_ACK rcv_n
 [StreamProxy]   Content-Range: bytes 1969521246-1969521906/1969521907
 [StreamProxy] Backend transfer completed (661 bytes sent)
 [StreamProxy] Backend cancelled (661 bytes sent to client)
-nw_socket_handle_socket_event [C16:1] Socket SO_ERROR [54: Connection reset by peer]
-nw_write_request_report [C16] Send failed with error "Broken pipe"
-nw_write_request_report [C16] Send failed with error "Broken pipe"
-nw_write_request_report [C16] Send failed with error "Broken pipe"
-[StreamProxy] Backend cancelled (970811 bytes sent to client)
-nw_write_request_report [C16] Send failed with error "Broken pipe"
-nw_protocol_socket_reset_linger [C16:1] setsockopt SO_LINGER failed [22: Invalid argument]
+nw_socket_handle_socket_event [C19:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_protocol_socket_reset_linger [C19:1] setsockopt SO_LINGER failed [22: Invalid argument]
+nw_flow_add_write_request [C19 ::1.62506 failed socket-flow (satisfied (Path is satisfied), viable, interface: lo0, scoped)] cannot accept write requests
+nw_write_request_report [C19] Send failed with error "Socket is not connected"
+nw_flow_add_write_request [C19 ::1.62506 failed socket-flow (satisfied (Path is satisfied), viable, interface: lo0, scoped)] cannot accept write requests
+nw_write_request_report [C19] Send failed with error "Socket is not connected"
+nw_flow_add_write_request [C19 ::1.62506 failed socket-flow (satisfied (Path is satisfied), viable, interface: lo0, scoped)] cannot accept write requests
+nw_write_request_report [C19] Send failed with error "Socket is not connected"
+nw_flow_add_write_request [C19 ::1.62506 failed socket-flow (satisfied (Path is satisfied), viable, interface: lo0, scoped)] cannot accept write requests
+nw_write_request_report [C19] Send failed with error "Socket is not connected"
 [StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[StreamProxy] Backend cancelled (816379 bytes sent to client)
 [StreamProxy] Connection accepted
 [StreamProxy] GET /0 Range: bytes=32732-
 [StreamProxy] GET forwarding Range: bytes=32732-
@@ -121,7 +137,11 @@ nw_protocol_socket_reset_linger [C16:1] setsockopt SO_LINGER failed [22: Invalid
 [StreamProxy]   Content-Length: 1969489175
 [StreamProxy]   Content-Range: bytes 32732-1969521906/1969521907
 [TransmuxingService] avformat_open_input OK, nb_streams=3
-;35m[matroska,webm @ 0x7f2826800] m;33mCould not find codec parameters for stream 2 (Video: png, none): unspecified size
+tcp_input [C4.1.2.1:3] flags=[R] seq=1161348322, ack=0, win=0 state=LAST_ACK rcv_nxt=1161348322, snd_una=3771177107
+tcp_input [C4.1.2.1:3] flags=[R] seq=1161348322, ack=0, win=0 state=CLOSED rcv_nxt=1161348322, snd_una=3771177107
+tcp_input [C7.1.1.1:3] flags=[R] seq=3632041094, ack=0, win=0 state=LAST_ACK rcv_nxt=3632041094, snd_una=301924919
+tcp_input [C7.1.1.1:3] flags=[R] seq=3632041094, ack=0, win=0 state=CLOSED rcv_nxt=3632041094, snd_una=301924919
+;35m[matroska,webm @ 0xbf3ff5900] m;33mCould not find codec parameters for stream 2 (Video: png, none): unspecified size
 Consider increasing the value for the 'analyzeduration' (30000000) and 'probesize' (33554432) options
 mInput #0, matroska,webm, from 'http://localhost:9100/0':
   Metadata:
@@ -156,44 +176,51 @@ mInput #0, matroska,webm, from 'http://localhost:9100/0':
 [TransmuxingService] Duration: 3076.4s, bitrate: 5121600bps, expectedSize: 2008911953
 [TransmuxingService] Best streams: video=0 audio=1
 [FFmpegHelper] detect_field_shifts: nb_streams=3 header codecpar_off=16 codec_type_off=0
-[FFmpegHelper] AVStream[0] ptr at off 16 (header) = 0x7f29df6c0
-[FFmpegHelper] candidate raw: 000000001b000000 0000000000000000 80f1c5e307000000 3500000000000000 
+[FFmpegHelper] AVStream[0] ptr at off 16 (header) = 0xbf75db3c0
+[FFmpegHelper] candidate raw: 000000001b000000 0000000000000000 80ba9cf30b000000 3500000000000000 
 [FFmpegHelper] validate_codecpar(cp_shift=0): ct_off=0 codec_type=0 codec_id=27
 [FFmpegHelper] DETECTED via header: stream_shift=0 cp_shift=0
-[FFmpegHelper] output AVStream codecpar: at_off8=0x0 at_off16=0x7f29dcd80 resolved=0x7f29dcd80
-[FFmpegHelper] copy_codecpar: src=0x7f29df6c0 dst=0x7f29dcd80 src_type=0 src_id=27 stream_shift=0 cp_shift=0
+[FFmpegHelper] output AVStream codecpar: at_off8=0x0 at_off16=0xbf75d9980 resolved=0xbf75d9980
+[FFmpegHelper] copy_codecpar: src=0xbf75db3c0 dst=0xbf75d9980 src_type=0 src_id=27 stream_shift=0 cp_shift=0
 [FFmpegHelper] avcodec_parameters_copy returned 0
 [FFmpegHelper] post-copy verify: dst_type=0 dst_id=27
 [FFmpegHelper] avcodec_parameters_copy verified OK
 [TransmuxingService] Mapped video stream[0] -> output[0]
-[FFmpegHelper] output AVStream codecpar: at_off8=0x1 at_off16=0x7f29dce40 resolved=0x7f29dce40
-[FFmpegHelper] copy_codecpar: src=0x7f29df600 dst=0x7f29dce40 src_type=1 src_id=86018 stream_shift=0 cp_shift=0
+[FFmpegHelper] output AVStream codecpar: at_off8=0x1 at_off16=0xbf75d9140 resolved=0xbf75d9140
+[FFmpegHelper] copy_codecpar: src=0xbf75da340 dst=0xbf75d9140 src_type=1 src_id=86018 stream_shift=0 cp_shift=0
 [FFmpegHelper] avcodec_parameters_copy returned 0
 [FFmpegHelper] post-copy verify: dst_type=1 dst_id=86018
 [FFmpegHelper] avcodec_parameters_copy verified OK
 [TransmuxingService] Mapped audio stream[1] -> output[1]
 [TransmuxingService] Mapped 2 output stream(s)
+[TransmuxingService] Set container duration: 3076416000 (3076.416s)
 [FFmpegHelper] aac_adtstoasc BSF created for stream 1
 [TransmuxingService] aac_adtstoasc BSF enabled for audio stream 1
-[TransmuxingService] Opening output: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4
+[TransmuxingService] Opening output: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-A8646310-CBC5-41DA-94BA-152B4E94DE2B/stream.mp4
 [TransmuxingService] Calling avformat_write_header...
 [TransmuxingService] Header written and flushed to disk (1261 bytes on disk)
-[HLSSegmenter] Created: fmp4=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4, playlist=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.m3u8, initSize=1261
+[HLSSegmenter] Created: fmp4=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-A8646310-CBC5-41DA-94BA-152B4E94DE2B/stream.mp4, playlist=/var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-A8646310-CBC5-41DA-94BA-152B4E94DE2B/stream.m3u8, initSize=1261, duration=3076.4s, virtualSegments=513
 [HLSSegmenter] Parsed timescale from moov/trak/mdia/mdhd: 90000
+[HLSSegmenter] Created VOD playlist with 513 segments, duration 3076.4s
 [HLSSegmenter] Started scanning (timescale=90000)
-[TransmuxingService] HLS segmenter started, resuming caller for progressive playback
+[TransmuxingService] HLS segmenter started with VOD playlist, resuming caller for progressive playback
 [TransmuxingService] Starting remux loop...
 [FFmpegPlayer] expectedSize=2008911953, session.expectedSize=2008911953
 [TransmuxServer] Listening on port 8100
-[TransmuxServer] Serving HLS at http://localhost:8100/stream.m3u8 (mp4: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-CF0CB7FE-263E-4059-BE69-3E3FA512A782/stream.mp4)
-[FFmpegPlayer] Loading HLS playlist: http://localhost:8100/stream.m3u8
+[TransmuxServer] Serving HLS at http://localhost:8100/stream.m3u8 (mp4: /var/folders/nx/zwyvf_6j5r53w7jtx6vtxj440000gn/T/mks-iptv-transmux-A8646310-CBC5-41DA-94BA-152B4E94DE2B/stream.mp4)
+[FFmpegPlayer] Loading VOD HLS playlist: http://localhost:8100/stream.m3u8
 [AVPlayerImplementation] Loading URL: http://localhost:8100/stream.m3u8
 [TransmuxingService] Progress: 1000 packets, 6 MB on disk
 [TransmuxingService] Progress: 2000 packets, 12 MB on disk
-[TransmuxingService] Progress: 3000 packets, 19 MB on disk
 [AVPlayerImplementation] Unknown status — itemError=nil, playerError=nil
 [FFmpegPlayer] Auto-playing to trigger buffering...
-AddInstanceForFactory: No factory registered for id <CFUUID 0x7e3c3eca0> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWhileEvaluatingBufferingRateReason
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWhileEvaluatingBufferingRateReason
+[TransmuxingService] Progress: 3000 packets, 19 MB on disk
+AddInstanceForFactory: No factory registered for id <CFUUID 0xbee8a0460> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+[TransmuxServer] GET /stream.m3u8 -> 200 (14504 bytes, VOD+ENDLIST)
+         HALC_ProxyObjectMap.cpp:174   HALC_ProxyObjectMap::_CopyObjectByObjectID: failed to create the local object
+            HALC_ShellDevice.cpp:2673  HALC_ShellDevice::RebuildControlList: couldn't find the control object
 <<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
 <<<< FigStreamPlayer >>>> fpfsi_PausePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29775
 <<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
@@ -201,280 +228,1242 @@ AddInstanceForFactory: No factory registered for id <CFUUID 0x7e3c3eca0> F8BB1C2
 <<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
 <<<< FigStreamPlayer >>>> fpfsi_PausePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29775
 <<<< FigStreamPlayer >>>> fpfsi_ResumePump signalled err=-12860 (kFigPlayerError_ParamErr) (pump is now NULL) at FigPlayer_Stream.m:29801
-[HLSSegmenter] Segment 0: offset=1261, size=1947, duration=0.020s
-[HLSSegmenter] Segment 1: offset=3208, size=335776, duration=1.000s
-[HLSSegmenter] Segment 2: offset=338984, size=602223, duration=1.000s
-[HLSSegmenter] Segment 3: offset=941207, size=647999, duration=1.000s
-[HLSSegmenter] Segment 4: offset=1589206, size=687600, duration=1.000s
-[HLSSegmenter] Segment 5: offset=2276806, size=704935, duration=1.000s
-[HLSSegmenter] Segment 6: offset=2981741, size=732602, duration=1.000s
-[HLSSegmenter] Segment 7: offset=3714343, size=648739, duration=1.000s
-[HLSSegmenter] Segment 8: offset=4363082, size=853211, duration=1.000s
-[HLSSegmenter] Segment 9: offset=5216293, size=1016210, duration=1.000s
-[HLSSegmenter] Segment 10: offset=6232503, size=857088, duration=1.000s
-[HLSSegmenter] Segment 11: offset=7089591, size=628905, duration=1.000s
-[HLSSegmenter] Segment 12: offset=7718496, size=634284, duration=1.000s
-[HLSSegmenter] Segment 13: offset=8352780, size=572133, duration=1.000s
-[HLSSegmenter] Segment 14: offset=8924913, size=644634, duration=1.000s
-[HLSSegmenter] Segment 15: offset=9569547, size=765287, duration=1.000s
-[HLSSegmenter] Segment 16: offset=10334834, size=707444, duration=1.000s
-[HLSSegmenter] Segment 17: offset=11042278, size=557366, duration=1.000s
-[HLSSegmenter] Segment 18: offset=11599644, size=592553, duration=1.000s
-[HLSSegmenter] Segment 19: offset=12192197, size=610516, duration=1.000s
-[HLSSegmenter] Segment 20: offset=12802713, size=593541, duration=1.000s
-[HLSSegmenter] Segment 21: offset=13396254, size=572537, duration=1.000s
-[HLSSegmenter] Segment 22: offset=13968791, size=549603, duration=1.000s
-[HLSSegmenter] Segment 23: offset=14518394, size=697473, duration=1.000s
-[HLSSegmenter] Segment 24: offset=15215867, size=581355, duration=1.000s
-[HLSSegmenter] Segment 25: offset=15797222, size=544561, duration=1.000s
-[HLSSegmenter] Segment 26: offset=16341783, size=603507, duration=1.000s
-[HLSSegmenter] Segment 27: offset=16945290, size=816200, duration=1.000s
-[HLSSegmenter] Segment 28: offset=17761490, size=754954, duration=1.000s
-[HLSSegmenter] Segment 29: offset=18516444, size=657769, duration=1.000s
-[HLSSegmenter] Segment 30: offset=19174213, size=775926, duration=1.000s
-[HLSSegmenter] Segment 31: offset=19950139, size=738240, duration=1.000s
-[HLSSegmenter] Segment 32: offset=20688379, size=695756, duration=1.000s
-[TransmuxServer] Playlist ready after 1 polls (2078 bytes)
-[TransmuxServer] GET /stream.m3u8 -> 200 (2078 bytes)
 <<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (boss is not initialized) at FigAlternateSelectionBoss.c:1053
-[TransmuxServer] GET 206 bytes=0-1260/2008911953 CL=1261 (file: 22571579, complete=false)
-[TransmuxServer] GET /stream.m3u8 -> 200 (2078 bytes)
+[TransmuxServer] GET /init.mp4 -> 200 (1261 bytes)
+[HLSSegmenter] Segment 0: offset=1261, size=1947, duration=0.020s, srcTime=0.000s, outTime=0.000s
+[HLSSegmenter] Segment 1: offset=3208, size=335776, duration=1.000s, srcTime=0.020s, outTime=0.020s
+[HLSSegmenter] Segment 2: offset=338984, size=602223, duration=1.000s, srcTime=1.020s, outTime=1.020s
+[HLSSegmenter] Segment 3: offset=941207, size=647999, duration=1.000s, srcTime=2.020s, outTime=2.020s
+[HLSSegmenter] Segment 4: offset=1589206, size=687600, duration=1.000s, srcTime=3.020s, outTime=3.020s
+[HLSSegmenter] Segment 5: offset=2276806, size=704935, duration=1.000s, srcTime=4.020s, outTime=4.020s
+[HLSSegmenter] Segment 6: offset=2981741, size=732602, duration=1.000s, srcTime=5.020s, outTime=5.020s
+[HLSSegmenter] Segment 7: offset=3714343, size=648739, duration=1.000s, srcTime=6.020s, outTime=6.020s
+[HLSSegmenter] Segment 8: offset=4363082, size=853211, duration=1.000s, srcTime=7.020s, outTime=7.020s
+[HLSSegmenter] Segment 9: offset=5216293, size=1016210, duration=1.000s, srcTime=8.020s, outTime=8.020s
+[HLSSegmenter] Segment 10: offset=6232503, size=857088, duration=1.000s, srcTime=9.020s, outTime=9.020s
+[HLSSegmenter] Segment 11: offset=7089591, size=628905, duration=1.000s, srcTime=10.020s, outTime=10.020s
+[HLSSegmenter] Segment 12: offset=7718496, size=634284, duration=1.000s, srcTime=11.020s, outTime=11.020s
+[HLSSegmenter] Segment 13: offset=8352780, size=572133, duration=1.000s, srcTime=12.020s, outTime=12.020s
+[HLSSegmenter] Segment 14: offset=8924913, size=644634, duration=1.000s, srcTime=13.020s, outTime=13.020s
+[HLSSegmenter] Segment 15: offset=9569547, size=765287, duration=1.000s, srcTime=14.020s, outTime=14.020s
+[HLSSegmenter] Segment 16: offset=10334834, size=707444, duration=1.000s, srcTime=15.020s, outTime=15.020s
+[HLSSegmenter] Segment 17: offset=11042278, size=557366, duration=1.000s, srcTime=16.020s, outTime=16.020s
+[HLSSegmenter] Segment 18: offset=11599644, size=592553, duration=1.000s, srcTime=17.020s, outTime=17.020s
+[HLSSegmenter] Segment 19: offset=12192197, size=610516, duration=1.000s, srcTime=18.020s, outTime=18.020s
+[HLSSegmenter] Segment 20: offset=12802713, size=593541, duration=1.000s, srcTime=19.020s, outTime=19.020s
+[HLSSegmenter] Segment 21: offset=13396254, size=572537, duration=1.000s, srcTime=20.020s, outTime=20.020s
+[HLSSegmenter] Segment 22: offset=13968791, size=549603, duration=1.000s, srcTime=21.020s, outTime=21.020s
+[HLSSegmenter] Segment 23: offset=14518394, size=697473, duration=1.000s, srcTime=22.020s, outTime=22.020s
+[HLSSegmenter] Segment 24: offset=15215867, size=581355, duration=1.000s, srcTime=23.020s, outTime=23.020s
+[HLSSegmenter] Segment 25: offset=15797222, size=544561, duration=1.000s, srcTime=24.020s, outTime=24.020s
+[HLSSegmenter] Segment 26: offset=16341783, size=603507, duration=1.000s, srcTime=25.020s, outTime=25.020s
+[HLSSegmenter] Segment 27: offset=16945290, size=816200, duration=1.000s, srcTime=26.020s, outTime=26.020s
+[HLSSegmenter] Segment 28: offset=17761490, size=754954, duration=1.000s, srcTime=27.020s, outTime=27.020s
+[HLSSegmenter] Segment 29: offset=18516444, size=657769, duration=1.000s, srcTime=28.020s, outTime=28.020s
+[HLSSegmenter] Segment 30: offset=19174213, size=775926, duration=1.000s, srcTime=29.020s, outTime=29.020s
+[HLSSegmenter] Segment 31: offset=19950139, size=738240, duration=1.000s, srcTime=30.020s, outTime=30.020s
+[HLSSegmenter] Segment 32: offset=20688379, size=695756, duration=1.000s, srcTime=31.020s, outTime=31.020s
+[HLSSegmenter] 33 real segments tracked so far
 <<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=12802713-13396253/2008911953 CL=593541 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=13396254-13968790/2008911953 CL=572537 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=13968791-14518393/2008911953 CL=549603 (file: 22571579, complete=false)
-<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
-metricevent_subscriber pss_didReceiveEvent signalled err=-19772 (kFigMetricEventSubscriberError_InternalError) (variant NULL) at FigMetricEventSubscribers.c:364
+[TransmuxServer] GET /seg_000.mp4 -> 200 (3713082 bytes, from sequential)
 cannot open file at line 51044 of [f0ca7bba1c]
 os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWithNoItemToPlayReason
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingToMinimizeStallsReason
+         HALC_ProxyObjectMap.cpp:174   HALC_ProxyObjectMap::_CopyObjectByObjectID: failed to create the local object
+            HALC_ShellDevice.cpp:2673  HALC_ShellDevice::RebuildControlList: couldn't find the control object
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+metricevent_subscriber pss_didReceiveEvent signalled err=-19772 (kFigMetricEventSubscriberError_InternalError) (variant NULL) at FigMetricEventSubscribers.c:364
+Reporter disconnected. { function=sendMessage, reporterID=262328012505089 }
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET /seg_001.mp4 -> 200 (5371039 bytes, from sequential)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET /seg_002.mp4 -> 200 (4473701 bytes, from sequential)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< URLAsset >>> URLAssetLoadValuesAsyncForTrackProperties signalled err=-12174 (kFigAssetError_TrackNotFound) (Asset has no tracks) at FigAsset_URL.c:2328
+[AVPlayerImplementation] Ready to play, duration: 3076.416s, indefinite: false
+[TransmuxServer] GET /seg_003.mp4 -> 200 (4197578 bytes, from sequential)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET /seg_004.mp4 -> 200 (4734272 bytes, from sequential)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxServer] GET /seg_005.mp4 -> 200 (2209922 bytes, from sequential)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+nw_path_necp_check_for_updates Failed to copy updated result (22)
+[ActiveTransmux] Seek requested to 36.0s
+[TransmuxingService] Seek-redirect to 36.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=1969456720-
+[StreamProxy] GET forwarding Range: bytes=1969456720-
+[HLSSegmenter] Segment 33: offset=21384135, size=662177, duration=1.000s, srcTime=32.020s, outTime=32.020s
+[HLSSegmenter] Segment 34: offset=22046312, size=657444, duration=1.000s, srcTime=33.020s, outTime=33.020s
+[HLSSegmenter] Segment 35: offset=22703756, size=622424, duration=1.000s, srcTime=34.020s, outTime=34.020s
+[HLSSegmenter] 36 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 65187
+[StreamProxy]   Content-Range: bytes 1969456720-1969521906/1969521907
+nw_socket_handle_socket_event [C23:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C23] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (25381544 bytes sent to client)
+nw_write_request_report [C23] Send failed with error "Broken pipe"
+nw_write_request_report [C23] Send failed with error "Broken pipe"
+nw_write_request_report [C23] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C23:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[StreamProxy] Backend transfer completed (65187 bytes sent)
+[StreamProxy] Backend cancelled (65187 bytes sent to client)
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=24359403-
+[StreamProxy] GET forwarding Range: bytes=24359403-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1945162504
+[StreamProxy]   Content-Range: bytes 24359403-1969521906/1969521907
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=23347104-
+[StreamProxy] GET forwarding Range: bytes=23347104-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1946174803
+[StreamProxy]   Content-Range: bytes 23347104-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C45:1] Socket SO_ERROR [54: Connection reset by peer]
+[HLSSegmenter] Segment 36 (flush): offset=23326180, size=758735, duration=0.973s, srcTime=35.020s
+[HLSSegmenter] Seek discontinuity to source 36.0s, 37 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_protocol_socket_reset_linger [C45:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[StreamProxy] Backend cancelled (260964 bytes sent to client)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=3294000 newDts=3151800 offset=142201
+[TransmuxingService] Rebase stream 1: lastDts=1761216 newDts=1681392 offset=79825
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 36.0s -> output 36.020s (offset=0.020)
+[HLSSegmenter] Segment 37: offset=24084915, size=254250, duration=0.580s, srcTime=36.000s, outTime=36.020s
+[HLSSegmenter] Segment 38: offset=24339165, size=757355, duration=1.000s, srcTime=36.580s, outTime=36.600s
+[HLSSegmenter] Segment 39: offset=25096520, size=415899, duration=1.000s, srcTime=37.580s, outTime=37.600s
+[HLSSegmenter] Segment 40: offset=25512419, size=517176, duration=1.000s, srcTime=38.580s, outTime=38.600s
+[HLSSegmenter] 41 real segments tracked so far
+[TransmuxServer] GET seg_006.mp4 -> served after seek-redirect (24 polls)
+[TransmuxServer] GET /seg_006.mp4 -> 200 (1944680 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 42.0s
+[HLSSegmenter] Segment 41: offset=26029595, size=550827, duration=1.000s, srcTime=39.580s, outTime=39.600s
+[HLSSegmenter] 42 real segments tracked so far
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1146.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[TransmuxingService] Seek-redirect to 1146.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=715472826-
+[StreamProxy] GET forwarding Range: bytes=715472826-
+[HLSSegmenter] Segment 42: offset=26580422, size=516754, duration=1.000s, srcTime=40.580s, outTime=40.600s
+[HLSSegmenter] 43 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1254049081
+[StreamProxy]   Content-Range: bytes 715472826-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C47:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C47] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (5150364 bytes sent to client)
+nw_write_request_report [C47] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 43 (flush): offset=27097176, size=547072, duration=0.967s, srcTime=41.580s
+[HLSSegmenter] Seek discontinuity to source 1146.0s, 44 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C47] Send failed with error "Broken pipe"
+nw_write_request_report [C47] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C47:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxServer] GET seg_007.mp4 -> served after seek-redirect (11 polls)
+[TransmuxServer] GET /seg_007.mp4 -> 200 (547072 bytes, from seek-redirect)
+nw_socket_handle_socket_event [C50:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_protocol_socket_reset_linger [C50:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=3909601 newDts=103051800 offset=-99142198
+[TransmuxingService] Rebase stream 1: lastDts=2088865 newDts=54961152 offset=-52872286
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1146.0s -> output 42.600s (offset=-1103.400)
+[HLSSegmenter] Segment 44: offset=27644248, size=538566, duration=0.840s, srcTime=1146.000s, outTime=42.600s
+[HLSSegmenter] Segment 45: offset=28182814, size=563256, duration=1.000s, srcTime=1146.840s, outTime=43.440s
+[HLSSegmenter] 46 real segments tracked so far
+[TransmuxServer] GET seg_191.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_191.mp4 -> 200 (1101822 bytes, from seek-redirect)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1152.0s
+[TransmuxingService] Seek-redirect to 1152.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=719041630-
+[StreamProxy] GET forwarding Range: bytes=719041630-
+[HLSSegmenter] Segment 46: offset=28746070, size=659647, duration=1.000s, srcTime=1147.840s, outTime=44.440s
+[HLSSegmenter] Segment 47: offset=29405717, size=666467, duration=1.000s, srcTime=1148.840s, outTime=45.440s
+[HLSSegmenter] Segment 48: offset=30072184, size=577250, duration=1.000s, srcTime=1149.840s, outTime=46.440s
+[HLSSegmenter] 49 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1250480277
+[StreamProxy]   Content-Range: bytes 719041630-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C53:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_protocol_socket_reset_linger [C53:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[HLSSegmenter] Segment 49 (flush): offset=30649434, size=569040, duration=0.967s, srcTime=1150.840s
+[HLSSegmenter] Seek discontinuity to source 1152.0s, 50 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+[StreamProxy] Backend cancelled (3837995 bytes sent to client)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=4359602 newDts=103591800 offset=-99232197
+[TransmuxingService] Rebase stream 1: lastDts=2328434 newDts=55249920 offset=-52921485
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1152.0s -> output 48.440s (offset=-1103.560)
+[HLSSegmenter] Segment 50: offset=31218474, size=200225, duration=0.000s, srcTime=1152.000s, outTime=48.440s
+[HLSSegmenter] Segment 51: offset=31418699, size=478895, duration=1.000s, srcTime=1152.000s, outTime=48.440s
+[HLSSegmenter] Segment 52: offset=31897594, size=495330, duration=1.000s, srcTime=1153.000s, outTime=49.440s
+[HLSSegmenter] Segment 53: offset=32392924, size=432417, duration=1.000s, srcTime=1154.000s, outTime=50.440s
+[HLSSegmenter] 54 real segments tracked so far
+[TransmuxServer] GET seg_192.mp4 -> served after seek-redirect (14 polls)
+[TransmuxServer] GET /seg_192.mp4 -> 200 (1606867 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1158.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWhileEvaluatingBufferingRateReason
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[HLSSegmenter] Segment 54: offset=32825341, size=583174, duration=1.000s, srcTime=1155.000s, outTime=51.440s
+[HLSSegmenter] 55 real segments tracked so far
+[TransmuxingService] Seek-redirect to 1158.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=722188891-
+[StreamProxy] GET forwarding Range: bytes=722188891-
+[HLSSegmenter] Segment 55: offset=33408515, size=622642, duration=1.000s, srcTime=1156.000s, outTime=52.440s
+[HLSSegmenter] Segment 56: offset=34031157, size=535928, duration=1.000s, srcTime=1157.000s, outTime=53.440s
+[HLSSegmenter] 57 real segments tracked so far
+[TransmuxServer] GET seg_193.mp4 -> served after seek-redirect (8 polls)
+[TransmuxServer] GET /seg_193.mp4 -> 200 (535928 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1164.0s
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1247333016
+[StreamProxy]   Content-Range: bytes 722188891-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C57:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C57] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (4567915 bytes sent to client)
+nw_write_request_report [C57] Send failed with error "Broken pipe"
+nw_write_request_report [C57] Send failed with error "Broken pipe"
+nw_write_request_report [C57] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C57:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[HLSSegmenter] Segment 57 (flush): offset=34567085, size=649115, duration=0.953s, srcTime=1158.000s
+[HLSSegmenter] Seek discontinuity to source 1158.0s, 58 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=4989603 newDts=104131800 offset=-99142196
+[TransmuxingService] Rebase stream 1: lastDts=2663235 newDts=55537680 offset=-52874444
+[TransmuxingService] All streams rebased, seek handling complete
+[TransmuxingService] Seek-redirect to 1164.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=725972624-
+[StreamProxy] GET forwarding Range: bytes=725972624-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1243549283
+[StreamProxy]   Content-Range: bytes 725972624-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 58 (flush): offset=35216200, size=81914, duration=0.953s, srcTime=1158.000s
+[HLSSegmenter] Seek discontinuity to source 1164.0s, 59 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C61:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C61] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (835683 bytes sent to client)
+nw_write_request_report [C61] Send failed with error "Broken pipe"
+nw_write_request_report [C61] Send failed with error "Broken pipe"
+nw_write_request_report [C61] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C61:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C62:2] flags=[R.] seq=1221750773, ack=3363924762, win=65535 state=CLOSED rcv_nxt=3363924762, snd_una=1221750772
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=4989604 newDts=104671800 offset=-99682195
+[TransmuxingService] Rebase stream 1: lastDts=2663236 newDts=55825392 offset=-53162155
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1164.0s -> output 55.440s (offset=-1108.560)
+[HLSSegmenter] Segment 59: offset=35298114, size=194868, duration=0.000s, srcTime=1164.000s, outTime=55.440s
+[HLSSegmenter] 60 real segments tracked so far
+[TransmuxServer] GET seg_194.mp4 -> served after seek-redirect (22 polls)
+[TransmuxServer] GET /seg_194.mp4 -> 200 (194868 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1170.0s
+[TransmuxingService] Seek-redirect to 1170.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=730522601-
+[StreamProxy] GET forwarding Range: bytes=730522601-
+[HLSSegmenter] Segment 60: offset=35492982, size=677143, duration=1.000s, srcTime=1164.000s, outTime=55.440s
+[HLSSegmenter] 61 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1238999306
+[StreamProxy]   Content-Range: bytes 730522601-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C65:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C65] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2780979 bytes sent to client)
+nw_write_request_report [C65] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 61 (flush): offset=36170125, size=871169, duration=0.939s, srcTime=1165.000s
+[HLSSegmenter] Seek discontinuity to source 1170.0s, 62 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C65] Send failed with error "Broken pipe"
+nw_write_request_report [C65] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C65:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=5209205 newDts=105211800 offset=-100002594
+[TransmuxingService] Rebase stream 1: lastDts=2782997 newDts=56113152 offset=-53330154
+[TransmuxingService] All streams rebased, seek handling complete
+Error processing request from MAD on result: Error Domain=NSOSStatusErrorDomain Code=-128 "userCanceledErr" UserInfo={NSLocalizedDescription=Request was canceled} request: <VKCImageAnalyzerRequest: 0xbfa458f00> requestID: 1 madRequestID: 1 cancelled: YES
+Error processing request from MAD on result: Error Domain=NSOSStatusErrorDomain Code=-128 "userCanceledErr" UserInfo={NSLocalizedDescription=Request was canceled} request: <VKCImageAnalyzerRequest: 0xbf78ee200> requestID: 2 madRequestID: 2 cancelled: YES
+[HLSSegmenter] Seek mapping: source 1170.0s -> output 57.440s (offset=-1112.560)
+[HLSSegmenter] Segment 62: offset=37041294, size=416079, duration=0.440s, srcTime=1170.000s, outTime=57.440s
+[HLSSegmenter] Segment 63: offset=37457373, size=628324, duration=1.000s, srcTime=1170.440s, outTime=57.880s
+[HLSSegmenter] Segment 64: offset=38085697, size=727183, duration=1.000s, srcTime=1171.440s, outTime=58.880s
+[HLSSegmenter] Segment 65: offset=38812880, size=734663, duration=1.000s, srcTime=1172.440s, outTime=59.880s
+[HLSSegmenter] 66 real segments tracked so far
+[TransmuxServer] GET seg_195.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_195.mp4 -> 200 (2506249 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1176.0s
+[TransmuxingService] Seek-redirect to 1176.0s
+[FFmpegHelper] avformat_flush returned 0
+[HLSSegmenter] Segment 66: offset=39547543, size=706330, duration=1.000s, srcTime=1173.440s, outTime=60.880s
+[HLSSegmenter] 67 real segments tracked so far
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 67 (flush): offset=40253873, size=555949, duration=0.935s, srcTime=1174.440s
+[HLSSegmenter] Seek discontinuity to source 1176.0s, 68 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=5659206 newDts=105751800 offset=-100092593
+[TransmuxingService] Rebase stream 1: lastDts=3022566 newDts=56401920 offset=-53379353
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1176.0s -> output 62.880s (offset=-1113.120)
+[HLSSegmenter] Segment 68: offset=40809822, size=73311, duration=0.000s, srcTime=1176.000s, outTime=62.880s
+[HLSSegmenter] 69 real segments tracked so far
+[TransmuxServer] GET seg_196.mp4 -> served after seek-redirect (5 polls)
+[TransmuxServer] GET /seg_196.mp4 -> 200 (73311 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1182.0s
+[TransmuxingService] Seek-redirect to 1182.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=738635864-
+[StreamProxy] GET forwarding Range: bytes=738635864-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1230886043
+[StreamProxy]   Content-Range: bytes 738635864-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 69 (flush): offset=40883133, size=544334, duration=0.921s, srcTime=1176.000s
+[HLSSegmenter] Seek discontinuity to source 1182.0s, 70 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C69:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C69] Send failed with error "Broken pipe"
+nw_write_request_report [C69] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (7010067 bytes sent to client)
+nw_write_request_report [C69] Send failed with error "Broken pipe"
+nw_write_request_report [C69] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C69:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=5785207 newDts=106291800 offset=-100506592
+[TransmuxingService] Rebase stream 1: lastDts=3093175 newDts=56689680 offset=-53596504
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1182.0s -> output 63.880s (offset=-1118.120)
+[HLSSegmenter] Segment 70: offset=41427467, size=353659, duration=0.400s, srcTime=1182.000s, outTime=63.880s
+[HLSSegmenter] 71 real segments tracked so far
+[TransmuxServer] GET seg_197.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_197.mp4 -> 200 (353659 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1188.0s
+[TransmuxingService] Seek-redirect to 1188.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=743201629-
+[StreamProxy] GET forwarding Range: bytes=743201629-
+[HLSSegmenter] Segment 71: offset=41781126, size=665947, duration=1.000s, srcTime=1182.400s, outTime=64.280s
+[HLSSegmenter] 72 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1226320278
+[StreamProxy]   Content-Range: bytes 743201629-1969521906/1969521907
+nw_socket_handle_socket_event [C75:1] Socket SO_ERROR [54: Connection reset by peer]
+[FFmpegHelper] BSF flushed after seek
+nw_write_request_report [C75] Send failed with error "Broken pipe"
+nw_write_request_report [C75] Send failed with error "Broken pipe"
+nw_write_request_report [C75] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2140595 bytes sent to client)
+nw_write_request_report [C75] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 72 (flush): offset=42447073, size=633039, duration=0.915s, srcTime=1183.400s
+[HLSSegmenter] Seek discontinuity to source 1188.0s, 73 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_protocol_socket_reset_linger [C75:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=5965208 newDts=106831800 offset=-100866591
+[TransmuxingService] Rebase stream 1: lastDts=3188360 newDts=56977392 offset=-53789031
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1188.0s -> output 66.280s (offset=-1121.720)
+[HLSSegmenter] Segment 73: offset=43080112, size=69021, duration=0.000s, srcTime=1188.000s, outTime=66.280s
+[HLSSegmenter] Segment 74: offset=43149133, size=781883, duration=1.000s, srcTime=1188.000s, outTime=66.280s
+[HLSSegmenter] Segment 75: offset=43931016, size=580960, duration=1.000s, srcTime=1189.000s, outTime=67.280s
+[HLSSegmenter] 76 real segments tracked so far
+[TransmuxServer] GET seg_198.mp4 -> served after seek-redirect (18 polls)
+[TransmuxServer] GET /seg_198.mp4 -> 200 (1431864 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+nw_path_necp_check_for_updates Failed to copy updated result (22)
+[ActiveTransmux] Seek requested to 1194.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1296.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[TransmuxingService] Seek-redirect to 1296.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=814917627-
+[StreamProxy] GET forwarding Range: bytes=814917627-
+Attempting to update all DD element frames, but the bounds or contentsRect are invalid. Bounds: X: 0.00 Y: 0.00, W: 0.00 H: 0.00, contentsRect: X: 0.00 Y: 0.00, W: 1.00 H: 1.00 , skipping
          HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
-Reporter disconnected. { function=sendMessage, reporterID=3938485010433 }
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[AVPlayerImplementation] Ready to play, duration: nan
-[TransmuxServer] GET 206 bytes=14518394-15215866/2008911953 CL=697473 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=15215867-15797221/2008911953 CL=581355 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=15797222-16341782/2008911953 CL=544561 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+Failed to get dominant result for text LID: lidInconclusive
+Visual isTranslatable: NO; not offering translation: lidInconclusive
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1154604280
+[StreamProxy]   Content-Range: bytes 814917627-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C79:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C79] Send failed with error "Broken pipe"
+nw_write_request_report [C79] Send failed with error "Broken pipe"
+nw_write_request_report [C79] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2956083 bytes sent to client)
+nw_write_request_report [C79] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 76 (flush): offset=44511976, size=572303, duration=0.905s, srcTime=1190.000s
+[HLSSegmenter] Seek discontinuity to source 1296.0s, 77 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_protocol_socket_reset_linger [C79:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=6247809 newDts=116551800 offset=-110303990
+[TransmuxingService] Rebase stream 1: lastDts=3339849 newDts=62161920 offset=-58822070
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1296.0s -> output 69.280s (offset=-1226.720)
+[HLSSegmenter] Segment 77: offset=45084279, size=262192, duration=0.140s, srcTime=1296.000s, outTime=69.280s
+[HLSSegmenter] 78 real segments tracked so far
+[TransmuxServer] GET seg_216.mp4 -> served after seek-redirect (16 polls)
+[TransmuxServer] GET /seg_216.mp4 -> 200 (262192 bytes, from seek-redirect)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1302.0s
+[TransmuxingService] Seek-redirect to 1302.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=818893615-
+[StreamProxy] GET forwarding Range: bytes=818893615-
+Failed to get dominant result for text LID: lidInconclusive
+Visual isTranslatable: NO; not offering translation: lidInconclusive
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1150628292
+[StreamProxy]   Content-Range: bytes 818893615-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 78 (flush): offset=45346471, size=643472, duration=0.895s, srcTime=1296.140s
+[HLSSegmenter] Seek discontinuity to source 1302.0s, 79 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C85:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C85] Send failed with error "Broken pipe"
+nw_write_request_report [C85] Send failed with error "Broken pipe"
+nw_write_request_report [C85] Send failed with error "Broken pipe"
+nw_write_request_report [C85] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2464811 bytes sent to client)
+nw_protocol_socket_reset_linger [C85:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C86:2] flags=[R.] seq=610680662, ack=3265502638, win=51705 state=CLOSED rcv_nxt=3265502638, snd_una=610680661
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=6420610 newDts=117091800 offset=-110671189
+[TransmuxingService] Rebase stream 1: lastDts=3434026 newDts=62449680 offset=-59015653
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1302.0s -> output 70.420s (offset=-1231.580)
+[HLSSegmenter] Segment 79: offset=45989943, size=674269, duration=0.920s, srcTime=1302.000s, outTime=70.420s
+[HLSSegmenter] 80 real segments tracked so far
+[TransmuxServer] GET seg_217.mp4 -> served after seek-redirect (20 polls)
+[TransmuxServer] GET /seg_217.mp4 -> 200 (674269 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1308.0s
+[TransmuxingService] Seek-redirect to 1308.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=822675968-
+[StreamProxy] GET forwarding Range: bytes=822675968-
+[HLSSegmenter] Segment 80: offset=46664212, size=722748, duration=1.000s, srcTime=1302.920s, outTime=71.340s
+[HLSSegmenter] 81 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1146845939
+[StreamProxy]   Content-Range: bytes 822675968-1969521906/1969521907
+nw_socket_handle_socket_event [C89:1] Socket SO_ERROR [54: Connection reset by peer]
+[FFmpegHelper] BSF flushed after seek
+nw_write_request_report [C89] Send failed with error "Broken pipe"
+nw_write_request_report [C89] Send failed with error "Broken pipe"
+nw_write_request_report [C89] Send failed with error "Broken pipe"
+nw_write_request_report [C89] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2135123 bytes sent to client)
+[HLSSegmenter] Segment 81 (flush): offset=47386960, size=639792, duration=0.897s, srcTime=1303.920s
+[HLSSegmenter] Seek discontinuity to source 1308.0s, 82 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_protocol_socket_reset_linger [C89:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C90:2] flags=[R.] seq=1584156375, ack=2393498328, win=59580 state=CLOSED rcv_nxt=2393498328, snd_una=1584156374
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=6602411 newDts=117631800 offset=-111029388
+[TransmuxingService] Rebase stream 1: lastDts=3529211 newDts=62737392 offset=-59208180
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1308.0s -> output 73.340s (offset=-1234.660)
+[HLSSegmenter] Segment 82: offset=48026752, size=79722, duration=0.020s, srcTime=1308.000s, outTime=73.340s
+[HLSSegmenter] 83 real segments tracked so far
+[TransmuxServer] GET seg_218.mp4 -> served after seek-redirect (18 polls)
+[TransmuxServer] GET /seg_218.mp4 -> 200 (79722 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1314.0s
+[TransmuxingService] Seek-redirect to 1314.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=826851383-
+[StreamProxy] GET forwarding Range: bytes=826851383-
+[HLSSegmenter] Segment 83: offset=48106474, size=748021, duration=1.000s, srcTime=1308.020s, outTime=73.360s
+[HLSSegmenter] 84 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1142670524
+[StreamProxy]   Content-Range: bytes 826851383-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C93:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C93] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 84 (flush): offset=48854495, size=708242, duration=0.888s, srcTime=1309.020s
+nw_write_request_report [C93] Send failed with error "Broken pipe"
+[HLSSegmenter] Seek discontinuity to source 1314.0s, 85 segments tracked
+nw_write_request_report [C93] Send failed with error "Broken pipe"
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C93] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (2479859 bytes sent to client)
+nw_protocol_socket_reset_linger [C93:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=6823812 newDts=118171800 offset=-111347987
+[TransmuxingService] Rebase stream 1: lastDts=3648972 newDts=63025152 offset=-59376179
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1314.0s -> output 75.360s (offset=-1238.640)
+[HLSSegmenter] Segment 85: offset=49562737, size=351122, duration=0.460s, srcTime=1314.000s, outTime=75.360s
+[HLSSegmenter] Segment 86: offset=49913859, size=726632, duration=1.000s, srcTime=1314.460s, outTime=75.820s
+[HLSSegmenter] 87 real segments tracked so far
+[TransmuxServer] GET seg_219.mp4 -> served after seek-redirect (20 polls)
+[TransmuxServer] GET /seg_219.mp4 -> 200 (1077754 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1320.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1326.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[TransmuxingService] Seek-redirect to 1326.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=836368435-
+[StreamProxy] GET forwarding Range: bytes=836368435-
+[HLSSegmenter] Segment 87: offset=50640491, size=632882, duration=1.000s, srcTime=1315.460s, outTime=76.820s
+[HLSSegmenter] Segment 88: offset=51273373, size=750276, duration=1.000s, srcTime=1316.460s, outTime=77.820s
+[HLSSegmenter] 89 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1133153472
+[StreamProxy]   Content-Range: bytes 836368435-1969521906/1969521907
+nw_socket_handle_socket_event [C97:1] Socket SO_ERROR [54: Connection reset by peer]
+[FFmpegHelper] BSF flushed after seek
+nw_write_request_report [C97] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (5383411 bytes sent to client)
+nw_write_request_report [C97] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 89 (flush): offset=52023649, size=604173, duration=0.887s, srcTime=1317.460s
+[HLSSegmenter] Seek discontinuity to source 1326.0s, 90 segments tracked
+nw_write_request_report [C97] Send failed with error "Broken pipe"
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C97] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C97:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=7245013 newDts=119251800 offset=-112006786
+[TransmuxingService] Rebase stream 1: lastDts=3873181 newDts=63601680 offset=-59728498
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1326.0s -> output 79.820s (offset=-1246.180)
+[HLSSegmenter] Segment 90: offset=52627822, size=486001, duration=0.680s, srcTime=1326.000s, outTime=79.820s
+[HLSSegmenter] 91 real segments tracked so far
+[TransmuxServer] GET seg_221.mp4 -> served after seek-redirect (20 polls)
+[TransmuxServer] GET /seg_221.mp4 -> 200 (486001 bytes, from seek-redirect)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
 nw_path_necp_check_for_updates Failed to copy updated result (22)
-[TransmuxServer] GET 206 bytes=16341783-16945289/2008911953 CL=603507 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=16945290-17761489/2008911953 CL=816200 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=17761490-18516443/2008911953 CL=754954 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=18516444-19174212/2008911953 CL=657769 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=19174213-19950138/2008911953 CL=775926 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=19950139-20688378/2008911953 CL=738240 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=20688379-21384134/2008911953 CL=695756 (file: 22571579, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxingService] Progress: 4000 packets, 25 MB on disk
-[HLSSegmenter] Segment 33: offset=21384135, size=662177, duration=1.000s
-[HLSSegmenter] Segment 34: offset=22046312, size=657444, duration=1.000s
-[HLSSegmenter] Segment 35: offset=22703756, size=622424, duration=1.000s
-[HLSSegmenter] Segment 36: offset=23326180, size=758735, duration=1.000s
-[HLSSegmenter] Segment 37: offset=24084915, size=416112, duration=1.000s
-[HLSSegmenter] Segment 38: offset=24501027, size=517002, duration=1.000s
-[HLSSegmenter] Segment 39: offset=25018029, size=550755, duration=1.000s
-[HLSSegmenter] Segment 40: offset=25568784, size=516545, duration=1.000s
-[HLSSegmenter] Segment 41: offset=26085329, size=547323, duration=1.000s
-[HLSSegmenter] Segment 42: offset=26632652, size=610848, duration=1.000s
-[HLSSegmenter] Segment 43: offset=27243500, size=646286, duration=1.000s
-[HLSSegmenter] Segment 44: offset=27889786, size=639377, duration=1.000s
-[HLSSegmenter] Segment 45: offset=28529163, size=861561, duration=1.000s
-[TransmuxServer] GET /stream.m3u8 -> 200 (2858 bytes)
-[TransmuxServer] GET 206 bytes=21384135-22046311/2008911953 CL=662177 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=22046312-22703755/2008911953 CL=657444 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=22703756-23326179/2008911953 CL=622424 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=23326180-24084914/2008911953 CL=758735 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=24084915-24501026/2008911953 CL=416112 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=24501027-25018028/2008911953 CL=517002 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=25018029-25568783/2008911953 CL=550755 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=25568784-26085328/2008911953 CL=516545 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=26085329-26632651/2008911953 CL=547323 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1332.0s
+[TransmuxingService] Seek-redirect to 1332.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=841105207-
+[StreamProxy] GET forwarding Range: bytes=841105207-
+[HLSSegmenter] Segment 91: offset=53113823, size=818123, duration=1.000s, srcTime=1326.680s, outTime=80.500s
+[HLSSegmenter] Segment 92: offset=53931946, size=794341, duration=1.000s, srcTime=1327.680s, outTime=81.500s
+[HLSSegmenter] 93 real segments tracked so far
+Visual isTranslatable: NO; reason: observation failure: noObservations
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[TransmuxServer] GET /seg_221.mp4 -> 200 (2098465 bytes, from sequential)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[ActiveTransmux] Seek requested to 1332.0s
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1128416700
+[StreamProxy]   Content-Range: bytes 841105207-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C103:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C103] Send failed with error "Broken pipe"
+nw_write_request_report [C103] Send failed with error "Broken pipe"
+nw_write_request_report [C103] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 93 (flush): offset=54726287, size=773610, duration=0.887s, srcTime=1328.680s
+[HLSSegmenter] Seek discontinuity to source 1332.0s, 94 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C103] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (3228155 bytes sent to client)
+nw_protocol_socket_reset_linger [C103:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C104:2] flags=[R.] seq=2494217499, ack=599658207, win=61575 state=CLOSED rcv_nxt=599658207, snd_una=2494217498
+Visual isTranslatable: NO; reason: observation failure: noObservations
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=7536614 newDts=119791800 offset=-112255185
+[TransmuxingService] Rebase stream 1: lastDts=4031822 newDts=63889392 offset=-59857569
+[TransmuxingService] All streams rebased, seek handling complete
+[TransmuxingService] Seek-redirect to 1332.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=841105207-
+[StreamProxy] GET forwarding Range: bytes=841105207-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1128416700
+[StreamProxy]   Content-Range: bytes 841105207-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C107:1] Socket SO_ERROR [54: Connection reset by peer]
+[HLSSegmenter] Segment 94 (flush): offset=55499897, size=252936, duration=0.887s, srcTime=1332.000s
+[HLSSegmenter] Seek discontinuity to source 1332.0s, 95 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_write_request_report [C107] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (868355 bytes sent to client)
+nw_write_request_report [C107] Send failed with error "Broken pipe"
+nw_write_request_report [C107] Send failed with error "Broken pipe"
+nw_write_request_report [C107] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C107:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxServer] GET seg_222.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_222.mp4 -> 200 (252936 bytes, from seek-redirect)
+nw_write_request_report [C106] Send failed with error "Broken pipe"
+nw_socket_handle_socket_event [C106:1] Socket SO_ERROR [54: Connection reset by peer]
+[TransmuxServer] GET seg_222.mp4 -> served after seek-redirect (13 polls)
+[TransmuxServer] GET /seg_222.mp4 -> 200 (252936 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1338.0s
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=7536615 newDts=119791800 offset=-112255184
+[TransmuxingService] Rebase stream 1: lastDts=4031823 newDts=63889392 offset=-59857568
+[TransmuxingService] All streams rebased, seek handling complete
+[TransmuxingService] Seek-redirect to 1338.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=845778319-
+[StreamProxy] GET forwarding Range: bytes=845778319-
+[TransmuxServer] GET seg_199.mp4 -> 404 (seek-redirect timeout after 60 polls, startTime=1194.0s)
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1123743588
+[StreamProxy]   Content-Range: bytes 845778319-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 95 (flush): offset=55752833, size=114803, duration=0.887s, srcTime=1332.000s
+[HLSSegmenter] Seek discontinuity to source 1338.0s, 96 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C113:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C113] Send failed with error "Broken pipe"
+nw_write_request_report [C113] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (910843 bytes sent to client)
+nw_write_request_report [C113] Send failed with error "Broken pipe"
+nw_write_request_report [C113] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C113:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=7536616 newDts=120331800 offset=-112795183
+[TransmuxingService] Rebase stream 1: lastDts=4031824 newDts=64177152 offset=-60145327
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1338.0s -> output 83.740s (offset=-1254.260)
+[HLSSegmenter] Segment 96: offset=55867636, size=114803, duration=0.000s, srcTime=1338.000s, outTime=83.740s
+[HLSSegmenter] Segment 97: offset=55982439, size=773611, duration=1.000s, srcTime=1338.000s, outTime=83.740s
+[HLSSegmenter] 98 real segments tracked so far
+[TransmuxServer] GET seg_223.mp4 -> served after seek-redirect (22 polls)
+[TransmuxServer] GET /seg_223.mp4 -> 200 (888414 bytes, from seek-redirect)
+[ActiveTransmux] Seek requested to 1344.0s
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWhileEvaluatingBufferingRateReason
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingToMinimizeStallsReason
+[TransmuxingService] Seek-redirect to 1344.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=850462730-
+[StreamProxy] GET forwarding Range: bytes=850462730-
+[HLSSegmenter] Segment 98: offset=56756050, size=870433, duration=1.000s, srcTime=1339.000s, outTime=84.740s
+[HLSSegmenter] 99 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1119059177
+[StreamProxy]   Content-Range: bytes 850462730-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 99 (flush): offset=57626483, size=867838, duration=0.880s, srcTime=1340.000s
+[HLSSegmenter] Seek discontinuity to source 1344.0s, 100 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C117:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C117] Send failed with error "Broken pipe"
+nw_write_request_report [C117] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (6023883 bytes sent to client)
+nw_write_request_report [C117] Send failed with error "Broken pipe"
+nw_write_request_report [C117] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C117:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C118:2] flags=[R.] seq=2244643494, ack=1755463373, win=47214 state=CLOSED rcv_nxt=1755463373, snd_una=2244643493
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=7885817 newDts=120871800 offset=-112985982
+[TransmuxingService] Rebase stream 1: lastDts=4223249 newDts=64465920 offset=-60242670
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1344.0s -> output 86.740s (offset=-1257.260)
+[HLSSegmenter] Segment 100: offset=58494321, size=724116, duration=0.880s, srcTime=1344.000s, outTime=86.740s
+[HLSSegmenter] Segment 101: offset=59218437, size=791572, duration=1.000s, srcTime=1344.880s, outTime=87.620s
+[HLSSegmenter] 102 real segments tracked so far
+[TransmuxServer] GET seg_224.mp4 -> served after seek-redirect (23 polls)
+[TransmuxServer] GET /seg_224.mp4 -> 200 (1515688 bytes, from seek-redirect)
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1350.0s
+[TransmuxingService] Seek-redirect to 1350.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=855224229-
+[StreamProxy] GET forwarding Range: bytes=855224229-
+[HLSSegmenter] Segment 102: offset=60010009, size=813193, duration=1.000s, srcTime=1345.880s, outTime=88.620s
+[HLSSegmenter] 103 real segments tracked so far
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1114297678
+[StreamProxy]   Content-Range: bytes 855224229-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 103 (flush): offset=60823202, size=780527, duration=0.883s, srcTime=1346.880s
+[HLSSegmenter] Seek discontinuity to source 1350.0s, 104 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C121:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C121] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (4022995 bytes sent to client)
+nw_write_request_report [C121] Send failed with error "Broken pipe"
+nw_write_request_report [C121] Send failed with error "Broken pipe"
+nw_write_request_report [C121] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C121:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C122:2] flags=[R.] seq=3574887721, ack=1267222068, win=65535 state=CLOSED rcv_nxt=1267222068, snd_una=3574887720
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=8238618 newDts=121411800 offset=-113173181
+[TransmuxingService] Rebase stream 1: lastDts=4413666 newDts=64753680 offset=-60340013
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1350.0s -> output 90.620s (offset=-1259.380)
+[HLSSegmenter] Segment 104: offset=61603729, size=784307, duration=0.920s, srcTime=1350.000s, outTime=90.620s
+[HLSSegmenter] Segment 105: offset=62388036, size=774383, duration=1.000s, srcTime=1350.920s, outTime=91.540s
+[HLSSegmenter] 106 real segments tracked so far
+[TransmuxServer] GET seg_225.mp4 -> served after seek-redirect (19 polls)
+[TransmuxServer] GET /seg_225.mp4 -> 200 (1558690 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1356.0s
+[TransmuxingService] Seek-redirect to 1356.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=858727000-
+[StreamProxy] GET forwarding Range: bytes=858727000-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1110794907
+[StreamProxy]   Content-Range: bytes 858727000-1969521906/1969521907
+nw_socket_handle_socket_event [C125:1] Socket SO_ERROR [54: Connection reset by peer]
+[FFmpegHelper] BSF flushed after seek
+nw_write_request_report [C125] Send failed with error "Broken pipe"
+nw_write_request_report [C125] Send failed with error "Broken pipe"
+nw_write_request_report [C125] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 106 (flush): offset=63162419, size=805895, duration=0.884s, srcTime=1351.920s
+[HLSSegmenter] Seek discontinuity to source 1356.0s, 107 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+[StreamProxy] Backend cancelled (2944979 bytes sent to client)
+nw_write_request_report [C125] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C125:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C126:2] flags=[R.] seq=1938989975, ack=1952879039, win=65535 state=CLOSED rcv_nxt=1952879039, snd_una=1938989974
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=8433019 newDts=121951800 offset=-113518780
+[TransmuxingService] Rebase stream 1: lastDts=4517011 newDts=65041392 offset=-60524380
+[TransmuxingService] All streams rebased, seek handling complete
+[TransmuxServer] GET seg_220.mp4 -> 404 (seek-redirect timeout after 60 polls, startTime=1320.0s)
+[HLSSegmenter] Seek mapping: source 1356.0s -> output 93.540s (offset=-1262.460)
+[HLSSegmenter] Segment 107: offset=63968314, size=212000, duration=0.160s, srcTime=1356.000s, outTime=93.540s
+[HLSSegmenter] Segment 108: offset=64180314, size=374643, duration=1.000s, srcTime=1356.160s, outTime=93.700s
+[HLSSegmenter] 109 real segments tracked so far
+[TransmuxServer] GET seg_226.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_226.mp4 -> 200 (586643 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1362.0s
+[TransmuxingService] Seek-redirect to 1362.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=861585046-
+[StreamProxy] GET forwarding Range: bytes=861585046-
+[HLSSegmenter] Segment 109: offset=64554957, size=383018, duration=1.000s, srcTime=1357.160s, outTime=94.700s
+[HLSSegmenter] 110 real segments tracked so far
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+         HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1107936861
+[StreamProxy]   Content-Range: bytes 861585046-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C129:1] Socket SO_ERROR [54: Connection reset by peer]
+[HLSSegmenter] Segment 110 (flush): offset=64937975, size=486779, duration=0.880s, srcTime=1358.160s
+nw_write_request_report [C129] Send failed with error "Broken pipe"
+[HLSSegmenter] Seek discontinuity to source 1362.0s, 111 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+[StreamProxy] Backend cancelled (2125547 bytes sent to client)
+nw_write_request_report [C129] Send failed with error "Broken pipe"
+nw_write_request_report [C129] Send failed with error "Broken pipe"
+nw_write_request_report [C129] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C129:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C130:2] flags=[R.] seq=3126008157, ack=1048837367, win=56201 state=CLOSED rcv_nxt=1048837367, snd_una=3126008156
+Failed to get dominant result for text LID: lidInconclusive
+Visual isTranslatable: NO; not offering translation: lidInconclusive
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[AVPlayerImplementation] Buffering — reason: AVPlayerWaitingWhileEvaluatingBufferingRateReason
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=8724620 newDts=122491800 offset=-113767179
+[TransmuxingService] Rebase stream 1: lastDts=4676708 newDts=65329152 offset=-60652443
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1362.0s -> output 96.700s (offset=-1265.300)
+[HLSSegmenter] Segment 111: offset=65424754, size=254088, duration=0.240s, srcTime=1362.000s, outTime=96.700s
+[HLSSegmenter] Segment 112: offset=65678842, size=370334, duration=1.000s, srcTime=1362.240s, outTime=96.940s
+[HLSSegmenter] 113 real segments tracked so far
+[TransmuxServer] GET seg_227.mp4 -> served after seek-redirect (20 polls)
+[TransmuxServer] GET /seg_227.mp4 -> 200 (624422 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1368.0s
+[TransmuxingService] Seek-redirect to 1368.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=864332854-
+[StreamProxy] GET forwarding Range: bytes=864332854-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1105189053
+[StreamProxy]   Content-Range: bytes 864332854-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 113 (flush): offset=66049176, size=392945, duration=0.875s, srcTime=1363.240s
+[HLSSegmenter] Seek discontinuity to source 1368.0s, 114 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C133:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C133] Send failed with error "Broken pipe"
+nw_write_request_report [C133] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (1954547 bytes sent to client)
+nw_write_request_report [C133] Send failed with error "Broken pipe"
+nw_write_request_report [C133] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C133:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C134:2] flags=[R.] seq=3193228942, ack=1116774578, win=57132 state=CLOSED rcv_nxt=1116774578, snd_una=3193228941
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=8974821 newDts=123031800 offset=-114056978
+[TransmuxingService] Rebase stream 1: lastDts=4812837 newDts=65617920 offset=-60805082
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1368.0s -> output 98.940s (offset=-1269.060)
+[HLSSegmenter] Segment 114: offset=66442121, size=483181, duration=0.780s, srcTime=1368.000s, outTime=98.940s
+[HLSSegmenter] 115 real segments tracked so far
+[TransmuxServer] GET seg_228.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_228.mp4 -> 200 (483181 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[TransmuxingService] Seek-redirect to 1374.0s
+[ActiveTransmux] Seek requested to 1374.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=867686970-
+[StreamProxy] GET forwarding Range: bytes=867686970-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1101834937
+[StreamProxy]   Content-Range: bytes 867686970-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 115 (flush): offset=66925302, size=585025, duration=0.874s, srcTime=1368.780s
+[HLSSegmenter] Seek discontinuity to source 1374.0s, 116 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C137:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_protocol_socket_reset_linger [C137:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+[StreamProxy] Backend cancelled (2803979 bytes sent to client)
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=9133222 newDts=123571800 offset=-114438577
+[TransmuxingService] Rebase stream 1: lastDts=4899814 newDts=65905680 offset=-61005865
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1374.0s -> output 100.720s (offset=-1273.280)
+[HLSSegmenter] Segment 116: offset=67510327, size=558309, duration=0.760s, srcTime=1374.000s, outTime=100.720s
+[HLSSegmenter] Segment 117: offset=68068636, size=481212, duration=1.000s, srcTime=1374.760s, outTime=101.480s
+[HLSSegmenter] 118 real segments tracked so far
+[TransmuxServer] GET seg_229.mp4 -> served after seek-redirect (18 polls)
+[TransmuxServer] GET /seg_229.mp4 -> 200 (1039521 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1380.0s
+[TransmuxingService] Seek-redirect to 1380.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=870698246-
+[StreamProxy] GET forwarding Range: bytes=870698246-
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1098823661
+[StreamProxy]   Content-Range: bytes 870698246-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+[HLSSegmenter] Segment 118 (flush): offset=68549848, size=553602, duration=0.874s, srcTime=1375.760s
+[HLSSegmenter] Seek discontinuity to source 1380.0s, 119 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_socket_handle_socket_event [C141:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C141] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (1879307 bytes sent to client)
+nw_write_request_report [C141] Send failed with error "Broken pipe"
+nw_write_request_report [C141] Send failed with error "Broken pipe"
+nw_write_request_report [C141] Send failed with error "Broken pipe"
+nw_protocol_socket_reset_linger [C141:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+Failed to get dominant result for text LID: lidInconclusive
+Visual isTranslatable: NO; not offering translation: lidInconclusive
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=9354623 newDts=124111800 offset=-114757176
+[TransmuxingService] Rebase stream 1: lastDts=5019527 newDts=66193392 offset=-61173864
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Seek mapping: source 1380.0s -> output 103.480s (offset=-1276.520)
+[HLSSegmenter] Segment 119: offset=69103450, size=256206, duration=0.460s, srcTime=1380.000s, outTime=103.480s
+[HLSSegmenter] 120 real segments tracked so far
+[TransmuxServer] GET seg_230.mp4 -> served after seek-redirect (17 polls)
+[TransmuxServer] GET /seg_230.mp4 -> 200 (256206 bytes, from seek-redirect)
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
+[ActiveTransmux] Seek requested to 1386.0s
+[TransmuxingService] Seek-redirect to 1386.0s
+[FFmpegHelper] avformat_flush returned 0
+[StreamProxy] Connection accepted
+[StreamProxy] GET /0 Range: bytes=873867146-
+[StreamProxy] GET forwarding Range: bytes=873867146-
+[StreamProxy] Backend responded: HTTP 206
+[StreamProxy]   Content-Type: video/x-matroska
+[StreamProxy]   Content-Length: 1095654761
+[StreamProxy]   Content-Range: bytes 873867146-1969521906/1969521907
+[FFmpegHelper] BSF flushed after seek
+nw_socket_handle_socket_event [C145:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C145] Send failed with error "Broken pipe"
+nw_write_request_report [C145] Send failed with error "Broken pipe"
+nw_write_request_report [C145] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (1403243 bytes sent to client)
+nw_write_request_report [C145] Send failed with error "Broken pipe"
+[HLSSegmenter] Segment 120 (flush): offset=69359656, size=469683, duration=0.871s, srcTime=1380.460s
+[HLSSegmenter] Seek discontinuity to source 1386.0s, 121 segments tracked
+[TransmuxingService] Seek prepared: awaiting keyframe, rebase for 2 streams
+nw_protocol_socket_reset_linger [C145:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C146:2] flags=[R.] seq=2645271209, ack=1491509484, win=65535 state=CLOSED rcv_nxt=1491509484, snd_una=2645271208
+[TransmuxingService] First video keyframe after seek at packet 0
+[TransmuxingService] Rebase stream 0: lastDts=9466224 newDts=124651800 offset=-115185575
+[TransmuxingService] Rebase stream 1: lastDts=5082984 newDts=66481152 offset=-61398167
+[TransmuxingService] All streams rebased, seek handling complete
+[HLSSegmenter] Stopped
+[TransmuxingService] Cancellation requested for session A8646310-CBC5-41DA-94BA-152B4E94DE2B
 nw_path_necp_check_for_updates Failed to copy updated result (22)
-[TransmuxServer] GET 206 bytes=26632652-27243499/2008911953 CL=610848 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=27243500-27889785/2008911953 CL=646286 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=27889786-28529162/2008911953 CL=639377 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=28529163-29390723/2008911953 CL=861561 (file: 30339811, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET /stream.m3u8 -> 200 (2858 bytes)
-[HLSSegmenter] Segment 46: offset=29390724, size=949087, duration=1.000s
-[HLSSegmenter] Segment 47: offset=30339811, size=943843, duration=1.000s
-[HLSSegmenter] Segment 48: offset=31283654, size=792948, duration=1.000s
-[HLSSegmenter] Segment 49: offset=32076602, size=751674, duration=1.000s
-[TransmuxingService] Progress: 5000 packets, 32 MB on disk
-[TransmuxServer] GET /stream.m3u8 -> 200 (3098 bytes)
-[TransmuxServer] GET 206 bytes=29390724-30339810/2008911953 CL=949087 (file: 37776850, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-nw_path_necp_check_for_updates Failed to copy updated result (22)
-[TransmuxServer] GET 206 bytes=30339811-31283653/2008911953 CL=943843 (file: 37776850, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=31283654-32076601/2008911953 CL=792948 (file: 37776850, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[TransmuxServer] GET 206 bytes=32076602-32828275/2008911953 CL=751674 (file: 37776850, complete=false)
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-<<< timebase >>> CMTimebaseGetTimeAndHostClockTimePairClampedAboveAnchorTime signalled err=-12753 (kCMSyncError_InvalidParameter) (NULL timebase) at FigTimebase.c:3981
-[HLSSegmenter] Segment 50: offset=32828276, size=777433, duration=1.000s
-[HLSSegmenter] Segment 51: offset=33605709, size=732150, duration=1.000s
-[HLSSegmenter] Segment 52: offset=34337859, size=620125, duration=1.000s
-[HLSSegmenter] Segment 53: offset=34957984, size=467301, duration=1.000s
-[HLSSegmenter] Segment 54: offset=35425285, size=599365, duration=1.000s
-[HLSSegmenter] Segment 55: offset=36024650, size=666157, duration=1.000s
+[TransmuxServer] Stopped
+[TransmuxServer] Listener cancelled
+[TransmuxingService] Cleaned up session A8646310-CBC5-41DA-94BA-152B4E94DE2B
+[FFmpegHelper] BSF freed
+[TransmuxingService] Transmux cancelled for session A8646310-CBC5-41DA-94BA-152B4E94DE2B after 29 packets
+[HLSSegmenter] Marked complete, 121 real segments tracked
+[TransmuxServer] Transmux complete — EOF on empty reads
+nw_socket_handle_socket_event [C151.1.1:2] Socket SO_ERROR [61: Connection refused]
+nw_endpoint_flow_failed_with_error [C151.1.1 ::1.8100 in_progress socket-flow (satisfied (Path is satisfied), viable, interface: lo0)] already failing, returning
+nw_socket_handle_socket_event [C151.1.2:2] Socket SO_ERROR [61: Connection refused]
+nw_endpoint_flow_failed_with_error [C151.1.2 127.0.0.1:8100 in_progress socket-flow (satisfied (Path is satisfied), viable, interface: lo0)] already failing, returning
+nw_endpoint_flow_failed_with_error [C151.1.2 127.0.0.1:8100 cancelled socket-flow ((null))] already failing, returning
+Connection 151: received failure notification
+Connection 151: failed to connect 1:61, reason -1
+Connection 151: encountered error(1:61)
+Task <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37> HTTP load failed, 295/0 bytes (error code: -1004 [1:61])
+Task <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37> finished with error [-1004] Error Domain=NSURLErrorDomain Code=-1004 "Could not connect to the server." UserInfo={_kCFStreamErrorCodeKey=61, NSUnderlyingError=0xbfa649e00 {Error Domain=kCFErrorDomainCFNetwork Code=-1004 "(null)" UserInfo={_kCFStreamErrorDomainKey=1, _kCFStreamErrorCodeKey=61, NSErrorPeerAddressKey=<CFData 0xbee48e3a0 [0x1fc8a6900]>{length = 28, capacity = 28, bytes = 0x1c1e1fa4000000000000000000000000 ... 0000000100000000}, _NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: lo0}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37>"
+), NSLocalizedDescription=Could not connect to the server., NSErrorFailingURLStringKey=http://localhost:8100/seg_231.mp4, NSErrorFailingURLKey=http://localhost:8100/seg_231.mp4, _kCFStreamErrorDomainKey=1}
+HTTPRequest figHttpRequestDoCallbackForDidFinish signalled err=-1004 ((OSStatus)[httpRequest->nserror code]) (Network error: domain=NSURLErrorDomain, code=-1004, Error Domain=NSURLErrorDomain Code=-1004 "Could not connect to the server." UserInfo={_kCFStreamErrorCodeKey=61, NSUnderlyingError=0xbfa649e00 {Error Domain=kCFErrorDomainCFNetwork Code=-1004 "(null)" UserInfo={_kCFStreamErrorDomainKey=1, _kCFStreamErrorCodeKey=61, NSErrorPeerAddressKey=<CFData 0xbee48e3a0 [0x1fc8a6900]>{length = 28, capacity = 28, bytes = 0x1c1e1fa4000000000000000000000000 ... 0000000100000000}, _NSURLErrorNWPathKey=satisfied (Path is satisfied), interface: lo0}}, _NSURLErrorFailingURLSessionTaskErrorKey=LocalDataTask <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37>, _NSURLErrorRelatedURLSessionTaskErrorKey=(
+    "LocalDataTask <B28FD597-4A10-4EF9-8F8B-D4690B5D1C8F>.<37>"
+), NSLocalizedDescription=Could not connect to the server., NSErrorFailingURLStringKey=http://localhost:8100/seg_231.mp4, NSErrorFailingURLKey=http://localhost:8100/se
+<< StreamingCache >> FigStreamingCacheMediaSegmentIsComplete signalled err=-16240 (kFigStreamingCacheError_InvalidParameter) (streamingCache NULL) at FigStreamingCache.c:6142
+failed to create session for sendOneMessage
+nw_socket_handle_socket_event [C149:1] Socket SO_ERROR [54: Connection reset by peer]
+nw_write_request_report [C149] Send failed with error "Broken pipe"
+nw_write_request_report [C149] Send failed with error "Broken pipe"
+[StreamProxy] Backend cancelled (182987 bytes sent to client)
+nw_protocol_socket_reset_linger [C149:1] setsockopt SO_LINGER failed [22: Invalid argument]
+[StreamProxy] Client connection failed: The operation couldn’t be completed. (Network.NWError error 54 - Connection reset by peer)
+tcp_output [C150:2] flags=[R.] seq=1204560696, ack=3412171698, win=4892 state=CLOSED rcv_nxt=3412171698, snd_una=1204560695
+[C17 ::1.62505 tcp, local: ::1.9100, definite, attribution: developer, server, prohibit joining protocols] is already cancelled, ignoring cancel
+[StreamProxy] Stopped proxy session #0
+[C21 ::1.62507 tcp, local: ::1.9100, definite, attribution: developer, server, prohibit joining protocols] is already cancelled, ignoring cancel
+[C43 ::1.62518 tcp, local: ::1.9100, definite, attribution: developer, server, prohibit joining protocols] is already cancelled, ignoring cancel
+[StreamProxy] NWListener cancelled on port 9100
+<<HLS-FASB>> FigAlternateSelectionBossCopyProperty signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:1042
+<<HLS-FASB>> fasb_copyFilteredAlternateList signalled err=-15514 (kFigAlternateSelectionBossError_AlternateListNotInitialized) (no alternates) at FigAlternateSelectionBoss.c:991
+<<<< FigAirPlay_Route >>>> airplayRoute_ResumeAirPlayScreen signalled err=-12860 (kFigPlayerError_ParamErr) (NULL or invalidated airplayRoute) at FigAirPlayRoute.c:596

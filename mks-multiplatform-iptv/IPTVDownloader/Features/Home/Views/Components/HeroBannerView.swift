@@ -69,7 +69,7 @@ struct HeroBannerView: View {
                     .adaptiveGlass(in: Capsule())
 
                 // Title
-                Text(item.name)
+                Text(item.cleanTitle)
                     .font(.title.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)

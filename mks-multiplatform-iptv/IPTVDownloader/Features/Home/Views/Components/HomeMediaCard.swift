@@ -156,7 +156,7 @@ struct HomeMediaCard: View {
                     Image(systemName: item.libraryType == .movie ? "film" : "tv")
                         .font(.title3)
                         .foregroundStyle(AppColors.textTertiary)
-                    Text(item.name)
+                    Text(item.cleanTitle)
                         .font(.caption2)
                         .foregroundStyle(AppColors.textTertiary)
                         .lineLimit(2)

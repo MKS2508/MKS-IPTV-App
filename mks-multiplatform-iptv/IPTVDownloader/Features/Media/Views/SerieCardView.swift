@@ -144,11 +144,12 @@ struct SerieCardView: View {
                 .foregroundColor(.primary)
                 .matchedGeometryEffect(id: "\(serie.id)-title", in: namespace)
             
-            HStack {
-                // Year with enhanced styling
+            // Badges row: year, quality, codec, HDR
+            HStack(spacing: 6) {
+                // Year badge
                 if let year = serie.year {
                     Text(year)
-                        .font(.system(size: detailsFontSize, weight: .medium))
+                        .font(.system(size: smallDetailsFontSize, weight: .medium))
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -159,6 +160,45 @@ struct SerieCardView: View {
                         )
                 }
                 
+                // Quality badge
+                if let quality = serie.quality {
+                    Text(quality)
+                        .font(.system(size: smallDetailsFontSize, weight: .medium))
+                        .foregroundColor(qualityColor(for: quality))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color(.darkGray).opacity(0.5))
+                        )
+                }
+                
+                // Codec badge
+                if let codec = serie.codec {
+                    Text(codec)
+                        .font(.system(size: smallDetailsFontSize, weight: .medium))
+                        .foregroundColor(.cyan)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color(.darkGray).opacity(0.5))
+                        )
+                }
+                
+                // HDR badge
+                if serie.isHDR {
+                    Text("HDR")
+                        .font(.system(size: smallDetailsFontSize, weight: .medium))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(Color(.darkGray).opacity(0.5))
+                        )
+                }
+                
                 Spacer()
                 
                 // Enhanced rating view
@@ -166,6 +206,14 @@ struct SerieCardView: View {
             }
             .matchedGeometryEffect(id: "\(serie.id)-details", in: namespace)
         }
+    }
+    
+    private func qualityColor(for quality: String) -> Color {
+        let q = quality.lowercased()
+        if q.contains("4k") || q.contains("2160") { return .purple }
+        if q.contains("1080") { return .blue }
+        if q.contains("720") { return .green }
+        return .gray
     }
     
     private func coverImage(width: CGFloat) -> some View {

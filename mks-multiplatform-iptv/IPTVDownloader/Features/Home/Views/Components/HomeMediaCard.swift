@@ -48,14 +48,50 @@ struct HomeMediaCard: View {
                     posterPlaceholder
                 }
 
-                // Title + rating overlay
+                // Title + rating + metadata badges overlay
                 VStack(alignment: .leading, spacing: 4) {
                     Spacer()
 
-                    Text(item.name)
+                    Text(item.cleanTitle)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
+
+                    // Metadata badges row
+                    HStack(spacing: 4) {
+                        // Year badge
+                        if let year = item.year {
+                            Text(year)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(3)
+                        }
+                        
+                        // Quality badge
+                        if let quality = item.quality {
+                            Text(quality)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(qualityColor(for: quality))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(3)
+                        }
+                        
+                        // HDR badge
+                        if item.isHDR {
+                            Text("HDR")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.5))
+                                .cornerRadius(3)
+                        }
+                    }
 
                     if item.displayRating5Based > 0 {
                         HStack(spacing: 2) {
@@ -144,5 +180,13 @@ struct HomeMediaCard: View {
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
         #endif
+    }
+    
+    private func qualityColor(for quality: String) -> Color {
+        let q = quality.lowercased()
+        if q.contains("4k") || q.contains("2160") { return .purple }
+        if q.contains("1080") { return .blue }
+        if q.contains("720") { return .green }
+        return .white.opacity(0.8)
     }
 }

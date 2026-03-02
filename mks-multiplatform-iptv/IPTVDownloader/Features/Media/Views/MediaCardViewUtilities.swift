@@ -71,10 +71,14 @@ struct CardAppearanceConfig: Equatable {
     static let movieDefault = CardAppearanceConfig(
         expandAnimation: .spring(response: 0.25, dampingFraction: 0.8, blendDuration: 0.2),
         cornerRadius: 16,
-        maxVisibleTags: 2,
+        maxVisibleTags: 3,
         iconMappings: [
             "year": "calendar",
             "quality": "hd",
+            "codec": "cpu",
+            "source": "opticaldisc",
+            "hdr": "sun.max",
+            "3d": "cube",
             "added": "calendar.badge.plus",
             "format": "doc.fill",
             "rating": "star.fill",
@@ -88,10 +92,13 @@ struct CardAppearanceConfig: Equatable {
     static let seriesDefault = CardAppearanceConfig(
         expandAnimation: .spring(response: 0.3, dampingFraction: 0.7),
         cornerRadius: 16,
-        maxVisibleTags: 2,
+        maxVisibleTags: 3,
         iconMappings: [
             "year": "calendar",
             "quality": "hd",
+            "codec": "cpu",
+            "source": "opticaldisc",
+            "hdr": "sun.max",
             "genre": "film",
             "runtime": "clock",
             "cast": "person.2",
@@ -135,11 +142,31 @@ struct MovieTagProvider: TagContentProvider {
             tags.append((getIconName(for: "quality"), quality))
         }
         
+        if let codec = movie.codec {
+            tags.append((getIconName(for: "codec"), codec))
+        }
+        
+        if movie.isHDR {
+            tags.append((getIconName(for: "hdr"), "HDR"))
+        }
+        
+        if movie.is3D {
+            tags.append((getIconName(for: "3d"), "3D"))
+        }
+        
         return tags.prefix(config.maxVisibleTags).map { ($0.0, $0.1) }
     }
     
     func expandedTags() -> [(icon: String, text: String)] {
         var tags = [(String, String)]()
+        
+        if let source = movie.source {
+            tags.append((getIconName(for: "source"), source))
+        }
+        
+        if let codec = movie.codec {
+            tags.append((getIconName(for: "codec"), "Codec: \(codec)"))
+        }
         
         if let added = movie.added {
             tags.append((getIconName(for: "added"), "Added: \(added)"))
@@ -172,6 +199,10 @@ struct MovieTagProvider: TagContentProvider {
         switch type {
         case "year": return "calendar"
         case "quality": return "hd"
+        case "codec": return "cpu"
+        case "source": return "opticaldisc"
+        case "hdr": return "sun.max"
+        case "3d": return "cube"
         case "added": return "calendar.badge.plus"
         case "format": return "doc.fill"
         case "adult": return "exclamationmark.triangle"
@@ -200,11 +231,27 @@ struct SerieTagProvider: TagContentProvider {
             tags.append((getIconName(for: "quality"), quality))
         }
         
+        if let codec = serie.codec {
+            tags.append((getIconName(for: "codec"), codec))
+        }
+        
+        if serie.isHDR {
+            tags.append((getIconName(for: "hdr"), "HDR"))
+        }
+        
         return tags.prefix(config.maxVisibleTags).map { ($0.0, $0.1) }
     }
     
     func expandedTags() -> [(icon: String, text: String)] {
         var tags = [(String, String)]()
+        
+        if let source = serie.source {
+            tags.append((getIconName(for: "source"), source))
+        }
+        
+        if let codec = serie.codec {
+            tags.append((getIconName(for: "codec"), "Codec: \(codec)"))
+        }
         
         if !serie.genre.isEmpty {
             tags.append((getIconName(for: "genre"), serie.genre))
@@ -233,6 +280,9 @@ struct SerieTagProvider: TagContentProvider {
         switch type {
         case "year": return "calendar"
         case "quality": return "hd"
+        case "codec": return "cpu"
+        case "source": return "opticaldisc"
+        case "hdr": return "sun.max"
         case "genre": return "film"
         case "runtime": return "clock"
         case "cast": return "person.2"
@@ -402,36 +452,20 @@ struct PlaceholderView: View {
 // MARK: - Extensiones de Modelo
 extension Movie {
     var formattedTitle: String {
-        return name
+        return cleanTitle
     }
     
     var year: String? {
-        // Extraer año del nombre, ej. "The Matrix (1999) 4K" -> "1999"
-        let pattern = "\\((\\d{4})\\)"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        
-        let nsString = name as NSString
-        let matches = regex.matches(in: name, range: NSRange(location: 0, length: nsString.length))
-        
-        guard let match = matches.first else { return nil }
-        return nsString.substring(with: match.range(at: 1))
+        parsedMetadata.year
     }
 }
 
 extension Serie {
     var formattedTitle: String {
-        return name
+        return cleanTitle
     }
     
     var year: String? {
-        // Extraer año del nombre, ej. "Stranger Things (2016)" -> "2016"
-        let pattern = "\\((\\d{4})\\)"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        
-        let nsString = name as NSString
-        let matches = regex.matches(in: name, range: NSRange(location: 0, length: nsString.length))
-        
-        guard let match = matches.first else { return nil }
-        return nsString.substring(with: match.range(at: 1))
+        parsedMetadata.year
     }
 }

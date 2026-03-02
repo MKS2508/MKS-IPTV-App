@@ -10,6 +10,15 @@ protocol LibraryItem {
     var displayRating5Based: Double { get }  // Renamed to avoid conflicts
     var added: String? { get }
     var libraryType: LibraryMediaType { get }
+    
+    // Parsed metadata from title
+    var cleanTitle: String { get }
+    var year: String? { get }
+    var quality: String? { get }
+    var codec: String? { get }
+    var source: String? { get }
+    var isHDR: Bool { get }
+    var is3D: Bool { get }
 }
 
 // Enum to identify media type

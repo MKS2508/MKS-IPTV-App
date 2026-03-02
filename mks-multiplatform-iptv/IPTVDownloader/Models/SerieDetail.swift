@@ -1,9 +1,16 @@
 import Foundation
 
 struct SerieDetail: Codable {
+    /// Set from the calling context after decoding (the API response doesn't include it).
+    var seriesId: Int = 0
+
     let seasons: [Season]
     let info: SerieInfo
     let episodes: [String: [Episode]]
+
+    enum CodingKeys: String, CodingKey {
+        case seasons, info, episodes
+    }
     
     struct Season: Codable {
         let airDate: String

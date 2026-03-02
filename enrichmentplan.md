@@ -1,5 +1,19 @@
 # Enrichment Plan: Metadata, Caching, UI/UX y Liquid Glass
 
+## Progreso Global
+
+| Fase | Estado | Commit | Descripcion |
+|------|--------|--------|-------------|
+| **Fase 0** | ✅ COMPLETADA | `57f612c` | Quick fixes: cleanTitle en HeroBanner y HomeMediaCard |
+| **Fase 1** | ✅ COMPLETADA | `5a652bb` | EnrichedMediaStore actor + prefetch en Home + tmdbIdInt |
+| **Fase 2** | ✅ COMPLETADA | pendiente commit | Hero Banner enriquecido con metadata TMDB |
+| **Fase 3** | 🔲 PENDIENTE | — | MediaDetailSheet (Apple TV+/Netflix style) |
+| **Fase 4** | 🔲 PENDIENTE | — | SWR generico en CacheManager |
+| **Fase 5** | 🔲 PENDIENTE | — | Liquid Glass UI enhancements |
+| **Fase 6** | 🔲 PENDIENTE | — | Serie Detail con episodes tab |
+
+---
+
 ## Estado Actual del Proyecto (verificado 2 Mar 2026)
 
 ```
@@ -37,24 +51,17 @@ mks-multiplatform-iptv/IPTVDownloader/
 
 ---
 
-## BUG CONFIRMADO: Hero Banner muestra `item.name` en vez de `item.cleanTitle`
+## BUG CORREGIDO: Hero Banner mostraba `item.name` en vez de `item.cleanTitle`
 
-### Archivo: `HeroBannerView.swift:72`
-```swift
-// ACTUAL (BUG):
-Text(item.name)         // "Movie.Title.2021.1080p.WEB-DL.x264"
+> ✅ **RESUELTO en Fase 0** — Commit `57f612c`
 
-// CORRECTO:
-Text(item.cleanTitle)   // "Movie Title"
-```
+### Cambios aplicados:
+| Archivo | Linea | Antes | Despues | Estado |
+|---------|-------|-------|---------|--------|
+| `HeroBannerView.swift` | 72 | `item.name` | `item.cleanTitle` | ✅ Fix |
+| `HomeMediaCard.swift` | 159 | `item.name` (placeholder) | `item.cleanTitle` | ✅ Fix |
 
-### Otros usos inconsistentes de `item.name`:
-| Archivo | Linea | Propiedad | Deberia ser |
-|---------|-------|-----------|-------------|
-| `HeroBannerView.swift` | 72 | `item.name` | `item.cleanTitle` |
-| `HomeMediaCard.swift` | 159 | `item.name` (placeholder) | `item.cleanTitle` |
-
-### Usos correctos (ya funcionan):
+### Usos que ya eran correctos:
 | Archivo | Linea | Propiedad |
 |---------|-------|-----------|
 | `HomeMediaCard.swift` | 55 | `item.cleanTitle` |
@@ -190,8 +197,8 @@ struct SerieDetail: Codable {
         ▼         ▼            ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                          UI LAYER                                    │
-│  HomeView → HeroBannerView (⚠️ usa item.name)                      │
-│          → HomeMediaCarousel → HomeMediaCard (✓ usa item.cleanTitle)│
+│  HomeView → HeroBannerView (✅ usa item.cleanTitle — fixed F0)      │
+│          → HomeMediaCarousel → HomeMediaCard (✅ usa item.cleanTitle)│
 │  MediaListView → MovieCardView (✓ usa movie.formattedTitle)        │
 │               → SerieCardView (✓ usa serie.formattedTitle)         │
 │               → fullScreenCover → AddDownloadMediaViewiOS          │
@@ -220,15 +227,13 @@ struct SerieDetail: Codable {
 │  │ EPG match table      │ 4 horas  │ epg_match_table.plist      │   │
 │  └──────────────────────┴──────────┴────────────────────────────┘   │
 │                                                                      │
-│  ⚠️ PROBLEMAS:                                                      │
-│  1. No hay stale-while-revalidate real (solo background refresh     │
-│     manual en cada ViewModel)                                       │
-│  2. parsedMetadata se recalcula en CADA acceso (no cacheado)        │
-│  3. No hay dedup de requests en vuelo                               │
-│  4. No hay prefetch de metadata para items del Home                 │
-│  5. No hay persistencia de MetadataResult enriquecidos              │
-│     asociados a Movie/Serie                                         │
-│  6. clearExpiredCache() usa cacheExpiration (1h) para TODO,         │
+│  PROBLEMAS (estado post Fase 1):                                    │
+│  1. No hay SWR generico en CacheManager (solo en EnrichedMediaStore)│ → Fase 4
+│  2. parsedMetadata se recalcula en CADA acceso (aceptable, ver 0.3) │ → Decision: mantener
+│  3. ✅ Dedup de requests en vuelo → EnrichedMediaStore.inFlightReqs │ RESUELTO F1
+│  4. ✅ Prefetch de metadata para items del Home → prefetchMetadata()│ RESUELTO F1
+│  5. ✅ Persistencia de MetadataResult → EnrichedMediaStore 3-tier   │ RESUELTO F1
+│  6. clearExpiredCache() usa cacheExpiration (1h) para TODO,         │ → Fase 4
 │     deberia respetar TTLs individuales                              │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -269,9 +274,9 @@ struct SerieDetail: Codable {
 │    │ Runtime proximity        │ 7      │                            │
 │    └──────────────────────────┴────────┘                            │
 │                                                                      │
-│  ⚠️ PROBLEMA: Solo se usa en MovieDetailViewModel.enrichMetadata()  │
-│     cuando se abre un detalle. NO se usa proactivamente al cargar   │
-│     el Home ni las listas.                                          │
+│  ✅ RESUELTO (Fase 1): EnrichedMediaStore ahora usa este servicio   │
+│     proactivamente via HomeViewModel.prefetchMetadata() al cargar   │
+│     el Home. Hero banner + primeros 10 items/carousel se prefetchean│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -316,239 +321,95 @@ struct SerieDetail: Codable {
 
 ## SECCION 2: Plan de Implementacion
 
-### FASE 0: Quick Fixes (sin refactorizacion)
+### FASE 0: Quick Fixes ✅ COMPLETADA
 
-#### Tarea 0.1: Fix Hero Banner cleanTitle
-**Archivo**: `HeroBannerView.swift:72`
-```swift
-// ANTES:
-Text(item.name)
+> **Commit**: `57f612c` — `fix(ui): use cleanTitle in hero banner and media card placeholder`
 
-// DESPUES:
-Text(item.cleanTitle)
-```
+#### Tarea 0.1: Fix Hero Banner cleanTitle ✅
+**Archivo**: `HeroBannerView.swift:72` — `item.name` → `item.cleanTitle`
 
-#### Tarea 0.2: Fix HomeMediaCard placeholder
-**Archivo**: `HomeMediaCard.swift:159`
-```swift
-// ANTES:
-Text(item.name)
+#### Tarea 0.2: Fix HomeMediaCard placeholder ✅
+**Archivo**: `HomeMediaCard.swift:159` — `item.name` → `item.cleanTitle`
 
-// DESPUES:
-Text(item.cleanTitle)
-```
-
-#### Tarea 0.3: Cachear `parsedMetadata` en Movie y Serie
-**Problema**: `TitleParser.parse(name)` se ejecuta con regex en CADA acceso a `cleanTitle`, `quality`, etc. Es un computed property sin cache.
-
-**Archivo**: `Movie.swift`
-```swift
-// ANTES:
-var parsedMetadata: TitleMetadata {
-    TitleParser.parse(name)
-}
-
-// DESPUES:
-private var _parsedMetadata: TitleMetadata?
-
-var parsedMetadata: TitleMetadata {
-    // No se puede mutar en struct, asi que usamos lazy pattern via wrapper
-    // o simplemente aceptamos el costo (regex es rapido para un solo titulo)
-    TitleParser.parse(name)
-}
-```
-
-**Decision**: Mantener como computed. Las regex son rapidas para un titulo individual. El costo real esta en listas de 10K+ items donde se llama N veces por item en cada render. Si se detecta un bottleneck, se puede cachear con un wrapper `@LazyParsed` o un diccionario en el ViewModel.
+#### Tarea 0.3: Cachear `parsedMetadata` en Movie y Serie — DECISION TOMADA
+**Decision**: Mantener como computed property. Las regex de TitleParser son rapidas para un titulo individual. El costo real esta en listas de 10K+ items donde se llama N veces por item en cada render. Si se detecta un bottleneck futuro, se puede cachear con un diccionario en el ViewModel.
 
 ---
 
-### FASE 1: Enriquecimiento Proactivo de Metadata
+### FASE 1: Enriquecimiento Proactivo de Metadata ✅ COMPLETADA
+
+> **Commit**: `5a652bb` — `feat(metadata): add proactive metadata enrichment with stale-while-revalidate`
 
 #### Objetivo
 Cuando el Home carga, los items del hero banner y los carousels ya deben tener metadata enriquecida (poster HD, backdrop, plot, etc.) sin que el usuario tenga que abrir el detalle.
 
-#### Tarea 1.1: Crear `EnrichedMediaStore` (nuevo actor)
+#### Tarea 1.1: EnrichedMediaStore ✅ IMPLEMENTADO
 
-**Archivo nuevo**: `Core/Metadata/EnrichedMediaStore.swift`
+**Archivo creado**: `Core/Metadata/EnrichedMediaStore.swift`
 
+Implementacion real (verificada en codebase):
+- Actor con `static let shared` singleton
+- Three-tier lookup: Memory → Disk (CacheManager) → Network (MetadataEnrichmentService)
+- SWR: entries stale after 1 hour, return immediately + revalidate in background
+- Request dedup via `inFlightRequests: [String: Task<MetadataResult?, Never>]`
+- `invalidate(for:)` method for cache busting
+- `prefetch(items:maxConcurrency:)` batch method with TaskGroup (max 5 concurrent)
+- Cache key format: `"enriched_{movie|serie}_{streamId}"`
+- `buildQuery()` uses TitleParser to extract cleanTitle + year for search
+
+**Diferencias vs plan original**:
+- Se agrego `invalidate(for:)` (no estaba en el plan)
+- Se agrego `prefetch(items:maxConcurrency:)` como metodo del store (en el plan, la concurrencia estaba en HomeViewModel)
+- `revalidate()` ahora verifica `inFlightRequests[key] == nil` para evitar revalidacion duplicada
+- `inFlightRequests` se limpia con `removeValue(forKey:)` en vez de asignar nil
+
+#### Tarea 1.2: Prefetch en Home ✅ IMPLEMENTADO
+
+**Archivo modificado**: `HomeViewModel.swift` — metodo `prefetchMetadata()`
+
+Implementacion real (simplificada vs plan):
 ```swift
-/// Actor que almacena y gestiona metadata enriquecida para Movie/Serie.
-/// Implementa stale-while-revalidate: devuelve datos cacheados inmediatamente
-/// y refresca en background si estan expirados.
-actor EnrichedMediaStore {
-    static let shared = EnrichedMediaStore()
-
-    /// In-memory cache de MetadataResult por media ID
-    /// Key: "movie_{streamId}" o "serie_{seriesId}"
-    private var memoryCache: [String: EnrichedEntry] = [:]
-
-    /// Requests en vuelo para dedup
-    private var inFlightRequests: [String: Task<MetadataResult?, Never>] = [:]
-
-    struct EnrichedEntry {
-        let result: MetadataResult
-        let fetchedAt: Date
-        var isStale: Bool {
-            Date().timeIntervalSince(fetchedAt) > 3600 // 1 hora
-        }
-    }
-
-    /// Obtiene metadata enriquecida. Stale-while-revalidate:
-    /// 1. Si hay cache valido → devuelve inmediato
-    /// 2. Si hay cache stale → devuelve inmediato + revalida en background
-    /// 3. Si no hay cache → fetch y devuelve
-    func getEnrichedMetadata(
-        for item: any LibraryItem,
-        tmdbId: Int? = nil
-    ) async -> MetadataResult? {
-        let key = cacheKey(for: item)
-
-        // 1. Check memory cache
-        if let entry = memoryCache[key] {
-            if !entry.isStale {
-                return entry.result
-            }
-            // Stale: return immediately but trigger background refresh
-            Task { await revalidate(key: key, item: item, tmdbId: tmdbId) }
-            return entry.result
-        }
-
-        // 2. Check disk cache (CacheManager)
-        if let diskCached = CacheManager.shared.getCachedMetadata(key: key) {
-            memoryCache[key] = EnrichedEntry(result: diskCached, fetchedAt: Date())
-            return diskCached
-        }
-
-        // 3. Fetch from providers (with dedup)
-        return await fetchWithDedup(key: key, item: item, tmdbId: tmdbId)
-    }
-
-    private func fetchWithDedup(
-        key: String,
-        item: any LibraryItem,
-        tmdbId: Int?
-    ) async -> MetadataResult? {
-        // Dedup: if already in-flight, await existing task
-        if let existing = inFlightRequests[key] {
-            return await existing.value
-        }
-
-        let task = Task<MetadataResult?, Never> {
-            let query = buildQuery(for: item, tmdbId: tmdbId)
-            let result = await MetadataEnrichmentService.shared
-                                    .fetchMetadata(query: query)
-            if let result {
-                memoryCache[key] = EnrichedEntry(
-                    result: result, fetchedAt: Date()
-                )
-                CacheManager.shared.cacheMetadata(result, key: key)
-            }
-            return result
-        }
-        inFlightRequests[key] = task
-        let result = await task.value
-        inFlightRequests[key] = nil
-        return result
-    }
-
-    private func revalidate(
-        key: String,
-        item: any LibraryItem,
-        tmdbId: Int?
-    ) async {
-        let query = buildQuery(for: item, tmdbId: tmdbId)
-        if let result = await MetadataEnrichmentService.shared
-                                .fetchMetadata(query: query) {
-            memoryCache[key] = EnrichedEntry(
-                result: result, fetchedAt: Date()
-            )
-            CacheManager.shared.cacheMetadata(result, key: key)
-        }
-    }
-
-    private func cacheKey(for item: any LibraryItem) -> String {
-        let type = item.libraryType == .movie ? "movie" : "serie"
-        return "enriched_\(type)_\(item.streamId)"
-    }
-
-    private func buildQuery(
-        for item: any LibraryItem,
-        tmdbId: Int?
-    ) -> MetadataSearchQuery {
-        let parsed = TitleParser.parse(item.name)
-        let yearInt = parsed.year.flatMap { Int($0) }
-        return MetadataSearchQuery(
-            title: parsed.cleanTitle,
-            year: yearInt,
-            tmdbId: tmdbId,
-            genre: nil,
-            runtimeMinutes: nil,
-            mediaType: item.libraryType == .movie ? .movie : .series
-        )
-    }
-}
-```
-
-#### Tarea 1.2: Prefetch de metadata en Home
-
-**Archivo**: `HomeViewModel.swift` — agregar metodo `prefetchMetadata`
-
-```swift
-/// Prefetch metadata para los items visibles en Home.
-/// Se ejecuta despues de assembleSections() en background.
-func prefetchMetadata(movies: [Movie], series: [Serie]) async {
+func prefetchMetadata() async {
     let store = EnrichedMediaStore.shared
-
-    // Prioridad 1: Hero banner
-    if let heroSection = sections.first(where: {
-        if case .heroBanner = $0.type { return true }; return false
-    }), case .heroBanner(let item) = heroSection.type {
-        let tmdbId = (item as? Movie)?.tmdbId.flatMap { Int($0) }
-        _ = await store.getEnrichedMetadata(for: item, tmdbId: tmdbId)
+    // Priority 1: Hero banner item
+    for section in sections {
+        if case .heroBanner(let item) = section.type {
+            let tmdbId = (item as? Movie)?.tmdbId.flatMap { Int($0) }
+            _ = await store.getEnrichedMetadata(for: item, tmdbId: tmdbId)
+            break
+        }
     }
-
-    // Prioridad 2: Items de carousels (primeros 10 de cada seccion)
+    // Priority 2: First 10 items per carousel section
     for section in sections {
         if case .mediaCarousel(let items) = section.type {
-            await withTaskGroup(of: Void.self) { group in
-                for item in items.prefix(10) {
-                    group.addTask {
-                        let tmdbId = (item as? Movie)?.tmdbId
-                                        .flatMap { Int($0) }
-                        _ = await store.getEnrichedMetadata(
-                            for: item, tmdbId: tmdbId
-                        )
-                    }
-                }
-            }
+            await store.prefetch(items: Array(items.prefix(10)))
         }
     }
 }
 ```
 
-**Archivo**: `AppDataLoader.swift` — llamar prefetch despues de assembleHomeSections
+**Diferencias vs plan original**:
+- Signature simplificada: `prefetchMetadata()` sin parametros (usa `sections` directamente)
+- Carousel prefetch delegado a `store.prefetch()` (el store maneja concurrencia internamente)
+- No necesita recibir `movies`/`series` como parametros
 
+**Archivo modificado**: `AppDataLoader.swift` — llamada no-bloqueante
 ```swift
-// En loadAllData(), despues de assembleHomeSections():
+// Despues del EPG background task:
 Task.detached { [weak self] in
-    guard let self, let hvm = self.homeViewModel,
-          let mvm = self.mediaViewModel else { return }
-    await hvm.prefetchMetadata(
-        movies: await mvm.movies,
-        series: await mvm.series
-    )
+    await self?.homeViewModel?.prefetchMetadata()
 }
 ```
 
-#### Tarea 1.3: Exponer metadata enriquecida en LibraryItem
+**Diferencia vs plan**: No necesita pasar movies/series, mas limpio.
 
-**Archivo**: `MediaListViewModel.swift` — agregar al protocolo LibraryItem
+#### Tarea 1.3: tmdbIdInt en LibraryItem ✅ IMPLEMENTADO
+
+**Archivo modificado**: `MediaListViewModel.swift`
 
 ```swift
 protocol LibraryItem {
     // ... existing properties ...
-
-    // Metadata enriquecida (puede ser nil si aun no se ha fetcheado)
     var tmdbIdInt: Int? { get }
 }
 
@@ -557,15 +418,17 @@ extension Movie: LibraryItem {
 }
 
 extension Serie: LibraryItem {
-    var tmdbIdInt: Int? { nil }  // Serie no tiene tmdbId en el modelo base
+    /// Serie model does not carry a TMDB ID from the Xtream Codes API.
+    /// Enrichment falls back to title+year search in metadata providers.
+    var tmdbIdInt: Int? { nil }
 }
 ```
 
 ---
 
-### FASE 2: Hero Banner Enriquecido
+### FASE 2: Hero Banner Enriquecido ✅ COMPLETADA
 
-#### Tarea 2.1: Refactorizar HeroBannerView con metadata enriquecida
+#### Tarea 2.1: Refactorizar HeroBannerView con metadata enriquecida ✅ IMPLEMENTADO
 
 **Archivo**: `HeroBannerView.swift`
 
@@ -1205,7 +1068,7 @@ private var episodesContent: some View {
 
 ---
 
-## SECCION 3: Diagrama de Arquitectura Objetivo
+## SECCION 3: Diagrama de Arquitectura (actual post Fase 1 + objetivo)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1261,19 +1124,21 @@ private var episodesContent: some View {
 │                          UI LAYER                                    │
 │                                                                      │
 │  HomeView                                                           │
-│  ├── HeroBannerView (enriched: backdrop HD, plot, genre, runtime)   │
-│  ├── HomeMediaCarousel → HomeMediaCard (cleanTitle, enriched poster)│
-│  └── EPG sections                                                   │
+│  ├── HeroBannerView (✅ cleanTitle, 🔲 enriched backdrop/plot F2)   │
+│  ├── HomeMediaCarousel → HomeMediaCard (✅ cleanTitle)              │
+│  ├── EPG sections                                                   │
+│  └── ✅ prefetchMetadata() runs after assembleSections (F1)         │
 │                                                                      │
 │  MediaListView                                                      │
-│  ├── MovieCardView / SerieCardView (formattedTitle = cleanTitle)    │
-│  └── .fullScreenCover → MediaDetailSheet (NEW)                      │
-│      ├── Collapsing header (backdrop HD + poster TMDB)              │
-│      ├── GlassSegmentedControl tabs                                 │
-│      ├── Overview (plot, cast, director, technical badges)          │
-│      ├── Episodes (para series, con season picker)                  │
-│      ├── Action buttons (play, download SIN navegar)                │
-│      └── Download modal (in-place, no pierde el detalle)            │
+│  ├── MovieCardView / SerieCardView (✅ formattedTitle = cleanTitle) │
+│  └── .fullScreenCover → 🔲 MediaDetailSheet (F3, actualmente usa   │
+│      │                    AddDownloadMediaViewiOS / AddDownloadView) │
+│      ├── 🔲 Collapsing header (backdrop HD + poster TMDB)          │
+│      ├── 🔲 GlassSegmentedControl tabs                             │
+│      ├── 🔲 Overview (plot, cast, director, technical badges)      │
+│      ├── 🔲 Episodes (para series, con season picker)              │
+│      ├── 🔲 Action buttons (play, download SIN navegar)            │
+│      └── 🔲 Download modal (in-place, no pierde el detalle)        │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1282,26 +1147,26 @@ private var episodesContent: some View {
 ## SECCION 4: Orden de Ejecucion y Dependencias
 
 ```
-Fase 0: Quick Fixes                    ← SIN dependencias, hacer PRIMERO
-  ├── 0.1 Fix HeroBannerView cleanTitle
-  ├── 0.2 Fix HomeMediaCard placeholder
-  └── 0.3 (Evaluar) parsedMetadata cache
+Fase 0: Quick Fixes ✅ COMPLETADA (57f612c)
+  ├── 0.1 Fix HeroBannerView cleanTitle      ✅
+  ├── 0.2 Fix HomeMediaCard placeholder       ✅
+  └── 0.3 parsedMetadata cache → Decision: mantener computed
 
-Fase 1: Enriquecimiento Proactivo      ← Requiere Fase 0
-  ├── 1.1 EnrichedMediaStore (nuevo)
-  ├── 1.2 Prefetch en HomeViewModel    ← Requiere 1.1
-  └── 1.3 tmdbIdInt en LibraryItem     ← Requiere 1.1
+Fase 1: Enriquecimiento Proactivo ✅ COMPLETADA (5a652bb)
+  ├── 1.1 EnrichedMediaStore (nuevo)          ✅ Core/Metadata/EnrichedMediaStore.swift
+  ├── 1.2 Prefetch en HomeViewModel           ✅ prefetchMetadata() + AppDataLoader
+  └── 1.3 tmdbIdInt en LibraryItem            ✅ Movie + Serie conformances
 
-Fase 2: Hero Banner Enriquecido        ← Requiere Fase 1
-  └── 2.1 HeroBannerView con metadata
+Fase 2: Hero Banner Enriquecido ✅ COMPLETADA
+  └── 2.1 HeroBannerView con metadata enriquecida   ✅ backdrop HD, subtitle, plot, rating
 
-Fase 3: Vista de Detalle               ← Requiere Fase 1
+Fase 3: Vista de Detalle               ← Requiere Fase 1 ✅
   ├── 3.1 MediaDetailSheet (nuevo)
   ├── 3.2 Integrar en MediaListView    ← Requiere 3.1
   └── 3.3 Download sin perder detalle  ← Requiere 3.1
 
-Fase 4: SWR en CacheManager            ← Independiente (puede ir en paralelo)
-  ├── 4.1 getCacheWithStaleness
+Fase 4: SWR en CacheManager            ← Independiente (puede ir en paralelo con Fase 2/3)
+  ├── 4.1 getCacheWithStaleness generico
   └── 4.2 Usar en MediaListViewModel
 
 Fase 5: Liquid Glass UI                ← Requiere Fase 2 y 3
@@ -1309,7 +1174,7 @@ Fase 5: Liquid Glass UI                ← Requiere Fase 2 y 3
   └── 5.2 Glass tabs en detail
 
 Fase 6: Serie Detail con episodios     ← Requiere Fase 3
-  └── 6.1 Tab Episodes
+  └── 6.1 Tab Episodes con season picker
 ```
 
 ---
@@ -1317,22 +1182,24 @@ Fase 6: Serie Detail con episodios     ← Requiere Fase 3
 ## SECCION 5: Archivos a Crear/Modificar
 
 ### Archivos NUEVOS:
-| Archivo | Fase | Descripcion |
-|---------|------|-------------|
-| `Core/Metadata/EnrichedMediaStore.swift` | 1.1 | Actor para metadata enriquecida con SWR |
-| `Features/Media/Views/MediaDetailSheet.swift` | 3.1 | Vista de detalle rediseñada |
-| `Features/Media/Views/EpisodeRow.swift` | 6.1 | Fila de episodio para series |
+| Archivo | Fase | Estado | Descripcion |
+|---------|------|--------|-------------|
+| `Core/Metadata/EnrichedMediaStore.swift` | 1.1 | ✅ CREADO | Actor para metadata enriquecida con SWR y dedup |
+| `Features/Media/Views/MediaDetailSheet.swift` | 3.1 | 🔲 PENDIENTE | Vista de detalle rediseñada |
+| `Features/Media/Views/EpisodeRow.swift` | 6.1 | 🔲 PENDIENTE | Fila de episodio para series |
 
-### Archivos a MODIFICAR:
-| Archivo | Fase | Cambio |
-|---------|------|--------|
-| `HeroBannerView.swift` | 0.1, 2.1 | `item.name` → `item.cleanTitle` + metadata enriquecida |
-| `HomeMediaCard.swift` | 0.2 | `item.name` → `item.cleanTitle` en placeholder |
-| `HomeViewModel.swift` | 1.2 | Agregar `prefetchMetadata()` |
-| `AppDataLoader.swift` | 1.2 | Llamar prefetch despues de assembleHomeSections |
-| `MediaListViewModel.swift` | 1.3, 4.2 | `tmdbIdInt` en LibraryItem + SWR |
-| `MediaListView.swift` | 3.2 | Reemplazar fullScreenCover content |
-| `CacheManager.swift` | 4.1 | Agregar `getCacheWithStaleness()` |
+### Archivos MODIFICADOS:
+| Archivo | Fase | Estado | Cambio |
+|---------|------|--------|--------|
+| `HeroBannerView.swift` | 0.1 | ✅ HECHO | `item.name` → `item.cleanTitle` |
+| `HeroBannerView.swift` | 2.1 | ✅ HECHO | Enriched backdrop, subtitle (year/genre/runtime), plot, TMDB rating |
+| `HomeMediaCard.swift` | 0.2 | ✅ HECHO | `item.name` → `item.cleanTitle` en placeholder |
+| `HomeViewModel.swift` | 1.2 | ✅ HECHO | `prefetchMetadata()` method added |
+| `AppDataLoader.swift` | 1.2 | ✅ HECHO | Non-blocking `Task.detached` prefetch call |
+| `MediaListViewModel.swift` | 1.3 | ✅ HECHO | `tmdbIdInt` en LibraryItem protocol + conformances |
+| `MediaListViewModel.swift` | 4.2 | 🔲 PENDIENTE | SWR generico en loadMedia() |
+| `MediaListView.swift` | 3.2 | 🔲 PENDIENTE | Reemplazar fullScreenCover → MediaDetailSheet |
+| `CacheManager.swift` | 4.1 | 🔲 PENDIENTE | `getCacheWithStaleness()` generico |
 
 ---
 
@@ -1379,17 +1246,17 @@ contentAdvisoryRating, itunesTrackId, confidence
 
 ## SECCION 7: Resumen de Problemas y Soluciones
 
-| # | Problema | Solucion | Fase |
-|---|----------|----------|------|
-| 1 | Hero banner muestra titulo crudo | `item.name` → `item.cleanTitle` | 0.1 |
-| 2 | Placeholder muestra titulo crudo | `item.name` → `item.cleanTitle` | 0.2 |
-| 3 | parsedMetadata no cacheado | Evaluar: mantener computed (regex rapido) | 0.3 |
-| 4 | No hay prefetch de metadata | EnrichedMediaStore + prefetch en Home | 1.x |
-| 5 | Hero banner sin backdrop HD | Usar metadata enriquecida en HeroBanner | 2.1 |
-| 6 | Detalle tipo dialogo basico | MediaDetailSheet con tabs y glass | 3.1 |
-| 7 | Download cierra el detalle | Modal in-place sin navegacion | 3.3 |
-| 8 | No hay SWR real en cache | getCacheWithStaleness() | 4.x |
-| 9 | No hay glass en detalle | Liquid Glass tabs y background | 5.x |
-| 10 | No hay tab Episodes en series | EpisodeRow + season picker | 6.1 |
-| 11 | Requests duplicados | Dedup via inFlightRequests en Store | 1.1 |
-| 12 | Serie no tiene tmdbId | Buscar por cleanTitle + year en TMDB | 1.1 |
+| # | Problema | Solucion | Fase | Estado |
+|---|----------|----------|------|--------|
+| 1 | Hero banner muestra titulo crudo | `item.name` → `item.cleanTitle` | 0.1 | ✅ |
+| 2 | Placeholder muestra titulo crudo | `item.name` → `item.cleanTitle` | 0.2 | ✅ |
+| 3 | parsedMetadata no cacheado | Decision: mantener computed (regex rapido) | 0.3 | ✅ |
+| 4 | No hay prefetch de metadata | EnrichedMediaStore + prefetchMetadata() | 1.x | ✅ |
+| 5 | Hero banner sin backdrop HD | Usar metadata enriquecida en HeroBanner | 2.1 | ✅ |
+| 6 | Detalle tipo dialogo basico | MediaDetailSheet con tabs y glass | 3.1 | 🔲 |
+| 7 | Download cierra el detalle | Modal in-place sin navegacion | 3.3 | 🔲 |
+| 8 | No hay SWR real en cache | getCacheWithStaleness() generico | 4.x | 🔲 |
+| 9 | No hay glass en detalle | Liquid Glass tabs y background | 5.x | 🔲 |
+| 10 | No hay tab Episodes en series | EpisodeRow + season picker | 6.1 | 🔲 |
+| 11 | Requests duplicados | Dedup via inFlightRequests en Store | 1.1 | ✅ |
+| 12 | Serie no tiene tmdbId | Buscar por cleanTitle + year en TMDB | 1.1 | ✅ |

@@ -50,7 +50,8 @@ class SerieDetailViewModel: ObservableObject {
         }
 
         do {
-            let detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
+            var detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
+            detail.seriesId = seriesId
             self.serieDetail = detail
             self.error = nil
 
@@ -71,7 +72,8 @@ class SerieDetailViewModel: ObservableObject {
 
     private func refreshInBackground(seriesId: Int) async {
         do {
-            let detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
+            var detail = try await movieService.fetchSeriesDetails(seriesId: seriesId)
+            detail.seriesId = seriesId
 
             // Update cache
             cacheManager.cacheSerieDetail(detail, id: seriesId)
@@ -128,7 +130,9 @@ class SerieDetailViewModel: ObservableObject {
 
     // For when SerieDetail is provided directly
     func setSerieDetail(_ detail: SerieDetail, seriesId: Int) {
-        self.serieDetail = detail
+        var d = detail
+        d.seriesId = seriesId
+        self.serieDetail = d
         self.loadedFromCache = false
 
         // Cache it

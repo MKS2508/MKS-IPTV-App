@@ -449,23 +449,6 @@ struct PlaceholderView: View {
     }
 }
 
-// MARK: - Extensiones de Modelo
-extension Movie {
-    var formattedTitle: String {
-        return cleanTitle
-    }
-    
-    var year: String? {
-        parsedMetadata.year
-    }
-}
-
-extension Serie {
-    var formattedTitle: String {
-        return cleanTitle
-    }
-    
-    var year: String? {
-        parsedMetadata.year
-    }
-}
+// MARK: - Model Extensions
+// formattedTitle, year, cleanTitle, quality, codec, source, isHDR, is3D
+// are now provided by the TitleParseable protocol (see MediaProtocols.swift)

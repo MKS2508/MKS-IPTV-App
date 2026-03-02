@@ -159,7 +159,7 @@ actor EnrichedMediaStore {
     // MARK: - Helpers
 
     private func cacheKey(for item: any LibraryItem) -> String {
-        let type = item.libraryType == .movie ? "movie" : "serie"
+        let type = item.mediaType == .movie ? "movie" : "serie"
         return "enriched_\(type)_\(item.streamId)"
     }
 
@@ -175,7 +175,7 @@ actor EnrichedMediaStore {
             tmdbId: tmdbId,
             genre: nil,
             runtimeMinutes: nil,
-            mediaType: item.libraryType == .movie ? .movie : .series
+            mediaType: item.mediaType == .movie ? .movie : .series
         )
     }
 }

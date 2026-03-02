@@ -2,60 +2,13 @@ import SwiftUI
 import AVKit
 import UniformTypeIdentifiers
 
-// Protocolo para unificar SerieDetail y MovieDetail
-protocol MediaItem {
-    var title: String { get }
-    var coverImageUrl: String { get }
-    var plotSummary: String { get }
-    var genreText: String { get }
-    var releaseDateText: String { get }
-    var castText: String { get }
-    var ratingValue: String { get }
-    var rating5BasedValue: Double { get }
-    var mediaType: MediaType { get }
-    var durationText: String { get }
-    var backdropPaths: [String] { get }
-}
-
-// Extensión para que SerieDetail conforme al protocolo MediaItem
-extension SerieDetail: MediaItem {
-    var title: String { return info.name }
-    var coverImageUrl: String { return info.cover ?? "" }
-    var plotSummary: String { return info.plot }
-    var genreText: String { return info.genre }
-    var releaseDateText: String { return info.releaseDate }
-    var castText: String { return info.cast }
-    var ratingValue: String { return info.rating }
-    var rating5BasedValue: Double { return info.rating5Based }
-    var mediaType: MediaType { return .series }
-    var durationText: String { return info.episodeRunTime }
-    var backdropPaths: [String] { return info.backdropPath }
-}
-
-// Extensión para que MovieDetail conforme al protocolo MediaItem
-extension MovieDetail: MediaItem {
-    var title: String { return movieData.name }
-    var coverImageUrl: String { return movieImage }
-    var plotSummary: String { return plot }
-    var genreText: String { return genre }
-    var releaseDateText: String { return releaseDate }
-    var castText: String { return cast.joined(separator: ", ") }
-    var ratingValue: String { return rating ?? "N/A" }
-    var rating5BasedValue: Double { return Double(rating ?? "") ?? 0 }
-    var mediaType: MediaType { return .movie }
-    var durationText: String {
-        let parts = duration.split(separator: ":")
-        if parts.count >= 2 {
-            return "\(parts[0])"
-        }
-        return "0"
-    }
-    var backdropPaths: [String] { return backdropPath ?? [] }
-}
+// MediaItem protocol replaced by MediaDetailItem (see MediaProtocols.swift).
+// Legacy property names (title, plotSummary, genreText, etc.) are provided
+// by the backward-compat extension on MediaDetailItem.
 
 struct AddDownloadMediaViewiOS: View {
     @Binding var selectedView: String?
-    let mediaItem: MediaItem
+    let mediaItem: any MediaDetailItem
     let onDismiss: () -> Void
     
     // Estado para Series

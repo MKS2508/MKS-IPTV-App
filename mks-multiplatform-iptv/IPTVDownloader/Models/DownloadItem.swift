@@ -17,10 +17,7 @@ struct DownloadItem: Identifiable {
     var filePath: String?
 }
 
-enum MediaType {
-    case movie
-    case series
-}
+// MediaType enum is now defined in MediaProtocols.swift
 
 enum DownloadStatus: Equatable {
     case notStarted

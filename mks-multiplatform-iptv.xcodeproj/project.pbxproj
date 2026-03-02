@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05548F942F5626330060E2DD /* TransmuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F932F5626330060E2DD /* TransmuxCore */; };
+		05548F962F5626330060E2DD /* transmux-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F952F5626330060E2DD /* transmux-cli */; };
 		05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05CF93D92F50E665006EBEDE /* KSPlayer */; };
 		05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05DB74D52F47CB3900547E01 /* KSPlayer */; };
 /* End PBXBuildFile section */
@@ -55,7 +57,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */,
+				05548F942F5626330060E2DD /* TransmuxCore in Frameworks */,
 				05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */,
+				05548F962F5626330060E2DD /* transmux-cli in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -153,6 +157,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */,
+				05548F922F5626330060E2DD /* XCLocalSwiftPackageReference "TransmuxCore" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 058CC0702D39C8CF006E00BF /* Products */;
@@ -520,6 +525,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		05548F922F5626330060E2DD /* XCLocalSwiftPackageReference "TransmuxCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = TransmuxCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -532,6 +544,14 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		05548F932F5626330060E2DD /* TransmuxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TransmuxCore;
+		};
+		05548F952F5626330060E2DD /* transmux-cli */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = "transmux-cli";
+		};
 		05CF93D92F50E665006EBEDE /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;

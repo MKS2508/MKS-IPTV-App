@@ -6,7 +6,7 @@
 //
 import Foundation
 
-struct Movie: Identifiable, Codable, Equatable {
+struct Movie: Identifiable, Codable, Equatable, TitleParseable {
     let name: String
     let streamType: String?
     let streamId: Int
@@ -79,34 +79,6 @@ struct Movie: Identifiable, Codable, Equatable {
         directSource = try container.decodeIfPresent(String.self, forKey: .directSource)
     }
 
-    var parsedMetadata: TitleMetadata {
-        TitleParser.parse(name)
-    }
-    
-    var quality: String? {
-        parsedMetadata.quality
-    }
-    
-    var codec: String? {
-        parsedMetadata.codec
-    }
-    
-    var source: String? {
-        parsedMetadata.source
-    }
-    
-    var cleanTitle: String {
-        parsedMetadata.cleanTitle
-    }
-    
-    var isHDR: Bool {
-        parsedMetadata.isHDR
-    }
-    
-    var is3D: Bool {
-        parsedMetadata.is3D
-    }
-    
     static func == (lhs: Movie, rhs: Movie) -> Bool {
         lhs.id == rhs.id
     }

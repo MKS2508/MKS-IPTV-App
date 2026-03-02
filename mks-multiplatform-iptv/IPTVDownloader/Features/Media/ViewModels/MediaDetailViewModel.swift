@@ -106,7 +106,9 @@ final class MediaDetailViewModel {
 
     /// Set serie detail directly (when provided externally)
     func setSerieDetail(_ detail: SerieDetail, seriesId: Int) {
-        self.serieDetail = detail
+        var d = detail
+        d.seriesId = seriesId
+        self.serieDetail = d
         self.movieDetail = nil
         self.loadedFromCache = false
         self.isLoading = false
@@ -150,7 +152,8 @@ final class MediaDetailViewModel {
                 cacheManager.cacheMovieDetail(detail, id: id)
 
             case .serie(let id):
-                let detail = try await movieService.fetchSeriesDetails(seriesId: id)
+                var detail = try await movieService.fetchSeriesDetails(seriesId: id)
+                detail.seriesId = id
                 serieDetail = detail
                 movieDetail = nil
                 cacheManager.cacheSerieDetail(detail, id: id)
@@ -204,7 +207,8 @@ final class MediaDetailViewModel {
                 }
 
             case .serie(let id):
-                let detail = try await movieService.fetchSeriesDetails(seriesId: id)
+                var detail = try await movieService.fetchSeriesDetails(seriesId: id)
+                detail.seriesId = id
                 cacheManager.cacheSerieDetail(detail, id: id)
 
                 // Update UI if still showing same serie

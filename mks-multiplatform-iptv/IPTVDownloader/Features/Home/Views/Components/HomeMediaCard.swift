@@ -121,7 +121,7 @@ struct HomeMediaCard: View {
                 VStack {
                     HStack {
                         Spacer()
-                        Image(systemName: item.libraryType == .movie ? "film" : "tv")
+                        Image(systemName: item.mediaType == .movie ? "film" : "tv")
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.9))
                             .padding(5)
@@ -153,7 +153,7 @@ struct HomeMediaCard: View {
             .frame(width: cardWidth, height: cardHeight)
             .overlay {
                 VStack(spacing: 6) {
-                    Image(systemName: item.libraryType == .movie ? "film" : "tv")
+                    Image(systemName: item.mediaType == .movie ? "film" : "tv")
                         .font(.title3)
                         .foregroundStyle(AppColors.textTertiary)
                     Text(item.cleanTitle)
@@ -167,7 +167,7 @@ struct HomeMediaCard: View {
     }
 
     private func navigateToItem() {
-        switch item.libraryType {
+        switch item.mediaType {
         case .movie:
             selectedView = NavigationDestination.movies.rawValue
         case .series:

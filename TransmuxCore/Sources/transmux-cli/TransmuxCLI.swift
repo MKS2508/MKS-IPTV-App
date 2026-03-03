@@ -64,17 +64,20 @@ struct TransmuxCLI {
                 let latestTime = session.segmenter.latestTransmuxedTime()
                 print("✅ Seek test complete. Latest transmuxed time: \(String(format: "%.1f", latestTime))s")
             } else {
-                print("⏳ Transmuxing... (press Ctrl+C to stop)")
+                print("⏳ Transmuxing for \(String(format: "%.1f", duration))s... (press Ctrl+C to stop early)")
                 print("   💡 Tip: Monitor logs with: tail -f /tmp/mks-iptv-transmux.log")
 
-                // Wait for user interrupt or completion
+                // Set up signal handler for early termination
                 signal(SIGINT) { _ in
                     print("\n⚠️  Interrupted by user")
                     exit(0)
                 }
 
-                // Wait for a long time (or until interrupted)
-                try await Task.sleep(for: .seconds(3600))
+                // Wait for specified duration (or until interrupted)
+                try await Task.sleep(for: .seconds(duration))
+
+                let latestTime = session.segmenter.latestTransmuxedTime()
+                print("✅ Duration complete. Latest transmuxed time: \(String(format: "%.1f", latestTime))s")
             }
 
             await service.cleanup(sessionID: session.sessionID)
@@ -98,14 +101,17 @@ struct TransmuxCLI {
 
         OPTIONS:
             --seek TIME             Seek to TIME seconds and test seeking functionality
-            --duration SECONDS      Duration to test after seek (default: 10 seconds)
+            --duration SECONDS      Duration to run transmux (default: 10 seconds)
             --verbose               Enable verbose output
 
         EXAMPLES:
-            # Basic transmux
+            # Basic transmux for 10 seconds
             transmux-cli movie.mkv
 
-            # Test seeking at 5 minutes
+            # Transmux for 30 seconds
+            transmux-cli movie.mkv --duration 30
+
+            # Test seeking at 5 minutes for 20 seconds
             transmux-cli movie.mkv --seek 300 --duration 20
 
             # Remote URL with verbose output

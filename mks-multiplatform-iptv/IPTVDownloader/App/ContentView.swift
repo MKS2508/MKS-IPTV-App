@@ -8,9 +8,6 @@
 //
 
 import SwiftUI
-#if canImport(KSPlayer)
-import KSPlayer
-#endif
 
 struct ContentView: View {
     @Binding var showingSettings: Bool

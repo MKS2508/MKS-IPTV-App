@@ -1,7 +1,4 @@
 import SwiftUI
-#if canImport(KSPlayer)
-import KSPlayer
-#endif
 
 @main
 struct mks_iptv_downloaderApp: App {
@@ -53,19 +50,6 @@ struct mks_iptv_downloaderApp: App {
 
 extension mks_iptv_downloaderApp {
     static func configurePlayerEngines() {
-        #if canImport(KSPlayer)
-        // Enable FFmpeg engine for non-native formats (MKV, TS, AVI, etc.)
-        KSOptions.secondPlayerType = KSMEPlayer.self
-
-        // PiP: auto-start when app goes to background
-        KSOptions.canStartPictureInPictureAutomaticallyFromInline = true
-
-        // IPTV reconnection options are configured per-instance in
-        // KSPlayerImplementation.makeOptions(for:) to allow per-stream tuning.
-
-        print("[KSPlayer] Engine configured: KSMEPlayer enabled for MKV/TS/AVI")
-        #else
-        print("[Player] KSPlayer not available, using AVPlayer only")
-        #endif
+        print("[Player] Using FFmpeg transmux pipeline (TransmuxCore) + AVPlayer")
     }
 }

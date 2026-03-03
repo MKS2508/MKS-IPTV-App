@@ -1,9 +1,7 @@
 import Foundation
 
-#if canImport(Libavformat)
-import Libavformat
-import Libavcodec
-import Libavutil
+#if canImport(CFFmpegHelper)
+import CFFmpegHelper
 #endif
 
 // MARK: - Error Types
@@ -54,7 +52,7 @@ struct StreamMetadata {
 
 // MARK: - FFProbe Utilities (C API)
 
-/// Analyzes media streams using the FFmpeg C API (Libavformat) bundled by KSPlayer.
+/// Analyzes media streams using the FFmpeg 8.0.1 C API via TransmuxCore.
 /// Replaces the previous shell-based ffprobe approach for cross-platform support.
 class FFProbeUtilities {
 
@@ -65,7 +63,7 @@ class FFProbeUtilities {
     /// - Returns: StreamMetadata containing codec and format information.
     /// - Throws: FFProbeError if analysis fails.
     static func analyzeMKVStream(from url: URL) async throws -> StreamMetadata {
-        #if canImport(Libavformat)
+        #if canImport(CFFmpegHelper)
         guard url.scheme == "http" || url.scheme == "https" || url.isFileURL else {
             throw FFProbeError.invalidURL
         }
@@ -87,7 +85,7 @@ class FFProbeUtilities {
 
     /// Checks if the FFmpeg C API is available for stream analysis.
     static func isAvailable() -> Bool {
-        #if canImport(Libavformat)
+        #if canImport(CFFmpegHelper)
         return true
         #else
         return false
@@ -96,7 +94,7 @@ class FFProbeUtilities {
 
     // MARK: - C API Implementation
 
-    #if canImport(Libavformat)
+    #if canImport(CFFmpegHelper)
     private static func performAnalysis(url: URL) throws -> StreamMetadata {
         var formatCtx: UnsafeMutablePointer<AVFormatContext>?
         let urlString = url.absoluteString

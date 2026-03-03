@@ -1,7 +1,6 @@
 //
 //  mks-multiplatform-iptv-Bridging-Header.h
 //
-//  Exposes C helper functions to Swift for correct FFmpeg struct access.
+//  FFmpeg C helpers are now provided by TransmuxCore's CFFmpegHelper module.
+//  Import via `import CFFmpegHelper` in Swift.
 //
-
-#include "IPTVDownloader/Core/Player/FFmpegStreamHelper.h"

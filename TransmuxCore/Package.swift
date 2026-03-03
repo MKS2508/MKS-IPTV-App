@@ -1,10 +1,17 @@
 // swift-tools-version:5.9
 import PackageDescription
+import Foundation
 
 // MARK: - FFmpeg Configuration
 
-/// FFmpeg headers and libraries root (relative to package directory)
+/// Absolute path to the package root — ensures linker -L paths resolve correctly
+/// even when Xcode propagates them to the consuming app target.
+let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
+
+/// FFmpeg headers and libraries root (relative to package directory for headers,
+/// absolute for linker search paths)
 let ffmpegRoot = "Frameworks/FFmpeg"
+let ffmpegAbsRoot = "\(packageDir)/Frameworks/FFmpeg"
 
 /// Header search paths for FFmpeg includes
 let ffmpegHeaderSearchPaths: [CSetting] = [
@@ -42,13 +49,14 @@ let systemDependencies: [LinkerSetting] = [
     .linkedFramework("Security"),
 ]
 
-/// Platform-specific library search paths
+/// Platform-specific library search paths (absolute to ensure correct resolution
+/// when linker settings propagate from SPM package to the consuming Xcode target)
 /// macOS: native arm64 build
-/// iOS: separate builds for arm64 device and x86_64 simulator
+/// iOS/tvOS: arm64 device builds
 let librarySearchPaths: [LinkerSetting] = [
-    .unsafeFlags(["-L", "\(ffmpegRoot)/macos/arm64"], .when(platforms: [.macOS])),
-    .unsafeFlags(["-L", "\(ffmpegRoot)/ios/arm64"], .when(platforms: [.iOS])),
-    .unsafeFlags(["-L", "\(ffmpegRoot)/ios/arm64"], .when(platforms: [.tvOS])),
+    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/macos/arm64"], .when(platforms: [.macOS])),
+    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/ios/arm64"], .when(platforms: [.iOS])),
+    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/ios/arm64"], .when(platforms: [.tvOS])),
 ]
 
 let package = Package(
@@ -74,7 +82,8 @@ let package = Package(
             name: "CFFmpegHelper",
             path: "Sources/CFFmpegHelper",
             publicHeadersPath: "include",
-            cSettings: ffmpegHeaderSearchPaths
+            cSettings: ffmpegHeaderSearchPaths,
+            linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths
         ),
         // MARK: - TransmuxCore (Swift library)
         .target(

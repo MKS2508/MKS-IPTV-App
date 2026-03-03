@@ -1,35 +1,6 @@
 import Foundation
 import Combine
 import os
-//import ffmpegkit
-
-
-extension VideoDownloader {
-    func convertToMOVAsync(inputPath: String, outputPath: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        // Construimos el comando FFmpeg
-        let _ = "-y -i \"\(inputPath)\" -c copy \"\(outputPath)\""
-        
-        // Llamada ASÍNCRONA
-//        FFmpegKit.executeAsync(command) { session in
-//            let returnCode = session?.getReturnCode()
-//            
-//            if let returnCode = returnCode, ReturnCode.isSuccess(returnCode) {
-//                print("Remux a MOV completado (asíncrono). Path: \(outputPath)")
-//                completion(.success(()))
-//            } else if let returnCode = returnCode, ReturnCode.isCancel(returnCode) {
-//                print("La operación FFmpeg fue cancelada.")
-//                completion(.failure(NSError(domain: "FFmpegKit", code: Int(returnCode.getValue()), userInfo: [NSLocalizedDescriptionKey: "Operación cancelada"])))
-//            } else {
-//                let errorLogs = session?.getAllLogsAsString() ?? "No logs available"
-//                let errorDescription = "Ocurrió un error al remuxear. returnCode: \(String(describing: returnCode))"
-//                print(errorDescription)
-//                print("Logs:\n\(errorLogs)")
-//                
-//                completion(.failure(NSError(domain: "FFmpegKit", code: Int(returnCode?.getValue() ?? -1), userInfo: [NSLocalizedDescriptionKey: errorDescription])))
-//            }
-//        }
-    }
-}
 
 class VideoDownloader: NSObject, URLSessionDataDelegate {
     private enum Constants {
@@ -50,7 +21,49 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         case downloadPaused
     }
     
-     var shouldConvertToMOV: Bool = false // Propiedad configurable para habilitar/deshabilitar la conversión
+     // TODO: [DOWNLOAD-SYSTEM-OVERHAUL] — Complete rewrite of post-download conversion
+     // Currently disabled: old FFmpegKit-based convertToMOVAsync was removed.
+     // This flag and the conversion code block below must be replaced with:
+     //
+     // 1. MULTIPLE OUTPUT FORMATS — Not just MOV. Support MP4, MKV, MOV.
+     //    Let the user choose target container format in the download dialog
+     //    (MediaDetailSheet download options). Default: MP4 for Apple ecosystem.
+     //
+     // 2. STREAM-DOWNLOAD + TRANSMUX FUSION — Replace URLSession bulk download
+     //    with TransmuxCore's streaming FFmpeg I/O approach:
+     //    - Use FFmpeg's avio/protocol layer to stream-download + remux simultaneously
+     //    - Progressive write to final container format during download (no post-download conversion)
+     //    - Much faster than download-then-convert: single pass, no temp files
+     //    - Leverage TransmuxingService for the remux pipeline
+     //
+     // 3. PLAY WHILE DOWNLOADING — Enable playback once ~10% is buffered:
+     //    - TransmuxServer serves partial fMP4 segments as they're written
+     //    - Seeking restricted to already-downloaded/transmuxed fragments only
+     //    - Cannot seek to future positions (only within existing written data)
+     //    - Fullness gate: minimum 10% buffered before allowing playback start
+     //    - AVPlayer reads from TransmuxServer while download continues in background
+     //
+     // 4. METADATA EMBEDDING (Subler-like) — After download/transmux completes:
+     //    - Use FFmpegMetadataWriter + MetadataEnrichmentService (already in app)
+     //    - Embed title, genre, cast, director, plot, year, rating into MP4/MKV/MOV
+     //    - Embed cover artwork as attached picture stream
+     //    - Automatic: enrich from TMDB/OMDB, then write to final file
+     //
+     // 5. PAUSE AND RESUME DOWNLOADS:
+     //    - HTTP Range request support for resuming partial downloads
+     //    - Persist download state (bytes downloaded, last fragment) across app restarts
+     //    - Resume transmux from last written fragment position
+     //    - Handle server support detection (Accept-Ranges header)
+     //
+     // 6. UPDATE DOWNLOAD DIALOG — MediaDetailSheet must show:
+     //    - Format picker (MP4/MKV/MOV) instead of hardcoded MOV toggle
+     //    - Quality/codec info from FFProbeUtilities
+     //    - Estimated file size
+     //    - "Play while downloading" toggle
+     //
+     // See: VideoDownloader, TransmuxingService, FFmpegMetadataWriter,
+     //      MetadataEnrichmentService, MediaDetailSheet
+     var shouldConvertToMOV: Bool = false
      
      enum DownloadState: Equatable {
          case notStarted
@@ -408,28 +421,17 @@ extension VideoDownloader {
             logger.info("URLSession task completed successfully")
             currentState = .completed
             
-            if shouldConvertToMOV, let path = currentDestinationPath {
-                let outputPath = (path as NSString).deletingPathExtension + ".mov"
-                
-                // Cambiamos el estado a `converting` antes de iniciar la conversión
-                currentState = .converting
-                
-                // Ejecutamos la conversión asíncrona
-                convertToMOVAsync(inputPath: path, outputPath: outputPath) { [weak self] result in
-                    guard let self = self else { return }
-                    
-                    switch result {
-                    case .success:
-                        self.logger.info("¡Conversión a MOV finalizada!: \(outputPath)")
-                        self.currentState = .completed // Cambio de estado al completar la conversión
-                    case .failure(let conversionError):
-                        self.logger.error("Error al convertir a MOV: \(conversionError.localizedDescription)")
-                        self.currentState = .error(conversionError) // Cambio de estado en caso de error
-                    }
-                    
-                    self.downloadContinuation?.resume()
-                    self.progressSubject.send(completion: .finished)
-                }
+            // TODO: [DOWNLOAD-SYSTEM-OVERHAUL] — Post-download conversion disabled.
+            // Old FFmpegKit convertToMOVAsync removed. Replace with TransmuxCore
+            // stream-download+transmux fusion. See TODO at shouldConvertToMOV property.
+            //
+            // if shouldConvertToMOV, let path = currentDestinationPath {
+            //     let outputPath = (path as NSString).deletingPathExtension + ".mov"
+            //     currentState = .converting
+            //     // ... TransmuxCore-based conversion pipeline here ...
+            // }
+            if false /* shouldConvertToMOV — disabled until TransmuxCore integration */ {
+                // Placeholder: will be replaced by TransmuxCore stream+transmux pipeline
             } else {
                 downloadContinuation?.resume()
                 progressSubject.send(completion: .finished)

@@ -87,39 +87,34 @@ enum PlayerError: LocalizedError {
 // MARK: - Player Type
 enum PlayerType: String, CaseIterable {
     case avplayer = "AVPlayer"
-    case ksplayer = "KSPlayer"
     case vlc = "VLCKit"
     case ffmpeg = "FFmpeg+AVPlayer"
-    
+
     var displayName: String {
         switch self {
         case .avplayer:
             return "Native Player"
-        case .ksplayer:
-            return "KS Player"
         case .vlc:
             return "VLC Player"
         case .ffmpeg:
             return "FFmpeg Transmuxer"
         }
     }
-    
+
     var supportedFormats: [String] {
         switch self {
         case .avplayer:
             return ["mp4", "m4v", "mov", "m3u8"]
-        case .ksplayer:
-            return ["mkv", "avi", "mp4", "ts", "m3u8", "flv", "wmv", "m4v", "mov", "webm"]
         case .vlc:
             return ["mkv", "avi", "mp4", "ts", "m3u8", "flv", "wmv", "m4v", "mov"]
         case .ffmpeg:
             return ["mkv", "avi", "ts", "flv", "wmv"] // Converts to MP4
         }
     }
-    
+
     var hasPiPSupport: Bool {
         switch self {
-        case .avplayer, .ksplayer, .ffmpeg:
+        case .avplayer, .ffmpeg:
             return true  // .ffmpeg transmuxes to AVPlayer which supports PiP
         case .vlc:
             return false
@@ -128,13 +123,13 @@ enum PlayerType: String, CaseIterable {
 
     var hasAirPlaySupport: Bool {
         switch self {
-        case .avplayer, .ksplayer, .ffmpeg:
+        case .avplayer, .ffmpeg:
             return true  // .ffmpeg transmuxes to AVPlayer which supports AirPlay
         case .vlc:
             return false
         }
     }
-    
+
     func supports(format: String) -> Bool {
         supportedFormats.contains(format.lowercased())
     }
@@ -142,7 +137,7 @@ enum PlayerType: String, CaseIterable {
 
 // MARK: - Player Configuration
 struct PlayerConfiguration {
-    var preferredPlayer: PlayerType = .ksplayer  // KSPlayer for best MKV + PiP/AirPlay
+    var preferredPlayer: PlayerType = .ffmpeg  // FFmpeg transmux pipeline for best format support + AirPlay
     var fallbackPlayer: PlayerType = .avplayer
     var autoSelectPlayer: Bool = true
     var enableHardwareDecoding: Bool = true

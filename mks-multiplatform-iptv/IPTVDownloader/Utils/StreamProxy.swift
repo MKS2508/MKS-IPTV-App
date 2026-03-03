@@ -254,19 +254,19 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
 /// An HTTP proxy that forwards requests to a backend URL with true byte streaming.
 ///
 /// ## Purpose
-/// KSPlayer's bundled FFmpeg (n6.1) has a buffer overflow when parsing HTTP URLs
-/// longer than ~500 characters. IPTV servers behind Cloudflare use 302 redirects
-/// to tokenized URLs that can exceed 900 characters, causing `EXC_BAD_ACCESS`.
+/// FFmpeg 8.0.1 (TransmuxCore) may have issues with very long HTTP URLs (>~500 chars).
+/// IPTV servers behind Cloudflare use 302 redirects to tokenized URLs that can
+/// exceed 900 characters.
 ///
 /// This proxy solves the problem by:
 /// 1. Listening on localhost with a short URL (e.g., `http://localhost:9100/0`)
-/// 2. Receiving HTTP requests from FFmpeg/KSPlayer
+/// 2. Receiving HTTP requests from FFmpeg
 /// 3. Forwarding requests to the real backend URL (with the long token)
 /// 4. Streaming the response bytes directly as they arrive (no buffering)
 ///
 /// ## Architecture
 /// ```
-/// FFmpeg (FFmpegKit n6.1)
+/// FFmpeg 8.0.1 (TransmuxCore)
 ///     | TCP connect localhost:9100
 /// [NWListener] accept NWConnection
 ///     | parse raw HTTP request (GET/HEAD + Range)

@@ -1,9 +1,7 @@
 import Foundation
 
-#if canImport(Libavformat)
-import Libavformat
-import Libavcodec
-import Libavutil
+#if canImport(CFFmpegHelper)
+import CFFmpegHelper
 #endif
 
 // MARK: - Transmux Error
@@ -18,7 +16,7 @@ enum TransmuxError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .ffmpegNotFound:
-            return "FFmpeg C API not available. Ensure KSPlayer (with FFmpegKit) is linked."
+            return "FFmpeg C API not available. Ensure TransmuxCore is linked."
         case .processStartFailure(let error):
             return "Failed to initialize transmuxing: \(error.localizedDescription)"
         case .processFailure(let status):
@@ -109,7 +107,7 @@ extension Notification.Name {
 
 // MARK: - Transmuxing Service
 
-/// Cross-platform transmuxing service using the FFmpeg C API bundled by KSPlayer.
+/// Cross-platform transmuxing service using the FFmpeg 8.0.1 C API via TransmuxCore.
 /// Remuxes MKV (or other non-native containers) to fragmented MP4
 /// without re-encoding -- copies video and audio streams as-is.
 ///
@@ -129,7 +127,7 @@ actor TransmuxingService {
     private var activeTransmuxes: [String: ActiveTransmux] = [:]
 
     private init() {
-        #if canImport(Libavformat)
+        #if canImport(CFFmpegHelper)
         // av_register_all() is no longer needed in FFmpeg 4+; formats are auto-registered.
         #endif
     }
@@ -140,7 +138,7 @@ actor TransmuxingService {
     /// The remux loop continues in the background. Use `cancelTransmux(sessionID:)`
     /// to stop it early.
     func startTransmux(from sourceURL: URL) async throws -> ProgressiveTransmuxSession {
-        #if canImport(Libavformat)
+        #if canImport(CFFmpegHelper)
         let sessionID = UUID().uuidString
         let outputDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("mks-iptv-transmux-\(sessionID)")
@@ -225,7 +223,7 @@ actor TransmuxingService {
 
     // MARK: - FFmpeg C API Core (Progressive)
 
-    #if canImport(Libavformat)
+    #if canImport(CFFmpegHelper)
 
     /// Two-phase transmux: resumes the continuation after the header is written,
     /// then continues the remux loop on the same background thread.

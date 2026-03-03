@@ -9,8 +9,6 @@
 /* Begin PBXBuildFile section */
 		05548F942F5626330060E2DD /* TransmuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F932F5626330060E2DD /* TransmuxCore */; };
 		05548F962F5626330060E2DD /* transmux-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F952F5626330060E2DD /* transmux-cli */; };
-		05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05CF93D92F50E665006EBEDE /* KSPlayer */; };
-		05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 05DB74D52F47CB3900547E01 /* KSPlayer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,9 +54,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				05DB74D62F47CB3900547E01 /* KSPlayer in Frameworks */,
 				05548F942F5626330060E2DD /* TransmuxCore in Frameworks */,
-				05CF93DA2F50E665006EBEDE /* KSPlayer in Frameworks */,
 				05548F962F5626330060E2DD /* transmux-cli in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -114,7 +110,6 @@
 				058CC06B2D39C8CF006E00BF /* Sources */,
 				058CC06C2D39C8CF006E00BF /* Frameworks */,
 				058CC06D2D39C8CF006E00BF /* Resources */,
-				05FE00012F48000000547E01 /* Fix KSPlayer Frameworks */,
 			);
 			buildRules = (
 			);
@@ -156,7 +151,6 @@
 			mainGroup = 058CC0662D39C8CF006E00BF;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */,
 				05548F922F5626330060E2DD /* XCLocalSwiftPackageReference "TransmuxCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -186,28 +180,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		05FE00012F48000000547E01 /* Fix KSPlayer Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Fix KSPlayer Frameworks";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/bash;
-			shellScript = "\"${SRCROOT}/mks-multiplatform-iptv/scripts/fix-ksplayer-frameworks.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		057C1B972D95EAC20059601D /* Sources */ = {
@@ -532,17 +504,6 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		05548F932F5626330060E2DD /* TransmuxCore */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -551,16 +512,6 @@
 		05548F952F5626330060E2DD /* transmux-cli */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = "transmux-cli";
-		};
-		05CF93D92F50E665006EBEDE /* KSPlayer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;
-			productName = KSPlayer;
-		};
-		05DB74D52F47CB3900547E01 /* KSPlayer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 05DB74D42F47CB3900547E01 /* XCRemoteSwiftPackageReference "KSPlayer" */;
-			productName = KSPlayer;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -16,9 +16,9 @@ class PlayerFactory {
 
     // MARK: - Public API
 
-    /// Create the optimal player for a given URL using Opción B strategy:
+    /// Create the optimal player for a given URL:
     ///   1. Native formats (MP4/M4V/MOV/M3U8) → AVPlayer (PiP + AirPlay)
-    ///   2. KSPlayer available + non-native → KSPlayer (PiP, no AirPlay for MKV)
+    ///   2. Non-native → FFmpeg transmux pipeline (produces AVPlayer output)
     ///   3. VLCKit available → VLC fallback
     ///   4. Last resort → AVPlayer (may fail with MKV)
     func createPlayer(for url: URL) -> any VideoPlayerProtocol {
@@ -47,17 +47,6 @@ class PlayerFactory {
             player.load(url: url)
             return player
 
-        case .ksplayer:
-            if KSPlayerImplementation.isAvailable() {
-                let player = KSPlayerImplementation()
-                player.load(url: url)
-                return player
-            }
-            print("[PlayerFactory] KSPlayer not available, falling back to AVPlayer")
-            let player = AVPlayerImplementation()
-            player.load(url: url)
-            return player
-
         case .vlc:
             if VLCPlayerImplementation.isAvailable() {
                 let player = VLCPlayerImplementation()
@@ -76,42 +65,30 @@ class PlayerFactory {
         }
     }
 
-    // MARK: - Smart Player Selection (Opción B)
+    // MARK: - Smart Player Selection
 
     private func createBestPlayer(for format: String, url: URL) -> any VideoPlayerProtocol {
         let isNative = PlayerType.avplayer.supports(format: format)
 
-        // 1. AirPlay required + non-native → FFmpeg transmux pipeline (produces AVPlayer output)
-        if configuration.requireAirPlaySupport && !isNative && PlayerType.ffmpeg.supports(format: format) {
-            print("[PlayerFactory] AirPlay required, non-native (\(format)) → FFmpeg transmux pipeline")
-            return createPlayer(type: .ffmpeg, url: url)
-        }
-
-        // 2. Native formats → AVPlayer (best PiP + AirPlay)
+        // 1. Native formats → AVPlayer (best PiP + AirPlay)
         if isNative {
             print("[PlayerFactory] Native format (\(format)) → AVPlayer")
             return createPlayer(type: .avplayer, url: url)
         }
 
-        // 3. Non-native but KSPlayer available → KSPlayer (PiP, wide codec support)
-        if KSPlayerImplementation.isAvailable() {
-            print("[PlayerFactory] Non-native format (\(format)) → KSPlayer")
-            return createPlayer(type: .ksplayer, url: url)
-        }
-
-        // 4. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
-        if VLCPlayerImplementation.isAvailable() {
-            print("[PlayerFactory] Non-native format (\(format)) → VLCKit fallback")
-            return createPlayer(type: .vlc, url: url)
-        }
-
-        // 5. FFmpeg transmux pipeline (cross-platform)
+        // 2. Non-native → FFmpeg transmux pipeline (produces AVPlayer output with AirPlay)
         if PlayerType.ffmpeg.supports(format: format) {
             print("[PlayerFactory] Non-native format (\(format)) → FFmpeg transmux pipeline")
             return createPlayer(type: .ffmpeg, url: url)
         }
 
-        // 6. Last resort: AVPlayer (will likely fail with MKV)
+        // 3. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
+        if VLCPlayerImplementation.isAvailable() {
+            print("[PlayerFactory] Non-native format (\(format)) → VLCKit fallback")
+            return createPlayer(type: .vlc, url: url)
+        }
+
+        // 4. Last resort: AVPlayer (will likely fail with MKV)
         print("[PlayerFactory] No suitable player for \(format), trying AVPlayer as last resort")
         return createPlayer(type: .avplayer, url: url)
     }
@@ -128,14 +105,11 @@ class PlayerFactory {
     static func availablePlayers() -> [PlayerType] {
         var players: [PlayerType] = [.avplayer]
 
-        if KSPlayerImplementation.isAvailable() {
-            players.append(.ksplayer)
-        }
         if VLCPlayerImplementation.isAvailable() {
             players.append(.vlc)
         }
 
-        // FFmpeg transmux pipeline is cross-platform (uses C API, not shell)
+        // FFmpeg transmux pipeline is cross-platform (uses C API via TransmuxCore)
         players.append(.ffmpeg)
 
         return players
@@ -178,9 +152,7 @@ class PlayerManager: ObservableObject {
         currentPlayer = player
 
         // Track actual player type
-        if player is KSPlayerImplementation {
-            currentPlayerType = .ksplayer
-        } else if player is VLCPlayerImplementation {
+        if player is VLCPlayerImplementation {
             currentPlayerType = .vlc
         } else if player is FFmpegPlayerImplementation {
             currentPlayerType = .ffmpeg

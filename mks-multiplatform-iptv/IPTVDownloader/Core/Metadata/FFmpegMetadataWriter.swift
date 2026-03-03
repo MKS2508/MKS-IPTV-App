@@ -1,9 +1,7 @@
 import Foundation
 
-#if canImport(Libavformat)
-import Libavformat
-import Libavcodec
-import Libavutil
+#if canImport(CFFmpegHelper)
+import CFFmpegHelper
 #endif
 
 // MARK: - Metadata Write Error
@@ -44,7 +42,7 @@ enum MetadataWriteError: LocalizedError {
 // MARK: - FFmpeg Metadata Writer
 
 /// Actor-based service for writing metadata tags to downloaded media files
-/// using the FFmpeg C API bundled by KSPlayer.
+/// using the FFmpeg 8.0.1 C API via TransmuxCore.
 ///
 /// **Strategy**: FFmpeg cannot write metadata in-place. The approach is:
 /// 1. Open the input file for reading
@@ -69,7 +67,7 @@ actor FFmpegMetadataWriter {
         metadata: MetadataResult,
         artworkData: Data?
     ) async throws {
-        #if canImport(Libavformat)
+        #if canImport(CFFmpegHelper)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw MetadataWriteError.fileNotFound(fileURL.path)
         }
@@ -117,7 +115,7 @@ actor FFmpegMetadataWriter {
 
     // MARK: - Core FFmpeg Implementation
 
-    #if canImport(Libavformat)
+    #if canImport(CFFmpegHelper)
     private static func performMetadataWrite(
         inputPath: String,
         tempPath: String,

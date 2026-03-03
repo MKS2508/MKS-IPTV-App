@@ -31,7 +31,7 @@ import Foundation
 /// // Play with AVPlayer
 /// let player = AVPlayer(url: serverSession.localURL)
 /// ```
-public enum TransmuxCore {
+public enum TransmuxCoreInfo {
     /// Package version
     public static let version = "1.0.0"
 }

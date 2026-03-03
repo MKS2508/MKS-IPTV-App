@@ -12,7 +12,7 @@ enum MKSPlayerPresentationMode {
     /// Fullscreen native player presentation.
     /// Uses `AVPlayerViewController` (iOS) / `AVPlayerView` (macOS) for all system controls:
     /// scrub bar, play/pause/skip, volume, AirPlay, PiP, fullscreen, subtitle picker.
-    /// Falls back to `playerView()` for non-AVPlayer backends (KSPlayer, VLC).
+    /// Falls back to `playerView()` for non-AVPlayer backends (VLC).
     case fullscreen
 }
 
@@ -202,7 +202,7 @@ struct MKSPlayerView: View {
 /// - **AVPlayer**: `underlyingAVPlayer` is available immediately → native controls from the start.
 /// - **FFmpeg**: `underlyingAVPlayer` is nil during transmux → shows the player's own view
 ///   (spinner), then transitions to native controls once the HLS pipeline produces an AVPlayer.
-/// - **KSPlayer / VLC**: `underlyingAVPlayer` is always nil → permanently uses their own player view.
+/// - **VLC**: `underlyingAVPlayer` is always nil → permanently uses its own player view.
 private struct ReactiveFullscreenSurface: View {
     let player: any VideoPlayerProtocol
     var onDismiss: (() -> Void)?
@@ -218,7 +218,7 @@ private struct ReactiveFullscreenSurface: View {
                 NativeAVPlayerView(player: avPlayer)
                 #endif
             } else {
-                // Fallback: player's own view (spinner for FFmpeg, native view for KSPlayer/VLC)
+                // Fallback: player's own view (spinner for FFmpeg, native view for VLC)
                 player.playerView()
             }
         }

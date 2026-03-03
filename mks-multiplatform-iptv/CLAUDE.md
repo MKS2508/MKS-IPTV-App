@@ -58,7 +58,7 @@ xcodebuild -project mks-multiplatform-iptv.xcodeproj \
 ```
 
 ### SPM Dependencies
-All dependencies (KSPlayer, VLCKitSPM, FlyingFox) are managed via Swift Package Manager.
+Dependencies (TransmuxCore local, VLCKitSPM) are managed via Swift Package Manager.
 Add new packages via Xcode: File > Add Package Dependencies.
 
 ## Project Structure
@@ -111,18 +111,17 @@ Reactive download system in `Features/Download/ViewModels/DownloadManager.swift`
 
 #### Player Abstraction
 Multi-player system in `Core/Player/` with protocol `VideoPlayerProtocol`:
-- **AVPlayer**: Native Apple player (limited format support)
-- **KSPlayer**: Preferred for MKV with PiP/AirPlay support
-- **VLCKit**: Wide format support (via VLCKitSPM Swift Package)
-- **FFmpeg Transmux**: Cross-platform transmux pipeline using FFmpeg C API (Libavformat) bundled by KSPlayer. Remuxes MKV to HLS/fMP4 and plays through AVPlayer for AirPlay support.
+- **AVPlayer**: Native Apple player (MP4/MOV/HLS)
+- **FFmpeg Transmux**: Primary player for non-native formats. Uses FFmpeg 8.0.1 C API via TransmuxCore to remux MKV/AVI/TS to HLS/fMP4, then plays through AVPlayer for AirPlay + PiP support.
+- **VLCKit**: Wide format fallback (via VLCKitSPM Swift Package)
 
 `PlayerFactory` auto-selects the best player based on format, features, and AirPlay requirements.
 
 #### TransmuxingService
-Actor-based service in `Core/Player/TransmuxingService.swift` that remuxes non-native containers (MKV, AVI, etc.) to HLS/fMP4 using the FFmpeg C API without re-encoding.
+Actor-based service in `Core/Player/TransmuxingService.swift` that remuxes non-native containers (MKV, AVI, etc.) to HLS/fMP4 using FFmpeg 8.0.1 C API (via TransmuxCore) without re-encoding.
 
-#### LocalHLSServer
-Lightweight HTTP server in `Utils/LocalHLSServer.swift` (using FlyingFox) that serves transmuxed HLS segments to AVPlayer for AirPlay compatibility.
+#### TransmuxServer
+NWListener-based HTTP server in `Utils/TransmuxServer.swift` that serves transmuxed HLS segments to AVPlayer for AirPlay compatibility.
 
 #### StreamManager
 Live stream URL resolution in `Features/Download/ViewModels/StreamManager.swift` that handles redirects and custom headers for IPTV stream compatibility.
@@ -140,9 +139,8 @@ Adaptive navigation in `PlatformNavigationView.swift`:
 
 ## Dependencies
 
-- **KSPlayer** (via SPM): Primary player for MKV/non-native formats with PiP and AirPlay support. Bundles FFmpegKit (Libavformat/Libavcodec/Libavutil).
+- **TransmuxCore** (local SPM): FFmpeg 8.0.1 transmux pipeline — remuxes MKV/AVI/TS to HLS/fMP4 for AVPlayer. Includes CFFmpegHelper (C wrapper) and static FFmpeg libs for macOS/iOS/tvOS.
 - **VLCKitSPM** (via SPM): VLC fallback player — `https://github.com/tylerjonesio/vlckit-spm.git`
-- **FlyingFox** (via SPM): Lightweight HTTP server for serving transmuxed HLS segments — `https://github.com/swhitty/FlyingFox.git`
 
 ## IPTV API Endpoints
 

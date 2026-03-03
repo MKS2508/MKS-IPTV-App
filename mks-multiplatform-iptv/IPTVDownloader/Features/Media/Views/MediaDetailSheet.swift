@@ -48,9 +48,11 @@ struct MediaDetailSheet: View {
 
     // MARK: - Tabs
 
-    enum DetailTab: String, CaseIterable {
+    enum DetailTab: String, CaseIterable, Identifiable {
         case overview = "Overview"
         case episodes = "Episodes"
+
+        var id: String { rawValue }
     }
 
     private var visibleTabs: [DetailTab] {
@@ -348,10 +350,9 @@ struct MediaDetailSheet: View {
     private var tabBarSection: some View {
         if visibleTabs.count > 1 {
             GlassSegmentedControl(
-                options: visibleTabs,
                 selectedOption: $selectedTab,
-                titleKeyPath: \.rawValue,
-                imageKeyPath: nil
+                options: visibleTabs,
+                titleForKeyPath: \.rawValue
             )
             .padding(.horizontal, 20)
             .padding(.vertical, 12)

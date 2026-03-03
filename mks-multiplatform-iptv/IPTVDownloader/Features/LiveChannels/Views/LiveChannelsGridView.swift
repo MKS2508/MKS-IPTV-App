@@ -313,8 +313,6 @@ struct LiveChannelDetailSheet: View {
     @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var showFullscreenPlayer = false
     @State private var isLoading = false
-    @State private var showKSPlayerView = false
-    @State private var ksPlayerURL: URL?
     
     var body: some View {
         NavigationView {
@@ -452,23 +450,6 @@ struct LiveChannelDetailSheet: View {
                         
                         // External players row
                         HStack(spacing: 16) {
-                            // KSPlayer button (only if available)
-                            if KSPlayerImplementation.isAvailable() {
-                                Button(action: playWithKSPlayer) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "play.rectangle")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        Text("KSPlayer")
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 18)
-                                    .padding(.vertical, 10)
-                                    .background(Color.purple)
-                                    .cornerRadius(20)
-                                }
-                            }
-                            
                             // Open in VLC button
                             OpenInVLCButton(urlProvider: {
                                 return IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
@@ -502,26 +483,6 @@ struct LiveChannelDetailSheet: View {
         .onDisappear {
             cleanUpPlayer()
         }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showKSPlayerView) {
-            if let url = ksPlayerURL {
-                KSPlayerFullScreenView(url: url, onClose: {
-                    showKSPlayerView = false
-                    ksPlayerURL = nil
-                })
-            }
-        }
-        #else
-        .sheet(isPresented: $showKSPlayerView) {
-            if let url = ksPlayerURL {
-                KSPlayerFullScreenView(url: url, onClose: {
-                    showKSPlayerView = false
-                    ksPlayerURL = nil
-                })
-                .frame(minWidth: 800, minHeight: 600)
-            }
-        }
-        #endif
         .fullscreenPlayer(
             isPresented: $showFullscreenPlayer,
             player: activePlayer,
@@ -583,63 +544,4 @@ struct LiveChannelDetailSheet: View {
         LiveLogger.debug("URL del canal copiada al portapapeles: \(urlString)")
     }
     
-    private func playWithKSPlayer() {
-        LiveLogger.debug("Opening channel in KSPlayer: \(channel.name)")
-        
-        guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
-                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: urlString) else {
-            LiveLogger.error("Failed to generate valid stream URL for KSPlayer")
-            return
-        }
-        
-        LiveLogger.debug("KSPlayer URL: \(url.absoluteString)")
-        
-        // Set URL and show KSPlayer fullscreen
-        ksPlayerURL = url
-        showKSPlayerView = true
-        
-        LiveLogger.debug("KSPlayer fullscreen view presented")
-    }
-}
-
-// MARK: - KSPlayer FullScreen View
-struct KSPlayerFullScreenView: View {
-    let url: URL
-    let onClose: () -> Void
-
-    @State private var activePlayer: (any VideoPlayerProtocol)?
-
-    var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
-
-            if let player = activePlayer {
-                MKSPlayerView(
-                    player: player,
-                    onDismiss: onClose,
-                    presentationMode: .fullscreen
-                )
-            } else {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .tint(.white)
-                    Text("Cargando KSPlayer...")
-                        .foregroundColor(.white)
-                        .font(.headline)
-                }
-            }
-        }
-        .onAppear {
-            let player = PlayerFactory.shared.createPlayer(type: .ksplayer, url: url)
-            player.play()
-            activePlayer = player
-        }
-        .onDisappear {
-            activePlayer?.stop()
-            activePlayer = nil
-        }
-    }
 }

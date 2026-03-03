@@ -484,7 +484,7 @@ struct DebugStreamingView: View {
             }
 
             // If the server redirects (common with Cloudflare-fronted IPTV),
-            // resolve a fresh direct URL so KSPlayer/FFmpeg doesn't need to
+            // resolve a fresh direct URL so FFmpeg doesn't need to
             // handle the 302 itself (FFmpeg's URL parser chokes on long token URLs)
             var playbackURL = url
             if preflight.wasRedirected {
@@ -496,9 +496,8 @@ struct DebugStreamingView: View {
                 }
             }
 
-            // NOTE: KSPlayer and FFmpeg Transmuxer both use FFmpegKit n6.1 which has a
-            // buffer overflow on URLs >~500 chars. Route long URLs through StreamProxy
-            // to shorten them to a localhost URL before handing to the player.
+            // FFmpeg 8.0.1 (TransmuxCore) may have issues with very long URLs (>~500 chars).
+            // Route long URLs through StreamProxy to shorten them to a localhost URL.
 
             let urlIsLong = playbackURL.absoluteString.count > proxyURLLengthThreshold
             if urlIsLong {
@@ -575,8 +574,8 @@ struct DebugStreamingView: View {
                 }
             }
 
-            // Use proxy for long URLs — KSPlayer and FFmpeg Transmuxer both use FFmpegKit n6.1
-            // which has a buffer overflow on URLs >~500 chars.
+            // Use proxy for long URLs — FFmpeg 8.0.1 (TransmuxCore) may have issues
+            // with very long URLs (>~500 chars).
             if needsProxy {
                 do {
                     let session = try await StreamProxy.shared.startProxy(for: playbackURL)
@@ -749,7 +748,7 @@ struct DebugStreamingView: View {
         }
 
         viewModel.log("FFprobe (Libavformat): \(FFProbeUtilities.isAvailable() ? "Available" : "Not Available")", type: FFProbeUtilities.isAvailable() ? .success : .warning)
-        viewModel.log("KSPlayer module: \(KSPlayerImplementation.isAvailable() ? "Linked" : "Not Linked")", type: .info)
+        viewModel.log("TransmuxCore (FFmpeg 8.0.1): Available", type: .success)
         viewModel.log("VLCKit module: \(VLCPlayerImplementation.isAvailable() ? "Linked" : "Not Linked")", type: .info)
         viewModel.log("==================", type: .info)
     }
@@ -789,7 +788,6 @@ struct DebugStreamingView: View {
     // MARK: - Helpers
 
     private func detectPlayerType(_ player: any VideoPlayerProtocol) -> PlayerType {
-        if player is KSPlayerImplementation { return .ksplayer }
         if player is VLCPlayerImplementation { return .vlc }
         if player is FFmpegPlayerImplementation { return .ffmpeg }
         return .avplayer

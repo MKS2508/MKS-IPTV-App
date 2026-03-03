@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@backend/*": ["./packages/backend/src/*"],
+      "@frontend/*": ["./packages/frontend/mks-iptv-client/src/*"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "references": [
+    { "path": "./packages/backend" },
+    { "path": "./packages/frontend/mks-iptv-client" }
+  ]
+}

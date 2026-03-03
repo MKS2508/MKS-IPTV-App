@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Build outputs
+dist/
+.build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test outputs
+coverage/
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Old modules
+.old_modules*/
+
+# Scaffolder generated (ignore from linting)
+packages/frontend/mks-iptv-client/src/components/animate-ui/
+packages/frontend/mks-iptv-client/src/components/Counter.tsx
+packages/frontend/mks-iptv-client/src/components/ShinyText.tsx
+packages/frontend/mks-iptv-client/src/components/ClickSpark.tsx
+packages/frontend/mks-iptv-client/public/data.json

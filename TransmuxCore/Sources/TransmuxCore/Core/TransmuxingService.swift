@@ -63,7 +63,9 @@ public extension Notification.Name {
 /// mismatch -- av_class is omitted, shifting all field offsets by 8 bytes.
 /// The C compiler sees the correct struct layout.
 public actor TransmuxingService {
-    public static let shared = TransmuxingService()
+    /// Default shared instance. Call `configure(streamProxy:)` early in app launch
+    /// to inject the HTTPS proxy before any transmux operations.
+    public static var shared = TransmuxingService()
 
     private var activeSessions: [String: URL] = [:]
     private var activeTransmuxes: [String: ActiveTransmux] = [:]
@@ -71,7 +73,12 @@ public actor TransmuxingService {
 
     public init(streamProxy: StreamProxyProvider? = nil) {
         self.streamProxy = streamProxy
-        // av_register_all() is no longer needed in FFmpeg 4+; formats are auto-registered.
+    }
+
+    /// Replace the shared instance with one configured with the given proxy.
+    /// Call once during app startup, before any transmux operations.
+    public static func configure(streamProxy: StreamProxyProvider) {
+        shared = TransmuxingService(streamProxy: streamProxy)
     }
 
     // MARK: - Public API
@@ -336,6 +343,9 @@ public actor TransmuxingService {
         // EAC3 REQUIRES delay_moov: FFmpeg's mp4 muxer must parse actual EAC3
         // frames to build AudioSpecificConfig in the moov atom. Setting frame_size
         // alone triggers "Cannot write moov atom before EAC3 packets parsed".
+        // However, we set frame_size=1536 IN ADDITION TO delay_moov so that
+        // the trex box gets default_sample_duration=1536 instead of 0.
+        // Without this, AVPlayer fails to build CMTimebase from the moov.
         // For EAC3, the init phase runs but we continue from current position
         // (no truncate/rewind) to keep DTS monotonic.
         if hasAC3Audio && bestAudio >= 0 {
@@ -347,8 +357,11 @@ public actor TransmuxingService {
                 hasAC3Audio = false
                 TransmuxLog.service("AC3: set frame_size=1536, using empty_moov (no delay_moov)")
             } else {
-                // EAC3: must use delay_moov, continue from current position after init
-                TransmuxLog.service("EAC3: delay_moov required, will continue from init position (no truncate/rewind)")
+                // EAC3: delay_moov required for AudioSpecificConfig, but we ALSO set
+                // frame_size so the trex box gets default_sample_duration=1536 instead of 0.
+                // Without this, AVPlayer can't build a valid CMTimebase from the moov.
+                mks_stream_set_frame_size(outCtx, audioOutIdx, 1536)
+                TransmuxLog.service("EAC3: delay_moov + frame_size=1536, will continue from init position (no truncate/rewind)")
             }
         }
 
@@ -486,9 +499,18 @@ public actor TransmuxingService {
 
             // AC3 init phase produced moov + first fragments. Continue from here.
             // DO NOT truncate or rewind -- the muxer's internal DTS state can't be reset.
-            // The init data (moov + fragments) becomes the init segment, and the
-            // segmenter scanner picks up new fragments after initSegmentSize offset.
             TransmuxLog.service("AC3 init phase complete, continuing from current position (no truncate/rewind)")
+
+            // The file now contains [ftyp][moov][moof][mdat]... but the HLS init segment
+            // (/init.mp4) must be ONLY [ftyp][moov]. The moof+mdat fragments from the init
+            // phase are regular media data — HLSSegmenter will scan and serve them as segments.
+            // Without this fix, AVPlayer gets a 7MB "init segment" containing media data,
+            // which corrupts CMTimebase setup and causes audio cutting.
+            let trueInitSize = Self.findInitSegmentEnd(at: mp4Path)
+            if trueInitSize > 0 && trueInitSize < headerFileSize {
+                TransmuxLog.service("AC3 init: total file=\(headerFileSize) bytes, true init (ftyp+moov)=\(trueInitSize) bytes, \(headerFileSize - trueInitSize) bytes of fragments will be scanned as HLS segments")
+                headerFileSize = trueInitSize
+            }
         }
 
         // Verify init segment has reasonable size (should be 400-800 bytes for typical streams)
@@ -545,7 +567,7 @@ public actor TransmuxingService {
         // the earliest keyframe maps to exactly lastWrittenDts + 1.
         var bufferedVideoKeyframes: [UnsafeMutablePointer<AVPacket>] = []
         var firstNVideoDtsAfterSeek: [Int64] = []
-        let videoDtsAveragingCount = 3
+        let videoDtsAveragingCount = 1
         var globalOffsetComputed = false
 
         // After a seek: skip packets until first video keyframe, then compute global offset.
@@ -564,8 +586,9 @@ public actor TransmuxingService {
         var pendingAudioPackets: [UnsafeMutablePointer<AVPacket>] = []
         let maxPendingAudioPackets = 500  // ~10 seconds of audio at 50 pkt/sec (handles longer seeks)
 
-        // Map output stream index to whether it's the video stream
+        // Map output stream indices for video and audio
         let videoOutputIdx: Int32 = bestVideo >= 0 ? Int32(streamMapping[Int(bestVideo)]) : -1
+        let audioOutputIdx: Int32 = bestAudio >= 0 ? Int32(streamMapping[Int(bestAudio)]) : -1
 
         // Seek cooldown: require minimum time between seeks to prevent cascading
         var lastSeekCompletionTime: Date? = nil
@@ -593,14 +616,11 @@ public actor TransmuxingService {
                 totalSeekCount += 1
                 let preSeekDts = lastWrittenDts.map { "stream\($0.key)=\($0.value)" }.joined(separator: ", ")
                 TransmuxLog.remux("===== SEEK #\(totalSeekCount) to \(String(format: "%.1f", seekTime))s =====")
-                TransmuxLog.remux("Pre-seek state: packetCount=\(packetCount) lastWrittenDts=[\(preSeekDts)]")
-                let preSeekOffsets = streamRebaseOffsets.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " ")
-                TransmuxLog.remux("Pre-seek offsets=[\(preSeekOffsets)]")
 
                 // 1. Flush the interleaver queue — writes any buffered packets
                 av_interleaved_write_frame(outCtx, nil)
                 avio_flush(outCtx.pointee.pb)
-                TransmuxLog.remux("Flushed interleaver + AVIO before seek")
+                // Flushed interleaver + AVIO
 
                 // 2. Flush input demuxer buffers (stale MPEG-TS PES packets)
                 mks_format_flush_input(inCtx)
@@ -612,12 +632,12 @@ public actor TransmuxingService {
                     TransmuxLog.remux("WARNING: av_seek_frame failed (\(seekRet)), continuing from current position", level: .warn)
                     continue
                 }
-                TransmuxLog.remux("av_seek_frame OK (ts=\(seekTS), ret=\(seekRet))")
+                // av_seek_frame OK
 
                 // 4. Flush AAC BSF state (partial ADTS frames from before seek)
                 if let bsf = aacBsfCtx {
                     mks_bsf_flush(bsf)
-                    TransmuxLog.remux("AAC BSF flushed")
+                    // AAC BSF flushed
                 }
 
                 // 5. Set seek-pending: skip until video keyframe, then compute global offset
@@ -638,7 +658,7 @@ public actor TransmuxingService {
                 segmenter.notifySeekDiscontinuity(seekTargetTime: seekTime)
 
                 packetCount = 0  // reset for aggressive flushing after seek
-                TransmuxLog.remux("Seek #\(totalSeekCount) prepared: awaiting video keyframe for global offset computation")
+                // Seek prepared: awaiting video keyframe
                 continue
             }
 
@@ -703,7 +723,7 @@ public actor TransmuxingService {
                             continue
                         }
                         videoKeyframeReceived = true
-                        TransmuxLog.remux("First video KEYFRAME after seek #\(totalSeekCount) at packet \(packetCount), buffer has \(pendingAudioPackets.count) audio packets, rawDts=\(rawDtsBefore) rawPts=\(rawPtsBefore)")
+                        // First video keyframe after seek
                     }
                     // Video keyframes fall through to the offset computation block below
                 } else {
@@ -739,14 +759,22 @@ public actor TransmuxingService {
             // Using MINIMUM DTS (not average) guarantees monotonicity.
             if seekPending && !globalOffsetComputed {
                 if isVideo && videoKeyframeReceived {
-                    let newDts = mks_packet_get_dts(pkt)
+                    var newDts = mks_packet_get_dts(pkt)
 
-                    // Skip keyframes with invalid DTS (can happen after seek)
+                    // Recover keyframes with invalid DTS but valid PTS (common after av_seek_frame)
+                    // For keyframes, DTS <= PTS. Use PTS as DTS estimate to avoid losing ~80ms of video.
                     if newDts == AV_NOPTS {
-                        TransmuxLog.remux("Skipping keyframe with invalid DTS (AV_NOPTS)", level: .warn)
-                        av_packet_unref(pkt)
-                        packetCount += 1
-                        continue
+                        let pts = mks_packet_get_pts(pkt)
+                        if pts != AV_NOPTS {
+                            mks_packet_set_dts(pkt, pts)
+                            newDts = pts
+                            // Recovered AV_NOPTS keyframe using PTS
+                        } else {
+                            TransmuxLog.remux("Skipping keyframe: both DTS and PTS are AV_NOPTS", level: .warn)
+                            av_packet_unref(pkt)
+                            packetCount += 1
+                            continue
+                        }
                     }
 
                     if bufferedVideoKeyframes.count < videoDtsAveragingCount {
@@ -754,7 +782,7 @@ public actor TransmuxingService {
                         if let clonedPkt = av_packet_clone(pkt) {
                             bufferedVideoKeyframes.append(clonedPkt)
                             firstNVideoDtsAfterSeek.append(newDts)
-                            TransmuxLog.remux("Buffered video keyframe #\(bufferedVideoKeyframes.count) with DTS=\(newDts)")
+                            // Keyframe buffered
                         }
 
                         // Don't write yet - wait until we have N keyframes
@@ -765,54 +793,77 @@ public actor TransmuxingService {
 
                     // Once we have N keyframes, compute per-stream offsets
                     if bufferedVideoKeyframes.count >= videoDtsAveragingCount {
-                        // Use MINIMUM DTS to guarantee the earliest keyframe maps to
-                        // exactly lastWrittenDts + 1 (no overlap with pre-seek data)
-                        let minDts = firstNVideoDtsAfterSeek.min()!
+                        let anchorDts = firstNVideoDtsAfterSeek[0]
 
-                        // Compute video offset
-                        if let lastVideoDts = lastWrittenDts[videoOutputIdx], lastVideoDts != AV_NOPTS {
-                            streamRebaseOffsets[videoOutputIdx] = lastVideoDts + 1 - minDts
-                            TransmuxLog.remux("VIDEO OFFSET: lastDts=\(lastVideoDts) minPostSeekDts=\(minDts) samples=\(firstNVideoDtsAfterSeek) → offset=\(streamRebaseOffsets[videoOutputIdx]!)")
-                        } else {
-                            streamRebaseOffsets[videoOutputIdx] = 0
-                            TransmuxLog.remux("VIDEO OFFSET: first video or invalid previous DTS → offset=0")
+                        // Query output stream timebases
+                        var vTbNum: Int32 = 0, vTbDen: Int32 = 0
+                        var aTbNum: Int32 = 0, aTbDen: Int32 = 0
+                        mks_stream_get_time_base(outCtx, videoOutputIdx, &vTbNum, &vTbDen)
+                        if audioOutputIdx >= 0 {
+                            mks_stream_get_time_base(outCtx, audioOutputIdx, &aTbNum, &aTbDen)
                         }
+
+                        // Compute target output ticks for each stream using INTEGER math.
+                        // Cross-convert each stream's last DTS into the other's timebase,
+                        // then take the max + 1. This guarantees:
+                        //   1. Both streams advance past their own last DTS (monotonic)
+                        //   2. Both streams land at the same wall-clock time (A/V sync)
+                        // Using ceil() on cross-timebase conversion prevents the truncation
+                        // bug where 1/90000 epsilon vanishes in 48kHz audio ticks.
+                        let lastVTicks = lastWrittenDts[videoOutputIdx] ?? 0
+                        let lastATicks = (audioOutputIdx >= 0) ? (lastWrittenDts[audioOutputIdx] ?? 0) : Int64(0)
+
+                        let targetVideoTicks: Int64
+                        let targetAudioTicks: Int64
+                        if vTbDen > 0 && aTbDen > 0 && lastVTicks != AV_NOPTS && lastATicks != AV_NOPTS {
+                            // Cross-timebase: last audio time in video ticks and vice versa
+                            let lastAInVTicks = Int64(ceil(Double(lastATicks) / Double(aTbDen) * Double(vTbDen)))
+                            let lastVInATicks = Int64(ceil(Double(lastVTicks) / Double(vTbDen) * Double(aTbDen)))
+                            targetVideoTicks = max(lastVTicks, lastAInVTicks) + 1
+                            targetAudioTicks = max(lastATicks, lastVInATicks) + 1
+                        } else {
+                            targetVideoTicks = lastVTicks + 1
+                            targetAudioTicks = lastATicks + 1
+                        }
+
+                        // Derive video offset
+                        let videoOffset: Int64
+                        if vTbDen > 0, lastWrittenDts[videoOutputIdx] != nil {
+                            videoOffset = targetVideoTicks - anchorDts
+                            streamRebaseOffsets[videoOutputIdx] = videoOffset
+                        } else {
+                            videoOffset = 0
+                            streamRebaseOffsets[videoOutputIdx] = 0
+                        }
+
+                        let targetVSec = vTbDen > 0 ? Double(targetVideoTicks) / Double(vTbDen) : 0
+                        let targetASec = aTbDen > 0 ? Double(targetAudioTicks) / Double(aTbDen) : 0
+                        TransmuxLog.remux("Seek #\(totalSeekCount) OFFSETS: videoTarget=\(String(format: "%.3f", targetVSec))s audioTarget=\(String(format: "%.3f", targetASec))s videoOffset=\(videoOffset) (lastV=\(String(format: "%.3f", Double(lastVTicks)/max(1, Double(vTbDen))))s lastA=\(String(format: "%.3f", Double(lastATicks)/max(1, Double(aTbDen))))s)")
 
                         globalOffsetComputed = true
                         seekPending = false
                         lastSeekCompletionTime = Date()
 
-                        let videoOffset = streamRebaseOffsets[videoOutputIdx] ?? 0
-
-                        // Write buffered video keyframes with the video offset
-                        TransmuxLog.remux("Writing \(bufferedVideoKeyframes.count) buffered video keyframes with videoOffset=\(videoOffset)")
+                        // Write buffered video keyframe
                         for videoPkt in bufferedVideoKeyframes {
                             if videoOffset != 0 {
                                 mks_packet_adjust_ts(videoPkt, videoOffset)
                             }
-
                             let videoDts = mks_packet_get_dts(videoPkt)
                             ret = av_interleaved_write_frame(outCtx, videoPkt)
-                            if ret < 0 {
-                                TransmuxLog.remux("Buffered video write_frame ERROR (\(ret)) dts=\(videoDts)", level: .error)
-                            } else if videoDts != AV_NOPTS {
+                            if ret >= 0, videoDts != AV_NOPTS {
                                 lastWrittenDts[videoOutputIdx] = videoDts
                             }
                             packetCount += 1
-
                             var mutablePtr: UnsafeMutablePointer<AVPacket>? = videoPkt
                             av_packet_free(&mutablePtr)
                         }
                         bufferedVideoKeyframes.removeAll()
-                        TransmuxLog.remux("Buffered video keyframes written")
 
-                        // Process buffered audio packets — compute audio offset from
-                        // the first rescaled packet's DTS in the audio output timebase
+                        // Process buffered audio packets
                         if !pendingAudioPackets.isEmpty {
-                            // Peek at the first audio packet to compute audio offset
                             var audioOffsetComputed = false
 
-                            TransmuxLog.remux("Processing \(pendingAudioPackets.count) buffered audio packets")
                             for audioPkt in pendingAudioPackets {
                                 let audioInStreamIdx = Int(audioPkt.pointee.stream_index)
                                 guard audioInStreamIdx < streamCount, streamMapping[audioInStreamIdx] >= 0 else {
@@ -821,58 +872,45 @@ public actor TransmuxingService {
                                 }
                                 let audioOutIdx = Int32(streamMapping[audioInStreamIdx])
 
-                                // NOTE: AAC BSF was already applied before buffering.
-                                // Do NOT apply it again here.
-
-                                // Rescale timestamps to output timebase
+                                // Rescale timestamps to output timebase (BSF already applied)
                                 audioPkt.pointee.stream_index = audioOutIdx
                                 mks_packet_rescale_ts(audioPkt, inCtx, Int32(audioInStreamIdx), outCtx, audioOutIdx)
                                 mks_packet_clear_pos(audioPkt)
 
-                                // Compute audio offset from the FIRST valid rescaled audio DTS
+                                // Compute audio offset from target ticks (integer-precise)
                                 if !audioOffsetComputed {
                                     let firstAudioDts = mks_packet_get_dts(audioPkt)
                                     if firstAudioDts != AV_NOPTS {
-                                        if let lastAudioDts = lastWrittenDts[audioOutIdx], lastAudioDts != AV_NOPTS {
-                                            streamRebaseOffsets[audioOutIdx] = lastAudioDts + 1 - firstAudioDts
-                                            TransmuxLog.remux("AUDIO OFFSET[stream\(audioOutIdx)]: lastDts=\(lastAudioDts) firstPostSeekDts=\(firstAudioDts) → offset=\(streamRebaseOffsets[audioOutIdx]!)")
+                                        if lastWrittenDts[audioOutIdx] != nil, aTbDen > 0 {
+                                            let audioOffset = targetAudioTicks - firstAudioDts
+                                            streamRebaseOffsets[audioOutIdx] = audioOffset
+                                            TransmuxLog.remux("Seek #\(totalSeekCount) AUDIO: offset=\(audioOffset) firstDts=\(firstAudioDts) → targetTick=\(targetAudioTicks)")
                                         } else {
                                             streamRebaseOffsets[audioOutIdx] = 0
-                                            TransmuxLog.remux("AUDIO OFFSET[stream\(audioOutIdx)]: first audio or invalid previous DTS → offset=0")
                                         }
                                         audioOffsetComputed = true
                                     }
                                 }
 
-                                // Apply per-stream audio offset
-                                let audioOffset = streamRebaseOffsets[audioOutIdx] ?? 0
-                                if audioOffset != 0 {
-                                    mks_packet_adjust_ts(audioPkt, audioOffset)
+                                // Apply offset
+                                let audioOff = streamRebaseOffsets[audioOutIdx] ?? 0
+                                if audioOff != 0 {
+                                    mks_packet_adjust_ts(audioPkt, audioOff)
                                 }
 
-                                // Save DTS before write
                                 var audioTrackDts = mks_packet_get_dts(audioPkt)
 
-                                // Detect and recover non-monotonic DTS BEFORE writing
+                                // Skip non-monotonic audio (expected for first packet at seek boundary)
                                 if audioTrackDts != AV_NOPTS {
                                     if let prevDts = lastWrittenDts[audioOutIdx], audioTrackDts <= prevDts {
-                                        let dtsDelta = audioTrackDts - prevDts
-                                        TransmuxLog.remux("NON-MONOTONIC DTS AUDIO: prev=\(prevDts) curr=\(audioTrackDts) delta=\(dtsDelta)", level: .error)
-
-                                        if dtsDelta < -2000 {
-                                            let correctedDts = prevDts + 1
-                                            TransmuxLog.remux("RECOVERING: forcing DTS=\(correctedDts)", level: .warn)
-                                            mks_packet_adjust_ts(audioPkt, correctedDts - audioTrackDts)
-                                            audioTrackDts = correctedDts
-                                        }
+                                        freePacketFromBuffer(audioPkt)
+                                        packetCount += 1
+                                        continue
                                     }
                                 }
 
-                                // Write audio packet
                                 ret = av_interleaved_write_frame(outCtx, audioPkt)
-                                if ret < 0 {
-                                    TransmuxLog.remux("Buffered audio write_frame ERROR (\(ret)) dts=\(audioTrackDts)", level: .error)
-                                } else if audioTrackDts != AV_NOPTS {
+                                if ret >= 0, audioTrackDts != AV_NOPTS {
                                     lastWrittenDts[audioOutIdx] = audioTrackDts
                                 }
                                 packetCount += 1
@@ -880,9 +918,17 @@ public actor TransmuxingService {
                             }
                             pendingAudioPackets.removeAll()
 
-                            TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE: offsets=\(streamRebaseOffsets.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " "))")
+                            // A/V sync diagnostic
+                            if videoOutputIdx >= 0 && audioOutputIdx >= 0,
+                               let vDts = lastWrittenDts[videoOutputIdx],
+                               let aDts = lastWrittenDts[audioOutputIdx],
+                               vTbDen > 0, aTbDen > 0 {
+                                let vSec = Double(vDts) / Double(vTbDen)
+                                let aSec = Double(aDts) / Double(aTbDen)
+                                TransmuxLog.remux("Seek #\(totalSeekCount) SYNC: video=\(String(format: "%.3f", vSec))s audio=\(String(format: "%.3f", aSec))s gap=\(String(format: "%.3f", aSec - vSec))s")
+                            }
                         } else {
-                            TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE: videoOffset=\(videoOffset) (no buffered audio)")
+                            TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE (no buffered audio)")
                         }
 
                         // Current packet (4th+ keyframe) needs to continue processing normally
@@ -899,33 +945,26 @@ public actor TransmuxingService {
             let rescaledDts = mks_packet_get_dts(pkt)
             let rescaledPts = mks_packet_get_pts(pkt)
 
-            // Log first few packets after each seek for debugging A/V sync
-            if totalSeekCount > 0 && packetCount < 10 {
-                let streamLabel = isVideo ? "VIDEO" : "AUDIO"
-                let kf = isVideo ? (mks_packet_is_keyframe(pkt) != 0 ? " KF" : "") : ""
-                TransmuxLog.remux(
-                    "POST-SEEK pkt[\(packetCount)] \(streamLabel)\(kf): rawDts=\(rawDtsBefore) rescaledPre=\(rescaledDtsBeforeRebase)/\(rescaledPtsBeforeRebase) final=\(rescaledDts)/\(rescaledPts) streamOffset=\(streamRebaseOffsets[outStreamIdx] ?? 0)"
-                )
-            }
-
             // Save DTS before write — av_interleaved_write_frame unrefs the packet,
             // resetting dts to AV_NOPTS_VALUE, so we must capture it beforehand.
             var dtsToTrack = rescaledDts
 
-            // Detect and recover non-monotonic DTS BEFORE writing
+            // Detect and handle non-monotonic DTS BEFORE writing
             if rescaledDts != AV_NOPTS {
                 if let prevDts = lastWrittenDts[outStreamIdx], rescaledDts <= prevDts {
-                    let streamLabel = isVideo ? "VIDEO" : "AUDIO"
-                    let dtsDelta = rescaledDts - prevDts
-                    TransmuxLog.remux("NON-MONOTONIC DTS \(streamLabel) stream[\(outStreamIdx)]: prev=\(prevDts) curr=\(rescaledDts) delta=\(dtsDelta)", level: .error)
-
-                    // Recovery for severe desync (>2 seconds backward) on audio only
-                    // Video non-monotonic DTS is a critical error - don't try to recover
-                    if !isVideo && dtsDelta < -2000 {
-                        let correctedDts = prevDts + 1
-                        TransmuxLog.remux("RECOVERING: forcing monotonic DTS=\(correctedDts) (was \(rescaledDts))", level: .warn)
-                        mks_packet_adjust_ts(pkt, correctedDts - rescaledDts)
-                        dtsToTrack = correctedDts
+                    if isVideo {
+                        // Video: silently drop (expected B-frames after seek)
+                        av_packet_unref(pkt)
+                        packetCount += 1
+                        continue
+                    } else {
+                        // Audio: recover severe backward jumps
+                        let dtsDelta = rescaledDts - prevDts
+                        if dtsDelta < -2000 {
+                            let correctedDts = prevDts + 1
+                            mks_packet_adjust_ts(pkt, correctedDts - rescaledDts)
+                            dtsToTrack = correctedDts
+                        }
                     }
                 }
             }
@@ -949,11 +988,10 @@ public actor TransmuxingService {
                 avio_flush(outCtx.pointee.pb)
             }
 
-            if packetCount / 1000 > lastProgressLog {
-                lastProgressLog = packetCount / 1000
+            if packetCount / 5000 > lastProgressLog {
+                lastProgressLog = packetCount / 5000
                 let currentSize = Self.fileSize(at: mp4Path)
-                let dtsState = lastWrittenDts.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " ")
-                TransmuxLog.remux("Progress: \(packetCount) packets, \(currentSize / 1_048_576) MB, seeks=\(totalSeekCount), dts=[\(dtsState)]")
+                TransmuxLog.remux("Progress: \(packetCount) packets, \(currentSize / 1_048_576) MB, seeks=\(totalSeekCount)")
             }
         }
 
@@ -1019,5 +1057,54 @@ public actor TransmuxingService {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
               let size = attrs[.size] as? Int64 else { return 0 }
         return size
+    }
+
+    /// Find the byte offset where the init segment ends (ftyp+moov only).
+    /// For delay_moov AC3/EAC3, the file after the init phase contains
+    /// [ftyp][moov][moof][mdat]... — the init segment should be just [ftyp][moov].
+    /// Returns the offset of the first moof box, or the full file size if no moof found.
+    private static func findInitSegmentEnd(at path: String) -> Int64 {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return 0 }
+        defer { try? handle.close() }
+
+        let totalSize = fileSize(at: path)
+        var offset: UInt64 = 0
+
+        while offset + 8 <= UInt64(totalSize) {
+            do { try handle.seek(toOffset: offset) } catch { break }
+            let headerData = handle.readData(ofLength: 8)
+            guard headerData.count == 8 else { break }
+
+            let size32 = headerData.withUnsafeBytes { ptr -> UInt32 in
+                ptr.load(fromByteOffset: 0, as: UInt32.self).bigEndian
+            }
+            let typeBytes = headerData.subdata(in: 4..<8)
+            let boxType = String(data: typeBytes, encoding: .ascii) ?? "????"
+
+            let boxSize: UInt64
+            if size32 == 1 {
+                let extData = handle.readData(ofLength: 8)
+                guard extData.count == 8 else { break }
+                boxSize = extData.withUnsafeBytes { $0.load(as: UInt64.self).bigEndian }
+            } else if size32 == 0 {
+                boxSize = UInt64(totalSize) - offset
+            } else {
+                boxSize = UInt64(size32)
+            }
+
+            if boxSize < 8 { break }
+
+            TransmuxLog.service("  box[\(boxType)] offset=\(offset) size=\(boxSize)")
+
+            // First moof marks the end of the init segment
+            if boxType == "moof" {
+                return Int64(offset)
+            }
+
+            offset += boxSize
+        }
+
+        // No moof found — entire file is the init segment
+        return totalSize
     }
 }

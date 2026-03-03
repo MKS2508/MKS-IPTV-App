@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import TransmuxCore
 
 // MARK: - FFmpeg Player Implementation
 /// Transmux pipeline player: remuxes non-native formats (MKV, AVI, etc.) to

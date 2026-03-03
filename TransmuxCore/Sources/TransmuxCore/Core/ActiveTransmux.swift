@@ -48,7 +48,7 @@ public class ActiveTransmux {
 
     /// Consume a pending seek request (called by the remux loop).
     /// Returns the requested time in seconds, or nil if no seek is pending.
-    func consumeSeekRequest() -> Double? {
+    public func consumeSeekRequest() -> Double? {
         lock.lock()
         defer { lock.unlock() }
         guard let req = _seekRequest else { return nil }

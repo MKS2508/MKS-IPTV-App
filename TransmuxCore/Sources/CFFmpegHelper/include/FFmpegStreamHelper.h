@@ -125,6 +125,10 @@ int64_t mks_packet_get_dts(const void * _Nonnull pkt);
 /// Get packet PTS. Returns AV_NOPTS_VALUE if not set.
 int64_t mks_packet_get_pts(const void * _Nonnull pkt);
 
+/// Set packet DTS to a specific value.
+/// Used to recover keyframes where DTS=AV_NOPTS but PTS is valid.
+void mks_packet_set_dts(void * _Nonnull pkt, int64_t dts);
+
 // --- Diagnostics ---
 
 /// Print struct layout info and pointer chain for a stream.

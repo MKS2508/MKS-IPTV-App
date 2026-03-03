@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import TransmuxCore
 
 // MARK: - Stream Forwarder (URLSession → NWConnection bridge)
 

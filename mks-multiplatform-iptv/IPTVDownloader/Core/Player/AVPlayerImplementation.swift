@@ -47,6 +47,12 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
+        // For HLS via TransmuxServer, let AVPlayer buffer properly before starting.
+        // Setting automaticallyWaitsToMinimizeStalling = false here causes CMTimebase
+        // NULL errors because play() is called before segment data arrives (~1s delay),
+        // and AVPlayer's clock runs with no media data, corrupting the timebase.
+        // The default (true) queues the play intent and waits for sufficient buffer.
+        // NOTE: load(asset:) still uses false for direct fMP4 resource-loader streaming.
 
         setupObservers()
     }

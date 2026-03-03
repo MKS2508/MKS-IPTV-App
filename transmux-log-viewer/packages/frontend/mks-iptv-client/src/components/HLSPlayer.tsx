@@ -1,6 +1,6 @@
-import { Button, Card, Input } from "@mks2508/mks-ui/react";
-import { FastForward, MonitorPlay } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { Card } from "@mks2508/mks-ui/react";
+import { MonitorPlay, Pause, Play, VolumeOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useHLSPlayer } from "@/hooks/useHLSPlayer";
 
 /**
@@ -8,19 +8,38 @@ import { useHLSPlayer } from "@/hooks/useHLSPlayer";
  *
  * @property sessionId - Active transmux session ID (null = show empty state)
  * @property onSeek - Async callback to seek in the transmux source. Returns true if accepted.
+ * @property onAvailableDurationChange - Callback fired when available duration updates
  */
 interface IHLSPlayerProps {
   sessionId: string | null;
   onSeek?: (time: number) => Promise<boolean>;
+  onAvailableDurationChange?: (duration: number) => void;
 }
 
 /**
- * HLS video player component with hls.js integration and seek controls
+ * Format seconds as h:mm:ss or m:ss
  *
- * Renders a video element that loads the HLS stream from the backend
- * when a session is active. Includes a seek bar to jump to specific
- * positions in the source file via the TransmuxCore seek API.
- * Shows an empty state with animated placeholder when no session is running.
+ * @param s - Seconds to format
+ * @returns Formatted time string
+ */
+function formatTime(s: number): string {
+  if (!Number.isFinite(s) || s < 0) return "0:00";
+  const totalSeconds = Math.floor(s);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return hours > 0
+    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
+    : `${minutes}:${pad(seconds)}`;
+}
+
+/**
+ * HLS video player with custom progress bar and progressive playback
+ *
+ * Uses HLS.js to load a BYTERANGE EVENT playlist from the backend.
+ * The progress bar shows four layers: played, buffered, available, and total.
+ * Supports click-to-seek within the available range and beyond (triggers backend seek).
  *
  * @example
  * ```tsx
@@ -28,64 +47,80 @@ interface IHLSPlayerProps {
  * <HLSPlayer sessionId={null} /> // empty state
  * ```
  */
-export function HLSPlayer({ sessionId, onSeek }: IHLSPlayerProps) {
-  const { videoRef, error, loaded, reloadSource } = useHLSPlayer(sessionId);
-  const [seekInput, setSeekInput] = useState("");
+export function HLSPlayer({ sessionId, onSeek, onAvailableDurationChange }: IHLSPlayerProps) {
+  const {
+    videoRef,
+    loaded,
+    error,
+    playing,
+    currentTime,
+    totalDuration,
+    availableDuration,
+    segmentCount,
+    sessionStatus,
+    seekTo,
+    togglePlay,
+  } = useHLSPlayer(sessionId);
+
   const [seeking, setSeeking] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+
+  /** Notify parent when available duration changes */
+  useEffect(() => {
+    onAvailableDurationChange?.(availableDuration);
+  }, [availableDuration, onAvailableDurationChange]);
+
+  /** The effective total for progress bar calculations */
+  const effectiveTotal = totalDuration > 0 ? totalDuration : availableDuration || 1;
+
+  /** Ratios for progress bar layers */
+  const playedRatio = effectiveTotal > 0 ? Math.min(currentTime / effectiveTotal, 1) : 0;
+  const availableRatio = effectiveTotal > 0 ? Math.min(availableDuration / effectiveTotal, 1) : 0;
 
   /**
-   * Handle seek form submission.
+   * Handle click on the progress bar
    *
-   * Awaits the backend seek command, then reloads the video source
-   * after a delay so the browser fetches the post-seek content.
+   * If the click position is within the available range, seek natively.
+   * If beyond, trigger a backend seek command.
    */
-  const handleSeek = useCallback(async () => {
-    const time = parseFloat(seekInput);
-    if (Number.isNaN(time) || time < 0 || !onSeek) return;
+  const handleProgressClick = useCallback(
+    async (e: React.MouseEvent<HTMLDivElement>) => {
+      const bar = progressRef.current;
+      if (!bar || effectiveTotal <= 0) return;
 
-    setSeeking(true);
-    const accepted = await onSeek(time);
-    if (accepted) {
-      setTimeout(() => {
-        reloadSource();
-        setSeeking(false);
-      }, 2500);
-    } else {
-      setSeeking(false);
-    }
-  }, [seekInput, onSeek, reloadSource]);
+      const rect = bar.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(clickX / rect.width, 1));
+      const targetTime = ratio * effectiveTotal;
 
-  /**
-   * Handle preset seek button clicks
-   */
-  const handlePresetSeek = useCallback(
-    async (time: number) => {
-      if (!onSeek) return;
-      setSeekInput(String(time));
-      setSeeking(true);
-      const accepted = await onSeek(time);
-      if (accepted) {
-        setTimeout(() => {
-          reloadSource();
+      if (targetTime <= availableDuration) {
+        // Within available range — native HLS.js seek
+        seekTo(targetTime);
+      } else if (onSeek) {
+        // Beyond available — trigger backend seek
+        setSeeking(true);
+        const accepted = await onSeek(targetTime);
+        if (!accepted) {
           setSeeking(false);
-        }, 2500);
-      } else {
-        setSeeking(false);
+        }
+        // Seeking overlay stays until new segments arrive
+        // (poll timer in useHLSPlayer will update availableDuration)
+        setTimeout(() => setSeeking(false), 5000);
       }
     },
-    [onSeek, reloadSource]
+    [effectiveTotal, availableDuration, seekTo, onSeek]
   );
 
   return (
     <Card className="glass border-border/20 rounded-lg overflow-hidden">
-      <div className="relative aspect-video bg-background/50">
+      <div className="relative h-[200px] bg-background/50">
         {sessionId ? (
           <>
+            {/* Video element — hidden controls, managed by custom UI */}
             <video
               ref={videoRef}
-              controls
               playsInline
+              muted
               className="w-full h-full object-contain bg-background"
             />
 
@@ -100,6 +135,11 @@ export function HLSPlayer({ sessionId, onSeek }: IHLSPlayerProps) {
                   <p className="font-mono text-[10px] text-muted-foreground/60 uppercase tracking-wider">
                     Loading stream...
                   </p>
+                  {segmentCount > 0 && (
+                    <p className="font-mono text-[9px] text-muted-foreground/40">
+                      {segmentCount} segments scanned
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -130,6 +170,14 @@ export function HLSPlayer({ sessionId, onSeek }: IHLSPlayerProps) {
                 </div>
               </div>
             )}
+
+            {/* No audio badge */}
+            <div className="absolute top-2 right-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-background/60 backdrop-blur-sm border border-border/20">
+              <VolumeOff className="size-3 text-muted-foreground/50" />
+              <span className="font-mono text-[8px] text-muted-foreground/50 uppercase">
+                EAC3
+              </span>
+            </div>
           </>
         ) : (
           /* Empty state */
@@ -154,46 +202,91 @@ export function HLSPlayer({ sessionId, onSeek }: IHLSPlayerProps) {
         )}
       </div>
 
-      {/* Seek controls — only shown when a session is active */}
-      {sessionId && onSeek && (
-        <div className="flex items-center gap-2 px-3 py-2 border-t border-border/15 bg-background/30">
-          <FastForward className="size-3.5 text-muted-foreground/50 shrink-0" />
-          <span className="font-mono text-[9px] text-muted-foreground/50 uppercase tracking-wider shrink-0">
-            Seek
-          </span>
-          <div className="flex items-center gap-1">
-            {[60, 300, 600, 1800].map((t) => (
-              <Button
-                key={t}
-                variant="ghost"
-                size="sm"
-                className="h-5 px-1.5 font-mono text-[9px] text-muted-foreground/60 hover:text-foreground"
-                onClick={() => handlePresetSeek(t)}
-                disabled={seeking}
-              >
-                {t >= 60 ? `${Math.floor(t / 60)}m` : `${t}s`}
-              </Button>
-            ))}
-          </div>
-          <div className="flex items-center gap-1 ml-auto">
-            <Input
-              ref={inputRef}
-              type="number"
-              placeholder="seconds"
-              value={seekInput}
-              onChange={(e) => setSeekInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSeek()}
-              className="h-5 w-20 font-mono text-[10px] px-1.5 bg-background/40 border-border/20"
+      {/* Transport controls + progress bar */}
+      {sessionId && (
+        <div className="px-3 py-2 border-t border-border/15 bg-background/30 space-y-1.5">
+          {/* Progress bar */}
+          <div
+            ref={progressRef}
+            className="relative h-2 rounded-full bg-muted/20 cursor-pointer group"
+            onClick={handleProgressClick}
+          >
+            {/* Available layer */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-muted-foreground/15 transition-all duration-300"
+              style={{ width: `${availableRatio * 100}%` }}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-5 px-2 font-mono text-[9px]"
-              onClick={handleSeek}
-              disabled={seeking || !seekInput}
+            {/* Played layer */}
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-150"
+              style={{ width: `${playedRatio * 100}%` }}
+            />
+            {/* Hover thumb indicator */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-primary shadow-[0_0_6px_var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              style={{ left: `calc(${playedRatio * 100}% - 6px)` }}
+            />
+          </div>
+
+          {/* Controls row */}
+          <div className="flex items-center gap-2">
+            {/* Play/Pause */}
+            <button
+              onClick={togglePlay}
+              className="shrink-0 flex items-center justify-center size-6 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/15 transition-colors"
+              aria-label={playing ? "Pause" : "Play"}
             >
-              {seeking ? "..." : "Go"}
-            </Button>
+              {playing ? (
+                <Pause className="size-3 text-primary" />
+              ) : (
+                <Play className="size-3 text-primary ml-0.5" />
+              )}
+            </button>
+
+            {/* Time display */}
+            <span className="font-mono text-[10px] text-foreground/70 tabular-nums">
+              {formatTime(currentTime)}
+            </span>
+            <span className="font-mono text-[10px] text-muted-foreground/30">/</span>
+            <span className="font-mono text-[10px] text-muted-foreground/50 tabular-nums">
+              {formatTime(totalDuration)}
+            </span>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Status indicators */}
+            <div className="flex items-center gap-2">
+              {/* Available duration */}
+              {availableDuration > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="size-1.5 rounded-full bg-muted-foreground/30" />
+                  <span className="font-mono text-[9px] text-muted-foreground/40">
+                    {formatTime(availableDuration)} avail
+                  </span>
+                </div>
+              )}
+
+              {/* Segment count */}
+              {segmentCount > 0 && (
+                <span className="font-mono text-[9px] text-muted-foreground/30 tabular-nums">
+                  {segmentCount} seg
+                </span>
+              )}
+
+              {/* Session status badge */}
+              <span
+                className={`font-mono text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded border ${
+                  sessionStatus === "running"
+                    ? "text-primary/70 border-primary/20 bg-primary/5"
+                    : sessionStatus === "completed"
+                      ? "text-chart-2/70 border-chart-2/20 bg-chart-2/5"
+                      : "text-muted-foreground/40 border-border/15 bg-background/30"
+                }`}
+              >
+                {sessionStatus}
+              </span>
+            </div>
           </div>
         </div>
       )}

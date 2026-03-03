@@ -31,22 +31,22 @@ public class HLSSegmenter {
     // MARK: - Types
 
     public struct Segment {
-        let index: Int
-        let byteOffset: Int64
-        let byteLength: Int64
-        let duration: Double
-        let startTime: Double       // output decode time in seconds (rebased tfdt)
-        let sourceStartTime: Double // source time in seconds (for virtual segment lookups)
+        public let index: Int
+        public let byteOffset: Int64
+        public let byteLength: Int64
+        public let duration: Double
+        public let startTime: Double       // output decode time in seconds (rebased tfdt)
+        public let sourceStartTime: Double // source time in seconds (for virtual segment lookups)
     }
 
     // MARK: - Properties
 
-    let fmp4Path: String
-    let playlistPath: String
-    let initSegmentSize: Int64
-    let totalDuration: Double
+    public let fmp4Path: String
+    public let playlistPath: String
+    public let initSegmentSize: Int64
+    public let totalDuration: Double
     public let targetSegmentDuration: Double = 6.0
-    private(set) var totalSegmentCount: Int
+    public private(set) var totalSegmentCount: Int
 
     private var segments: [Segment] = []
     private var scanOffset: Int64 = 0
@@ -133,7 +133,7 @@ public class HLSSegmenter {
             self.pendingDecodeTime = 0
             // Record the seek target so the first post-seek segment can compute the mapping
             self.pendingSeekSourceTime = seekTargetTime
-            TransmuxLog.segmenter("Seek discontinuity: target=\(String(format: "%.1f", seekTargetTime))s, segments=\(prevSegCount)->\(self.segments.count), prevSrcToOutOffset=\(String(format: "%.3f", prevOffset)), buffered=\(self.bufferedRawSegment != nil)")
+            // Seek discontinuity processed
         }
     }
 
@@ -307,7 +307,7 @@ public class HLSSegmenter {
                             sourceToOutputOffset = startTimeSec - seekTarget
                             sourceStartTimeSec = seekTarget
                             pendingSeekSourceTime = nil
-                            TransmuxLog.segmenter("SEEK MAPPING: source \(String(format: "%.1f", seekTarget))s -> output \(String(format: "%.3f", startTimeSec))s (srcToOutOffset=\(String(format: "%.3f", sourceToOutputOffset)))")
+                            // Seek mapping established
                         } else {
                             // Normal segment: reverse the mapping
                             sourceStartTimeSec = startTimeSec - sourceToOutputOffset
@@ -324,7 +324,7 @@ public class HLSSegmenter {
                         segments.append(segment)
                         if duration > maxDuration { maxDuration = duration }
 
-                        TransmuxLog.segmenter("Segment[\(segment.index)]: bytes=\(buffered.byteOffset)+\(buffered.byteLength) dur=\(String(format: "%.3f", duration))s srcTime=\(String(format: "%.3f", sourceStartTimeSec))s outTime=\(String(format: "%.3f", startTimeSec))s decodeTicks=\(buffered.decodeTime)")
+                        // Segment tracked
                         newSegmentsFound = true
                     }
 
@@ -346,7 +346,7 @@ public class HLSSegmenter {
 
         // No playlist rewrite needed — VOD playlist was written once on start().
         // We only track real segments for byte-range lookups by TransmuxServer.
-        if newSegmentsFound {
+        if newSegmentsFound && (segments.count <= 3 || segments.count % 10 == 0) {
             TransmuxLog.segmenter("\(segments.count) real segments tracked so far (scanOffset=\(scanOffset))")
         }
     }
@@ -392,7 +392,7 @@ public class HLSSegmenter {
         segments.append(segment)
         if duration > maxDuration { maxDuration = duration }
 
-        TransmuxLog.segmenter("Segment[\(segment.index)] (FLUSH): bytes=\(buffered.byteOffset)+\(buffered.byteLength) dur=\(String(format: "%.3f", duration))s srcTime=\(String(format: "%.3f", sourceStartTimeSec))s outTime=\(String(format: "%.3f", startTimeSec))s")
+        // Segment flushed
         bufferedRawSegment = nil
     }
 
@@ -450,21 +450,31 @@ public class HLSSegmenter {
     /// The time range is in source time (matching the virtual HLS playlist).
     /// Only returns segments that have actually been transmuxed (scanned from the file).
     /// Returns empty array if those segments haven't been transmuxed yet.
+    ///
+    /// Each real fragment is assigned to exactly ONE virtual segment based on its START time
+    /// (snappedStart >= start && snappedStart < end). This prevents duplicate moof+mdat fragments
+    /// across consecutive segments, which causes AVPlayer CMTimebase errors from seeing
+    /// the same tfdt decode timestamps twice.
+    ///
+    /// A small epsilon (0.01s) is added to sourceStartTime before comparison to handle
+    /// floating-point boundary cases: keyframe DTS values are often N*period - 1/timescale
+    /// (e.g., 11.999s instead of 12.0s), so without the snap they'd be assigned to the
+    /// previous virtual segment, causing data loss when that segment has already been served.
     public func realSegments(inTimeRange start: Double, end: Double) -> [(offset: Int64, length: Int64)] {
         return scanQueue.sync {
             var result: [(offset: Int64, length: Int64)] = []
             var matchDetails: [String] = []
             for seg in segments {
                 let segEnd = seg.sourceStartTime + seg.duration
-                // Segment overlaps with requested source time range
-                if segEnd > start && seg.sourceStartTime < end {
+                // Snap forward by 0.01s to correct for DTS rounding:
+                // e.g., srcTime=11.999 snaps to 12.009, correctly assigned to seg [12,18)
+                let snapped = seg.sourceStartTime + 0.01
+                if snapped >= start && snapped < end {
                     result.append((offset: seg.byteOffset, length: seg.byteLength))
                     matchDetails.append("idx\(seg.index):[src=\(String(format: "%.1f-%.1f", seg.sourceStartTime, segEnd))s out=\(String(format: "%.1f", seg.startTime))s off=\(seg.byteOffset) len=\(seg.byteLength)]")
                 }
             }
-            if !result.isEmpty {
-                TransmuxLog.segmenter("realSegments(\(String(format: "%.1f-%.1f", start, end))s): \(result.count) matches: \(matchDetails.joined(separator: ", "))", level: .debug)
-            }
+            // Match details available in matchDetails if needed for debugging
             return result
         }
     }
@@ -510,6 +520,7 @@ public class HLSSegmenter {
         m3u8 += "#EXT-X-TARGETDURATION:6\n"
         m3u8 += "#EXT-X-MEDIA-SEQUENCE:0\n"
         m3u8 += "#EXT-X-PLAYLIST-TYPE:VOD\n"
+        m3u8 += "#EXT-X-INDEPENDENT-SEGMENTS\n"
         m3u8 += "#EXT-X-MAP:URI=\"init.mp4\"\n"
 
         for i in 0..<totalSegmentCount {

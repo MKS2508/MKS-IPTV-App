@@ -27,6 +27,8 @@ export function App() {
     duration: 500,
   });
 
+  const [availableDuration, setAvailableDuration] = useState(0);
+
   const { logs, stats, connected, clearLogs } = useLogStream();
   const { activeSession, loading, runCLI, stopSession, seekSession } = useCLISession();
 
@@ -145,6 +147,7 @@ export function App() {
                     : null
                 }
                 onSeek={isRunning ? handleSeek : undefined}
+                onAvailableDurationChange={setAvailableDuration}
               />
             </div>
 
@@ -160,7 +163,7 @@ export function App() {
           </div>
 
           {/* Stats Bar */}
-          <StatsBar stats={stats} connected={connected} />
+          <StatsBar stats={stats} connected={connected} availableDuration={availableDuration} />
         </main>
       </div>
 

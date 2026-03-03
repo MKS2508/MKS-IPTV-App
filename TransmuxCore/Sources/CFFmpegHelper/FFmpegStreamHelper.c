@@ -704,6 +704,11 @@ int64_t mks_packet_get_pts(const void *pkt) {
     return p->pts;
 }
 
+void mks_packet_set_dts(void *pkt, int64_t dts) {
+    AVPacket *p = (AVPacket *)pkt;
+    if (p) p->dts = dts;
+}
+
 // --- Diagnostics ---
 
 void mks_debug_stream_layout(const void *fmtCtx, int streamIndex) {

@@ -1,14 +1,32 @@
 import type { ILogStats } from "@/types/log";
 
 /**
+ * Format seconds as mm:ss or h:mm:ss
+ *
+ * @param s - Seconds to format
+ * @returns Formatted time string
+ */
+function formatDuration(s: number): string {
+  if (!Number.isFinite(s) || s <= 0) return "0:00";
+  const total = Math.floor(s);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+/**
  * Props for the StatsBar component
  *
  * @property stats - Aggregated log statistics
  * @property connected - Whether the SSE stream is connected
+ * @property availableDuration - Seconds of content available in the stream (optional)
  */
 interface IStatsBarProps {
   stats: ILogStats;
   connected: boolean;
+  availableDuration?: number;
 }
 
 /**
@@ -23,7 +41,7 @@ interface IStatsBarProps {
  * <StatsBar stats={logStats} connected={true} />
  * ```
  */
-export function StatsBar({ stats, connected }: IStatsBarProps) {
+export function StatsBar({ stats, connected, availableDuration }: IStatsBarProps) {
   return (
     <div className="flex items-center gap-3 px-3 py-1.5 border-t border-border/15 bg-background/30 shrink-0">
       {/* Connection indicator */}
@@ -63,6 +81,21 @@ export function StatsBar({ stats, connected }: IStatsBarProps) {
         value={stats.segments}
         highlight={stats.segments > 0 ? "chart-2" : undefined}
       />
+
+      {/* Available stream duration */}
+      {availableDuration != null && availableDuration > 0 && (
+        <>
+          <div className="h-3 w-px bg-border/20" />
+          <div className="flex items-center gap-1">
+            <span className="font-mono text-[9px] text-muted-foreground/40 uppercase tracking-wider">
+              Available
+            </span>
+            <span className="font-mono-emphasis text-[11px] tabular-nums text-chart-2">
+              {formatDuration(availableDuration)}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

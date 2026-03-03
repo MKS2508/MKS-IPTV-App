@@ -42,7 +42,14 @@ const app = new Elysia()
   .use(cliModule)
   .use(hlsModule)
   .use(sourcesModule)
-  .onStart(({ server }) => {
+  .onStart(({ decorator, server }) => {
+    // Wire CLIService into HLSService so it can access session metadata
+    const cli = (decorator as any).cliService;
+    const hls = (decorator as any).hlsService;
+    if (cli && hls && typeof hls.setCLIService === "function") {
+      hls.setCLIService(cli);
+    }
+
     const serverLog = logger.component("Server");
     serverLog.info("TransmuxCore Log Viewer API started");
     serverLog.info(`Watching log file: /tmp/mks-iptv-transmux.log`);

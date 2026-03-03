@@ -1,4 +1,5 @@
 import SwiftUI
+import TransmuxCore
 
 @main
 struct mks_iptv_downloaderApp: App {
@@ -8,6 +9,8 @@ struct mks_iptv_downloaderApp: App {
     var activeProfile: IPTVProfile? { profilesManager.activeProfile }
 
     init() {
+        StderrFilter.install()
+        TransmuxingService.configure(streamProxy: StreamProxyAdapter())
         Self.configurePlayerEngines()
     }
 

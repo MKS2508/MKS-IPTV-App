@@ -14,9 +14,9 @@ import Foundation
 /// ```bash
 /// tail -f /tmp/mks-iptv-transmux.log
 /// ```
-enum TransmuxLog {
+public enum TransmuxLog {
 
-    enum Level: String {
+    public enum Level: String {
         case debug = "DBG"
         case info  = "INF"
         case warn  = "WRN"
@@ -24,7 +24,7 @@ enum TransmuxLog {
     }
 
     /// Log file path — easy to tail from terminal.
-    static let filePath = "/tmp/mks-iptv-transmux.log"
+    public static let filePath = "/tmp/mks-iptv-transmux.log"
 
     private static let queue = DispatchQueue(label: "TransmuxLog.write", qos: .utility)
     private static let dateFormatter: DateFormatter = {
@@ -43,7 +43,7 @@ enum TransmuxLog {
     }()
 
     /// Write a log entry to file and stdout.
-    static func log(
+    public static func log(
         _ message: String,
         tag: String,
         level: Level = .info,
@@ -70,7 +70,7 @@ enum TransmuxLog {
     }
 
     /// Convenience: log with formatted values.
-    static func segment(
+    public static func segment(
         _ action: String,
         segIndex: Int,
         startTime: Double,
@@ -85,7 +85,7 @@ enum TransmuxLog {
     }
 
     /// Convenience: log seek-related events with full state dump.
-    static func seekEvent(
+    public static func seekEvent(
         _ action: String,
         seekTime: Double,
         latestTime: Double,
@@ -100,7 +100,7 @@ enum TransmuxLog {
     }
 
     /// Convenience: log remux loop events.
-    static func remux(
+    public static func remux(
         _ message: String,
         level: Level = .info
     ) {
@@ -108,7 +108,7 @@ enum TransmuxLog {
     }
 
     /// Convenience: log segmenter events.
-    static func segmenter(
+    public static func segmenter(
         _ message: String,
         level: Level = .info
     ) {
@@ -116,7 +116,7 @@ enum TransmuxLog {
     }
 
     /// Convenience: log service-level events (session management, initialization).
-    static func service(
+    public static func service(
         _ message: String,
         level: Level = .info
     ) {

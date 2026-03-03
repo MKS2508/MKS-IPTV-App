@@ -23,23 +23,23 @@ import Network
 ///
 /// AVPlayer (http://localhost:81XX/stream.m3u8)
 /// ```
-actor TransmuxServer {
+public actor TransmuxServer {
 
-    static let shared = TransmuxServer()
+    public static let shared = TransmuxServer()
 
     // MARK: - Types
 
-    struct Session {
-        let localURL: URL
-        let port: UInt16
+    public struct Session {
+        public let localURL: URL
+        public let port: UInt16
     }
 
-    enum ServerError: LocalizedError {
+    public enum ServerError: LocalizedError {
         case portExhausted
         case invalidFilePath
         case alreadyRunning
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .portExhausted:
                 return "Could not find available port in range 8100-8199"
@@ -79,7 +79,7 @@ actor TransmuxServer {
     /// Called after avformat_write_header succeeds and HLSSegmenter has written
     /// the VOD playlist. Waits for the NWListener to reach `.ready` state
     /// before returning, so AVPlayer can connect immediately.
-    func start(
+    public func start(
         filePath: String,
         playlistPath: String,
         expectedSize: Int64,
@@ -159,13 +159,13 @@ actor TransmuxServer {
     }
 
     /// Mark the transmux as complete. After this, empty reads mean real EOF.
-    func setComplete() {
+    public func setComplete() {
         isComplete = true
         print("[TransmuxServer] Transmux complete — EOF on empty reads")
     }
 
     /// Stop serving and clean up all connections.
-    func stop() {
+    public func stop() {
         for connection in activeConnections {
             connection.cancel()
         }
@@ -409,17 +409,16 @@ actor TransmuxServer {
         let latestTime = segmenter.latestTransmuxedTime()
         let lastSeek = seekHandle?.lastSeekTarget
 
-        TransmuxLog.seekEvent(
-            "REQUEST seg_\(String(format: "%03d", segIndex))",
-            seekTime: startTime,
-            latestTime: latestTime,
-            lastSeekTarget: lastSeek,
-            extra: "endTime=\(String(format: "%.1f", endTime))s latestBuffered=\(String(format: "%.1f", latestBuffered))s complete=\(isComplete)"
-        )
+        // Segment request logged only when seek is needed (below)
 
-        // Step 1: Immediate fullness check — serve only if transmux has produced
-        // enough data to cover the ENTIRE segment time range.
-        if latestBuffered >= endTime {
+        // Step 1: Immediate fullness check — serve if transmux has produced
+        // enough data to cover the full segment time range. We require
+        // latestBuffered >= endTime (with epsilon) to ensure the fMP4 scanner
+        // has processed ALL moof boxes whose start time falls within [startTime, endTime).
+        // Epsilon tolerance (0.05s) handles DTS floating-point rounding:
+        // e.g., latestBuffered=35.999 should pass for endTime=36.0.
+        let fullnessEpsilon = 0.05
+        if latestBuffered >= endTime - fullnessEpsilon {
             let byteRanges = segmenter.realSegments(inTimeRange: startTime, end: endTime)
             if !byteRanges.isEmpty {
                 let segData = Self.readByteRanges(filePath: filePath, ranges: byteRanges)
@@ -474,11 +473,6 @@ actor TransmuxServer {
             )
             handle.requestSeek(to: startTime)
             seekTriggered = true
-        } else {
-            TransmuxLog.log(
-                "seg_\(String(format: "%03d", segIndex)): strategy=sequential-wait latestBuffered=\(String(format: "%.1f", latestBuffered))s nearbyThreshold=\(String(format: "%.1f", nearbyThreshold))s seekWindow=\(String(format: "%.1f", seekWindowEnd))s",
-                tag: "Server"
-            )
         }
 
         // Step 4: Polling loop with FULLNESS GATE
@@ -525,12 +519,14 @@ actor TransmuxServer {
 
                     // FULLNESS GATE: only check realSegments when latestBufferedSourceTime
                     // confirms enough data has been produced to cover the entire segment.
+                    // Epsilon tolerance (0.05s) handles DTS floating-point rounding:
+                    // e.g., bufferedTime=35.999 should pass for endTime=36.0.
                     let bufferedTime = segmenter.latestBufferedSourceTime()
-                    guard bufferedTime >= endTime else {
-                        // Log progress every 10 polls
-                        if totalPolls % 10 == 0 {
+                    guard bufferedTime >= endTime - fullnessEpsilon else {
+                        // Log only when truly stalled (phase 2+)
+                        if totalPolls % 40 == 0 {
                             TransmuxLog.log(
-                                "seg_\(String(format: "%03d", segIndex)): waiting... polls=\(totalPolls) latestBuffered=\(String(format: "%.1f", bufferedTime))s need=\(String(format: "%.1f", endTime))s gap=\(String(format: "%.1f", endTime - bufferedTime))s",
+                                "seg_\(String(format: "%03d", segIndex)): waiting \(String(format: "%.1f", endTime - bufferedTime))s gap",
                                 tag: "Server"
                             )
                         }
@@ -587,12 +583,11 @@ actor TransmuxServer {
         defer { try? fileHandle.close() }
 
         var result = Data()
-        for (i, range) in ranges.enumerated() {
+        for (_, range) in ranges.enumerated() {
             do {
                 try fileHandle.seek(toOffset: UInt64(range.offset))
                 let chunk = fileHandle.readData(ofLength: Int(range.length))
                 result.append(chunk)
-                TransmuxLog.log("readByteRanges[\(i)]: offset=\(range.offset) len=\(range.length) read=\(chunk.count)", tag: "Server", level: .debug)
             } catch {
                 TransmuxLog.log("readByteRanges: seek/read failed at offset \(range.offset): \(error)", tag: "Server", level: .error)
             }
@@ -608,8 +603,6 @@ actor TransmuxServer {
         header += "Access-Control-Allow-Origin: *\r\n"
         header += "Connection: close\r\n"
         header += "\r\n"
-
-        TransmuxLog.log("GET /seg_\(String(format: "%03d", segIndex)).mp4 -> 200 (\(data.count) bytes, from \(source))", tag: "Server")
 
         var responseData = Data(header.utf8)
         responseData.append(data)
@@ -912,21 +905,21 @@ actor TransmuxServer {
 
 /// Minimal HTTP request parser for extracting method, path, and Range header.
 /// Used by both StreamProxy and TransmuxServer.
-struct HTTPRequestParser {
+public struct HTTPRequestParser {
 
-    enum Method: String {
+    public enum Method: String {
         case get = "GET"
         case head = "HEAD"
     }
 
-    struct Request {
-        let method: Method
-        let path: String
-        let rangeHeader: String?
+    public struct Request {
+        public let method: Method
+        public let path: String
+        public let rangeHeader: String?
     }
 
     /// Parse a raw HTTP request from bytes.
-    static func parse(_ data: Data) -> Request? {
+    public static func parse(_ data: Data) -> Request? {
         guard let raw = String(data: data, encoding: .utf8) else { return nil }
 
         let lines = raw.components(separatedBy: "\r\n")

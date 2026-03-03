@@ -19,9 +19,10 @@
 // apart). Track separate shifts for AVStream and AVCodecParameters. Use raw
 // memcpy as a fallback for codecpar copy when avcodec_parameters_copy fails.
 
-#import <Libavformat/avformat.h>
-#import <Libavcodec/avcodec.h>
-#import <Libavutil/avutil.h>
+#import <libavformat/avformat.h>
+#import <libavcodec/avcodec.h>
+#import <libavcodec/bsf.h>
+#import <libavutil/avutil.h>
 
 #include "FFmpegStreamHelper.h"
 #include <stddef.h>

@@ -1,0 +1,56 @@
+// FFmpeg Module Map for Swift Package Manager
+// Paths are relative to this file: Sources/CFFmpegHelper/include/
+// Exposes both FFmpeg C API and custom helper functions as a single module
+
+module CFFmpegHelper {
+    // Custom helper functions for field access workarounds
+    header "FFmpegStreamHelper.h"
+
+    // Core FFmpeg headers (3 levels up: include/ -> CFFmpegHelper/ -> Sources/ -> package root)
+
+    // libavformat - container formats
+    header "../../../Frameworks/FFmpeg/include/libavformat/avformat.h"
+    header "../../../Frameworks/FFmpeg/include/libavformat/avio.h"
+
+    // libavcodec - codecs
+    header "../../../Frameworks/FFmpeg/include/libavcodec/avcodec.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/bsf.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/codec.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/codec_desc.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/codec_id.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/codec_par.h"
+    header "../../../Frameworks/FFmpeg/include/libavcodec/packet.h"
+
+    // libavutil - utilities
+    header "../../../Frameworks/FFmpeg/include/libavutil/avutil.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/channel_layout.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/common.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/dict.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/error.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/frame.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/log.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/mathematics.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/mem.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/opt.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/pixfmt.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/rational.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/samplefmt.h"
+    header "../../../Frameworks/FFmpeg/include/libavutil/timestamp.h"
+
+    // libswresample - audio resampling
+    header "../../../Frameworks/FFmpeg/include/libswresample/swresample.h"
+
+    // libswscale - video scaling
+    header "../../../Frameworks/FFmpeg/include/libswscale/swscale.h"
+
+    // Link all FFmpeg libraries
+    link "avformat"
+    link "avcodec"
+    link "avutil"
+    link "swresample"
+    link "swscale"
+    link "avfilter"
+    link "avdevice"
+
+    export *
+}

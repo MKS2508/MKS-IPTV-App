@@ -66,4 +66,18 @@ GEMINI.md
 /wiki-content
 /docs/vendor
 /docs/_site
-/docs/_site
+
+# Xcode DerivedData
+DerivedData/
+
+# FFmpeg compiled binaries and source (rebuild with Scripts/build-all.sh)
+TransmuxCore/Frameworks/
+TransmuxCore/Scripts/build/
+TransmuxCore/Scripts/ffmpeg-*/
+
+# Node / Bun
+node_modules/
+bun.lock
+
+# Build outputs
+dist/

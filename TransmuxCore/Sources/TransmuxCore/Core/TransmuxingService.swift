@@ -1,10 +1,5 @@
 import Foundation
-
-#if canImport(Libavformat)
-import Libavformat
-import Libavcodec
-import Libavutil
-#endif
+import CFFmpegHelper
 
 // MARK: - Transmux Error
 
@@ -15,7 +10,7 @@ public enum TransmuxError: LocalizedError {
     case processFailure(status: Int)
     case notAvailableOnPlatform
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .ffmpegNotFound:
             return "FFmpeg C API not available. Ensure KSPlayer (with FFmpegKit) is linked."
@@ -76,9 +71,7 @@ public actor TransmuxingService {
 
     public init(streamProxy: StreamProxyProvider? = nil) {
         self.streamProxy = streamProxy
-        #if canImport(Libavformat)
         // av_register_all() is no longer needed in FFmpeg 4+; formats are auto-registered.
-        #endif
     }
 
     // MARK: - Public API
@@ -87,7 +80,6 @@ public actor TransmuxingService {
     /// The remux loop continues in the background. Use `cancelTransmux(sessionID:)`
     /// to stop it early.
     public func startTransmux(from sourceURL: URL) async throws -> ProgressiveTransmuxSession {
-        #if canImport(Libavformat)
         let sessionID = UUID().uuidString
         let outputDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("mks-iptv-transmux-\(sessionID)")
@@ -113,6 +105,9 @@ public actor TransmuxingService {
                 inputPath = sourceURL.absoluteString
                 TransmuxLog.service("WARNING: No StreamProxy provided for HTTPS URL, attempting direct (may fail if FFmpeg lacks HTTPS support)", level: .warn)
             }
+        } else if sourceURL.scheme == "file" {
+            // For local files, use path() with percentEncoded: false to avoid URL-encoding issues
+            inputPath = sourceURL.path(percentEncoded: false)
         } else {
             inputPath = sourceURL.absoluteString
         }
@@ -144,9 +139,6 @@ public actor TransmuxingService {
             activeTransmuxes.removeValue(forKey: sessionID)
             throw error
         }
-        #else
-        throw TransmuxError.notAvailableOnPlatform
-        #endif
     }
 
     /// Cancel an active transmux session.
@@ -178,8 +170,6 @@ public actor TransmuxingService {
     }
 
     // MARK: - FFmpeg C API Core (Progressive)
-
-    #if canImport(Libavformat)
 
     /// Two-phase transmux: resumes the continuation after the header is written,
     /// then continues the remux loop on the same background thread.
@@ -241,7 +231,7 @@ public actor TransmuxingService {
         // Extract duration and expected size
         let durationSeconds = Double(inCtx.pointee.duration) / Double(AV_TIME_BASE)
         let bitrate = inCtx.pointee.bit_rate
-        public let expectedSize: Int64
+        let expectedSize: Int64
         if bitrate > 0 && durationSeconds > 0 {
             expectedSize = Int64(Double(bitrate) / 8.0 * durationSeconds * 1.02)
         } else {
@@ -986,6 +976,4 @@ public actor TransmuxingService {
               let size = attrs[.size] as? Int64 else { return 0 }
         return size
     }
-
-    #endif
 }

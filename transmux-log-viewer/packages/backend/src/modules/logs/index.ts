@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, sse } from "elysia";
 import { logModels } from "./model";
 import { LogService } from "./service";
 
@@ -10,18 +10,21 @@ import { LogService } from "./service";
  * - GET /logs/history - Retrieve full log history
  * - POST /logs/clear - Clear the log file
  *
+ * Uses Elysia's native sse() helper with async generator for proper
+ * Server-Sent Events streaming with automatic cleanup on disconnect.
+ *
  * @example
  * ```typescript
- * // Stream logs via SSE
- * const eventSource = new EventSource('/logs/stream');
- * eventSource.onmessage = (e) => {
+ * // Stream logs via EventSource
+ * const es = new EventSource('/logs/stream');
+ * es.onmessage = (e) => {
  *   const log = JSON.parse(e.data);
  *   console.log(log.message);
  * };
  *
- * // Get history
- * const response = await fetch('/logs/history');
- * const { logs } = await response.json();
+ * // Or via Eden Treaty
+ * const { data } = await api.logs.stream.get();
+ * for await (const chunk of data) console.log(chunk);
  * ```
  */
 export const logsModule = new Elysia({ prefix: "/logs" })
@@ -29,17 +32,29 @@ export const logsModule = new Elysia({ prefix: "/logs" })
   .model(logModels)
   .get(
     "/stream",
-    async ({ logService, set }) => {
-      set.headers["Content-Type"] = "text/event-stream";
-      set.headers["Cache-Control"] = "no-cache";
-      set.headers.Connection = "keep-alive";
+    async function* ({ logService, request }) {
+      const signal = request.signal;
 
-      return logService.streamLogs();
+      // Initial connection event
+      yield sse({
+        data: {
+          type: "connected",
+          message: "Connected to log stream",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      // Stream parsed log entries
+      for await (const entry of logService.streamEntries(signal)) {
+        if (signal.aborted) return;
+        yield sse({ data: entry });
+      }
     },
     {
       detail: {
         summary: "Stream logs via SSE",
-        description: "Server-Sent Events endpoint that streams new log lines in real-time",
+        description:
+          "Server-Sent Events endpoint that streams new log lines in real-time",
         tags: ["logs"],
       },
     }

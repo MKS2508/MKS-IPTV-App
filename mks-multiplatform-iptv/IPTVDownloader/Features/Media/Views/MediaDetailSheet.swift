@@ -35,7 +35,8 @@ struct MediaDetailSheet: View {
     @State private var showDownloadOptions = false
     @State private var downloadEpisode: SerieDetail.Episode?
     @State private var downloadStartedBanner = false
-    @State private var shouldConvertToMOV = true
+    @State private var selectedFormat: VideoDownloader.OutputFormat = .mp4
+    @State private var playWhileDownloading = false
     @State private var selectedFolder: URL = FileManager.default.urls(
         for: .downloadsDirectory, in: .userDomainMask
     ).first!
@@ -546,10 +547,50 @@ struct MediaDetailSheet: View {
 
             Divider()
 
-            // MOV conversion toggle
-            Toggle(isOn: $shouldConvertToMOV) {
-                Label("Convert to MOV", systemImage: "film")
-                    .font(.subheadline)
+            // Format picker
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Output Format")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                
+                HStack(spacing: 12) {
+                    ForEach(VideoDownloader.OutputFormat.allCases, id: \.self) { format in
+                        Button {
+                            selectedFormat = format
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: formatIcon(for: format))
+                                Text(format.rawValue)
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(selectedFormat == format ? AppColors.accent.opacity(0.2) : Color.secondary.opacity(0.1))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(selectedFormat == format ? AppColors.accent : Color.clear, lineWidth: 1.5)
+                            )
+                            .foregroundStyle(selectedFormat == format ? AppColors.accent : .primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Play while downloading toggle
+            Toggle(isOn: $playWhileDownloading) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Play While Downloading", systemImage: "play.circle")
+                        .font(.subheadline)
+                    Text("Start playback once 10% is buffered")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .toggleStyle(SwitchToggleStyle(tint: AppColors.accent))
 
@@ -582,7 +623,8 @@ struct MediaDetailSheet: View {
                 title: episode.title,
                 type: .series,
                 vodExtension: episode.containerExtension,
-                shouldConvertToMOV: shouldConvertToMOV,
+                outputFormat: selectedFormat,
+                playWhileDownloading: playWhileDownloading,
                 downloadPathParam: selectedFolder.path,
                 genre: detail.detailGenre,
                 runtimeMinutes: nil,
@@ -595,7 +637,8 @@ struct MediaDetailSheet: View {
                 title: detail.cleanTitle,
                 type: .movie,
                 vodExtension: movie.movieData.containerExtension ?? "mkv",
-                shouldConvertToMOV: shouldConvertToMOV,
+                outputFormat: selectedFormat,
+                playWhileDownloading: playWhileDownloading,
                 downloadPathParam: selectedFolder.path,
                 tmdbId: movie.tmdbId,
                 genre: detail.detailGenre,
@@ -656,6 +699,15 @@ struct MediaDetailSheet: View {
         let result = await EnrichedMediaStore.shared
             .getEnrichedMetadata(for: detail, tmdbId: detail.tmdbIdInt)
         enrichedMetadata = result
+    }
+    
+    /// Icon for each output format
+    private func formatIcon(for format: VideoDownloader.OutputFormat) -> String {
+        switch format {
+        case .mp4: return "video.fill"
+        case .mkv: return "film.fill"
+        case .mov: return "play.rectangle.fill"
+        }
     }
 }
 

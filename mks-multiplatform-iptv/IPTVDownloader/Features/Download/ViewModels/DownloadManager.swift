@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import TransmuxCore
 
 class DownloadManager: ObservableObject {
     @Published private(set) var downloads: [DownloadItem] = []
@@ -64,7 +65,20 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    func startDownload(vodID: String, title: String, type: MediaType, vodExtension: String, shouldConvertToMOV: Bool, downloadPathParam: String, tmdbId: Int? = nil, genre: String? = nil, runtimeMinutes: Int? = nil, preResolvedMetadata: MetadataResult? = nil, metadataCandidates: [ScoredMetadataResult]? = nil) {
+    func startDownload(
+        vodID: String,
+        title: String,
+        type: MediaType,
+        vodExtension: String,
+        outputFormat: VideoDownloader.OutputFormat = .mp4,
+        playWhileDownloading: Bool = false,
+        downloadPathParam: String,
+        tmdbId: Int? = nil,
+        genre: String? = nil,
+        runtimeMinutes: Int? = nil,
+        preResolvedMetadata: MetadataResult? = nil,
+        metadataCandidates: [ScoredMetadataResult]? = nil
+    ) {
         var download = DownloadItem(
             id: UUID(),
             vodID: vodID,
@@ -72,6 +86,10 @@ class DownloadManager: ObservableObject {
             type: type,
             status: .notStarted
         )
+        
+        // Set output format and play-while-downloading option
+        download.outputFormat = outputFormat
+        download.playWhileDownloading = playWhileDownloading
 
         // Attach pre-resolved metadata if provided
         if let metadata = preResolvedMetadata {
@@ -90,7 +108,7 @@ class DownloadManager: ObservableObject {
 
         // Create a new downloader for this download
         let downloader = VideoDownloader(profile: profile)
-        downloader.shouldConvertToMOV = true
+        downloader.outputFormat = outputFormat
         let downloadId = finalDownload.id
         downloaders[downloadId] = downloader
 
@@ -113,22 +131,29 @@ class DownloadManager: ObservableObject {
                     downloadPath = UserDefaults.downloadPath
                 }
 
+                // Use the output format's extension for the destination file
                 let destinationPath = URL(fileURLWithPath: downloadPath)
-                    .appendingPathComponent("\(title).\(vodExtension)")
+                    .appendingPathComponent("\(title).\(outputFormat.fileExtension)")
                     .path
 
-                if type == .movie {
-                    try await downloader.downloadMovie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
-                } else {
-                    try await downloader.downloadSerie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
-                }
+                // Use streaming transmux download for all downloads now
+                let session = try await downloader.downloadWithTransmux(
+                    vodID: vodID,
+                    to: destinationPath,
+                    vodExtension: vodExtension,
+                    format: outputFormat,
+                    isMovie: type == .movie
+                )
+                
+                // Wait for transmux completion
+                await waitForTransmuxCompletion(session: session, downloader: downloader)
 
                 // Mark as completed
                 await MainActor.run {
                     if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
                         self.downloads[index].status = .completed
                         self.downloads[index].progress = 100.0
-                        self.downloads[index].filePath = destinationPath
+                        self.downloads[index].filePath = session.outputPath
 
                         // Clean up
                         self.downloaders[downloadId] = nil
@@ -138,7 +163,7 @@ class DownloadManager: ObservableObject {
                 }
 
                 // Post-download metadata writing
-                let fileURL = URL(fileURLWithPath: destinationPath)
+                let fileURL = URL(fileURLWithPath: session.outputPath)
                 if let metadata = preResolvedMetadata {
                     // Pre-resolved metadata: write tags directly
                     Task { [weak self] in
@@ -196,6 +221,33 @@ class DownloadManager: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.handleError(for: downloadId, error: error)
+                }
+            }
+        }
+    }
+    
+    /// Wait for a transmux session to complete
+    private func waitForTransmuxCompletion(session: ProgressiveTransmuxSession, downloader: VideoDownloader) async {
+        // Listen for the transmux completion notification
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let observer = NotificationCenter.default.addObserver(
+                forName: .transmuxDidComplete,
+                object: session.sessionID,
+                queue: .main
+            ) { _ in
+                continuation.resume()
+            }
+            
+            // Also poll for completion as a fallback
+            Task {
+                while true {
+                    let bufferedTime = await session.segmenter.latestBufferedSourceTime()
+                    if bufferedTime >= session.duration {
+                        NotificationCenter.default.removeObserver(observer)
+                        continuation.resume()
+                        return
+                    }
+                    try? await Task.sleep(for: .milliseconds(500))
                 }
             }
         }

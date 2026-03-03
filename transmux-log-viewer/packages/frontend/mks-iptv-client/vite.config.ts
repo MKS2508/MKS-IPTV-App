@@ -12,4 +12,10 @@ export default defineConfig({
       "@backend": path.resolve(__dirname, "../../backend/src"),
     },
   },
+  // PORT/HOST set by portless when running via `bun run --filter` (portless
+  // can't auto-inject --port because it sees `bun`, not `vite`)
+  server: {
+    port: Number(process.env.PORT) || 5173,
+    host: process.env.HOST || "localhost",
+  },
 });

@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import os
+import TransmuxCore
 
 class VideoDownloader: NSObject, URLSessionDataDelegate {
     private enum Constants {
@@ -8,9 +9,35 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         static let maxRetries = 3
         static let retryDelay: TimeInterval = 1.0
         static let speedSampleCount = 10
+        static let playbackBufferThreshold: Double = 0.10 // 10% buffer for play-while-downloading
     }
     
     private let profile: IPTVProfile
+    
+    /// Output container format for downloaded content
+    enum OutputFormat: String, CaseIterable, Codable {
+        case mp4 = "MP4"
+        case mkv = "MKV"
+        case mov = "MOV"
+        
+        /// File extension for this format
+        var fileExtension: String {
+            switch self {
+            case .mp4: return "mp4"
+            case .mkv: return "mkv"
+            case .mov: return "mov"
+            }
+        }
+        
+        /// FFmpeg format name for output
+        var ffmpegFormat: String {
+            switch self {
+            case .mp4: return "mp4"
+            case .mkv: return "matroska"
+            case .mov: return "mov"
+            }
+        }
+    }
     
     enum DownloadError: Error {
         case invalidURL
@@ -21,49 +48,10 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         case downloadPaused
     }
     
-     // TODO: [DOWNLOAD-SYSTEM-OVERHAUL] — Complete rewrite of post-download conversion
-     // Currently disabled: old FFmpegKit-based convertToMOVAsync was removed.
-     // This flag and the conversion code block below must be replaced with:
-     //
-     // 1. MULTIPLE OUTPUT FORMATS — Not just MOV. Support MP4, MKV, MOV.
-     //    Let the user choose target container format in the download dialog
-     //    (MediaDetailSheet download options). Default: MP4 for Apple ecosystem.
-     //
-     // 2. STREAM-DOWNLOAD + TRANSMUX FUSION — Replace URLSession bulk download
-     //    with TransmuxCore's streaming FFmpeg I/O approach:
-     //    - Use FFmpeg's avio/protocol layer to stream-download + remux simultaneously
-     //    - Progressive write to final container format during download (no post-download conversion)
-     //    - Much faster than download-then-convert: single pass, no temp files
-     //    - Leverage TransmuxingService for the remux pipeline
-     //
-     // 3. PLAY WHILE DOWNLOADING — Enable playback once ~10% is buffered:
-     //    - TransmuxServer serves partial fMP4 segments as they're written
-     //    - Seeking restricted to already-downloaded/transmuxed fragments only
-     //    - Cannot seek to future positions (only within existing written data)
-     //    - Fullness gate: minimum 10% buffered before allowing playback start
-     //    - AVPlayer reads from TransmuxServer while download continues in background
-     //
-     // 4. METADATA EMBEDDING (Subler-like) — After download/transmux completes:
-     //    - Use FFmpegMetadataWriter + MetadataEnrichmentService (already in app)
-     //    - Embed title, genre, cast, director, plot, year, rating into MP4/MKV/MOV
-     //    - Embed cover artwork as attached picture stream
-     //    - Automatic: enrich from TMDB/OMDB, then write to final file
-     //
-     // 5. PAUSE AND RESUME DOWNLOADS:
-     //    - HTTP Range request support for resuming partial downloads
-     //    - Persist download state (bytes downloaded, last fragment) across app restarts
-     //    - Resume transmux from last written fragment position
-     //    - Handle server support detection (Accept-Ranges header)
-     //
-     // 6. UPDATE DOWNLOAD DIALOG — MediaDetailSheet must show:
-     //    - Format picker (MP4/MKV/MOV) instead of hardcoded MOV toggle
-     //    - Quality/codec info from FFProbeUtilities
-     //    - Estimated file size
-     //    - "Play while downloading" toggle
-     //
-     // See: VideoDownloader, TransmuxingService, FFmpegMetadataWriter,
-     //      MetadataEnrichmentService, MediaDetailSheet
-     var shouldConvertToMOV: Bool = false
+     // TODO: [DOWNLOAD-SYSTEM-OVERHAUL] — IN PROGRESS
+     // Implementing TransmuxCore-based streaming download pipeline.
+     // See full specification below.
+     var outputFormat: OutputFormat = .mp4
      
      enum DownloadState: Equatable {
          case notStarted
@@ -235,6 +223,121 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         logger.info("Starting series download: vodID=\(vodID)")
         let urlString = IPTVConfiguration.buildSeriesURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
         try await download(from: urlString, to: destinationPath)
+    }
+    
+    // MARK: - TransmuxCore Streaming Download (Stream-Download + Transmux Fusion)
+    
+    /// Streaming download using TransmuxCore's FFmpeg I/O layer.
+    /// Simultaneously downloads and transmuxes to the target container format in a single pass.
+    /// Returns a ProgressiveTransmuxSession once the fMP4 header is written, enabling play-while-downloading.
+    ///
+    /// - Parameters:
+    ///   - vodID: The VOD ID from the IPTV server
+    ///   - destinationPath: Final output file path
+    ///   - vodExtension: Source file extension
+    ///   - format: Target container format (MP4/MKV/MOV)
+    /// - Returns: ProgressiveTransmuxSession for play-while-downloading support
+    func downloadWithTransmux(
+        vodID: String,
+        to destinationPath: String,
+        vodExtension: String,
+        format: OutputFormat,
+        isMovie: Bool
+    ) async throws -> ProgressiveTransmuxSession {
+        currentVodId = vodID
+        currentDestinationPath = destinationPath
+        currentState = .downloading
+        downloadedBytes = 0
+        totalBytes = 0
+        
+        logger.info("Starting streaming transmux download: vodID=\(vodID), format=\(format.rawValue)")
+        
+        // Build source URL from IPTV configuration
+        let urlString = isMovie
+            ? IPTVConfiguration.buildMovieURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
+            : IPTVConfiguration.buildSeriesURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
+        
+        guard let sourceURL = URL(string: urlString) else {
+            throw DownloadError.invalidURL
+        }
+        
+        // Ensure destination directory exists
+        let fileURL = URL(fileURLWithPath: destinationPath)
+        let directoryURL = fileURL.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directoryURL.path) {
+            try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
+            logger.info("Created directory at path: \(directoryURL.path)")
+        }
+        
+        // Start transmux session - this returns once fMP4 header is written
+        startTime = Date()
+        let session = try await TransmuxingService.shared.startTransmux(from: sourceURL)
+        
+        logger.info("Transmux session started: \(session.sessionID)")
+        logger.info("Output: \(session.outputPath)")
+        logger.info("Duration: \(session.duration)s, Expected size: \(session.expectedSize) bytes")
+        
+        // Update total bytes for progress tracking
+        totalBytes = session.expectedSize
+        
+        // Set up progress monitoring from the session's segmenter
+        Task { [weak self] in
+            await self?.monitorTransmuxProgress(session: session)
+        }
+        
+        return session
+    }
+    
+    /// Monitor transmux progress and emit progress updates
+    private func monitorTransmuxProgress(session: ProgressiveTransmuxSession) async {
+        let segmenter = session.segmenter
+        
+        // Poll for progress updates while transmux is active
+        while currentState == .downloading {
+            let bufferedTime = await segmenter.latestBufferedSourceTime()
+            let duration = session.duration
+            
+            if duration > 0 {
+                let progress = bufferedTime / duration
+                let bytesProcessed = Int64(Double(session.expectedSize) * progress)
+                
+                let downloadProgress = DownloadProgress(
+                    bytesDownloaded: bytesProcessed,
+                    totalBytes: session.expectedSize,
+                    speed: calculateSpeed(elapsed: Date().timeIntervalSince(startTime ?? Date())),
+                    eta: calculateETA()
+                )
+                progressSubject.send(downloadProgress)
+            }
+            
+            // Check if transmux is complete
+            if bufferedTime >= duration {
+                currentState = .completed
+                progressSubject.send(completion: .finished)
+                break
+            }
+            
+            // Poll interval
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+    }
+    
+    /// Check if enough content is buffered for play-while-downloading (10% threshold)
+    func isReadyForPlayback(session: ProgressiveTransmuxSession) async -> Bool {
+        let bufferedTime = await session.segmenter.latestBufferedSourceTime()
+        let duration = session.duration
+        guard duration > 0 else { return false }
+        
+        let bufferPercentage = bufferedTime / duration
+        return bufferPercentage >= Constants.playbackBufferThreshold
+    }
+    
+    /// Get the current buffer percentage for play-while-downloading
+    func bufferPercentage(session: ProgressiveTransmuxSession) async -> Double {
+        let bufferedTime = await session.segmenter.latestBufferedSourceTime()
+        let duration = session.duration
+        guard duration > 0 else { return 0 }
+        return (bufferedTime / duration) * 100
     }
     
     private func download(from urlString: String, to destinationPath: String) async throws {

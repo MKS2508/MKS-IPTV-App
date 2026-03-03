@@ -15,6 +15,12 @@ struct DownloadItem: Identifiable {
     var metadataResult: MetadataResult?
     var metadataCandidates: [ScoredMetadataResult] = []
     var filePath: String?
+    
+    /// Output container format for the download
+    var outputFormat: VideoDownloader.OutputFormat = .mp4
+    
+    /// Whether play-while-downloading is enabled
+    var playWhileDownloading: Bool = false
 }
 
 // MediaType enum is now defined in MediaProtocols.swift

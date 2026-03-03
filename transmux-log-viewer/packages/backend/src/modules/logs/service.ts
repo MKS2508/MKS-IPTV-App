@@ -8,7 +8,7 @@ const serviceLog = logger.component("LogService");
  * Service for managing TransmuxCore log file operations
  *
  * Handles:
- * - Real-time log streaming via SSE
+ * - Real-time log streaming via SSE (yields parsed entries)
  * - Log file parsing and filtering
  * - Log history retrieval
  * - Log file clearing
@@ -16,57 +16,46 @@ const serviceLog = logger.component("LogService");
  * @example
  * ```typescript
  * const service = new LogService();
- *
- * // Stream logs
- * const stream = service.streamLogs();
- *
- * // Get history
- * const history = await service.getHistory();
- *
- * // Clear logs
- * await service.clearLogs();
+ * for await (const entry of service.streamEntries(signal)) {
+ *   console.log(entry.message);
+ * }
  * ```
  */
 export class LogService {
   private readonly LOG_FILE = "/tmp/mks-iptv-transmux.log";
 
   /**
-   * Stream log file changes via SSE
+   * Stream parsed log entries from the log file
    *
-   * Polls the log file for changes and yields new lines as they appear.
-   * Each line is parsed into a structured LogEntry object.
+   * Polls the log file for changes and yields new lines as parsed
+   * ILogEntry objects. The route handler wraps these with Elysia's
+   * sse() for proper SSE formatting.
    *
-   * @returns AsyncGenerator yielding SSE-formatted log entries
+   * @param signal - AbortSignal for client disconnect detection
+   * @returns AsyncGenerator yielding parsed log entries
    */
-  async *streamLogs(): AsyncGenerator<string, void, unknown> {
+  async *streamEntries(signal?: AbortSignal): AsyncGenerator<ILogEntry, void, unknown> {
     let lastSize = 0;
-    const running = true;
 
     // Get initial file size
     try {
       const stats = await stat(this.LOG_FILE);
       lastSize = stats.size;
-      serviceLog.info(`Initial log file size: ${lastSize} bytes`);
+      serviceLog.info(`SSE connected — log file size: ${lastSize} bytes`);
     } catch (_error) {
       serviceLog.warn("Log file not found, waiting for creation...");
-      yield this.formatSSE({
-        type: "error",
-        message: "Log file not found. Start transmux-cli to create it.",
-      });
     }
 
-    // Send initial connection message
-    yield this.formatSSE({
-      type: "connected",
-      message: "Connected to log stream",
-      timestamp: new Date().toISOString(),
-    });
-
-    // Poll for file changes
-    while (running) {
+    // Poll for file changes until client disconnects
+    while (!signal?.aborted) {
       try {
         const stats = await stat(this.LOG_FILE);
         const currentSize = stats.size;
+
+        // File was truncated (e.g. log clear) — reset
+        if (currentSize < lastSize) {
+          lastSize = 0;
+        }
 
         // Only read new content
         if (currentSize > lastSize) {
@@ -75,21 +64,31 @@ export class LogService {
           const newContent = content.slice(lastSize);
           lastSize = currentSize;
 
-          // Split by lines and parse each
           const lines = newContent.split("\n").filter((line) => line.trim());
 
           for (const line of lines) {
-            const parsed = this.parseLogLine(line);
-            yield this.formatSSE(parsed);
+            if (signal?.aborted) return;
+            yield this.parseLogLine(line);
           }
         }
       } catch (_error) {
         // File doesn't exist yet, just continue polling
       }
 
-      // Poll every 500ms
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Interruptible 500ms sleep
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 500);
+        if (signal) {
+          const onAbort = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+        }
+      });
     }
+
+    serviceLog.info("SSE stream closed (client disconnected)");
   }
 
   /**
@@ -152,59 +151,56 @@ export class LogService {
   /**
    * Parse a raw log line into a structured LogEntry
    *
-   * Expected format:
-   * [TIMESTAMP] [TAG] Message
-   *
-   * Examples:
-   * - [2026-03-02 21:00:00] [SERVICE] Transmux started: session abc123
-   * - [2026-03-02 21:00:01] [AC3    ] AC3 init phase reset complete
-   * - [2026-03-02 21:00:02] [ERROR  ] Non-monotonic DTS detected
+   * Supports two formats:
+   * 1. TransmuxCore log: [HH:mm:ss.SSS] [LEVEL] [TAG] message
+   * 2. Session header:   ========== TRANSMUX SESSION <id> @ HH:mm:ss.SSS ==========
    *
    * @param line - Raw log line to parse
    * @returns Parsed log entry with metadata
    */
   private parseLogLine(line: string): ILogEntry {
-    // Extract timestamp
-    const timestampMatch = line.match(/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/);
-    const timestamp = timestampMatch ? timestampMatch[1] : new Date().toISOString();
+    // Format: [HH:mm:ss.SSS] [LEVEL] [TAG] message
+    const logMatch = line.match(
+      /\[(\d{2}:\d{2}:\d{2}\.\d{3})\]\s+\[(DBG|INF|WRN|ERR)\]\s+\[(\w+)\]\s+(.*)/
+    );
 
-    // Extract tag (second bracketed value)
-    const tagMatch = line.match(/\[([A-Z]+\s*)\]/g);
-    let tag = "UNKNOWN";
-    let message = line;
+    if (logMatch) {
+      const [, timestamp, levelCode, tag, message] = logMatch;
+      const levelMap: Record<string, LogLevel> = {
+        DBG: "DEBUG",
+        INF: "INFO",
+        WRN: "WARN",
+        ERR: "ERROR",
+      };
 
-    if (tagMatch && tagMatch.length > 1) {
-      tag = tagMatch[1].replace(/[[\]]/g, "").trim();
-      message = line.split(tagMatch[1])[1]?.trim() || line;
+      return {
+        timestamp,
+        tag: tag.toUpperCase(),
+        level: levelMap[levelCode] ?? "INFO",
+        message,
+        raw: line,
+      };
     }
 
-    // Determine log level based on keywords
-    let level: LogLevel = "INFO";
-
-    if (line.includes("ERROR") || line.includes("error") || line.includes("failed")) {
-      level = "ERROR";
-    } else if (line.includes("WARN") || line.includes("warning")) {
-      level = "WARN";
-    } else if (line.includes("DEBUG")) {
-      level = "DEBUG";
+    // Session header line
+    const sessionMatch = line.match(/=+\s+TRANSMUX SESSION\s+(\S+)\s+@\s+(\S+)\s+=+/);
+    if (sessionMatch) {
+      return {
+        timestamp: sessionMatch[2],
+        tag: "SESSION",
+        level: "INFO",
+        message: `Session started: ${sessionMatch[1]}`,
+        raw: line,
+      };
     }
 
+    // Fallback: unstructured line
     return {
-      timestamp,
-      tag,
-      level,
-      message,
+      timestamp: new Date().toISOString(),
+      tag: "UNKNOWN",
+      level: "INFO",
+      message: line.trim(),
       raw: line,
     };
-  }
-
-  /**
-   * Format data as SSE message
-   *
-   * @param data - Data to send via SSE
-   * @returns SSE-formatted string
-   */
-  private formatSSE(data: unknown): string {
-    return `data: ${JSON.stringify(data)}\n\n`;
   }
 }

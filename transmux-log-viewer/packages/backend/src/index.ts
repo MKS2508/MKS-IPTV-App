@@ -3,7 +3,12 @@ import logger from "@mks2508/better-logger";
 import { Elysia } from "elysia";
 import { cliModule } from "./modules/cli";
 import { healthModule } from "./modules/health";
+import { hlsModule } from "./modules/hls";
 import { logsModule } from "./modules/logs";
+import { sourcesModule } from "./modules/sources";
+
+/** Port — uses PORT env var when available (portless sets this automatically) */
+const port = Number(process.env.PORT) || 3000;
 
 /**
  * Main Elysia server for TransmuxCore log viewer
@@ -14,22 +19,32 @@ import { logsModule } from "./modules/logs";
  * @see /modules/logs - SSE streaming, history, and clear endpoints
  * @see /modules/health - Health check endpoint
  * @see /modules/cli - TransmuxCore CLI execution endpoints
+ * @see /modules/hls - HLS serving (fMP4 + m3u8)
+ * @see /modules/sources - Test data sources (IPTV + local files)
  */
 const app = new Elysia()
   .use(
     cors({
-      origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+      origin: (request): boolean => {
+        const origin = request.headers.get("origin");
+        if (!origin) return true;
+        // Allow localhost (any port) and portless .localhost URLs
+        return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+          || /^https?:\/\/[\w.-]+\.localhost(:\d+)?$/.test(origin);
+      },
       credentials: true,
     })
   )
   .use(logsModule)
   .use(healthModule)
   .use(cliModule)
-  .onStart(() => {
+  .use(hlsModule)
+  .use(sourcesModule)
+  .onStart(({ server }) => {
     const serverLog = logger.component("Server");
-    serverLog.info("🚀 TransmuxCore Log Viewer API started");
-    serverLog.info(`📝 Watching log file: /tmp/mks-iptv-transmux.log`);
-    serverLog.info(`🌐 API: http://localhost:3000`);
+    serverLog.info("TransmuxCore Log Viewer API started");
+    serverLog.info(`Watching log file: /tmp/mks-iptv-transmux.log`);
+    serverLog.info(`API: http://localhost:${server?.port ?? port}`);
   })
   .onError(({ code, error, set }) => {
     const errorLog = logger.component("Error");
@@ -51,6 +66,6 @@ const app = new Elysia()
     errorLog.error(`Internal error: ${errorMessage}`, { error });
     return { error: "Internal Server Error", message: errorMessage };
   })
-  .listen(3000);
+  .listen(port);
 
 export type App = typeof app;

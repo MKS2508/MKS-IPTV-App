@@ -22,7 +22,9 @@ import { treaty } from "@elysiajs/eden";
  * }
  * ```
  */
-export const api = treaty<App>("http://localhost:3000");
+/** API base URL — uses VITE_API_URL when available (portless mode) */
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+export const api = treaty<App>(API_BASE);
 
 /**
  * API response helper for handling Eden responses

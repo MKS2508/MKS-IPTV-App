@@ -1,5 +1,6 @@
 import SwiftUI
 
+#if os(macOS)
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var profilesManager: IPTVProfilesManager
@@ -243,3 +244,5 @@ struct SettingsView_Previews: PreviewProvider {
     }
 }
 #endif
+
+#endif // os(macOS)

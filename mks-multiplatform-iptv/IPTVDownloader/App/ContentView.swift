@@ -69,10 +69,12 @@ struct ContentView: View {
             updateTouchBarContext(for: newValue)
         }
         #endif
+        #if os(macOS)
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .environmentObject(profilesManager)
         }
+        #endif
     }
 
     // MARK: - View Components

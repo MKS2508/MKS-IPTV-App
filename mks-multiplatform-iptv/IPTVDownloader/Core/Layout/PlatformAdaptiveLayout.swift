@@ -209,22 +209,3 @@ extension View {
     }
 }
 
-// MARK: - Size Class Extensions
-
-#if canImport(UIKit)
-import UIKit
-
-extension HorizontalSizeClass {
-    /// Whether this is a compact size class
-    var isCompact: Bool {
-        self == .compact
-    }
-}
-
-extension VerticalSizeClass {
-    /// Whether this is a compact size class
-    var isCompact: Bool {
-        self == .compact
-    }
-}
-#endif

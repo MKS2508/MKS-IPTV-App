@@ -85,7 +85,7 @@ struct MediaGridContainer<Content: View>: View {
 
     private var glassLoadingState: some View {
         VStack(spacing: 16) {
-            if LiquidGlassAvailability.isAvailable {
+            if #available(iOS 26, macOS 26, tvOS 26, *) {
                 ProgressView()
                     .scaleEffect(1.5)
                     .glassEffect(.regular, in: Circle())

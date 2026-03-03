@@ -12,7 +12,7 @@ extension MediaListView {
 
     var loadingView: some View {
         VStack(spacing: 24) {
-            if LiquidGlassAvailability.isAvailable {
+            if #available(iOS 26, macOS 26, tvOS 26, *) {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
@@ -96,7 +96,7 @@ extension MediaListView {
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                if LiquidGlassAvailability.isAvailable {
+                if #available(iOS 26, macOS 26, tvOS 26, *) {
                     ProgressView()
                         .scaleEffect(1.8)
                         .tint(.white)
@@ -161,7 +161,7 @@ private extension View {
     /// Apply modifier only if iOS 26+/macOS 26+ is available
     @ViewBuilder
     func ifAvailable<Content: View>(@ViewBuilder transform: (Self) -> Content) -> some View {
-        if LiquidGlassAvailability.isAvailable {
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
             transform(self)
         } else {
             self

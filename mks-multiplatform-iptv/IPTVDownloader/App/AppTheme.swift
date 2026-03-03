@@ -11,6 +11,11 @@ import SwiftUI
 // MARK: - Liquid Glass Availability Detection
 
 /// Detects native Liquid Glass API availability for iOS 26+ / macOS 26+
+///
+/// **Important**: For gating `.glassEffect()` or `GlassEffectContainer` calls,
+/// use `if #available(iOS 26, macOS 26, tvOS 26, *)` directly — the compiler
+/// requires a compile-time availability check, not a runtime Bool.
+/// This enum is kept for non-API checks (e.g., choosing layout strategies).
 enum LiquidGlassAvailability {
     /// Returns true if running on iOS 26+ or macOS 26+ with native Liquid Glass support
     static var isAvailable: Bool {
@@ -18,6 +23,8 @@ enum LiquidGlassAvailability {
         if #available(iOS 26, *) { return true }
         #elseif os(macOS)
         if #available(macOS 26, *) { return true }
+        #elseif os(tvOS)
+        if #available(tvOS 26, *) { return true }
         #endif
         return false
     }
@@ -84,16 +91,19 @@ enum AppGlass {
 
 extension View {
     /// Apply standard app glass effect with red tint (iOS 26+/macOS 26+ only)
+    @available(iOS 26, macOS 26, tvOS 26, *)
     func appGlass(in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius)) -> some View {
         self.glassEffect(.regular.tint(AppColors.glassTint), in: shape)
     }
 
     /// Apply interactive app glass effect (responds to touch/hover)
+    @available(iOS 26, macOS 26, tvOS 26, *)
     func appGlassInteractive(in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius)) -> some View {
         self.glassEffect(.regular.tint(AppColors.glassTint).interactive(), in: shape)
     }
 
     /// Apply prominent app glass effect (for featured content)
+    @available(iOS 26, macOS 26, tvOS 26, *)
     func appGlassProminent(in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadiusLarge)) -> some View {
         self.glassEffect(.regular.tint(AppColors.accent.opacity(0.15)), in: shape)
     }
@@ -109,7 +119,7 @@ extension View {
         in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius),
         fallbackOpacity: Double = 1.0
     ) -> some View {
-        if LiquidGlassAvailability.isAvailable {
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
             self.glassEffect(.regular.tint(AppColors.glassTint), in: shape)
         } else {
             self.background(.ultraThinMaterial.opacity(fallbackOpacity), in: shape)
@@ -125,7 +135,7 @@ extension View {
         in shape: some Shape = RoundedRectangle(cornerRadius: AppGlass.cornerRadius),
         fallbackOpacity: Double = 1.0
     ) -> some View {
-        if LiquidGlassAvailability.isAvailable {
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
             self.glassEffect(.regular.tint(AppColors.glassTint).interactive(), in: shape)
         } else {
             self.background(.ultraThinMaterial.opacity(fallbackOpacity), in: shape)
@@ -145,7 +155,7 @@ struct AdaptiveGlassContainer<Content: View>: View {
     }
 
     var body: some View {
-        if LiquidGlassAvailability.isAvailable {
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
             GlassEffectContainer {
                 content
             }
@@ -157,24 +167,29 @@ struct AdaptiveGlassContainer<Content: View>: View {
 
 // MARK: - Button Styles
 
-/// Custom glass button style with app accent
+/// Custom glass button style with app accent — adaptive with fallback
 struct AppGlassButtonStyle: ButtonStyle {
     var isProminent = false
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
+        let label = configuration.label
             .font(.body.weight(.medium))
             .foregroundStyle(.primary)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .glassEffect(
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
+            label.glassEffect(
                 isProminent
                     ? .regular.tint(AppColors.accent.opacity(0.15))
                     : .regular.tint(AppColors.glassTint).interactive(),
                 in: .capsule
             )
-            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+        } else {
+            label.background(.ultraThinMaterial, in: .capsule)
+        }
     }
 }
 

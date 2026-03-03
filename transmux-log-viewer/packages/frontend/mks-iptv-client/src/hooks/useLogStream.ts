@@ -30,6 +30,7 @@ export function useLogStream() {
     warns: 0,
     seeks: 0,
     packets: 0,
+    segments: 0,
   });
   const [connected, setConnected] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -86,8 +87,10 @@ export function useLogStream() {
           errors: prev.errors + (entry.level === "ERROR" ? 1 : 0),
           warns: prev.warns + (entry.level === "WARN" ? 1 : 0),
           seeks: prev.seeks + (entry.tag === "SEEK" ? 1 : 0),
-          packets:
-            prev.packets + (entry.message.toLowerCase().includes("packet") ? 1 : 0),
+          packets: prev.packets + (entry.message.toLowerCase().includes("packet") ? 1 : 0),
+          segments:
+            prev.segments +
+            (entry.tag === "SEGMENTER" && entry.message.startsWith("Segment[") ? 1 : 0),
         }));
       } catch {
         // Ignore malformed SSE data
@@ -140,7 +143,7 @@ export function useLogStream() {
    */
   const clearLogs = useCallback(() => {
     setLogs([]);
-    setStats({ total: 0, errors: 0, warns: 0, seeks: 0, packets: 0 });
+    setStats({ total: 0, errors: 0, warns: 0, seeks: 0, packets: 0, segments: 0 });
   }, []);
 
   // Auto-connect on mount, cleanup on unmount — zero deps

@@ -53,8 +53,7 @@ export const logsModule = new Elysia({ prefix: "/logs" })
     {
       detail: {
         summary: "Stream logs via SSE",
-        description:
-          "Server-Sent Events endpoint that streams new log lines in real-time",
+        description: "Server-Sent Events endpoint that streams new log lines in real-time",
         tags: ["logs"],
       },
     }

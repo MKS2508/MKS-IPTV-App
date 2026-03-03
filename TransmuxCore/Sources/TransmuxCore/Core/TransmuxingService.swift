@@ -186,6 +186,11 @@ public actor TransmuxingService {
         var outputCtx: UnsafeMutablePointer<AVFormatContext>?
         var continuationResumed = false
 
+        // --- Initialize C-level logging to the same file TransmuxLog uses ---
+        // Routes FFmpegHelper diagnostics and FFmpeg av_log messages
+        // to /tmp/mks-iptv-transmux.log so the web log viewer sees everything.
+        mks_log_init(TransmuxLog.filePath)
+
         // --- Open input ---
         var inputOptions: OpaquePointer?
         av_dict_set(&inputOptions, "user_agent", "VLC/3.0.18 LibVLC/3.0.18", 0)
@@ -324,17 +329,40 @@ public actor TransmuxingService {
             }
         }
 
+        // For AC3 (not EAC3): set frame_size=1536 so delay_moov is not needed.
+        // AC3 frames are always 1536 samples. With frame_size set, empty_moov
+        // writes the moov immediately -- no init phase needed.
+        //
+        // EAC3 REQUIRES delay_moov: FFmpeg's mp4 muxer must parse actual EAC3
+        // frames to build AudioSpecificConfig in the moov atom. Setting frame_size
+        // alone triggers "Cannot write moov atom before EAC3 packets parsed".
+        // For EAC3, the init phase runs but we continue from current position
+        // (no truncate/rewind) to keep DTS monotonic.
+        if hasAC3Audio && bestAudio >= 0 {
+            let audioCodecId = mks_stream_get_codec_id(inCtx, bestAudio)
+            let audioOutIdx = Int32(streamMapping[Int(bestAudio)])
+            if audioCodecId == 86019 {
+                // Pure AC3: frame_size eliminates delay_moov
+                mks_stream_set_frame_size(outCtx, audioOutIdx, 1536)
+                hasAC3Audio = false
+                TransmuxLog.service("AC3: set frame_size=1536, using empty_moov (no delay_moov)")
+            } else {
+                // EAC3: must use delay_moov, continue from current position after init
+                TransmuxLog.service("EAC3: delay_moov required, will continue from init position (no truncate/rewind)")
+            }
+        }
+
         // --- Set fragmented MP4 muxer options ---
         // - frag_keyframe: Start new fragment at each keyframe
         // - empty_moov: Write initial moov without sample data
         // - default_base_moof: Use default base for moof offsets
-        // - delay_moov: ONLY for AC3/EAC3 (required because codec frame size is not set until first packet)
+        // - delay_moov: ONLY for AC3/EAC3 fallback (when extradata is missing, e.g. MPEG-TS)
         //
-        // For AAC/H.264: moov is written immediately after avformat_write_header(), allowing
-        // HLSSegmenter to extract it as init.mp4 right away.
+        // For AAC/H.264 and AC3 with frame_size set: moov is written immediately after
+        // avformat_write_header(), allowing HLSSegmenter to extract it as init.mp4 right away.
         //
-        // For AC3/EAC3: delay_moov is required (FFmpeg will error without it). The init.mp4
-        // will be extracted after the first packet is written. This adds ~200ms delay but is necessary.
+        // For AC3/EAC3 without extradata (rare): delay_moov is required. The init phase
+        // writes packets until moov appears, then continues from that position (no rewind).
         var options: OpaquePointer?
         let movflags = hasAC3Audio
             ? "frag_keyframe+empty_moov+delay_moov+default_base_moof"
@@ -416,6 +444,9 @@ public actor TransmuxingService {
                 mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
                 mks_packet_clear_pos(pkt)
 
+                // Save DTS before write — av_interleaved_write_frame unrefs the packet
+                let dts = mks_packet_get_dts(pkt)
+
                 ret = av_interleaved_write_frame(outCtx, pkt)
                 if ret < 0 {
                     TransmuxLog.service("Initial packet write failed (ret=\(ret))", level: .warn)
@@ -423,8 +454,7 @@ public actor TransmuxingService {
                     break
                 }
 
-                // Track DTS of written packets
-                let dts = mks_packet_get_dts(pkt)
+                // Track DTS of written packets (saved before write)
                 if dts != AV_NOPTS {
                     lastWrittenDts[outStreamIdx] = dts
                 }
@@ -454,40 +484,11 @@ public actor TransmuxingService {
                 TransmuxLog.service("CRITICAL: AC3 moov still not written after \(packetsWritten) packets", level: .error)
             }
 
-            // CRITICAL: Reset both input and output after AC3 init phase
-            // The init phase wrote packets to force moov to disk. Now we need to:
-            // 1. Truncate output back to just the init segment (ftyp+moov)
-            // 2. Seek input back to beginning
-            // 3. Reset muxer state to accept packets from DTS=0 again
-
-            TransmuxLog.service("Resetting after AC3 init phase...")
-
-            // Flush and truncate output to init segment size
-            avio_flush(outCtx.pointee.pb)
-            let initSegmentEnd = headerFileSize
-            let seekResult = avio_seek(outCtx.pointee.pb, Int64(initSegmentEnd), SEEK_SET)
-            if seekResult < 0 {
-                TransmuxLog.service("WARNING: Failed to truncate output to init size (ret=\(seekResult))", level: .warn)
-            } else {
-                TransmuxLog.service("Truncated output to init segment size (\(initSegmentEnd) bytes)")
-            }
-
-            // Seek input back to beginning
-            ret = av_seek_frame(inCtx, -1, 0, AVSEEK_FLAG_BACKWARD)
-            if ret < 0 {
-                TransmuxLog.service("WARNING: Failed to seek input to beginning (ret=\(ret))", level: .warn)
-            } else {
-                TransmuxLog.service("Seeked input back to beginning")
-            }
-
-            // Flush codec buffers
-            avformat_flush(inCtx)
-
-            // Reset lastWrittenDts since we're starting fresh
-            lastWrittenDts.removeAll()
-            TransmuxLog.service("Reset lastWrittenDts to start fresh from beginning")
-
-            TransmuxLog.service("AC3 init phase reset complete, ready to remux from beginning")
+            // AC3 init phase produced moov + first fragments. Continue from here.
+            // DO NOT truncate or rewind -- the muxer's internal DTS state can't be reset.
+            // The init data (moov + fragments) becomes the init segment, and the
+            // segmenter scanner picks up new fragments after initSegmentSize offset.
+            TransmuxLog.service("AC3 init phase complete, continuing from current position (no truncate/rewind)")
         }
 
         // Verify init segment has reasonable size (should be 400-800 bytes for typical streams)
@@ -530,15 +531,18 @@ public actor TransmuxingService {
         var lastProgressLog = 0
         var totalSeekCount = 0
 
-        // --- Timestamp rebasing state (GLOBAL OFFSET for A/V sync) ---
-        // After each seek, a SINGLE global offset is computed from the video stream
-        // and applied to ALL streams. This preserves the temporal relationship
-        // between audio and video, preventing A/V desync.
-        var globalRebaseOffset: Int64 = 0
+        // --- Per-stream timestamp rebasing after seek ---
+        // Each stream gets its OWN rebase offset because output streams may have
+        // different timebases (e.g. video at 90kHz, audio at 48kHz). A single
+        // global offset in one timebase produces non-monotonic DTS in the other.
+        // The video offset is computed from buffered keyframes; the audio offset
+        // is computed from the first rescaled buffered audio packet's DTS.
+        var streamRebaseOffsets: [Int32: Int64] = [:]
         // Note: lastWrittenDts and AV_NOPTS are declared above (before AC3 initial phase)
 
-        // State for computing global offset after seek
-        // Buffer first N video keyframes to compute averaged offset (more robust than single keyframe)
+        // State for computing offsets after seek
+        // Buffer first N video keyframes; use MINIMUM DTS (not average) to guarantee
+        // the earliest keyframe maps to exactly lastWrittenDts + 1.
         var bufferedVideoKeyframes: [UnsafeMutablePointer<AVPacket>] = []
         var firstNVideoDtsAfterSeek: [Int64] = []
         let videoDtsAveragingCount = 3
@@ -590,7 +594,8 @@ public actor TransmuxingService {
                 let preSeekDts = lastWrittenDts.map { "stream\($0.key)=\($0.value)" }.joined(separator: ", ")
                 TransmuxLog.remux("===== SEEK #\(totalSeekCount) to \(String(format: "%.1f", seekTime))s =====")
                 TransmuxLog.remux("Pre-seek state: packetCount=\(packetCount) lastWrittenDts=[\(preSeekDts)]")
-                TransmuxLog.remux("Pre-seek globalOffset=\(globalRebaseOffset)")
+                let preSeekOffsets = streamRebaseOffsets.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " ")
+                TransmuxLog.remux("Pre-seek offsets=[\(preSeekOffsets)]")
 
                 // 1. Flush the interleaver queue — writes any buffered packets
                 av_interleaved_write_frame(outCtx, nil)
@@ -681,22 +686,28 @@ public actor TransmuxingService {
             }
 
             // --- Keyframe handling after seek ---
-            // Buffer audio packets until the first video keyframe arrives.
-            // Video non-keyframes are still skipped (can't start decoding from them).
-            // This preserves A/V sync by keeping all audio data.
-            if seekPending && !videoKeyframeReceived {
+            // Buffer audio packets until the global offset is fully computed.
+            // Video non-keyframes are skipped (can't start decoding from them).
+            // Audio MUST be buffered for the ENTIRE seek-pending period — not just
+            // until the first video keyframe. Without this, audio packets that arrive
+            // between videoKeyframeReceived=true and globalOffsetComputed=true bypass
+            // the buffer and get written with offset=0, corrupting the timeline.
+            if seekPending && !globalOffsetComputed {
                 skippedPacketsAfterSeek += 1
                 if outStreamIdx == videoOutputIdx {
-                    if mks_packet_is_keyframe(pkt) == 0 {
-                        // Skip non-keyframe video
-                        av_packet_unref(pkt)
-                        packetCount += 1
-                        continue
+                    if !videoKeyframeReceived {
+                        if mks_packet_is_keyframe(pkt) == 0 {
+                            // Skip non-keyframe video before first keyframe
+                            av_packet_unref(pkt)
+                            packetCount += 1
+                            continue
+                        }
+                        videoKeyframeReceived = true
+                        TransmuxLog.remux("First video KEYFRAME after seek #\(totalSeekCount) at packet \(packetCount), buffer has \(pendingAudioPackets.count) audio packets, rawDts=\(rawDtsBefore) rawPts=\(rawPtsBefore)")
                     }
-                    videoKeyframeReceived = true
-                    TransmuxLog.remux("First video KEYFRAME after seek #\(totalSeekCount) at packet \(packetCount), buffer has \(pendingAudioPackets.count) audio packets, rawDts=\(rawDtsBefore) rawPts=\(rawPtsBefore)")
+                    // Video keyframes fall through to the offset computation block below
                 } else {
-                    // Buffer audio packet instead of discarding
+                    // Buffer ALL audio packets until global offset is computed
                     if pendingAudioPackets.count < maxPendingAudioPackets {
                         if let clonedPkt = av_packet_clone(pkt) {
                             pendingAudioPackets.append(clonedPkt)
@@ -722,11 +733,10 @@ public actor TransmuxingService {
             let rescaledDtsBeforeRebase = mks_packet_get_dts(pkt)
             let rescaledPtsBeforeRebase = mks_packet_get_pts(pkt)
 
-            // --- Global timestamp rebasing after seek (A/V sync preserved) ---
-            // Buffer the first N video keyframes to compute AVERAGED global offset.
-            // Averaging is more robust against DTS outliers and jitter than using a single keyframe.
-            // This SAME offset is applied to ALL streams (video AND audio),
-            // preserving their temporal relationship and preventing A/V desync.
+            // --- Per-stream timestamp rebasing after seek ---
+            // Buffer video keyframes to compute the video offset, then derive
+            // the audio offset from the first rescaled buffered audio packet.
+            // Using MINIMUM DTS (not average) guarantees monotonicity.
             if seekPending && !globalOffsetComputed {
                 if isVideo && videoKeyframeReceived {
                     let newDts = mks_packet_get_dts(pkt)
@@ -753,32 +763,32 @@ public actor TransmuxingService {
                         continue
                     }
 
-                    // Once we have N keyframes, compute averaged offset
+                    // Once we have N keyframes, compute per-stream offsets
                     if bufferedVideoKeyframes.count >= videoDtsAveragingCount {
-                        let avgDts = firstNVideoDtsAfterSeek.reduce(0, +) / Int64(videoDtsAveragingCount)
+                        // Use MINIMUM DTS to guarantee the earliest keyframe maps to
+                        // exactly lastWrittenDts + 1 (no overlap with pre-seek data)
+                        let minDts = firstNVideoDtsAfterSeek.min()!
 
-                        // Check if we have a valid previous video DTS (not AV_NOPTS)
+                        // Compute video offset
                         if let lastVideoDts = lastWrittenDts[videoOutputIdx], lastVideoDts != AV_NOPTS {
-                            // Global offset = continue monotonically from last video DTS
-                            globalRebaseOffset = lastVideoDts + 1 - avgDts
-                            TransmuxLog.remux("GLOBAL OFFSET from AVERAGE: lastVideoDts=\(lastVideoDts) avgDts=\(avgDts) samples=\(firstNVideoDtsAfterSeek) → offset=\(globalRebaseOffset)")
+                            streamRebaseOffsets[videoOutputIdx] = lastVideoDts + 1 - minDts
+                            TransmuxLog.remux("VIDEO OFFSET: lastDts=\(lastVideoDts) minPostSeekDts=\(minDts) samples=\(firstNVideoDtsAfterSeek) → offset=\(streamRebaseOffsets[videoOutputIdx]!)")
                         } else {
-                            // First video ever OR previous DTS was invalid - no offset needed
-                            globalRebaseOffset = 0
-                            TransmuxLog.remux("GLOBAL OFFSET: first video or invalid previous DTS, avgDts=\(avgDts) → offset=0")
+                            streamRebaseOffsets[videoOutputIdx] = 0
+                            TransmuxLog.remux("VIDEO OFFSET: first video or invalid previous DTS → offset=0")
                         }
 
                         globalOffsetComputed = true
                         seekPending = false
                         lastSeekCompletionTime = Date()
-                        TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE with averaged global offset=\(globalRebaseOffset)")
 
-                        // Write buffered video keyframes with the computed offset
-                        TransmuxLog.remux("Writing \(bufferedVideoKeyframes.count) buffered video keyframes with offset=\(globalRebaseOffset)")
+                        let videoOffset = streamRebaseOffsets[videoOutputIdx] ?? 0
+
+                        // Write buffered video keyframes with the video offset
+                        TransmuxLog.remux("Writing \(bufferedVideoKeyframes.count) buffered video keyframes with videoOffset=\(videoOffset)")
                         for videoPkt in bufferedVideoKeyframes {
-                            // Apply global rebase offset
-                            if globalRebaseOffset != 0 {
-                                mks_packet_adjust_ts(videoPkt, globalRebaseOffset)
+                            if videoOffset != 0 {
+                                mks_packet_adjust_ts(videoPkt, videoOffset)
                             }
 
                             let videoDts = mks_packet_get_dts(videoPkt)
@@ -796,9 +806,13 @@ public actor TransmuxingService {
                         bufferedVideoKeyframes.removeAll()
                         TransmuxLog.remux("Buffered video keyframes written")
 
-                        // Process buffered audio packets now that global offset is known
+                        // Process buffered audio packets — compute audio offset from
+                        // the first rescaled packet's DTS in the audio output timebase
                         if !pendingAudioPackets.isEmpty {
-                            TransmuxLog.remux("Processing \(pendingAudioPackets.count) buffered audio packets with offset=\(globalRebaseOffset)")
+                            // Peek at the first audio packet to compute audio offset
+                            var audioOffsetComputed = false
+
+                            TransmuxLog.remux("Processing \(pendingAudioPackets.count) buffered audio packets")
                             for audioPkt in pendingAudioPackets {
                                 let audioInStreamIdx = Int(audioPkt.pointee.stream_index)
                                 guard audioInStreamIdx < streamCount, streamMapping[audioInStreamIdx] >= 0 else {
@@ -807,46 +821,68 @@ public actor TransmuxingService {
                                 }
                                 let audioOutIdx = Int32(streamMapping[audioInStreamIdx])
 
-                                // Apply AAC BSF if needed
-                                if let bsf = aacBsfCtx, Int32(audioInStreamIdx) == audioInputStreamIndex {
-                                    _ = mks_bsf_filter_packet(bsf, audioPkt)
-                                }
+                                // NOTE: AAC BSF was already applied before buffering.
+                                // Do NOT apply it again here.
 
-                                // Rescale timestamps
+                                // Rescale timestamps to output timebase
                                 audioPkt.pointee.stream_index = audioOutIdx
                                 mks_packet_rescale_ts(audioPkt, inCtx, Int32(audioInStreamIdx), outCtx, audioOutIdx)
                                 mks_packet_clear_pos(audioPkt)
 
-                                // Apply global rebase offset
-                                if globalRebaseOffset != 0 {
-                                    mks_packet_adjust_ts(audioPkt, globalRebaseOffset)
+                                // Compute audio offset from the FIRST valid rescaled audio DTS
+                                if !audioOffsetComputed {
+                                    let firstAudioDts = mks_packet_get_dts(audioPkt)
+                                    if firstAudioDts != AV_NOPTS {
+                                        if let lastAudioDts = lastWrittenDts[audioOutIdx], lastAudioDts != AV_NOPTS {
+                                            streamRebaseOffsets[audioOutIdx] = lastAudioDts + 1 - firstAudioDts
+                                            TransmuxLog.remux("AUDIO OFFSET[stream\(audioOutIdx)]: lastDts=\(lastAudioDts) firstPostSeekDts=\(firstAudioDts) → offset=\(streamRebaseOffsets[audioOutIdx]!)")
+                                        } else {
+                                            streamRebaseOffsets[audioOutIdx] = 0
+                                            TransmuxLog.remux("AUDIO OFFSET[stream\(audioOutIdx)]: first audio or invalid previous DTS → offset=0")
+                                        }
+                                        audioOffsetComputed = true
+                                    }
                                 }
 
-                                let audioDts = mks_packet_get_dts(audioPkt)
+                                // Apply per-stream audio offset
+                                let audioOffset = streamRebaseOffsets[audioOutIdx] ?? 0
+                                if audioOffset != 0 {
+                                    mks_packet_adjust_ts(audioPkt, audioOffset)
+                                }
+
+                                // Save DTS before write
+                                var audioTrackDts = mks_packet_get_dts(audioPkt)
+
+                                // Detect and recover non-monotonic DTS BEFORE writing
+                                if audioTrackDts != AV_NOPTS {
+                                    if let prevDts = lastWrittenDts[audioOutIdx], audioTrackDts <= prevDts {
+                                        let dtsDelta = audioTrackDts - prevDts
+                                        TransmuxLog.remux("NON-MONOTONIC DTS AUDIO: prev=\(prevDts) curr=\(audioTrackDts) delta=\(dtsDelta)", level: .error)
+
+                                        if dtsDelta < -2000 {
+                                            let correctedDts = prevDts + 1
+                                            TransmuxLog.remux("RECOVERING: forcing DTS=\(correctedDts)", level: .warn)
+                                            mks_packet_adjust_ts(audioPkt, correctedDts - audioTrackDts)
+                                            audioTrackDts = correctedDts
+                                        }
+                                    }
+                                }
 
                                 // Write audio packet
                                 ret = av_interleaved_write_frame(outCtx, audioPkt)
                                 if ret < 0 {
-                                    TransmuxLog.remux("Buffered audio write_frame ERROR (\(ret)) dts=\(audioDts)", level: .error)
-                                } else if audioDts != AV_NOPTS {
-                                    if let prevDts = lastWrittenDts[audioOutIdx], audioDts <= prevDts {
-                                        let dtsDelta = audioDts - prevDts
-                                        TransmuxLog.remux("NON-MONOTONIC DTS AUDIO: prev=\(prevDts) curr=\(audioDts) delta=\(dtsDelta)", level: .error)
-
-                                        // Recovery for severe desync
-                                        if dtsDelta < -2000 {
-                                            let correctedDts = prevDts + 1
-                                            TransmuxLog.remux("RECOVERING: forcing DTS=\(correctedDts)", level: .warn)
-                                            mks_packet_adjust_ts(audioPkt, correctedDts - audioDts)
-                                        }
-                                    }
-                                    lastWrittenDts[audioOutIdx] = mks_packet_get_dts(audioPkt)
+                                    TransmuxLog.remux("Buffered audio write_frame ERROR (\(ret)) dts=\(audioTrackDts)", level: .error)
+                                } else if audioTrackDts != AV_NOPTS {
+                                    lastWrittenDts[audioOutIdx] = audioTrackDts
                                 }
                                 packetCount += 1
                                 freePacketFromBuffer(audioPkt)
                             }
                             pendingAudioPackets.removeAll()
-                            TransmuxLog.remux("Buffered audio processing complete")
+
+                            TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE: offsets=\(streamRebaseOffsets.sorted(by: { $0.key < $1.key }).map { "s\($0.key)=\($0.value)" }.joined(separator: " "))")
+                        } else {
+                            TransmuxLog.remux("Seek #\(totalSeekCount) COMPLETE: videoOffset=\(videoOffset) (no buffered audio)")
                         }
 
                         // Current packet (4th+ keyframe) needs to continue processing normally
@@ -855,9 +891,9 @@ public actor TransmuxingService {
                 }
             }
 
-            // Apply global rebase offset to ALL streams (preserves A/V sync)
-            if globalRebaseOffset != 0 {
-                mks_packet_adjust_ts(pkt, globalRebaseOffset)
+            // Apply per-stream rebase offset
+            if let offset = streamRebaseOffsets[outStreamIdx], offset != 0 {
+                mks_packet_adjust_ts(pkt, offset)
             }
 
             let rescaledDts = mks_packet_get_dts(pkt)
@@ -868,15 +904,16 @@ public actor TransmuxingService {
                 let streamLabel = isVideo ? "VIDEO" : "AUDIO"
                 let kf = isVideo ? (mks_packet_is_keyframe(pkt) != 0 ? " KF" : "") : ""
                 TransmuxLog.remux(
-                    "POST-SEEK pkt[\(packetCount)] \(streamLabel)\(kf): rawDts=\(rawDtsBefore) rescaledPre=\(rescaledDtsBeforeRebase)/\(rescaledPtsBeforeRebase) final=\(rescaledDts)/\(rescaledPts) globalOffset=\(globalRebaseOffset)"
+                    "POST-SEEK pkt[\(packetCount)] \(streamLabel)\(kf): rawDts=\(rawDtsBefore) rescaledPre=\(rescaledDtsBeforeRebase)/\(rescaledPtsBeforeRebase) final=\(rescaledDts)/\(rescaledPts) streamOffset=\(streamRebaseOffsets[outStreamIdx] ?? 0)"
                 )
             }
 
-            ret = av_interleaved_write_frame(outCtx, pkt)
-            if ret < 0 {
-                TransmuxLog.remux("write_frame ERROR (\(ret)) at packet \(packetCount), stream=\(outStreamIdx) dts=\(rescaledDts)", level: .error)
-            } else if rescaledDts != AV_NOPTS {
-                // Detect non-monotonic DTS (critical for A/V sync)
+            // Save DTS before write — av_interleaved_write_frame unrefs the packet,
+            // resetting dts to AV_NOPTS_VALUE, so we must capture it beforehand.
+            var dtsToTrack = rescaledDts
+
+            // Detect and recover non-monotonic DTS BEFORE writing
+            if rescaledDts != AV_NOPTS {
                 if let prevDts = lastWrittenDts[outStreamIdx], rescaledDts <= prevDts {
                     let streamLabel = isVideo ? "VIDEO" : "AUDIO"
                     let dtsDelta = rescaledDts - prevDts
@@ -888,9 +925,16 @@ public actor TransmuxingService {
                         let correctedDts = prevDts + 1
                         TransmuxLog.remux("RECOVERING: forcing monotonic DTS=\(correctedDts) (was \(rescaledDts))", level: .warn)
                         mks_packet_adjust_ts(pkt, correctedDts - rescaledDts)
+                        dtsToTrack = correctedDts
                     }
                 }
-                lastWrittenDts[outStreamIdx] = mks_packet_get_dts(pkt)  // Use potentially corrected DTS
+            }
+
+            ret = av_interleaved_write_frame(outCtx, pkt)
+            if ret < 0 {
+                TransmuxLog.remux("write_frame ERROR (\(ret)) at packet \(packetCount), stream=\(outStreamIdx) dts=\(dtsToTrack)", level: .error)
+            } else if dtsToTrack != AV_NOPTS {
+                lastWrittenDts[outStreamIdx] = dtsToTrack
             }
             packetCount += 1
 

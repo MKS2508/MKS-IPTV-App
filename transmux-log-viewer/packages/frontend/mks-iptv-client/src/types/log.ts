@@ -15,6 +15,10 @@ export type LogTag =
   | "OFFSET"
   | "DTS"
   | "ERROR"
+  | "CHELPER"
+  | "CLAYOUT"
+  | "FFMPEG"
+  | "SESSION"
   | "UNKNOWN";
 
 /**
@@ -49,12 +53,22 @@ export interface ILogStats {
   warns: number;
   seeks: number;
   packets: number;
+  segments: number;
 }
 
 /**
  * Session status
  */
 export type SessionStatus = "running" | "completed" | "failed" | "killed";
+
+/**
+ * Session execution mode — mirrors backend SessionMode
+ *
+ * - `interactive`: Accepts SEEK/STOP commands via stdin
+ * - `seek`: One-shot seek mode, no stdin seek support
+ * - `test-seek`: Self-terminating test mode
+ */
+export type SessionMode = "interactive" | "seek" | "test-seek";
 
 /**
  * Active session info from backend
@@ -66,6 +80,7 @@ export type SessionStatus = "running" | "completed" | "failed" | "killed";
  * @property playlistPath - Path to output stream.m3u8
  * @property initSegmentSize - Size of init segment in bytes
  * @property duration - Duration in seconds
+ * @property mode - Execution mode (interactive, seek, test-seek)
  * @property status - Current session status
  * @property startedAt - ISO timestamp when session started
  */
@@ -77,6 +92,7 @@ export interface ISessionInfo {
   playlistPath: string;
   initSegmentSize: number;
   duration: number;
+  mode: SessionMode;
   status: SessionStatus;
   startedAt: string;
 }

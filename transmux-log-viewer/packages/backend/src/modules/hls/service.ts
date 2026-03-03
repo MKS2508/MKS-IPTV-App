@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import logger from "@mks2508/better-logger";
 
 const hlsLog = logger.component("HLSService");
@@ -16,7 +17,7 @@ const hlsLog = logger.component("HLSService");
  * ```
  */
 export class HLSService {
-  private readonly BASE_DIR = "/tmp";
+  private readonly BASE_DIR = tmpdir();
 
   /**
    * Get the HLS playlist (m3u8) for a given session
@@ -90,6 +91,22 @@ export class HLSService {
         if (match) {
           const start = parseInt(match[1], 10);
           const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+          // Validate range bounds
+          if (start >= fileSize || start > end || end >= fileSize) {
+            hlsLog.warn(
+              `Invalid range: ${start}-${end}/${fileSize}`
+            );
+            return {
+              body: null,
+              status: 416,
+              headers: {
+                "Content-Range": `bytes */${fileSize}`,
+                "Accept-Ranges": "bytes",
+              },
+            };
+          }
+
           const chunkSize = end - start + 1;
 
           hlsLog.info(`Range request: ${start}-${end}/${fileSize} (${chunkSize} bytes)`);
@@ -124,6 +141,112 @@ export class HLSService {
     } catch (error) {
       hlsLog.error(
         `Failed to serve stream: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return {
+        body: null,
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      };
+    }
+  }
+
+  /**
+   * Serve any file from a session's output directory
+   *
+   * Used by HLS.js to fetch init segments (init.mp4) and media segments
+   * (seg_XXX.mp4) referenced by the m3u8 playlist.
+   *
+   * @param sessionId - Transmux session ID
+   * @param filename - File name within the session directory
+   * @param rangeHeader - Optional HTTP Range header value
+   * @returns Object with file data, status code, and headers
+   */
+  async getSessionFile(
+    sessionId: string,
+    filename: string,
+    rangeHeader?: string | null
+  ): Promise<{
+    body: Blob | null;
+    status: number;
+    headers: Record<string, string>;
+  }> {
+    // Sanitize filename — only allow alphanumeric, underscore, dash, dot
+    if (!/^[\w\-.]+$/.test(filename)) {
+      hlsLog.warn(`Invalid filename requested: ${filename}`);
+      return {
+        body: null,
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      };
+    }
+
+    const path = `${this.BASE_DIR}/mks-iptv-transmux-${sessionId}/${filename}`;
+
+    try {
+      const file = Bun.file(path);
+      const exists = await file.exists();
+
+      if (!exists) {
+        hlsLog.warn(`Session file not found: ${path}`);
+        return {
+          body: null,
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        };
+      }
+
+      const fileSize = file.size;
+      const contentType = filename.endsWith(".mp4")
+        ? "video/mp4"
+        : filename.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "application/octet-stream";
+
+      // Handle Range request
+      if (rangeHeader) {
+        const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+        if (match) {
+          const start = parseInt(match[1], 10);
+          const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+          if (start >= fileSize || start > end || end >= fileSize) {
+            return {
+              body: null,
+              status: 416,
+              headers: {
+                "Content-Range": `bytes */${fileSize}`,
+                "Accept-Ranges": "bytes",
+              },
+            };
+          }
+
+          const chunkSize = end - start + 1;
+          return {
+            body: file.slice(start, end + 1),
+            status: 206,
+            headers: {
+              "Content-Type": contentType,
+              "Content-Length": String(chunkSize),
+              "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+              "Accept-Ranges": "bytes",
+            },
+          };
+        }
+      }
+
+      hlsLog.info(`Served ${filename} for session ${sessionId} (${fileSize} bytes)`);
+      return {
+        body: file,
+        status: 200,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": String(fileSize),
+          "Accept-Ranges": "bytes",
+        },
+      };
+    } catch (error) {
+      hlsLog.error(
+        `Failed to serve session file: ${error instanceof Error ? error.message : String(error)}`
       );
       return {
         body: null,

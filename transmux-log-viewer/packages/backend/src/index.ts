@@ -29,8 +29,10 @@ const app = new Elysia()
         const origin = request.headers.get("origin");
         if (!origin) return true;
         // Allow localhost (any port) and portless .localhost URLs
-        return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-          || /^https?:\/\/[\w.-]+\.localhost(:\d+)?$/.test(origin);
+        return (
+          /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+          /^https?:\/\/[\w.-]+\.localhost(:\d+)?$/.test(origin)
+        );
       },
       credentials: true,
     })

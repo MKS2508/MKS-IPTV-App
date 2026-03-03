@@ -1,7 +1,7 @@
-import { watch, Stats } from "node:fs";
+import { type Stats, watch } from "node:fs";
 import { stat } from "node:fs/promises";
 import logger from "@mks2508/better-logger";
-import type { IActiveSession, SessionStatus } from "./model";
+import type { IActiveSession, SessionMode, SessionStatus } from "./model";
 
 const cliLog = logger.component("CLIService");
 
@@ -15,7 +15,7 @@ type WatcherHandle = {
  * Path to the TransmuxCore CLI executable
  */
 const TRANSMUX_CLI_PATH =
-  "/Users/mks/Documents/MKS-IPTV-App/TransmuxCore/.build/arm64-apple-macosx/debug/transmux-cli";
+  "/Volumes/KODAK1TB/MKS-IPTV-App/TransmuxCore/.build/arm64-apple-macosx/debug/transmux-cli";
 
 /** Log file written by TransmuxCore CLI */
 const LOG_FILE_PATH = "/tmp/mks-iptv-transmux.log";
@@ -47,6 +47,7 @@ export class CLIService {
   private sessions: Map<string, IActiveSession> = new Map();
   private processes: Map<string, ReturnType<typeof Bun.spawn>> = new Map();
   private logWatchers: Map<string, WatcherHandle> = new Map();
+  private pollTimers: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   /**
    * Run the TransmuxCore CLI with the given options
@@ -66,16 +67,29 @@ export class CLIService {
     seek?: number;
     duration?: number;
     verbose?: boolean;
+    testSeek?: number;
   }): Promise<IActiveSession> {
-    const { input, seek = 0, duration = 10, verbose = true } = opts;
+    const { input, seek = 0, duration = 10, verbose = true, testSeek } = opts;
 
     const args = [TRANSMUX_CLI_PATH, input];
 
-    if (seek > 0) {
+    // Determine session mode based on arguments
+    let mode: SessionMode;
+    if (testSeek != null && testSeek > 0) {
+      // Self-terminating test mode — no interactive
+      args.push("--test-seek", String(testSeek));
+      args.push("--duration", String(duration));
+      mode = "test-seek";
+    } else if (seek > 0) {
+      // One-shot seek mode
       args.push("--seek", String(seek));
+      args.push("--duration", String(duration));
+      mode = "seek";
+    } else {
+      // Interactive mode — backend manages lifecycle via stdin commands
+      args.push("--interactive");
+      mode = "interactive";
     }
-
-    args.push("--duration", String(duration));
 
     if (verbose) {
       args.push("--verbose");
@@ -84,6 +98,7 @@ export class CLIService {
     cliLog.info(`Spawning CLI: ${args.join(" ")}`);
 
     const proc = Bun.spawn(args, {
+      stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
       env: { ...process.env },
@@ -98,6 +113,7 @@ export class CLIService {
       playlistPath: "",
       initSegmentSize: 0,
       duration,
+      mode,
       status: "running",
       startedAt: new Date().toISOString(),
     };
@@ -121,7 +137,10 @@ export class CLIService {
   }
 
   /**
-   * Stop an active CLI session by killing its process
+   * Stop an active CLI session
+   *
+   * Sends STOP command via stdin (for interactive mode graceful shutdown),
+   * then kills the process as a fallback.
    *
    * @param sessionId - Session ID to stop
    * @returns Success/error result
@@ -135,7 +154,18 @@ export class CLIService {
     }
 
     try {
-      proc.kill();
+      // Send STOP via stdin for graceful shutdown in interactive mode
+      this.writeToStdin(sessionId, "STOP");
+
+      // Kill after short grace period
+      setTimeout(() => {
+        try {
+          proc.kill();
+        } catch {
+          // Process may have already exited
+        }
+      }, 500);
+
       this.updateSessionStatus(sessionId, "killed");
       this.cleanupWatcher(sessionId);
       cliLog.info(`Killed session: ${sessionId}`);
@@ -144,6 +174,74 @@ export class CLIService {
       const msg = error instanceof Error ? error.message : String(error);
       cliLog.error(`Failed to kill session ${sessionId}: ${msg}`);
       return { success: false, message: msg };
+    }
+  }
+
+  /**
+   * Send a seek command to an active interactive CLI session
+   *
+   * Writes `SEEK <time>` to the process stdin. The CLI reads this and
+   * calls `session.seekHandle.requestSeek(to:)` in TransmuxCore.
+   *
+   * @param sessionId - Session ID to seek
+   * @param time - Target time in seconds
+   * @returns Success/error result
+   */
+  async seekSession(
+    sessionId: string,
+    time: number
+  ): Promise<{ success: boolean; message: string }> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return { success: false, message: `Session not found: ${sessionId}` };
+    }
+
+    if (session.status !== "running") {
+      return { success: false, message: `Session ${sessionId} is not running (status: ${session.status})` };
+    }
+
+    if (session.mode !== "interactive") {
+      return {
+        success: false,
+        message: `Seek requires interactive mode (session ${sessionId} is in "${session.mode}" mode)`,
+      };
+    }
+
+    const written = this.writeToStdin(sessionId, `SEEK ${time}`);
+    if (!written) {
+      return { success: false, message: `Failed to write to stdin for session ${sessionId}` };
+    }
+
+    cliLog.info(`Seek command sent: session=${sessionId} time=${time}s`);
+    return { success: true, message: `Seek to ${time}s requested` };
+  }
+
+  /**
+   * Write a command line to a process's stdin
+   *
+   * @param sessionId - Session whose process to write to
+   * @param command - Command string (newline appended automatically)
+   * @returns Whether the write succeeded
+   */
+  private writeToStdin(sessionId: string, command: string): boolean {
+    const proc = this.processes.get(sessionId);
+    if (!proc) return false;
+
+    try {
+      const stdin = (proc as any).stdin;
+      if (stdin && typeof stdin.write === "function") {
+        stdin.write(`${command}\n`);
+        if (typeof stdin.flush === "function") {
+          stdin.flush();
+        }
+        return true;
+      }
+      cliLog.warn(`No stdin pipe for session ${sessionId}`);
+      return false;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      cliLog.error(`stdin write error for ${sessionId}: ${msg}`);
+      return false;
     }
   }
 
@@ -196,7 +294,9 @@ export class CLIService {
         this.processLine(buffer, session);
       }
     } catch (error) {
-      cliLog.error(`Error reading stdout: ${error instanceof Error ? error.message : String(error)}`);
+      cliLog.error(
+        `Error reading stdout: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -241,7 +341,9 @@ export class CLIService {
         this.processLine(buffer, session);
       }
     } catch (error) {
-      cliLog.error(`Error reading stderr: ${error instanceof Error ? error.message : String(error)}`);
+      cliLog.error(
+        `Error reading stderr: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -282,52 +384,56 @@ export class CLIService {
       let watcher: ReturnType<typeof watch> | null = null;
       try {
         watcher = watch(LOG_FILE_PATH, (eventType) => {
-        if (eventType !== "change") return;
+          if (eventType !== "change") return;
 
-        stat(LOG_FILE_PATH)
-          .then((stats: Stats) => {
-            const newSize = stats.size;
-            if (newSize <= lastSize) return;
+          stat(LOG_FILE_PATH)
+            .then((stats: Stats) => {
+              const newSize = stats.size;
+              if (newSize <= lastSize) return;
 
-            // Read only the new bytes
-            const fd = Bun.file(LOG_FILE_PATH);
-            fd.text()
-              .then((content) => {
-                const newContent = content.slice(lastSize);
-                lastSize = newSize;
+              // Read only the new bytes
+              const fd = Bun.file(LOG_FILE_PATH);
+              fd.text()
+                .then((content) => {
+                  const newContent = content.slice(lastSize);
+                  lastSize = newSize;
 
-                const lines = newContent.split("\n");
-                for (const line of lines) {
-                  if (line.trim()) {
-                    this.processLogLine(line, session);
+                  const lines = newContent.split("\n");
+                  for (const line of lines) {
+                    if (line.trim()) {
+                      this.processLogLine(line, session);
+                    }
                   }
-                }
 
-                // Update watcher handle if session ID changed
-                if (session.sessionId !== lastSessionId) {
-                  const oldHandle = this.logWatchers.get(lastSessionId);
-                  if (oldHandle) {
-                    this.logWatchers.delete(lastSessionId);
-                    this.logWatchers.set(session.sessionId, {
-                      close: () => watcher.close(),
-                      lastSize,
-                    });
+                  // Update watcher handle if session ID changed
+                  if (session.sessionId !== lastSessionId) {
+                    const oldHandle = this.logWatchers.get(lastSessionId);
+                    if (oldHandle) {
+                      this.logWatchers.delete(lastSessionId);
+                      this.logWatchers.set(session.sessionId, {
+                        close: () => watcher?.close(),
+                        lastSize,
+                      });
+                    }
+                    lastSessionId = session.sessionId;
                   }
-                  lastSessionId = session.sessionId;
-                }
-              })
-              .catch((err) => {
-                cliLog.error(`Error reading log file: ${err}`);
-              });
-          })
-          .catch(() => {
-            // File might have been deleted
-          });
-      });
+                })
+                .catch((err) => {
+                  cliLog.error(`Error reading log file: ${err}`);
+                });
+            })
+            .catch(() => {
+              // File might have been deleted
+            });
+        });
+      } catch (err) {
+        cliLog.error(`Failed to watch log file: ${err}`);
+        return;
+      }
 
       // Store watcher handle for cleanup
       this.logWatchers.set(session.sessionId, {
-        close: () => watcher.close(),
+        close: () => watcher?.close(),
         lastSize: startOffset,
       });
     };
@@ -397,6 +503,13 @@ export class CLIService {
         this.logWatchers.set(newId, watcherHandle);
       }
 
+      // Migrate poll timer to new session ID
+      const pollTimer = this.pollTimers.get(oldId);
+      if (pollTimer) {
+        this.pollTimers.delete(oldId);
+        this.pollTimers.set(newId, pollTimer);
+      }
+
       cliLog.info(`Session re-keyed from log: ${oldId} -> ${newId}`);
     }
 
@@ -457,6 +570,13 @@ export class CLIService {
         this.processes.set(newId, proc);
       }
 
+      // Migrate poll timer to new session ID
+      const pollTimer = this.pollTimers.get(oldId);
+      if (pollTimer) {
+        this.pollTimers.delete(oldId);
+        this.pollTimers.set(newId, pollTimer);
+      }
+
       cliLog.info(`Session re-keyed: ${oldId} -> ${newId}`);
     }
 
@@ -493,6 +613,13 @@ export class CLIService {
         if (proc) {
           this.processes.delete(oldId);
           this.processes.set(newId, proc);
+        }
+
+        // Migrate poll timer to new session ID
+        const pollTimer = this.pollTimers.get(oldId);
+        if (pollTimer) {
+          this.pollTimers.delete(oldId);
+          this.pollTimers.set(newId, pollTimer);
         }
 
         cliLog.info(`Session re-keyed (legacy): ${oldId} -> ${newId}`);
@@ -548,6 +675,39 @@ export class CLIService {
   }
 
   /**
+   * Poll for the log file to appear, then start watching it
+   *
+   * Used when the CLI hasn't created the log file yet at spawn time.
+   * Polls every 500ms up to 30 times (15s) then gives up.
+   *
+   * @param session - Session to attach watcher to
+   */
+  private pollForLogFile(session: IActiveSession): void {
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const timer = setInterval(() => {
+      attempts++;
+      stat(LOG_FILE_PATH)
+        .then(() => {
+          clearInterval(timer);
+          this.pollTimers.delete(session.sessionId);
+          cliLog.info("Log file appeared, starting watcher");
+          this.watchLogFile(session);
+        })
+        .catch(() => {
+          if (attempts >= maxAttempts) {
+            clearInterval(timer);
+            this.pollTimers.delete(session.sessionId);
+            cliLog.warn("Log file never appeared after polling");
+          }
+        });
+    }, 500);
+
+    this.pollTimers.set(session.sessionId, timer);
+  }
+
+  /**
    * Close and remove the log file watcher for a session
    *
    * @param sessionId - Session to clean up
@@ -558,6 +718,14 @@ export class CLIService {
       handle.close();
       this.logWatchers.delete(sessionId);
       cliLog.debug(`Closed log watcher for session ${sessionId}`);
+    }
+
+    // Also clear any active poll timer for this session
+    const pollTimer = this.pollTimers.get(sessionId);
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      this.pollTimers.delete(sessionId);
+      cliLog.debug(`Cleared poll timer for session ${sessionId}`);
     }
   }
 }

@@ -12,6 +12,10 @@ const ALL_TAGS: LogTag[] = [
   "SEEK",
   "OFFSET",
   "DTS",
+  "CHELPER",
+  "CLAYOUT",
+  "FFMPEG",
+  "SESSION",
   "ERROR",
   "UNKNOWN",
 ];
@@ -101,6 +105,14 @@ export function LogViewer({ logs, onClear }: ILogViewerProps) {
         return "border-chart-4/40 text-chart-4";
       case "SERVICE":
         return "border-chart-5/40 text-chart-5";
+      case "CHELPER":
+        return "border-orange-500/40 text-orange-400";
+      case "CLAYOUT":
+        return "border-amber-500/40 text-amber-400";
+      case "FFMPEG":
+        return "border-red-400/40 text-red-300";
+      case "SESSION":
+        return "border-cyan-500/40 text-cyan-400";
       default:
         return "border-border/40 text-muted-foreground";
     }
@@ -206,7 +218,11 @@ export function LogViewer({ logs, onClear }: ILogViewerProps) {
 
                 {/* Tag */}
                 <span
-                  className={`shrink-0 w-[52px] text-right uppercase tracking-wider font-semibold ${getTagClass(log.tag).split(" ").find((c) => c.startsWith("text-")) ?? "text-muted-foreground"}`}
+                  className={`shrink-0 w-[52px] text-right uppercase tracking-wider font-semibold ${
+                    getTagClass(log.tag)
+                      .split(" ")
+                      .find((c) => c.startsWith("text-")) ?? "text-muted-foreground"
+                  }`}
                 >
                   {log.tag}
                 </span>

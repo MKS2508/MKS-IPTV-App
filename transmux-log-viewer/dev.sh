@@ -654,6 +654,27 @@ api_run_cli() {
   echo "$response"
 }
 
+api_test_seek() {
+  local input="$1"
+  local seek_time="${2:-300}"
+  local api_url
+  api_url=$(get_api_url)
+
+  local payload="{\"input\":\"$input\",\"testSeek\":$seek_time,\"verbose\":true}"
+
+  local response
+  response=$(curl -sf -X POST "$api_url/cli/run" \
+    -H "Content-Type: application/json" \
+    -d "$payload" 2>/dev/null)
+
+  if [[ $? -ne 0 ]]; then
+    error "Failed to call API at $api_url/cli/run"
+    return 1
+  fi
+
+  echo "$response"
+}
+
 api_stop_session() {
   local session_id="$1"
   local api_url
@@ -830,6 +851,21 @@ cmd_test() {
     seek-basic)
       log "Running seek-basic test (seek=300, duration=20)"
       cmd_cli seek "$PRIMARY_TEST_FILE" 300
+      ;;
+    test-seek)
+      log "Running automated seek test with log validation (seek=300)"
+      > /tmp/mks-iptv-transmux.log
+      local response
+      response=$(api_test_seek "$PRIMARY_TEST_FILE" 300)
+      if [[ $? -eq 0 ]]; then
+        local session_id pid
+        session_id=$(echo "$response" | jq -r '.sessionId' 2>/dev/null)
+        pid=$(echo "$response" | jq -r '.pid' 2>/dev/null)
+        log "Started test-seek session: $session_id (PID: $pid)"
+        log "CLI will validate logs automatically. Check output with: ./dev.sh output shell 50"
+      else
+        error "Failed to start test-seek via API"
+      fi
       ;;
     seek-deep)
       log "Running seek-deep test (seek=600, duration=60)"

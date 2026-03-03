@@ -1,91 +1,101 @@
-import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** Resolve API base URL for stream endpoints */
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 /**
- * Hook for managing HLS.js video player lifecycle
+ * Hook for managing video player lifecycle
  *
- * Creates an HLS.js instance, loads the backend HLS source,
- * attaches to a video element, and handles cleanup on unmount.
+ * Loads the fMP4 stream directly from the backend stream.mp4 endpoint.
+ * TransmuxCore outputs a single progressive fMP4 — no HLS segments needed.
  *
  * @param sessionId - Active transmux session ID (null = no source)
  * @returns Video ref, player state, and control functions
  */
 export function useHLSPlayer(sessionId: string | null) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const hlsRef = useRef<Hls | null>(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const currentSessionRef = useRef<string | null>(null);
 
   /**
-   * Load the HLS source for the given session
+   * Load the stream.mp4 for the given session
    */
-  const loadSource = useCallback(
-    (sid: string) => {
-      const video = videoRef.current;
-      if (!video) return;
+  const loadSource = useCallback((sid: string) => {
+    const video = videoRef.current;
+    if (!video) return;
 
-      // Clean up existing instance
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
+    currentSessionRef.current = sid;
+    setError(null);
+    setLoaded(false);
 
-      setError(null);
-      setLoaded(false);
+    const streamUrl = `${API_BASE}/hls/${sid}/stream.mp4`;
+    video.src = streamUrl;
 
-      const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      const playlistUrl = `${apiBase}/hls/${sid}/playlist.m3u8`;
+    const onLoaded = () => {
+      setLoaded(true);
+      video.play().catch(() => {
+        // Autoplay may be blocked
+      });
+    };
 
-      if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-        });
+    const onError = () => {
+      setError("Failed to load stream");
+    };
 
-        hls.loadSource(playlistUrl);
-        hls.attachMedia(video);
+    video.addEventListener("loadedmetadata", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  }, []);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setLoaded(true);
-          video.play().catch(() => {
-            // Autoplay may be blocked
-          });
-        });
+  /**
+   * Reload the video source with a cache-busting param.
+   *
+   * After a seek the FFmpeg pipeline writes new content into stream.mp4
+   * starting from the seek position. The browser won't re-request the
+   * file on its own so we force a reload by resetting `video.src`.
+   */
+  const reloadSource = useCallback(() => {
+    const video = videoRef.current;
+    const sid = currentSessionRef.current;
+    if (!video || !sid) return;
 
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            setError(`HLS error: ${data.type} - ${data.details}`);
+    setError(null);
+    setLoaded(false);
 
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-              hls.startLoad();
-            } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-              hls.recoverMediaError();
-            } else {
-              hls.destroy();
-            }
-          }
-        });
+    const streamUrl = `${API_BASE}/hls/${sid}/stream.mp4?t=${Date.now()}`;
+    video.src = streamUrl;
 
-        hlsRef.current = hls;
-      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        // Native HLS support (Safari)
-        video.src = playlistUrl;
-        video.addEventListener("loadedmetadata", () => {
-          setLoaded(true);
-          video.play().catch(() => {});
-        });
-      } else {
-        setError("HLS is not supported in this browser");
-      }
-    },
-    []
-  );
+    const onLoaded = () => {
+      setLoaded(true);
+      video.play().catch(() => {
+        // Autoplay may be blocked
+      });
+    };
+
+    const onError = () => {
+      setError("Failed to reload stream after seek");
+    };
+
+    video.addEventListener("loadedmetadata", onLoaded, { once: true });
+    video.addEventListener("error", onError, { once: true });
+  }, []);
 
   // Load source when sessionId changes
   useEffect(() => {
     if (sessionId) {
+      currentSessionRef.current = sessionId;
       loadSource(sessionId);
+    } else {
+      // Clear video when session ends
+      currentSessionRef.current = null;
+      const video = videoRef.current;
+      if (video) {
+        video.removeAttribute("src");
+        video.load();
+      }
+      setLoaded(false);
+      setError(null);
     }
   }, [sessionId, loadSource]);
 
@@ -106,21 +116,12 @@ export function useHLSPlayer(sessionId: string | null) {
     };
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, []);
-
   return {
     videoRef,
     playing,
     error,
     loaded,
     loadSource,
+    reloadSource,
   };
 }

@@ -30,9 +30,7 @@ export function StatsBar({ stats, connected }: IStatsBarProps) {
       <div className="flex items-center gap-1.5">
         <div
           className={`size-1.5 rounded-full ${
-            connected
-              ? "bg-primary shadow-[0_0_6px_var(--primary)]"
-              : "bg-muted-foreground/30"
+            connected ? "bg-primary shadow-[0_0_6px_var(--primary)]" : "bg-muted-foreground/30"
           }`}
         />
         <span className="font-mono text-[9px] text-muted-foreground/50 uppercase tracking-wider">
@@ -54,8 +52,17 @@ export function StatsBar({ stats, connected }: IStatsBarProps) {
         value={stats.warns}
         highlight={stats.warns > 0 ? "chart-1" : undefined}
       />
-      <StatCounter label="Seeks" value={stats.seeks} highlight={stats.seeks > 0 ? "chart-2" : undefined} />
+      <StatCounter
+        label="Seeks"
+        value={stats.seeks}
+        highlight={stats.seeks > 0 ? "chart-2" : undefined}
+      />
       <StatCounter label="Packets" value={stats.packets} />
+      <StatCounter
+        label="Segments"
+        value={stats.segments}
+        highlight={stats.segments > 0 ? "chart-2" : undefined}
+      />
     </div>
   );
 }

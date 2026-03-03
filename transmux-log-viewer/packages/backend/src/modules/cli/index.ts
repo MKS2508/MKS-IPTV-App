@@ -6,9 +6,10 @@ import { CLIService } from "./service";
  * CLI module - Handles TransmuxCore CLI execution and session management
  *
  * Endpoints:
- * - POST /cli/run - Start a new transmux session
+ * - POST /cli/run - Start a new transmux session (interactive mode by default)
  * - GET /cli/sessions - List all sessions (active and completed)
  * - POST /cli/stop/:sessionId - Stop a running session
+ * - POST /cli/seek/:sessionId - Seek to a time in an active interactive session
  *
  * @example
  * ```bash
@@ -36,6 +37,7 @@ export const cliModule = new Elysia({ prefix: "/cli" })
         pid: session.pid,
         outputPath: session.outputPath,
         playlistPath: session.playlistPath,
+        mode: session.mode,
         status: session.status,
         message: `CLI started with PID ${session.pid}`,
       };
@@ -84,6 +86,30 @@ export const cliModule = new Elysia({ prefix: "/cli" })
       detail: {
         summary: "Stop CLI session",
         description: "Kill a running transmux session",
+        tags: ["cli"],
+      },
+    }
+  )
+  .post(
+    "/seek/:sessionId",
+    async ({ cliService, params, body }) => {
+      const result = await cliService.seekSession(params.sessionId, body.time);
+      return result;
+    },
+    {
+      params: t.Object({
+        sessionId: t.String(),
+      }),
+      body: "CLISeekRequest",
+      response: {
+        200: "SuccessResponse",
+      },
+      detail: {
+        summary: "Seek in active session",
+        description:
+          "Send a seek command to a running interactive transmux session. " +
+          "TransmuxCore will seek to the specified time in the source file " +
+          "and continue transmuxing from there with rebased timestamps.",
         tags: ["cli"],
       },
     }

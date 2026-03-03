@@ -12,6 +12,16 @@
 // All FFmpeg struct pointers are passed as void* to avoid type conflicts
 // between the bridging header and Swift's "import Libavformat" module.
 
+// --- Logging setup ---
+
+/// Initialize C-level file logging and FFmpeg av_log callback.
+/// Routes all CHelper diagnostics and FFmpeg internal messages
+/// (e.g. "non monotonically increasing dts") to the same log file
+/// that TransmuxLog.swift writes to, so the web log viewer sees everything.
+/// Must be called before any other mks_* function.
+/// @param logFilePath  Path to append logs to (e.g. "/tmp/mks-iptv-transmux.log")
+void mks_log_init(const char * _Nullable logFilePath);
+
 // --- Stream inspection ---
 
 /// Get codec_type (AVMediaType) for a stream. Returns -1 on failure.
@@ -48,6 +58,15 @@ int mks_stream_copy_codecpar(void * _Nonnull dstStream,
 
 /// Set codec_tag to 0 on a stream's codecpar.
 void mks_stream_clear_codec_tag(void * _Nonnull stream);
+
+/// Set frame_size on a stream's codecpar.
+/// Used to pre-populate AC3/EAC3 frame_size before write_header,
+/// eliminating the need for delay_moov.
+void mks_stream_set_frame_size(void * _Nonnull fmtCtx, int streamIndex, int frameSize);
+
+/// Check if a stream's codecpar has extradata (non-NULL, size > 0).
+/// Returns 1 if extradata exists, 0 otherwise.
+int mks_stream_has_extradata(const void * _Nonnull fmtCtx, int streamIndex);
 
 // --- Packet helpers ---
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import type { ICLIOptions } from "@/types/stream-source";
 import type { ISessionInfo, SessionStatus } from "@/types/log";
+import type { ICLIOptions } from "@/types/stream-source";
 
 /**
  * Shallow compare two session objects to avoid unnecessary re-renders
@@ -15,10 +15,15 @@ function sessionEqual(a: ISessionInfo | null, b: ISessionInfo | null): boolean {
   if (!a || !b) return false;
   return (
     a.sessionId === b.sessionId &&
-    a.status === b.status &&
+    a.pid === b.pid &&
+    a.input === b.input &&
     a.outputPath === b.outputPath &&
     a.playlistPath === b.playlistPath &&
-    a.pid === b.pid
+    a.initSegmentSize === b.initSegmentSize &&
+    a.duration === b.duration &&
+    a.mode === b.mode &&
+    a.status === b.status &&
+    a.startedAt === b.startedAt
   );
 }
 
@@ -94,12 +99,11 @@ export function useCLISession() {
       }
 
       if (data) {
+        setError(null);
         const sessionList = (data.sessions ?? []) as ISessionInfo[];
 
         // Only update sessions array if count changed (avoid re-render)
-        setSessions((prev) =>
-          prev.length === sessionList.length ? prev : sessionList
-        );
+        setSessions((prev) => (prev.length === sessionList.length ? prev : sessionList));
 
         const prev = activeSessionRef.current;
 
@@ -191,6 +195,7 @@ export function useCLISession() {
           playlistPath: data.playlistPath,
           initSegmentSize: 0,
           duration: opts.duration ?? 10,
+          mode: (data as any).mode ?? "interactive",
           status: "running",
           startedAt: new Date().toISOString(),
         };
@@ -216,9 +221,7 @@ export function useCLISession() {
   const stopSession = useCallback(
     async (sessionId: string) => {
       try {
-        const { error: apiError } = await api.cli
-          .stop({ sessionId })
-          .post();
+        const { error: apiError } = await api.cli.stop({ sessionId }).post();
 
         if (apiError) {
           setError(String(apiError));
@@ -226,9 +229,7 @@ export function useCLISession() {
         }
 
         setActiveSession((prev) =>
-          prev &&
-          (prev.sessionId === sessionId ||
-            prev.sessionId.startsWith("pending-"))
+          prev && (prev.sessionId === sessionId || prev.sessionId.startsWith("pending-"))
             ? { ...prev, status: "killed" }
             : prev
         );
@@ -241,6 +242,29 @@ export function useCLISession() {
     [fetchSessions]
   );
 
+  /**
+   * Send a seek command to an active interactive CLI session
+   *
+   * @param sessionId - Session to seek
+   * @param time - Target time in seconds
+   * @returns Whether the seek was accepted
+   */
+  const seekSession = useCallback(async (sessionId: string, time: number): Promise<boolean> => {
+    try {
+      const { data, error: apiError } = await api.cli.seek({ sessionId }).post({ time });
+
+      if (apiError) {
+        setError(String(apiError));
+        return false;
+      }
+
+      return data?.success ?? false;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, []);
+
   return {
     activeSession,
     sessions,
@@ -249,5 +273,6 @@ export function useCLISession() {
     runCLI,
     fetchSessions,
     stopSession,
+    seekSession,
   };
 }

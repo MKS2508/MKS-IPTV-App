@@ -1,3 +1,4 @@
+export { useCLISession, useHLSPlayer, useLogStream } from "../hooks";
 export { api, unwrap } from "./api";
 export {
   DEFAULT_CLI_OPTIONS,
@@ -6,4 +7,3 @@ export {
   PRIMARY_MKV_TEST_FILE,
   TRANSMUX_CLI_PATH,
 } from "./test-files";
-export { useLogStream, useCLISession, useHLSPlayer } from "../hooks";

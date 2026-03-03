@@ -9,7 +9,7 @@ import {
   Label,
   Switch,
 } from "@mks2508/mks-ui/react";
-import { FileVideo, Folder, Globe, Play, Search, Square } from "lucide-react";
+import { FileVideo, Folder, Globe, Link, Play, Search, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import type { ILocalFileSource, IStreamSource } from "@/types";
@@ -47,6 +47,7 @@ export function SourcePanel({ onRun, onStop, isRunning }: ISourcePanelProps) {
   const [duration, setDuration] = useState(10);
   const [verbose, setVerbose] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [customUrl, setCustomUrl] = useState("");
 
   useEffect(() => {
     const fetchSources = async () => {
@@ -57,14 +58,10 @@ export function SourcePanel({ onRun, onStop, isRunning }: ISourcePanelProps) {
         ]);
 
         if (localRes.data) {
-          setLocalFiles(
-            (localRes.data as { files: ILocalFileSource[] }).files ?? []
-          );
+          setLocalFiles((localRes.data as { files: ILocalFileSource[] }).files ?? []);
         }
         if (iptvRes.data) {
-          setIptvSources(
-            (iptvRes.data as { sources: IStreamSource[] }).sources ?? []
-          );
+          setIptvSources((iptvRes.data as { sources: IStreamSource[] }).sources ?? []);
         }
       } catch {
         // Sources endpoint may not be ready
@@ -77,9 +74,7 @@ export function SourcePanel({ onRun, onStop, isRunning }: ISourcePanelProps) {
   const filteredIPTV = useMemo(() => {
     if (!searchQuery.trim()) return iptvSources.slice(0, 30);
     const q = searchQuery.toLowerCase();
-    return iptvSources
-      .filter((s) => s.name.toLowerCase().includes(q))
-      .slice(0, 30);
+    return iptvSources.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 30);
   }, [iptvSources, searchQuery]);
 
   const handleRun = useCallback(() => {
@@ -133,12 +128,48 @@ export function SourcePanel({ onRun, onStop, isRunning }: ISourcePanelProps) {
                 >
                   {file.extension}
                 </Badge>
-                <span className="text-[9px] text-muted-foreground/60">
-                  {formatSize(file.size)}
-                </span>
+                <span className="text-[9px] text-muted-foreground/60">{formatSize(file.size)}</span>
               </div>
             </button>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Custom URL */}
+      <Card className="glass border-border/30 rounded-lg shrink-0">
+        <CardHeader className="pb-1.5 pt-2.5 px-3">
+          <CardTitle className="font-mono-emphasis text-[11px] uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
+            <Link className="size-3 text-primary" />
+            Custom URL
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-2 pb-2">
+          <div className="flex gap-1.5">
+            <Input
+              placeholder="http://... or /path/to/file"
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              className="h-6 text-[10px] font-mono bg-background/30 border-border/30 flex-1"
+            />
+            <Button
+              variant={selectedInput === customUrl.trim() && customUrl.trim() ? "default" : "outline"}
+              size="sm"
+              className="h-6 px-2 text-[10px] font-mono shrink-0"
+              onClick={() => {
+                if (customUrl.trim()) {
+                  setSelectedInput(customUrl.trim());
+                }
+              }}
+              disabled={!customUrl.trim()}
+            >
+              Use
+            </Button>
+          </div>
+          {selectedInput === customUrl.trim() && customUrl.trim() && (
+            <div className="mt-1 text-[9px] font-mono text-primary/60 truncate px-0.5">
+              Selected: {customUrl.trim()}
+            </div>
+          )}
         </CardContent>
       </Card>
 

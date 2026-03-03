@@ -27,7 +27,6 @@
     "clean": "rm -rf packages/backend/dist packages/frontend/mks-iptv-client/dist"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.5",
-    "concurrently": "^9.1.2"
+    "@biomejs/biome": "^2.4.5"
   }
 }

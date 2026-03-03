@@ -23,11 +23,106 @@
 #import <libavcodec/avcodec.h>
 #import <libavcodec/bsf.h>
 #import <libavutil/avutil.h>
+#import <libavutil/log.h>
+#import <libavutil/time.h>
 
 #include "FFmpegStreamHelper.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
+#include <pthread.h>
+
+// --- File logging (writes to /tmp/mks-iptv-transmux.log) ---
+//
+// All log output goes to BOTH stderr (Xcode console) and the log file
+// so the web-based log viewer sees everything in real time.
+// Format matches TransmuxLog.swift: [HH:mm:ss.SSS] [LEVEL] [TAG] message
+
+static FILE *s_log_file = NULL;
+static pthread_mutex_t s_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+/// Format a timestamp matching TransmuxLog.swift: HH:mm:ss.SSS
+/// Uses av_gettime() (microseconds since epoch) to avoid system <time.h>
+/// which is unavailable inside the CFFmpegHelper Swift module.
+/// NOTE: This produces UTC time. TransmuxLog.swift produces local time.
+/// For timezone-correct timestamps, the log viewer can normalize.
+static void format_timestamp(char *buf, size_t bufsize) {
+    int64_t us = av_gettime();
+    int64_t total_secs = us / 1000000;
+    int ms = (int)((us % 1000000) / 1000);
+    int64_t day_secs = total_secs % 86400;
+    int h = (int)(day_secs / 3600);
+    int m = (int)((day_secs % 3600) / 60);
+    int s = (int)(day_secs % 60);
+    snprintf(buf, bufsize, "%02d:%02d:%02d.%03d", h, m, s, ms);
+}
+
+/// Write a log entry to both stderr and the log file.
+static void log_to_file(const char *tag, const char *level, const char *fmt, ...) {
+    char msg[2048];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+
+    char ts[16];
+    format_timestamp(ts, sizeof(ts));
+
+    // stderr (Xcode console)
+    fprintf(stderr, "[%s] [%s] [%s] %s\n", ts, level, tag, msg);
+
+    // Log file (thread-safe, append mode)
+    pthread_mutex_lock(&s_log_mutex);
+    if (s_log_file) {
+        fprintf(s_log_file, "[%s] [%s] [%s] %s\n", ts, level, tag, msg);
+        fflush(s_log_file);
+    }
+    pthread_mutex_unlock(&s_log_mutex);
+}
+
+/// FFmpeg av_log callback — routes FFmpeg internal messages to the log file.
+/// Captures critical messages like "non monotonically increasing dts" from the mp4 muxer.
+static void ffmpeg_log_callback(void *avcl, int level, const char *fmt, va_list vl) {
+    if (level > av_log_get_level()) return;
+
+    char buf[1024];
+    vsnprintf(buf, sizeof(buf), fmt, vl);
+
+    // Strip trailing whitespace/newlines (FFmpeg appends them)
+    size_t len = strlen(buf);
+    while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r' || buf[len-1] == ' ')) {
+        buf[--len] = '\0';
+    }
+    if (len == 0) return;
+
+    const char *lvl;
+    if (level <= AV_LOG_ERROR)        lvl = "ERR";
+    else if (level <= AV_LOG_WARNING) lvl = "WRN";
+    else if (level <= AV_LOG_INFO)    lvl = "INF";
+    else                              lvl = "DBG";
+
+    log_to_file("FFmpeg", lvl, "%s", buf);
+}
+
+void mks_log_init(const char *logFilePath) {
+    pthread_mutex_lock(&s_log_mutex);
+    if (s_log_file) {
+        fclose(s_log_file);
+        s_log_file = NULL;
+    }
+    if (logFilePath) {
+        s_log_file = fopen(logFilePath, "a");
+        if (!s_log_file) {
+            fprintf(stderr, "[FFmpegHelper] WARNING: failed to open log file: %s\n", logFilePath);
+        }
+    }
+    pthread_mutex_unlock(&s_log_mutex);
+
+    // Route FFmpeg internal logging through our callback
+    av_log_set_level(AV_LOG_INFO);
+    av_log_set_callback(ffmpeg_log_callback);
+}
 
 // --- Runtime layout detection ---
 
@@ -54,8 +149,8 @@ static int validate_codecpar(const unsigned char *raw, size_t ct_off,
     int ct = *(int *)(raw + ct_off);
     int ci = *(int *)(raw + ct_off + 4);
 
-    fprintf(stderr, "[FFmpegHelper] validate_codecpar(%s): ct_off=%zu codec_type=%d codec_id=%d\n",
-            label, ct_off, ct, ci);
+    log_to_file("CHelper", "DBG", "validate_codecpar(%s): ct_off=%zu codec_type=%d codec_id=%d",
+                label, ct_off, ct, ci);
 
     // codec_type must be in [0..5] (AVMEDIA_TYPE_VIDEO..AVMEDIA_TYPE_NB-1)
     // codec_id must be positive and reasonable (0 = AV_CODEC_ID_NONE is invalid for a real stream)
@@ -88,9 +183,9 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
     size_t header_cp_offset = offsetof(AVStream, codecpar);
     size_t header_ct_offset = offsetof(AVCodecParameters, codec_type);
 
-    fprintf(stderr, "[FFmpegHelper] detect_field_shifts: nb_streams=%u "
-            "header codecpar_off=%zu codec_type_off=%zu\n",
-            ctx->nb_streams, header_cp_offset, header_ct_offset);
+    log_to_file("CHelper", "DBG", "detect_field_shifts: nb_streams=%u "
+                "header codecpar_off=%zu codec_type_off=%zu",
+                ctx->nb_streams, header_cp_offset, header_ct_offset);
 
     for (unsigned i = 0; i < ctx->nb_streams; i++) {
         AVStream *s = ctx->streams[i];
@@ -109,8 +204,8 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
             size_t off = candidate_offsets[c];
             void *candidate = *(void **)(stream_raw + off);
 
-            fprintf(stderr, "[FFmpegHelper] AVStream[%u] ptr at off %zu (%s) = %p\n",
-                    i, off, candidate_labels[c], candidate);
+            log_to_file("CHelper", "DBG", "AVStream[%u] ptr at off %zu (%s) = %p",
+                        i, off, candidate_labels[c], candidate);
 
             // Skip NULL or clearly invalid pointers (< 4096 = first page, never a heap alloc)
             if (!candidate || (uintptr_t)candidate < 4096) continue;
@@ -118,12 +213,15 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
             const unsigned char *cp_raw = (const unsigned char *)candidate;
 
             // Dump first 32 bytes for diagnostics
-            fprintf(stderr, "[FFmpegHelper] candidate raw: ");
-            for (int b = 0; b < 32; b++) {
-                fprintf(stderr, "%02x", cp_raw[b]);
-                if (b % 8 == 7) fprintf(stderr, " ");
+            char hexbuf[128];
+            int pos = 0;
+            for (int b = 0; b < 32 && pos < (int)sizeof(hexbuf) - 4; b++) {
+                pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02x", cp_raw[b]);
+                if (b % 8 == 7 && pos < (int)sizeof(hexbuf) - 2) {
+                    pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, " ");
+                }
             }
-            fprintf(stderr, "\n");
+            log_to_file("CHelper", "DBG", "candidate raw: %s", hexbuf);
 
             // Layout A: no av_class in AVCodecParameters binary
             //   codec_type at raw offset header_ct_offset - header_ct_offset = 0? No.
@@ -137,8 +235,8 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
             if (validate_codecpar(cp_raw, header_ct_offset, "cp_shift=0")) {
                 s_stream_shift = candidate_shifts[c];
                 s_cp_shift = 0;
-                fprintf(stderr, "[FFmpegHelper] DETECTED via %s: stream_shift=%d cp_shift=%d\n",
-                        candidate_labels[c], s_stream_shift, s_cp_shift);
+                log_to_file("CHelper", "INF", "DETECTED via %s: stream_shift=%d cp_shift=%d",
+                            candidate_labels[c], s_stream_shift, s_cp_shift);
                 return;
             }
 
@@ -147,8 +245,8 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
                 validate_codecpar(cp_raw, header_ct_offset - 8, "cp_shift=8")) {
                 s_stream_shift = candidate_shifts[c];
                 s_cp_shift = 8;
-                fprintf(stderr, "[FFmpegHelper] DETECTED via %s: stream_shift=%d cp_shift=%d\n",
-                        candidate_labels[c], s_stream_shift, s_cp_shift);
+                log_to_file("CHelper", "INF", "DETECTED via %s: stream_shift=%d cp_shift=%d",
+                            candidate_labels[c], s_stream_shift, s_cp_shift);
                 return;
             }
 
@@ -156,15 +254,15 @@ static void detect_field_shifts(const AVFormatContext *ctx) {
             if (validate_codecpar(cp_raw, header_ct_offset + 8, "cp_shift=-8")) {
                 s_stream_shift = candidate_shifts[c];
                 s_cp_shift = -8;
-                fprintf(stderr, "[FFmpegHelper] DETECTED via %s: stream_shift=%d cp_shift=%d\n",
-                        candidate_labels[c], s_stream_shift, s_cp_shift);
+                log_to_file("CHelper", "INF", "DETECTED via %s: stream_shift=%d cp_shift=%d",
+                            candidate_labels[c], s_stream_shift, s_cp_shift);
                 return;
             }
         }
     }
 
-    fprintf(stderr, "[FFmpegHelper] WARNING: could not detect layout from any stream, "
-            "using header offsets (shift=0/0)\n");
+    log_to_file("CHelper", "WRN", "could not detect layout from any stream, "
+                "using header offsets (shift=0/0)");
 }
 
 // --- Raw field readers (apply detected shifts) ---
@@ -317,8 +415,8 @@ int mks_stream_copy_codecpar(void *dstStream,
     AVCodecParameters *dstPar = get_stream_codecpar(dst);
 
     if (!srcPar || !dstPar) {
-        fprintf(stderr, "[FFmpegHelper] copy_codecpar FAILED: src=%p dst=%p\n",
-                (void *)srcPar, (void *)dstPar);
+        log_to_file("CHelper", "ERR", "copy_codecpar FAILED: src=%p dst=%p",
+                    (void *)srcPar, (void *)dstPar);
         return -1;
     }
 
@@ -326,38 +424,38 @@ int mks_stream_copy_codecpar(void *dstStream,
     const unsigned char *dst_stream_raw = (const unsigned char *)dst;
     void *cp_at_8  = *(void **)(dst_stream_raw + 8);
     void *cp_at_16 = *(void **)(dst_stream_raw + 16);
-    fprintf(stderr, "[FFmpegHelper] output AVStream codecpar: at_off8=%p at_off16=%p resolved=%p\n",
-            cp_at_8, cp_at_16, (void *)dstPar);
+    log_to_file("CHelper", "DBG", "output AVStream codecpar: at_off8=%p at_off16=%p resolved=%p",
+                cp_at_8, cp_at_16, (void *)dstPar);
 
     // Log source codec info using shift-corrected reads
     int src_ct = read_cp_int(srcPar, offsetof(AVCodecParameters, codec_type));
     int src_ci = read_cp_int(srcPar, offsetof(AVCodecParameters, codec_id));
-    fprintf(stderr, "[FFmpegHelper] copy_codecpar: src=%p dst=%p src_type=%d src_id=%d "
-            "stream_shift=%d cp_shift=%d\n",
-            (void *)srcPar, (void *)dstPar, src_ct, src_ci,
-            s_stream_shift, s_cp_shift);
+    log_to_file("CHelper", "DBG", "copy_codecpar: src=%p dst=%p src_type=%d src_id=%d "
+                "stream_shift=%d cp_shift=%d",
+                (void *)srcPar, (void *)dstPar, src_ct, src_ci,
+                s_stream_shift, s_cp_shift);
 
     // --- Method 1: Try avcodec_parameters_copy ---
     // This may fail if symbol conflicts cause it to resolve to a different
     // FFmpeg build with incompatible AVCodecParameters layout.
     int ret = avcodec_parameters_copy(dstPar, srcPar);
-    fprintf(stderr, "[FFmpegHelper] avcodec_parameters_copy returned %d\n", ret);
+    log_to_file("CHelper", "DBG", "avcodec_parameters_copy returned %d", ret);
 
     if (ret >= 0) {
         // Verify: read codec_type and codec_id from dst using corrected offsets
         int dst_ct = read_cp_int(dstPar, offsetof(AVCodecParameters, codec_type));
         int dst_ci = read_cp_int(dstPar, offsetof(AVCodecParameters, codec_id));
-        fprintf(stderr, "[FFmpegHelper] post-copy verify: dst_type=%d dst_id=%d\n",
-                dst_ct, dst_ci);
+        log_to_file("CHelper", "DBG", "post-copy verify: dst_type=%d dst_id=%d",
+                    dst_ct, dst_ci);
 
         if (dst_ct >= 0 && dst_ct <= 5 && dst_ci != 0) {
-            fprintf(stderr, "[FFmpegHelper] avcodec_parameters_copy verified OK\n");
+            log_to_file("CHelper", "INF", "avcodec_parameters_copy verified OK");
             // Clear codec_tag for output container compatibility
             write_cp_uint32(dstPar, offsetof(AVCodecParameters, codec_tag), 0);
             return 0;
         }
-        fprintf(stderr, "[FFmpegHelper] avcodec_parameters_copy produced bad result, "
-                "trying raw memcpy fallback\n");
+        log_to_file("CHelper", "WRN", "avcodec_parameters_copy produced bad result, "
+                    "trying raw memcpy fallback");
     }
 
     // --- Method 2: Raw memcpy fallback ---
@@ -366,14 +464,14 @@ int mks_stream_copy_codecpar(void *dstStream,
     // A raw memcpy transfers all fields at their correct binary offsets,
     // bypassing avcodec_parameters_copy which may resolve to a different library.
     size_t copy_size = sizeof(AVCodecParameters);
-    fprintf(stderr, "[FFmpegHelper] raw memcpy fallback: %zu bytes src=%p → dst=%p\n",
-            copy_size, (void *)srcPar, (void *)dstPar);
+    log_to_file("CHelper", "INF", "raw memcpy fallback: %zu bytes src=%p -> dst=%p",
+                copy_size, (void *)srcPar, (void *)dstPar);
 
     // Step 1: Read source extradata info BEFORE memcpy (using corrected offsets)
     void *src_extradata = read_cp_ptr(srcPar, offsetof(AVCodecParameters, extradata));
     int src_extradata_size = read_cp_int(srcPar, offsetof(AVCodecParameters, extradata_size));
-    fprintf(stderr, "[FFmpegHelper] src extradata=%p size=%d\n",
-            src_extradata, src_extradata_size);
+    log_to_file("CHelper", "DBG", "src extradata=%p size=%d",
+                src_extradata, src_extradata_size);
 
     // Step 2: Free destination's existing extradata (if any)
     void *old_dst_extradata = read_cp_ptr(dstPar, offsetof(AVCodecParameters, extradata));
@@ -395,7 +493,7 @@ int mks_stream_copy_codecpar(void *dstStream,
                    AV_INPUT_BUFFER_PADDING_SIZE);
             write_cp_ptr(dstPar, offsetof(AVCodecParameters, extradata), new_extradata);
         } else {
-            fprintf(stderr, "[FFmpegHelper] WARNING: extradata av_malloc failed\n");
+            log_to_file("CHelper", "WRN", "extradata av_malloc failed");
             write_cp_ptr(dstPar, offsetof(AVCodecParameters, extradata), NULL);
             write_cp_int(dstPar, offsetof(AVCodecParameters, extradata_size), 0);
         }
@@ -410,9 +508,26 @@ int mks_stream_copy_codecpar(void *dstStream,
     // Verify memcpy result
     int dst_ct2 = read_cp_int(dstPar, offsetof(AVCodecParameters, codec_type));
     int dst_ci2 = read_cp_int(dstPar, offsetof(AVCodecParameters, codec_id));
-    fprintf(stderr, "[FFmpegHelper] memcpy done: dst_type=%d dst_id=%d\n", dst_ct2, dst_ci2);
+    log_to_file("CHelper", "INF", "memcpy done: dst_type=%d dst_id=%d", dst_ct2, dst_ci2);
 
     return 0;
+}
+
+void mks_stream_set_frame_size(void *fmtCtx, int streamIndex, int frameSize) {
+    AVCodecParameters *cp = get_codecpar((AVFormatContext *)fmtCtx, streamIndex);
+    if (cp) {
+        write_cp_int(cp, offsetof(AVCodecParameters, frame_size), frameSize);
+        log_to_file("CHelper", "INF", "set frame_size=%d on stream %d",
+                    frameSize, streamIndex);
+    }
+}
+
+int mks_stream_has_extradata(const void *fmtCtx, int streamIndex) {
+    AVCodecParameters *cp = get_codecpar((const AVFormatContext *)fmtCtx, streamIndex);
+    if (!cp) return 0;
+    void *extradata = read_cp_ptr(cp, offsetof(AVCodecParameters, extradata));
+    int extradata_size = read_cp_int(cp, offsetof(AVCodecParameters, extradata_size));
+    return (extradata != NULL && extradata_size > 0) ? 1 : 0;
 }
 
 void mks_stream_clear_codec_tag(void *stream) {
@@ -473,14 +588,14 @@ void *mks_bsf_create_aac_adtstoasc(const void *fmtCtx, int audioStreamIndex) {
 
     const AVBitStreamFilter *filter = av_bsf_get_by_name("aac_adtstoasc");
     if (!filter) {
-        fprintf(stderr, "[FFmpegHelper] aac_adtstoasc BSF not found in this FFmpeg build\n");
+        log_to_file("CHelper", "ERR", "aac_adtstoasc BSF not found in this FFmpeg build");
         return NULL;
     }
 
     AVBSFContext *bsfCtx = NULL;
     int ret = av_bsf_alloc(filter, &bsfCtx);
     if (ret < 0 || !bsfCtx) {
-        fprintf(stderr, "[FFmpegHelper] av_bsf_alloc failed: %d\n", ret);
+        log_to_file("CHelper", "ERR", "av_bsf_alloc failed: %d", ret);
         return NULL;
     }
 
@@ -488,15 +603,15 @@ void *mks_bsf_create_aac_adtstoasc(const void *fmtCtx, int audioStreamIndex) {
     // Both pointers are resolved through C code which sees the correct layout.
     AVCodecParameters *srcPar = get_codecpar(ctx, audioStreamIndex);
     if (!srcPar) {
-        fprintf(stderr, "[FFmpegHelper] Cannot get codecpar for audio stream %d\n",
-                audioStreamIndex);
+        log_to_file("CHelper", "ERR", "Cannot get codecpar for audio stream %d",
+                    audioStreamIndex);
         av_bsf_free(&bsfCtx);
         return NULL;
     }
 
     ret = avcodec_parameters_copy(bsfCtx->par_in, srcPar);
     if (ret < 0) {
-        fprintf(stderr, "[FFmpegHelper] avcodec_parameters_copy to BSF par_in failed: %d\n", ret);
+        log_to_file("CHelper", "ERR", "avcodec_parameters_copy to BSF par_in failed: %d", ret);
         av_bsf_free(&bsfCtx);
         return NULL;
     }
@@ -507,13 +622,13 @@ void *mks_bsf_create_aac_adtstoasc(const void *fmtCtx, int audioStreamIndex) {
 
     ret = av_bsf_init(bsfCtx);
     if (ret < 0) {
-        fprintf(stderr, "[FFmpegHelper] av_bsf_init failed: %d\n", ret);
+        log_to_file("CHelper", "ERR", "av_bsf_init failed: %d", ret);
         av_bsf_free(&bsfCtx);
         return NULL;
     }
 
-    fprintf(stderr, "[FFmpegHelper] aac_adtstoasc BSF created for stream %d\n",
-            audioStreamIndex);
+    log_to_file("CHelper", "INF", "aac_adtstoasc BSF created for stream %d",
+                audioStreamIndex);
     return bsfCtx;
 }
 
@@ -533,7 +648,7 @@ void mks_bsf_free(void *bsfCtx) {
     if (!bsfCtx) return;
     AVBSFContext *ctx = (AVBSFContext *)bsfCtx;
     av_bsf_free(&ctx);
-    fprintf(stderr, "[FFmpegHelper] BSF freed\n");
+    log_to_file("CHelper", "INF", "BSF freed");
 }
 
 // --- Seek support ---
@@ -543,7 +658,7 @@ void mks_format_flush_input(void *fmtCtx) {
     if (!ctx) return;
 
     int ret = avformat_flush(ctx);
-    fprintf(stderr, "[FFmpegHelper] avformat_flush returned %d\n", ret);
+    log_to_file("CHelper", "DBG", "avformat_flush returned %d", ret);
 }
 
 void mks_bsf_flush(void *bsfCtx) {
@@ -556,7 +671,7 @@ void mks_bsf_flush(void *bsfCtx) {
     // "A non-NULL packet sent after an EOF".
     av_bsf_flush(ctx);
 
-    fprintf(stderr, "[FFmpegHelper] BSF flushed after seek\n");
+    log_to_file("CHelper", "INF", "BSF flushed after seek");
 }
 
 int mks_packet_is_keyframe(const void *pkt) {
@@ -594,33 +709,33 @@ int64_t mks_packet_get_pts(const void *pkt) {
 void mks_debug_stream_layout(const void *fmtCtx, int streamIndex) {
     const AVFormatContext *ctx = (const AVFormatContext *)fmtCtx;
     if (!ctx) {
-        fprintf(stderr, "[C-Layout] ctx is NULL!\n");
+        log_to_file("CLayout", "ERR", "ctx is NULL!");
         return;
     }
 
     detect_field_shifts(ctx);
 
-    fprintf(stderr, "[C-Layout] stream_shift=%d cp_shift=%d\n",
-            s_stream_shift, s_cp_shift);
+    log_to_file("CLayout", "DBG", "stream_shift=%d cp_shift=%d",
+                s_stream_shift, s_cp_shift);
 
     if (streamIndex < 0 || (unsigned)streamIndex >= ctx->nb_streams) {
-        fprintf(stderr, "[C-Layout] streamIndex %d out of range\n", streamIndex);
+        log_to_file("CLayout", "ERR", "streamIndex %d out of range", streamIndex);
         return;
     }
 
     AVStream *s = ctx->streams[streamIndex];
     if (!s) {
-        fprintf(stderr, "[C-Layout] stream[%d] is NULL\n", streamIndex);
+        log_to_file("CLayout", "ERR", "stream[%d] is NULL", streamIndex);
         return;
     }
 
     AVCodecParameters *cp = get_stream_codecpar(s);
-    fprintf(stderr, "[C-Layout] stream[%d] codecpar=%p\n", streamIndex, (void *)cp);
+    log_to_file("CLayout", "DBG", "stream[%d] codecpar=%p", streamIndex, (void *)cp);
     if (cp) {
         int ct = read_cp_int(cp, offsetof(AVCodecParameters, codec_type));
         int ci = read_cp_int(cp, offsetof(AVCodecParameters, codec_id));
         int w  = read_cp_int(cp, offsetof(AVCodecParameters, width));
         int h  = read_cp_int(cp, offsetof(AVCodecParameters, height));
-        fprintf(stderr, "[C-Layout] codec_type=%d codec_id=%d %dx%d\n", ct, ci, w, h);
+        log_to_file("CLayout", "DBG", "codec_type=%d codec_id=%d %dx%d", ct, ci, w, h);
     }
 }

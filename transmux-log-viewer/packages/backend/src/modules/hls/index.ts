@@ -7,6 +7,7 @@ import { HLSService } from "./service";
  * Endpoints:
  * - GET /hls/:sessionId/playlist.m3u8 - HLS playlist
  * - GET /hls/:sessionId/stream.mp4 - Video stream with Range support
+ * - GET /hls/:sessionId/:filename - Any session file (init.mp4, seg_*.mp4)
  *
  * @example
  * ```bash
@@ -68,6 +69,43 @@ export const hlsModule = new Elysia({ prefix: "/hls" })
       detail: {
         summary: "Get HLS stream",
         description: "Serve the fMP4 stream with HTTP Range support",
+        tags: ["hls"],
+      },
+    }
+  )
+  .get(
+    "/:sessionId/:filename",
+    async ({ hlsService, params, request, set }) => {
+      const rangeHeader = request.headers.get("range");
+      const result = await hlsService.getSessionFile(
+        params.sessionId,
+        params.filename,
+        rangeHeader
+      );
+
+      set.status = result.status;
+      for (const [key, value] of Object.entries(result.headers)) {
+        set.headers[key] = value;
+      }
+
+      if (!result.body) {
+        return {
+          error: result.status === 400 ? "Bad Request" : "Not Found",
+          message: `File not found: ${params.filename}`,
+        };
+      }
+
+      return result.body;
+    },
+    {
+      params: t.Object({
+        sessionId: t.String(),
+        filename: t.String(),
+      }),
+      detail: {
+        summary: "Get session file",
+        description:
+          "Serve any file from the session directory (init.mp4, seg_XXX.mp4, etc.)",
         tags: ["hls"],
       },
     }

@@ -28,7 +28,7 @@ export function App() {
   });
 
   const { logs, stats, connected, clearLogs } = useLogStream();
-  const { activeSession, loading, runCLI, stopSession } = useCLISession();
+  const { activeSession, loading, runCLI, stopSession, seekSession } = useCLISession();
 
   /**
    * Handle run from SourcePanel
@@ -50,6 +50,22 @@ export function App() {
     }
   }, [activeSession, stopSession]);
 
+  /**
+   * Handle seek from HLSPlayer controls
+   *
+   * @param time - Target time in seconds
+   * @returns Whether the seek was accepted by the backend
+   */
+  const handleSeek = useCallback(
+    async (time: number): Promise<boolean> => {
+      if (activeSession && activeSession.status === "running") {
+        return seekSession(activeSession.sessionId, time);
+      }
+      return false;
+    },
+    [activeSession, seekSession]
+  );
+
   const isRunning = activeSession?.status === "running" || loading;
 
   return (
@@ -65,13 +81,8 @@ export function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <h1 className="font-mono-emphasis text-sm uppercase tracking-wider">
-                TransmuxCore
-              </h1>
-              <Badge
-                variant="outline"
-                className="font-mono text-[9px] h-4 px-1.5 border-border/30"
-              >
+              <h1 className="font-mono-emphasis text-sm uppercase tracking-wider">TransmuxCore</h1>
+              <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 border-border/30">
                 Test Pipeline
               </Badge>
             </div>
@@ -117,11 +128,7 @@ export function App() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left panel - Source selector */}
         <aside className="w-[280px] shrink-0 border-r border-border/15 bg-background/20 overflow-hidden">
-          <SourcePanel
-            onRun={handleRun}
-            onStop={handleStop}
-            isRunning={isRunning}
-          />
+          <SourcePanel onRun={handleRun} onStop={handleStop} isRunning={isRunning} />
         </aside>
 
         {/* Right panel - Player + Logs */}
@@ -133,20 +140,17 @@ export function App() {
                 sessionId={
                   activeSession &&
                   !activeSession.sessionId.startsWith("pending-") &&
-                  (activeSession.status === "running" ||
-                    activeSession.status === "completed")
+                  (activeSession.status === "running" || activeSession.status === "completed")
                     ? activeSession.sessionId
                     : null
                 }
+                onSeek={isRunning ? handleSeek : undefined}
               />
             </div>
 
             {/* Session Info */}
             <div className="shrink-0">
-              <SessionInfo
-                session={activeSession}
-                onStop={(id) => stopSession(id)}
-              />
+              <SessionInfo session={activeSession} onStop={(id) => stopSession(id)} />
             </div>
 
             {/* Log Viewer */}

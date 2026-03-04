@@ -709,6 +709,468 @@ void mks_packet_set_dts(void *pkt, int64_t dts) {
     if (p) p->dts = dts;
 }
 
+// --- Stream metadata ---
+
+/// Read a metadata tag from a stream's AVDictionary.
+/// AVStream.metadata is accessed via shift-corrected offset (same as codecpar, time_base, etc.)
+static int read_stream_metadata(const AVFormatContext *ctx, int streamIndex,
+                                 const char *key, char *buf, int bufSize) {
+    if (!ctx || streamIndex < 0 || (unsigned)streamIndex >= ctx->nb_streams || !buf || bufSize <= 0)
+        return -1;
+
+    detect_field_shifts(ctx);
+
+    AVStream *s = ctx->streams[streamIndex];
+    if (!s) return -1;
+
+    // Read metadata dictionary via shift-corrected offset
+    AVDictionary *meta = (AVDictionary *)read_stream_ptr(s, offsetof(AVStream, metadata));
+    if (!meta) {
+        buf[0] = '\0';
+        return -1;
+    }
+
+    AVDictionaryEntry *entry = av_dict_get(meta, key, NULL, 0);
+    if (!entry || !entry->value) {
+        buf[0] = '\0';
+        return -1;
+    }
+
+    snprintf(buf, bufSize, "%s", entry->value);
+    return 0;
+}
+
+int mks_stream_get_language(const void *fmtCtx, int streamIndex,
+                            char *buf, int bufSize) {
+    return read_stream_metadata((const AVFormatContext *)fmtCtx, streamIndex,
+                                 "language", buf, bufSize);
+}
+
+int mks_stream_get_title(const void *fmtCtx, int streamIndex,
+                         char *buf, int bufSize) {
+    return read_stream_metadata((const AVFormatContext *)fmtCtx, streamIndex,
+                                 "title", buf, bufSize);
+}
+
+int mks_stream_get_channels(const void *fmtCtx, int streamIndex) {
+    AVCodecParameters *cp = get_codecpar((const AVFormatContext *)fmtCtx, streamIndex);
+    if (!cp) return 0;
+
+    // AVChannelLayout { enum AVChannelOrder order (4 bytes); int nb_channels (4 bytes); ... }
+    // nb_channels is at ch_layout + 4 bytes offset.
+    // read_cp_int already applies s_cp_shift, so we add 4 to the header offset.
+    int nb_channels = read_cp_int(cp, offsetof(AVCodecParameters, ch_layout) + 4);
+
+    if (nb_channels > 0 && nb_channels < 64) return nb_channels;
+
+    return 0;
+}
+
+int mks_stream_get_sample_rate(const void *fmtCtx, int streamIndex) {
+    AVCodecParameters *cp = get_codecpar((const AVFormatContext *)fmtCtx, streamIndex);
+    if (!cp) return 0;
+    return read_cp_int(cp, offsetof(AVCodecParameters, sample_rate));
+}
+
+int mks_stream_get_subtitle_codec_id(const void *fmtCtx, int streamIndex) {
+    const AVFormatContext *ctx = (const AVFormatContext *)fmtCtx;
+    if (!ctx || streamIndex < 0 || (unsigned)streamIndex >= ctx->nb_streams)
+        return 0;
+
+    int codec_type = mks_stream_get_codec_type(fmtCtx, streamIndex);
+    if (codec_type != AVMEDIA_TYPE_SUBTITLE) return 0;
+
+    return mks_stream_get_codec_id(fmtCtx, streamIndex);
+}
+
+// --- Subtitle extraction ---
+
+/// Format a timestamp as HH:MM:SS.mmm for WebVTT
+static void format_vtt_timestamp(char *buf, size_t bufsize, int64_t ms) {
+    if (ms < 0) ms = 0;
+    int h  = (int)(ms / 3600000);
+    int m  = (int)((ms % 3600000) / 60000);
+    int s  = (int)((ms % 60000) / 1000);
+    int mm = (int)(ms % 1000);
+    snprintf(buf, bufsize, "%02d:%02d:%02d.%03d", h, m, s, mm);
+}
+
+// --- Subtitle collector (in-band, fed during remux loop) ---
+// IPTV servers block concurrent connections, so we collect subtitle packets
+// from the SAME av_read_frame loop used for A/V remux — zero extra connections.
+
+#define MAX_SUB_STREAMS 16
+
+struct MKSSubtitleCollector {
+    int streamCount;
+    int streamIndices[MAX_SUB_STREAMS];
+    AVCodecContext *decoders[MAX_SUB_STREAMS];
+    FILE *files[MAX_SUB_STREAMS];
+    AVRational timeBases[MAX_SUB_STREAMS];
+    int cueCounts[MAX_SUB_STREAMS];
+    int activeCount;
+};
+
+MKSSubtitleCollector *mks_subtitle_collector_create(
+    const void *fmtCtx,
+    int streamCount,
+    const int *streamIndices,
+    const char *const *outputPaths)
+{
+    const AVFormatContext *ctx = (const AVFormatContext *)fmtCtx;
+    if (!ctx || streamCount <= 0 || streamCount > MAX_SUB_STREAMS ||
+        !streamIndices || !outputPaths)
+        return NULL;
+
+    MKSSubtitleCollector *c = calloc(1, sizeof(MKSSubtitleCollector));
+    if (!c) return NULL;
+
+    c->streamCount = streamCount;
+    c->activeCount = 0;
+
+    for (int i = 0; i < streamCount; i++) {
+        c->streamIndices[i] = streamIndices[i];
+        c->cueCounts[i] = 0;
+        c->decoders[i] = NULL;
+        c->files[i] = NULL;
+
+        int idx = streamIndices[i];
+        if (idx < 0 || (unsigned)idx >= ctx->nb_streams) {
+            log_to_file("CHelper", "WRN", "sub collector: stream %d out of range", idx);
+            continue;
+        }
+
+        AVCodecParameters *cp = get_codecpar(ctx, idx);
+        if (!cp) continue;
+
+        int codec_id = read_cp_int(cp, offsetof(AVCodecParameters, codec_id));
+        const AVCodec *decoder = avcodec_find_decoder(codec_id);
+        if (!decoder) {
+            log_to_file("CHelper", "WRN", "sub collector: no decoder for stream %d (codec_id=%d)", idx, codec_id);
+            continue;
+        }
+
+        AVCodecContext *dc = avcodec_alloc_context3(decoder);
+        if (!dc) continue;
+
+        avcodec_parameters_to_context(dc, cp);
+        int ret = avcodec_open2(dc, decoder, NULL);
+        if (ret < 0) {
+            log_to_file("CHelper", "WRN", "sub collector: open2 failed stream %d (ret=%d)", idx, ret);
+            avcodec_free_context(&dc);
+            continue;
+        }
+
+        FILE *f = fopen(outputPaths[i], "w");
+        if (!f) { avcodec_free_context(&dc); continue; }
+        fprintf(f, "WEBVTT\n\n");
+
+        c->decoders[i] = dc;
+        c->files[i] = f;
+
+        AVStream *st = ctx->streams[idx];
+        c->timeBases[i] = read_stream_rational(st, offsetof(AVStream, time_base));
+        if (c->timeBases[i].den == 0) { c->timeBases[i].num = 1; c->timeBases[i].den = 1000; }
+
+        c->activeCount++;
+        log_to_file("CHelper", "INF", "sub collector: stream %d ready (codec_id=%d, tb=%d/%d)",
+                    idx, codec_id, c->timeBases[i].num, c->timeBases[i].den);
+    }
+
+    if (c->activeCount == 0) {
+        log_to_file("CHelper", "WRN", "sub collector: no decodable subtitle streams");
+        free(c);
+        return NULL;
+    }
+
+    log_to_file("CHelper", "INF", "sub collector: created with %d/%d active streams",
+                c->activeCount, streamCount);
+    return c;
+}
+
+void mks_subtitle_collector_feed(MKSSubtitleCollector *collector, const void *rawPkt) {
+    if (!collector || !rawPkt) return;
+    const AVPacket *pkt = (const AVPacket *)rawPkt;
+
+    // Find matching slot
+    int slot = -1;
+    for (int i = 0; i < collector->streamCount; i++) {
+        if (pkt->stream_index == collector->streamIndices[i] &&
+            collector->decoders[i] && collector->files[i]) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) return;
+
+    AVSubtitle sub;
+    int gotSub = 0;
+    int ret = avcodec_decode_subtitle2(collector->decoders[slot], &sub, &gotSub,
+                                        (AVPacket *)rawPkt);
+    if (ret < 0 || !gotSub) return;
+
+    int64_t pts_ms = 0;
+    if (pkt->pts != AV_NOPTS_VALUE) {
+        pts_ms = av_rescale_q(pkt->pts, collector->timeBases[slot], (AVRational){1, 1000});
+    }
+    int64_t start_ms = pts_ms + sub.start_display_time;
+    int64_t end_ms   = pts_ms + sub.end_display_time;
+    if (end_ms <= start_ms) end_ms = start_ms + 5000;
+
+    FILE *f = collector->files[slot];
+    for (unsigned r = 0; r < sub.num_rects; r++) {
+        AVSubtitleRect *rect = sub.rects[r];
+        const char *text = NULL;
+
+        if (rect->type == SUBTITLE_TEXT && rect->text) {
+            text = rect->text;
+        } else if (rect->type == SUBTITLE_ASS && rect->ass) {
+            text = rect->ass;
+            int commas = 0;
+            while (*text && commas < 8) { if (*text == ',') commas++; text++; }
+        }
+
+        if (text && text[0] != '\0') {
+            int cc = collector->cueCounts[slot];
+            char startTS[16], endTS[16];
+            format_vtt_timestamp(startTS, sizeof(startTS), start_ms);
+            format_vtt_timestamp(endTS, sizeof(endTS), end_ms);
+            fprintf(f, "%d\n%s --> %s\n", cc + 1, startTS, endTS);
+
+            const char *p = text;
+            int inOverride = 0;
+            while (*p) {
+                if (*p == '{' && *(p+1) == '\\') { inOverride = 1; p++; continue; }
+                if (inOverride) { if (*p == '}') inOverride = 0; p++; continue; }
+                if (*p == '\\' && (*(p+1) == 'N' || *(p+1) == 'n')) { fprintf(f, "\n"); p += 2; continue; }
+                fputc(*p, f);
+                p++;
+            }
+            fprintf(f, "\n\n");
+            fflush(f);  // Flush so TransmuxServer can serve partial VTT
+            collector->cueCounts[slot] = cc + 1;
+        }
+    }
+    avsubtitle_free(&sub);
+}
+
+void mks_subtitle_collector_finish(MKSSubtitleCollector *collector, int *cueCounts) {
+    if (!collector) return;
+
+    int totalCues = 0;
+    for (int i = 0; i < collector->streamCount; i++) {
+        if (collector->files[i]) fclose(collector->files[i]);
+        if (collector->decoders[i]) avcodec_free_context(&collector->decoders[i]);
+        if (cueCounts) cueCounts[i] = collector->cueCounts[i];
+        totalCues += collector->cueCounts[i];
+        if (collector->cueCounts[i] > 0) {
+            log_to_file("CHelper", "INF", "sub collector: stream %d -> %d cues",
+                        collector->streamIndices[i], collector->cueCounts[i]);
+        }
+    }
+    log_to_file("CHelper", "INF", "sub collector: finished, %d total cues from %d streams",
+                totalCues, collector->activeCount);
+    free(collector);
+}
+
+#undef MAX_SUB_STREAMS
+
+// --- Diagnostics (moved after collector) ---
+static int _removed_legacy_extract_fn = 0;  // was: _unused_mks_subtitle_extract_all_to_vtt
+// The standalone extraction function was removed — use the in-band collector instead.
+
+#if 0  // Legacy extraction function — REMOVED (IPTV servers reject extra connections)
+static int _unused_mks_subtitle_extract_all_to_vtt(const char *inputURL,
+                                     int streamCount,
+                                     const int *streamIndices,
+                                     const char * const *outputPaths,
+                                     int *cueCounts) {
+    if (!inputURL || streamCount <= 0 || !streamIndices || !outputPaths || !cueCounts)
+        return -1;
+
+    for (int i = 0; i < streamCount; i++) cueCounts[i] = 0;
+
+    // Open ONE connection for all subtitle streams
+    // Must pass same HTTP options as main transmux (reconnect, probesize)
+    // or IPTV servers may reject the connection
+    AVFormatContext *subCtx = NULL;
+    AVDictionary *opts = NULL;
+    av_dict_set(&opts, "reconnect", "1", 0);
+    av_dict_set(&opts, "reconnect_streamed", "1", 0);
+    av_dict_set(&opts, "reconnect_delay_max", "5", 0);
+    log_to_file("CHelper", "INF", "subtitle extract: opening %s for %d streams", inputURL, streamCount);
+    int ret = avformat_open_input(&subCtx, inputURL, NULL, &opts);
+    av_dict_free(&opts);
+    if (ret < 0 || !subCtx) {
+        log_to_file("CHelper", "ERR", "subtitle extract: cannot open input (ret=%d)", ret);
+        return -1;
+    }
+
+    ret = avformat_find_stream_info(subCtx, NULL);
+    if (ret < 0) {
+        log_to_file("CHelper", "ERR", "subtitle extract: find_stream_info failed (ret=%d)", ret);
+        avformat_close_input(&subCtx);
+        return -1;
+    }
+
+    detect_field_shifts(subCtx);
+
+    // Set up per-stream decoder contexts, output files, and time bases
+    #define MAX_SUB_STREAMS 16
+    if (streamCount > MAX_SUB_STREAMS) streamCount = MAX_SUB_STREAMS;
+
+    AVCodecContext *decCtxs[MAX_SUB_STREAMS] = {0};
+    FILE *outFiles[MAX_SUB_STREAMS] = {0};
+    AVRational timeBases[MAX_SUB_STREAMS] = {{0}};
+    int activeCount = 0;
+
+    for (int i = 0; i < streamCount; i++) {
+        int idx = streamIndices[i];
+        if (idx < 0 || (unsigned)idx >= subCtx->nb_streams) {
+            log_to_file("CHelper", "WRN", "subtitle extract: stream %d out of range, skipping", idx);
+            continue;
+        }
+
+        AVCodecParameters *cp = get_codecpar(subCtx, idx);
+        if (!cp) continue;
+
+        int codec_id = read_cp_int(cp, offsetof(AVCodecParameters, codec_id));
+        const AVCodec *decoder = avcodec_find_decoder(codec_id);
+        if (!decoder) {
+            log_to_file("CHelper", "WRN", "subtitle extract: no decoder for stream %d (codec_id=%d)", idx, codec_id);
+            continue;
+        }
+
+        AVCodecContext *dc = avcodec_alloc_context3(decoder);
+        if (!dc) continue;
+
+        avcodec_parameters_to_context(dc, cp);
+        ret = avcodec_open2(dc, decoder, NULL);
+        if (ret < 0) {
+            log_to_file("CHelper", "WRN", "subtitle extract: avcodec_open2 failed for stream %d (ret=%d)", idx, ret);
+            avcodec_free_context(&dc);
+            continue;
+        }
+
+        FILE *f = fopen(outputPaths[i], "w");
+        if (!f) {
+            avcodec_free_context(&dc);
+            continue;
+        }
+        fprintf(f, "WEBVTT\n\n");
+
+        decCtxs[i] = dc;
+        outFiles[i] = f;
+
+        AVStream *st = subCtx->streams[idx];
+        timeBases[i] = read_stream_rational(st, offsetof(AVStream, time_base));
+        if (timeBases[i].den == 0) { timeBases[i].num = 1; timeBases[i].den = 1000; }
+
+        activeCount++;
+        log_to_file("CHelper", "DBG", "subtitle extract: stream %d ready (codec_id=%d)", idx, codec_id);
+    }
+
+    if (activeCount == 0) {
+        log_to_file("CHelper", "WRN", "subtitle extract: no streams could be initialized");
+        avformat_close_input(&subCtx);
+        return -1;
+    }
+
+    // Single-pass read loop: dispatch packets to the correct decoder
+    AVPacket *pkt = av_packet_alloc();
+    AVSubtitle sub;
+    int gotSub = 0;
+
+    while (av_read_frame(subCtx, pkt) >= 0) {
+        // Find which of our subtitle streams this packet belongs to
+        int slotIdx = -1;
+        for (int i = 0; i < streamCount; i++) {
+            if (pkt->stream_index == streamIndices[i] && decCtxs[i] && outFiles[i]) {
+                slotIdx = i;
+                break;
+            }
+        }
+        if (slotIdx < 0) {
+            av_packet_unref(pkt);
+            continue;
+        }
+
+        ret = avcodec_decode_subtitle2(decCtxs[slotIdx], &sub, &gotSub, pkt);
+        if (ret < 0 || !gotSub) {
+            av_packet_unref(pkt);
+            continue;
+        }
+
+        int64_t pts_ms = 0;
+        if (pkt->pts != AV_NOPTS_VALUE) {
+            pts_ms = av_rescale_q(pkt->pts, timeBases[slotIdx], (AVRational){1, 1000});
+        }
+        int64_t start_ms = pts_ms + sub.start_display_time;
+        int64_t end_ms   = pts_ms + sub.end_display_time;
+        if (end_ms <= start_ms) end_ms = start_ms + 5000;
+
+        for (unsigned r = 0; r < sub.num_rects; r++) {
+            AVSubtitleRect *rect = sub.rects[r];
+            const char *text = NULL;
+
+            if (rect->type == SUBTITLE_TEXT && rect->text) {
+                text = rect->text;
+            } else if (rect->type == SUBTITLE_ASS && rect->ass) {
+                text = rect->ass;
+                int commas = 0;
+                while (*text && commas < 8) {
+                    if (*text == ',') commas++;
+                    text++;
+                }
+            }
+
+            if (text && text[0] != '\0') {
+                int cc = cueCounts[slotIdx];
+                char startTS[16], endTS[16];
+                format_vtt_timestamp(startTS, sizeof(startTS), start_ms);
+                format_vtt_timestamp(endTS, sizeof(endTS), end_ms);
+
+                fprintf(outFiles[slotIdx], "%d\n%s --> %s\n", cc + 1, startTS, endTS);
+
+                const char *p = text;
+                int inOverride = 0;
+                while (*p) {
+                    if (*p == '{' && *(p+1) == '\\') { inOverride = 1; p++; continue; }
+                    if (inOverride) { if (*p == '}') inOverride = 0; p++; continue; }
+                    if (*p == '\\' && (*(p+1) == 'N' || *(p+1) == 'n')) { fprintf(outFiles[slotIdx], "\n"); p += 2; continue; }
+                    fputc(*p, outFiles[slotIdx]);
+                    p++;
+                }
+                fprintf(outFiles[slotIdx], "\n\n");
+                cueCounts[slotIdx] = cc + 1;
+            }
+        }
+
+        avsubtitle_free(&sub);
+        av_packet_unref(pkt);
+    }
+
+    av_packet_free(&pkt);
+
+    // Cleanup
+    int totalCues = 0;
+    for (int i = 0; i < streamCount; i++) {
+        if (outFiles[i]) fclose(outFiles[i]);
+        if (decCtxs[i]) avcodec_free_context(&decCtxs[i]);
+        totalCues += cueCounts[i];
+        if (cueCounts[i] > 0) {
+            log_to_file("CHelper", "INF", "subtitle extract: stream %d → %d cues → %s",
+                        streamIndices[i], cueCounts[i], outputPaths[i]);
+        }
+    }
+    avformat_close_input(&subCtx);
+
+    log_to_file("CHelper", "INF", "subtitle extract: %d total cues from %d streams", totalCues, activeCount);
+    return 0;
+    #undef MAX_SUB_STREAMS
+}
+#endif  // Legacy extraction function
+
 // --- Diagnostics ---
 
 void mks_debug_stream_layout(const void *fmtCtx, int streamIndex) {

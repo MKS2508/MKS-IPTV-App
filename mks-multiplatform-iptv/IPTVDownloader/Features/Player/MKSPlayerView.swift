@@ -54,6 +54,7 @@ struct MKSPlayerView: View {
     var presentationMode: MKSPlayerPresentationMode = .inline
 
     @State private var showMetadata = true
+    @State private var showDebugOverlay = UserDefaults.showPlayerDebugOverlay
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -61,6 +62,23 @@ struct MKSPlayerView: View {
             playerSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
+                .onTapGesture(count: 3) {
+                    showDebugOverlay.toggle()
+                    UserDefaults.showPlayerDebugOverlay = showDebugOverlay
+                }
+
+            // Debug overlay (top-leading corner, any mode)
+            if showDebugOverlay {
+                VStack {
+                    HStack {
+                        PlayerDebugOverlay(player: player)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(8)
+                .allowsHitTesting(false)
+            }
 
             // Overlays only for inline mode (fullscreen has native controls)
             if presentationMode == .inline {

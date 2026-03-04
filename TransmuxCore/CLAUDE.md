@@ -144,3 +144,4 @@ Definidos en: `transmux-log-viewer/packages/frontend/mks-iptv-client/src/lib/tes
 - **No re-encoding** — TransmuxCore SOLO remuxea, nunca transcodifica
 - **Paths relativos en Package.swift** — los `-L` flags apuntan a `Frameworks/FFmpeg/lib/` relativo al package
 - **Module map paths** — relativos a `Sources/CFFmpegHelper/include/` (3 niveles hasta package root: `../../../`)
+- **IPTV servers block multiple concurrent connections** — NEVER open multiple HTTP connections to the same IPTV URL simultaneously. Servers enforce single-connection limits. For operations that need to re-read the file (e.g. subtitle extraction), either: (a) do it in a single pass over the same connection, (b) wait for the previous connection to close first, or (c) extract data during the main read loop. The `mks_subtitle_extract_all_to_vtt` function uses approach (a): one connection, one pass, multiple output files.

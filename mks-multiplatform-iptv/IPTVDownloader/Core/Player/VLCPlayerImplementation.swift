@@ -44,8 +44,21 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
             return false
         #endif
     }
-    
+
     func load(url: URL) {
+        load(url: url, metadata: nil)
+    }
+
+    func load(url: URL, metadata: MetadataResult?) {
+        // Note: VLC doesn't support externalMetadata like AVPlayer does
+        // Metadata is ignored but we log it for debugging
+        if let metadata = metadata {
+            print("[VLCPlayerImplementation] Metadata provided but VLC doesn't support externalMetadata: \(metadata.title)")
+        }
+        loadInternal(url: url)
+    }
+
+    private func loadInternal(url: URL) {
         guard VLCPlayerImplementation.isAvailable() else {
             error = .unsupportedFormat
             print("[VLCPlayerImplementation] VLCKit not available")

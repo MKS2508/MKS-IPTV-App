@@ -29,6 +29,9 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     private var transmuxSessionID: String?
     @Published private(set) var isTransmuxing: Bool = false
 
+    /// Stored metadata to pass to the inner AVPlayer after transmux starts
+    private var pendingMetadata: MetadataResult?
+
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
     }
@@ -42,9 +45,14 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     }
 
     func load(url: URL) {
+        load(url: url, metadata: nil)
+    }
+
+    func load(url: URL, metadata: MetadataResult?) {
         print("[FFmpegPlayer] Loading URL: \(url)")
         isTransmuxing = true
         error = nil
+        pendingMetadata = metadata
 
         Task { @MainActor in
             do {
@@ -93,7 +101,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 print("[FFmpegPlayer] Loading VOD HLS playlist: \(hlsURL)")
                 self.isTransmuxing = false
                 self.avPlayer = AVPlayerImplementation()
-                self.avPlayer?.load(url: hlsURL)
+                self.avPlayer?.load(url: hlsURL, metadata: self.pendingMetadata)
                 self.setupBindings()
 
                 // Observe transmux completion for logging/cleanup only.
@@ -160,6 +168,21 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     /// The underlying AVPlayer instance, if the transmux pipeline has produced one.
     var underlyingAVPlayer: AVPlayer? {
         avPlayer?.underlyingAVPlayer
+    }
+
+    /// Forward buffering detail from the inner AVPlayer, with transmux context.
+    var bufferingDetail: PlayerBufferingDetail {
+        if isTransmuxing {
+            return PlayerBufferingDetail(
+                isBuffering: true,
+                reason: "Transmuxing...",
+                loadedRangeAhead: nil,
+                bitrate: nil,
+                stallCount: 0,
+                playerRate: nil
+            )
+        }
+        return avPlayer?.bufferingDetail ?? .idle
     }
 
     // MARK: - Private Methods
@@ -235,9 +258,22 @@ fileprivate struct FFmpegPlayerContentView: View {
                 if player.isBuffering {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
+                    VStack(spacing: 8) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.2)
+
+                        let detail = player.bufferingDetail
+                        Text(detail.reason ?? "Buffering...")
+                            .font(.callout)
+                            .foregroundStyle(.white)
+
+                        if let ahead = detail.loadedRangeAhead {
+                            Text("\(String(format: "%.1f", ahead))s buffered")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                    }
                 }
             }
         } else {

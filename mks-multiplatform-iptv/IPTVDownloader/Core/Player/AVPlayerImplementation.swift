@@ -35,16 +35,78 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
     var underlyingAVPlayer: AVPlayer? { player }
 
+    var bufferingDetail: PlayerBufferingDetail {
+        guard let player = player, let item = playerItem else { return .idle }
+
+        // Compute seconds of buffered data ahead of playhead
+        let currentSec = player.currentTime().seconds
+        var loadedAhead: Double? = nil
+        if let range = item.loadedTimeRanges.first?.timeRangeValue {
+            let bufferedEnd = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration)
+            let ahead = bufferedEnd - currentSec
+            if ahead.isFinite && ahead >= 0 {
+                loadedAhead = ahead
+            }
+        }
+
+        // Access log metrics
+        var bitrate: Double? = nil
+        var stallCount = 0
+        if let log = item.accessLog(), let event = log.events.last {
+            if event.observedBitrate > 0 {
+                bitrate = event.observedBitrate
+            }
+            stallCount = event.numberOfStalls
+        }
+
+        // Buffering reason (AVPlayer.WaitingReason is a struct, not enum)
+        let reason: String?
+        let waitingReason = player.reasonForWaitingToPlay
+        if waitingReason == .toMinimizeStalls {
+            reason = "Buffering..."
+        } else if waitingReason == .noItemToPlay {
+            reason = "No content"
+        } else if waitingReason != nil {
+            reason = "Evaluating..."
+        } else {
+            reason = isBuffering ? "Buffering..." : nil
+        }
+
+        return PlayerBufferingDetail(
+            isBuffering: isBuffering,
+            reason: reason,
+            loadedRangeAhead: loadedAhead,
+            bitrate: bitrate,
+            stallCount: stallCount,
+            playerRate: player.rate
+        )
+    }
+
     deinit {
         stop()
     }
-    
+
     func load(url: URL) {
+        load(url: url, metadata: nil)
+    }
+
+    func load(url: URL, metadata: MetadataResult?) {
         stop()
 
         print("[AVPlayerImplementation] Loading URL: \(url)")
 
         playerItem = AVPlayerItem(url: url)
+
+        // Set external metadata for Control Center / Lock Screen / AirPlay
+        if let metadata {
+            let externalMetadata = PlayerMetadataHelper.makeExternalMetadata(from: metadata)
+            playerItem?.externalMetadata = externalMetadata
+            print("[AVPlayerImplementation] Set \(externalMetadata.count) metadata items for: \(metadata.title)")
+
+            // Load artwork asynchronously (poster image)
+            PlayerMetadataHelper.loadArtwork(from: metadata, into: playerItem!)
+        }
+
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
         // For HLS via TransmuxServer, let AVPlayer buffer properly before starting.

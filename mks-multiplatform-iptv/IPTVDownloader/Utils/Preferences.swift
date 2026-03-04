@@ -9,6 +9,7 @@ import Foundation
 
 extension UserDefaults {
     private static let downloadPathKey = "DownloadPath"
+    private static let showPlayerDebugOverlayKey = "showPlayerDebugOverlay"
 
     static var downloadPath: String {
         get {
@@ -23,5 +24,13 @@ extension UserDefaults {
         set {
             UserDefaults.standard.setValue(newValue, forKey: downloadPathKey)
         }
+    }
+
+    /// Whether to show the player debug overlay with live AVPlayer metrics.
+    /// Only available in DEBUG builds. Toggled via triple-tap on the player surface
+    /// or via Settings.
+    static var showPlayerDebugOverlay: Bool {
+        get { UserDefaults.standard.bool(forKey: showPlayerDebugOverlayKey) }
+        set { UserDefaults.standard.setValue(newValue, forKey: showPlayerDebugOverlayKey) }
     }
 }

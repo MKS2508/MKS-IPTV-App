@@ -22,75 +22,141 @@ class PlayerFactory {
     ///   3. VLCKit available → VLC fallback
     ///   4. Last resort → AVPlayer (may fail with MKV)
     func createPlayer(for url: URL) -> any VideoPlayerProtocol {
+        createPlayer(for: url, metadata: nil)
+    }
+
+    /// Create the optimal player for a given URL with metadata for Control Center / Lock Screen / AirPlay.
+    func createPlayer(for url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
         let format = url.pathExtension.lowercased()
 
         if configuration.autoSelectPlayer {
-            return createBestPlayer(for: format, url: url)
+            return createBestPlayer(for: format, url: url, metadata: metadata)
         }
 
         // Manual selection with fallback chain
         if configuration.preferredPlayer.supports(format: format) {
-            return createPlayer(type: configuration.preferredPlayer, url: url)
+            return createPlayer(type: configuration.preferredPlayer, url: url, metadata: metadata)
         }
         if configuration.fallbackPlayer.supports(format: format) {
             print("[PlayerFactory] Preferred player doesn't support \(format), using fallback")
-            return createPlayer(type: configuration.fallbackPlayer, url: url)
+            return createPlayer(type: configuration.fallbackPlayer, url: url, metadata: metadata)
         }
         print("[PlayerFactory] No preferred player supports \(format), auto-selecting")
-        return createBestPlayer(for: format, url: url)
+        return createBestPlayer(for: format, url: url, metadata: metadata)
     }
 
     func createPlayer(type: PlayerType, url: URL) -> any VideoPlayerProtocol {
+        createPlayer(type: type, url: url, metadata: nil)
+    }
+
+    func createPlayer(type: PlayerType, url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
         switch type {
         case .avplayer:
             let player = AVPlayerImplementation()
-            player.load(url: url)
+            player.load(url: url, metadata: metadata)
             return player
 
         case .vlc:
             if VLCPlayerImplementation.isAvailable() {
                 let player = VLCPlayerImplementation()
                 player.load(url: url)
+                // Note: VLC doesn't support externalMetadata, but the default load(url:metadata:) will call load(url:)
                 return player
             }
             print("[PlayerFactory] VLCKit not available, falling back to AVPlayer")
             let player = AVPlayerImplementation()
-            player.load(url: url)
+            player.load(url: url, metadata: metadata)
             return player
 
         case .ffmpeg:
             let player = FFmpegPlayerImplementation(configuration: configuration)
-            player.load(url: url)
+            player.load(url: url, metadata: metadata)
             return player
         }
     }
 
     // MARK: - Smart Player Selection
 
-    private func createBestPlayer(for format: String, url: URL) -> any VideoPlayerProtocol {
-        let isNative = PlayerType.avplayer.supports(format: format)
+    /// Native formats that AVPlayer can handle directly (with PiP + AirPlay)
+    private static let nativeFormats: Set<String> = ["mp4", "m4v", "mov", "m3u8", "ts"]
+
+    /// Formats that require FFmpeg transmux (MKV is the vast majority of IPTV VODs)
+    private static let transmuxFormats: Set<String> = ["mkv", "avi", "flv", "wmv", "webm"]
+
+    /// Detect the format from URL - handles IPTV URLs that may not have clear extensions
+    private func detectFormat(from url: URL) -> String {
+        // First try the path extension
+        let pathExtension = url.pathExtension.lowercased()
+        if !pathExtension.isEmpty {
+            return pathExtension
+        }
+
+        // For IPTV URLs without extension, check the last path component
+        // e.g., http://server/movie/user/pass/12345 or .../12345.mkv
+        let path = url.path.lowercased()
+
+        // Check for extension in the path (might be after query params stripped)
+        for ext in Self.nativeFormats.union(Self.transmuxFormats) {
+            if path.hasSuffix(".\(ext)") || path.contains(".\(ext)?") {
+                return ext
+            }
+        }
+
+        // Check URL structure for content type hints
+        if path.contains("/movie/") || path.contains("/series/") {
+            // VOD content - default to mkv (most common)
+            print("[PlayerFactory] No extension detected, VOD path → assuming mkv")
+            return "mkv"
+        }
+
+        if path.contains("/live/") {
+            // Live stream - typically ts or m3u8
+            return "ts"
+        }
+
+        // Unknown - return empty, will default to FFmpeg
+        return ""
+    }
+
+    private func createBestPlayer(for format: String, url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
+        // Detect actual format from URL (handles IPTV URLs better)
+        let detectedFormat = format.isEmpty ? detectFormat(from: url) : format
 
         // 1. Native formats → AVPlayer (best PiP + AirPlay)
-        if isNative {
-            print("[PlayerFactory] Native format (\(format)) → AVPlayer")
-            return createPlayer(type: .avplayer, url: url)
+        if Self.nativeFormats.contains(detectedFormat) {
+            print("[PlayerFactory] Native format (\(detectedFormat)) → AVPlayer")
+            return createPlayer(type: .avplayer, url: url, metadata: metadata)
         }
 
-        // 2. Non-native → FFmpeg transmux pipeline (produces AVPlayer output with AirPlay)
-        if PlayerType.ffmpeg.supports(format: format) {
-            print("[PlayerFactory] Non-native format (\(format)) → FFmpeg transmux pipeline")
-            return createPlayer(type: .ffmpeg, url: url)
+        // 2. MKV and other non-native → FFmpeg transmux pipeline (ALWAYS for MKV)
+        // This is the primary path for IPTV VOD content
+        if Self.transmuxFormats.contains(detectedFormat) {
+            print("[PlayerFactory] Transmux format (\(detectedFormat)) → FFmpeg transmux pipeline")
+            return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
         }
 
-        // 3. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
+        // 3. Unknown format - check if it looks like a stream
+        let path = url.path.lowercased()
+        if path.contains("/live/") || path.hasSuffix(".m3u8") {
+            print("[PlayerFactory] Live stream detected → AVPlayer")
+            return createPlayer(type: .avplayer, url: url, metadata: metadata)
+        }
+
+        // 4. VOD with unknown format - default to FFmpeg transmux (safest for IPTV)
+        if path.contains("/movie/") || path.contains("/series/") {
+            print("[PlayerFactory] VOD with unknown format → FFmpeg transmux pipeline (default)")
+            return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
+        }
+
+        // 5. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
         if VLCPlayerImplementation.isAvailable() {
-            print("[PlayerFactory] Non-native format (\(format)) → VLCKit fallback")
-            return createPlayer(type: .vlc, url: url)
+            print("[PlayerFactory] Unknown format (\(detectedFormat)) → VLCKit fallback")
+            return createPlayer(type: .vlc, url: url, metadata: metadata)
         }
 
-        // 4. Last resort: AVPlayer (will likely fail with MKV)
-        print("[PlayerFactory] No suitable player for \(format), trying AVPlayer as last resort")
-        return createPlayer(type: .avplayer, url: url)
+        // 6. Last resort: FFmpeg transmux (better chance than AVPlayer for non-native)
+        print("[PlayerFactory] Unknown format (\(detectedFormat)) → FFmpeg transmux (last resort)")
+        return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
     }
 
     // MARK: - Stream Detection
@@ -127,6 +193,10 @@ class PlayerManager: ObservableObject {
     private init() {}
 
     func loadVideo(url: URL, preferredPlayer: PlayerType? = nil, requireAirPlay: Bool = false) {
+        loadVideo(url: url, metadata: nil, preferredPlayer: preferredPlayer, requireAirPlay: requireAirPlay)
+    }
+
+    func loadVideo(url: URL, metadata: MetadataResult?, preferredPlayer: PlayerType? = nil, requireAirPlay: Bool = false) {
         // Stop previous player synchronously to release connections immediately.
         // FFmpegPlayerImplementation.stop() handles its own cleanup (cancelTransmux,
         // cleanup session, stop TransmuxServer). Do NOT schedule a separate cleanup
@@ -148,7 +218,7 @@ class PlayerManager: ObservableObject {
             PlayerFactory.shared.configure(config)
         }
 
-        let player = PlayerFactory.shared.createPlayer(for: url)
+        let player = PlayerFactory.shared.createPlayer(for: url, metadata: metadata)
         currentPlayer = player
 
         // Track actual player type
@@ -160,6 +230,7 @@ class PlayerManager: ObservableObject {
             currentPlayerType = .avplayer
         }
 
-        print("[PlayerManager] Loaded \(url.lastPathComponent) with \(currentPlayerType.displayName)")
+        let titleInfo = metadata?.title ?? url.lastPathComponent
+        print("[PlayerManager] Loaded \"\(titleInfo)\" with \(currentPlayerType.displayName)")
     }
 }

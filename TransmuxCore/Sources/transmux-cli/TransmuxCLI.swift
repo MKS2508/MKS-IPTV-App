@@ -57,6 +57,28 @@ struct TransmuxCLI {
             print("  Init segment: \(session.initSegmentSize) bytes")
             print("  Duration: \(String(format: "%.1f", session.duration))s")
 
+            // Print discovered audio tracks
+            if session.audioTracks.isEmpty {
+                print("  Audio tracks: none")
+            } else {
+                print("  Audio tracks (\(session.audioTracks.count)):")
+                for (i, a) in session.audioTracks.enumerated() {
+                    let def = a.isDefault ? " [DEFAULT]" : ""
+                    print("    [\(i)] in:\(a.inputStreamIndex)→out:\(a.outputStreamIndex) \(a.codecName) \(a.channels)ch \(a.sampleRate)Hz lang=\(a.language) title=\"\(a.title)\"\(def)")
+                }
+            }
+
+            // Print discovered subtitle tracks
+            if session.subtitleTracks.isEmpty {
+                print("  Subtitle tracks: none")
+            } else {
+                print("  Subtitle tracks (\(session.subtitleTracks.count)):")
+                for (i, s) in session.subtitleTracks.enumerated() {
+                    let forced = s.isForced ? " [FORCED]" : ""
+                    print("    [\(i)] lang=\(s.language) title=\"\(s.title)\" vtt=\(s.vttFileName)\(forced)")
+                }
+            }
+
             if interactive {
                 // --- Interactive mode: read stdin for SEEK/STATUS/STOP commands ---
                 await runInteractive(session: session, verbose: verbose)
@@ -227,9 +249,9 @@ struct TransmuxCLI {
         return false
     }
 
-    /// Poll log file for "Seek #N COMPLETE" to confirm seek was processed.
+    /// Poll log file for "SEEK #N OK" to confirm seek was processed.
     static func waitForSeekCompletion(session: ProgressiveTransmuxSession, logPath: String, seekNumber: Int, timeout: Double) async -> Bool {
-        let marker = "Seek #\(seekNumber) COMPLETE"
+        let marker = "SEEK #\(seekNumber) OK"
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if let contents = try? String(contentsOfFile: logPath, encoding: .utf8) {
@@ -258,7 +280,7 @@ struct TransmuxCLI {
         var offsets: [Int64] = []
 
         for line in lines {
-            if line.contains("Seek #") && line.contains("COMPLETE") {
+            if line.contains("SEEK #") && line.contains(" OK ") {
                 seekCompleteCount += 1
             }
             if line.contains("VIDEO OFFSET:") && line.contains("minPostSeekDts") {

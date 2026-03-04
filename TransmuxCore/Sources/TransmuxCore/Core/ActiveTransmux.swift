@@ -43,7 +43,7 @@ public class ActiveTransmux {
         _seekRequest = timeSeconds
         _lastSeekTarget = timeSeconds
         lock.unlock()
-        TransmuxLog.service("Seek requested to \(String(format: "%.1f", timeSeconds))s")
+        TransmuxLog.log("SEEK-REQUEST \u{2192} \(String(format: "%.1f", timeSeconds))s", tag: "Server")
     }
 
     /// Consume a pending seek request (called by the remux loop).

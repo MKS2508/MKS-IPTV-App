@@ -129,6 +129,63 @@ int64_t mks_packet_get_pts(const void * _Nonnull pkt);
 /// Used to recover keyframes where DTS=AV_NOPTS but PTS is valid.
 void mks_packet_set_dts(void * _Nonnull pkt, int64_t dts);
 
+// --- Stream metadata ---
+
+/// Get language metadata tag from a stream. Writes up to bufSize chars.
+/// Returns 0 on success, -1 if no language tag.
+int mks_stream_get_language(const void * _Nonnull fmtCtx, int streamIndex,
+                            char * _Nonnull buf, int bufSize);
+
+/// Get title metadata tag from a stream (e.g. "Commentary", "Director's Cut").
+/// Returns 0 on success, -1 if no title tag.
+int mks_stream_get_title(const void * _Nonnull fmtCtx, int streamIndex,
+                         char * _Nonnull buf, int bufSize);
+
+/// Get number of audio channels from stream codecpar.
+/// Returns 0 on failure or if not an audio stream.
+int mks_stream_get_channels(const void * _Nonnull fmtCtx, int streamIndex);
+
+/// Get audio sample rate from stream codecpar.
+/// Returns 0 on failure or if not an audio stream.
+int mks_stream_get_sample_rate(const void * _Nonnull fmtCtx, int streamIndex);
+
+/// Get subtitle codec_id for a stream. Returns 0 (AV_CODEC_ID_NONE) if not subtitle.
+int mks_stream_get_subtitle_codec_id(const void * _Nonnull fmtCtx, int streamIndex);
+
+// --- Subtitle collector (in-band, fed during remux loop) ---
+
+/// Opaque handle for collecting subtitle packets during the main remux loop.
+/// Uses the SAME open connection — no extra HTTP connections needed.
+/// IPTV servers block concurrent connections, so this is the only viable approach.
+typedef struct MKSSubtitleCollector MKSSubtitleCollector;
+
+/// Create a subtitle collector for N subtitle streams from the already-open format context.
+/// @param fmtCtx         The already-open AVFormatContext (same one used for A/V remux)
+/// @param streamCount    Number of subtitle streams to collect
+/// @param streamIndices  Array of input stream indices
+/// @param outputPaths    Array of output .vtt file paths
+/// @returns Opaque collector handle, or NULL on error
+MKSSubtitleCollector * _Nullable mks_subtitle_collector_create(
+    const void * _Nonnull fmtCtx,
+    int streamCount,
+    const int * _Nonnull streamIndices,
+    const char * _Nonnull const * _Nonnull outputPaths);
+
+/// Feed a raw AVPacket to the collector. Call this from the remux loop for subtitle packets.
+/// The collector checks if the packet's stream_index matches any of its subtitle streams.
+/// If it does, the packet is decoded and the cue is appended to the corresponding .vtt file.
+/// @param collector  Handle from mks_subtitle_collector_create
+/// @param pkt        Raw AVPacket pointer (const void* to avoid Swift import issues)
+void mks_subtitle_collector_feed(MKSSubtitleCollector * _Nonnull collector,
+                                  const void * _Nonnull pkt);
+
+/// Finalize the collector: close all output files and free resources.
+/// @param collector  Handle to finalize. Do not use after this call.
+/// @param cueCounts  Output array of cue counts per stream (length = streamCount from create).
+///                   Pass NULL if not needed.
+void mks_subtitle_collector_finish(MKSSubtitleCollector * _Nonnull collector,
+                                    int * _Nullable cueCounts);
+
 // --- Diagnostics ---
 
 /// Print struct layout info and pointer chain for a stream.

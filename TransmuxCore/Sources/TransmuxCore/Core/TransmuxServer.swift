@@ -67,6 +67,8 @@ public actor TransmuxServer {
     private var initSegmentSize: Int64 = 0
     /// Seek handle for redirecting the sequential transmux to a new input position
     private var seekHandle: ActiveTransmux?
+    /// Set to true when stop() is called; prevents polling loops from logging errors on deleted files
+    private var stopped = false
 
     private let networkQueue = DispatchQueue(label: "TransmuxServer.network", qos: .userInitiated)
     private let portRange: Range<UInt16> = 8100..<8200
@@ -95,6 +97,7 @@ public actor TransmuxServer {
             throw ServerError.invalidFilePath
         }
 
+        self.stopped = false
         self.filePath = filePath
         self.playlistPath = playlistPath
         self.expectedSize = expectedSize
@@ -125,19 +128,19 @@ public actor TransmuxServer {
             nwListener.stateUpdateHandler = { state in
                 switch state {
                 case .ready:
-                    print("[TransmuxServer] Listening on port \(port)")
+                    TransmuxLog.log("LISTEN :\(port)", tag: "Server")
                     if !resumed {
                         resumed = true
                         continuation.resume()
                     }
                 case .failed(let error):
-                    print("[TransmuxServer] Listener failed: \(error)")
+                    TransmuxLog.log("Listener failed: \(error)", tag: "Server", level: .error)
                     if !resumed {
                         resumed = true
                         continuation.resume(throwing: error)
                     }
                 case .cancelled:
-                    print("[TransmuxServer] Listener cancelled")
+                    TransmuxLog.log("Listener cancelled", tag: "Server", level: .warn)
                     if !resumed {
                         resumed = true
                         continuation.resume(throwing: ServerError.portExhausted)
@@ -154,18 +157,20 @@ public actor TransmuxServer {
             throw ServerError.invalidFilePath
         }
 
-        print("[TransmuxServer] Serving HLS at \(url) (mp4: \(filePath))")
+        TransmuxLog.log("SERVING \(url) (mp4: \(filePath))", tag: "Server")
         return Session(localURL: url, port: port)
     }
 
     /// Mark the transmux as complete. After this, empty reads mean real EOF.
     public func setComplete() {
         isComplete = true
-        print("[TransmuxServer] Transmux complete — EOF on empty reads")
+        TransmuxLog.log("Transmux complete \u{2014} EOF on empty reads", tag: "Server")
     }
 
     /// Stop serving and clean up all connections.
     public func stop() {
+        stopped = true
+
         for connection in activeConnections {
             connection.cancel()
         }
@@ -182,7 +187,8 @@ public actor TransmuxServer {
         initSegmentSize = 0
         seekHandle = nil
 
-        print("[TransmuxServer] Stopped")
+        TransmuxLog.log("STOPPED", tag: "Server")
+        TransmuxLog.flush()
     }
 
     // MARK: - Connection Handling
@@ -207,14 +213,14 @@ public actor TransmuxServer {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, error in
             guard let data = data, !data.isEmpty else {
                 if let error = error {
-                    print("[TransmuxServer] Read error: \(error)")
+                    TransmuxLog.log("Read error: \(error)", tag: "Server", level: .error)
                 }
                 connection.cancel()
                 return
             }
 
             guard let request = HTTPRequestParser.parse(data) else {
-                print("[TransmuxServer] Failed to parse HTTP request")
+                TransmuxLog.log("Failed to parse HTTP request", tag: "Server", level: .warn)
                 let response = Data("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n".utf8)
                 connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                     connection.cancel()
@@ -252,14 +258,34 @@ public actor TransmuxServer {
 
         // Route based on request path
         if path.hasSuffix(".m3u8") {
-            // HLS playlist
-            if let playlistPath = playlist {
+            // HLS playlist (master, media, or subtitle)
+            // For sub_*.m3u8, serve from the output directory
+            let resolvedPlaylistPath: String?
+            if path.contains("sub_"), let playlist = playlist {
+                let dir = (playlist as NSString).deletingLastPathComponent
+                let fileName = (path as NSString).lastPathComponent
+                resolvedPlaylistPath = (dir as NSString).appendingPathComponent(fileName)
+            } else if path.contains("master") || path.contains("stream") {
+                resolvedPlaylistPath = playlist
+            } else {
+                resolvedPlaylistPath = playlist
+            }
+
+            if let resolvedPath = resolvedPlaylistPath {
                 switch request.method {
                 case .head:
-                    handleHeadPlaylist(connection: connection, playlistPath: playlistPath)
+                    handleHeadPlaylist(connection: connection, playlistPath: resolvedPath)
                 case .get:
-                    handleGetPlaylist(connection: connection, playlistPath: playlistPath)
+                    handleGetPlaylist(connection: connection, playlistPath: resolvedPath)
                 }
+            }
+        } else if path.hasSuffix(".vtt") {
+            // WebVTT subtitle file
+            if let playlist = playlist {
+                let dir = (playlist as NSString).deletingLastPathComponent
+                let fileName = (path as NSString).lastPathComponent
+                let vttPath = (dir as NSString).appendingPathComponent(fileName)
+                handleGetVTT(connection: connection, vttPath: vttPath)
             }
         } else if path == "/init.mp4" || path.hasSuffix("/init.mp4") {
             // Init segment (ftyp+moov)
@@ -292,7 +318,7 @@ public actor TransmuxServer {
     /// and #EXT-X-ENDLIST, so no polling or waiting is needed.
     private nonisolated func handleGetPlaylist(connection: NWConnection, playlistPath: String) {
         guard let playlistData = FileManager.default.contents(atPath: playlistPath) else {
-            print("[TransmuxServer] GET /stream.m3u8 -> 404 (file not found)")
+            TransmuxLog.log("GET m3u8 404", tag: "Server", level: .warn)
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
@@ -308,7 +334,7 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        print("[TransmuxServer] GET /stream.m3u8 -> 200 (\(playlistData.count) bytes, VOD+ENDLIST)")
+        TransmuxLog.log("GET m3u8 200 \(playlistData.count)B", tag: "Server")
 
         var responseData = Data(header.utf8)
         responseData.append(playlistData)
@@ -328,10 +354,39 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        print("[TransmuxServer] HEAD /stream.m3u8 -> 200 Content-Length: \(fileSize)")
+        TransmuxLog.log("HEAD m3u8 200 CL=\(fileSize)", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
+    // MARK: - WebVTT Handler
+
+    /// Serve a WebVTT subtitle file.
+    private nonisolated func handleGetVTT(connection: NWConnection, vttPath: String) {
+        guard let vttData = FileManager.default.contents(atPath: vttPath) else {
+            TransmuxLog.log("GET vtt 404: \(vttPath)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        var header = "HTTP/1.1 200 OK\r\n"
+        header += "Content-Type: text/vtt\r\n"
+        header += "Content-Length: \(vttData.count)\r\n"
+        header += "Access-Control-Allow-Origin: *\r\n"
+        header += "Connection: close\r\n"
+        header += "\r\n"
+
+        TransmuxLog.log("GET vtt 200 \(vttData.count)B \((vttPath as NSString).lastPathComponent)", tag: "Server")
+
+        var responseData = Data(header.utf8)
+        responseData.append(vttData)
+        connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
             connection.cancel()
         })
     }
@@ -342,7 +397,7 @@ public actor TransmuxServer {
     private nonisolated func handleGetInit(connection: NWConnection, filePath: String, initSize: Int64) {
         guard initSize > 0,
               let fileHandle = FileHandle(forReadingAtPath: filePath) else {
-            print("[TransmuxServer] GET /init.mp4 -> 404 (cannot read init segment)")
+            TransmuxLog.log("GET init.mp4 404", tag: "Server", level: .warn)
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
@@ -360,7 +415,7 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        print("[TransmuxServer] GET /init.mp4 -> 200 (\(data.count) bytes)")
+        TransmuxLog.log("GET init.mp4 200 \(data.count)B", tag: "Server")
 
         var responseData = Data(header.utf8)
         responseData.append(data)
@@ -419,11 +474,11 @@ public actor TransmuxServer {
         // e.g., latestBuffered=35.999 should pass for endTime=36.0.
         let fullnessEpsilon = 0.05
         if latestBuffered >= endTime - fullnessEpsilon {
-            let byteRanges = segmenter.realSegments(inTimeRange: startTime, end: endTime)
-            if !byteRanges.isEmpty {
-                let segData = Self.readByteRanges(filePath: filePath, ranges: byteRanges)
+            let fragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+            if !fragments.isEmpty {
+                let segData = Self.readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
                 if !segData.isEmpty {
-                    TransmuxLog.segment("SERVE", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "immediate", extra: "bytes=\(segData.count) ranges=\(byteRanges.count) latestBuffered=\(String(format: "%.1f", latestBuffered))s")
+                    TransmuxLog.segmentServed(segIndex: segIndex, startTime: startTime, endTime: endTime, bytes: segData.count, fragments: fragments.count, source: "immediate", latestBuffered: latestBuffered)
                     Self.sendSegmentResponse(connection: connection, data: segData, segIndex: segIndex, source: "immediate")
                     return
                 }
@@ -432,7 +487,7 @@ public actor TransmuxServer {
 
         // No seek handle or transmux is complete with no data — respond 404
         guard let handle = seekHandle, !isComplete else {
-            TransmuxLog.segment("404 no-seek-handle", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "none", extra: "complete=\(isComplete)")
+            TransmuxLog.segmentEvent("404 no-seek-handle", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "none", extra: "complete=\(isComplete)")
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
@@ -489,21 +544,26 @@ public actor TransmuxServer {
             var totalPolls = 0
             let pollStart = Date()
             var currentPhaseIdx = 0
+            let initialBuffered = latestBuffered  // snapshot at poll start
 
             for (phaseIdx, (pollCount, interval)) in pollPhases.enumerated() {
                 currentPhaseIdx = phaseIdx
 
                 // Fallback seek: at start of Phase 2, if no seek was triggered yet
                 // and sequential transmux hasn't made meaningful progress, trigger seek.
+                // "Meaningful progress" = advanced >= 2s since polling started.
+                // Without this, a seek from 2082→2096 triggers fallback for seg_350
+                // (startTime=2100) even though the sequential transmux is actively producing.
                 if phaseIdx == 1 && !seekTriggered {
                     let currentBuffered = segmenter.latestBufferedSourceTime()
-                    if currentBuffered < startTime + 1.0 {
+                    let progress = currentBuffered - initialBuffered
+                    if currentBuffered < startTime + 1.0 && progress < 2.0 {
                         TransmuxLog.seekEvent(
                             "FALLBACK SEEK trigger",
                             seekTime: startTime,
                             latestTime: segmenter.latestTransmuxedTime(),
                             lastSeekTarget: handle.lastSeekTarget,
-                            extra: "seg_\(String(format: "%03d", segIndex)) latestBuffered=\(String(format: "%.1f", currentBuffered))s stalled"
+                            extra: "seg_\(String(format: "%03d", segIndex)) latestBuffered=\(String(format: "%.1f", currentBuffered))s progress=\(String(format: "%.1f", progress))s stalled"
                         )
                         handle.requestSeek(to: startTime)
                         seekTriggered = true
@@ -524,7 +584,7 @@ public actor TransmuxServer {
                     let bufferedTime = segmenter.latestBufferedSourceTime()
                     guard bufferedTime >= endTime - fullnessEpsilon else {
                         // Log only when truly stalled (phase 2+)
-                        if totalPolls % 40 == 0 {
+                        if totalPolls % 80 == 0 {
                             TransmuxLog.log(
                                 "seg_\(String(format: "%03d", segIndex)): waiting \(String(format: "%.1f", endTime - bufferedTime))s gap",
                                 tag: "Server"
@@ -534,23 +594,41 @@ public actor TransmuxServer {
                     }
 
                     // Fullness gate passed — check for actual segment byte ranges
-                    let ranges = segmenter.realSegments(inTimeRange: startTime, end: endTime)
-                    if !ranges.isEmpty {
-                        let segData = Self.readByteRanges(filePath: filePath, ranges: ranges)
+                    let fragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+                    if !fragments.isEmpty {
+                        let segData = Self.readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
                         if !segData.isEmpty {
                             let elapsed = Date().timeIntervalSince(pollStart)
                             let source = seekTriggered ? "seek-redirect" : "sequential-wait"
-                            TransmuxLog.segment(
-                                "SERVE",
+                            TransmuxLog.segmentServed(
                                 segIndex: segIndex,
                                 startTime: startTime,
                                 endTime: endTime,
+                                bytes: segData.count,
+                                fragments: fragments.count,
                                 source: source,
-                                extra: "bytes=\(segData.count) polls=\(totalPolls) elapsed=\(String(format: "%.2f", elapsed))s phase=\(phaseIdx+1) latestBuffered=\(String(format: "%.1f", bufferedTime))s"
+                                latestBuffered: bufferedTime,
+                                extra: "polls=\(totalPolls) elapsed=\(String(format: "%.2f", elapsed))s phase=\(phaseIdx+1)"
                             )
                             Self.sendSegmentResponse(connection: connection, data: segData, segIndex: segIndex, source: source)
                             return
                         }
+                    }
+
+                    // GAP DETECTION: Fullness gate passed (enough total time produced)
+                    // but no real segments exist for this time range. This means we
+                    // seeked PAST this region — there's a hole in coverage.
+                    // Trigger a seek to produce the missing data.
+                    if !seekTriggered {
+                        TransmuxLog.seekEvent(
+                            "GAP SEEK trigger",
+                            seekTime: startTime,
+                            latestTime: segmenter.latestTransmuxedTime(),
+                            lastSeekTarget: handle.lastSeekTarget,
+                            extra: "seg_\(String(format: "%03d", segIndex)) [\(String(format: "%.1f-%.1f", startTime, endTime))s] buffered=\(String(format: "%.1f", bufferedTime))s but no segments \u{2014} data gap"
+                        )
+                        handle.requestSeek(to: startTime)
+                        seekTriggered = true
                     }
                 }
             }
@@ -559,7 +637,7 @@ public actor TransmuxServer {
             let elapsed = Date().timeIntervalSince(pollStart)
             let finalBuffered = segmenter.latestBufferedSourceTime()
             let finalLatest = segmenter.latestTransmuxedTime()
-            TransmuxLog.segment(
+            TransmuxLog.segmentEvent(
                 "TIMEOUT 404",
                 segIndex: segIndex,
                 startTime: startTime,
@@ -571,6 +649,158 @@ public actor TransmuxServer {
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
             })
+        }
+    }
+
+    /// Read fragment byte ranges from a file, rewriting each fragment's tfdt
+    /// values to match the source timeline. The internal fMP4 keeps monotonic
+    /// DTS (required by FFmpeg), but AVPlayer expects tfdt = sourceStartTime * timescale.
+    /// This patches each moof's tfdt in-place before concatenating.
+    private nonisolated static func readAndRewriteFragments(
+        filePath: String,
+        fragments: [HLSSegmenter.RealFragment],
+        trackTimescales: [UInt32: UInt32]
+    ) -> Data {
+        guard let fileHandle = FileHandle(forReadingAtPath: filePath) else {
+            // File gone = session cleanup happened before polling loop exited; not a real error
+            TransmuxLog.log("readAndRewriteFragments: file gone (session cleanup)", tag: "Server", level: .debug)
+            return Data()
+        }
+        defer { try? fileHandle.close() }
+
+        // If no timescales parsed, skip rewriting (safe fallback)
+        let shouldRewrite = !trackTimescales.isEmpty
+
+        var result = Data()
+        for fragment in fragments {
+            do {
+                try fileHandle.seek(toOffset: UInt64(fragment.offset))
+                var chunk = fileHandle.readData(ofLength: Int(fragment.length))
+                if shouldRewrite && !chunk.isEmpty {
+                    rewriteTfdtInPlace(&chunk, sourceTime: fragment.sourceStartTime, trackTimescales: trackTimescales)
+                }
+                result.append(chunk)
+            } catch {
+                TransmuxLog.log("readAndRewriteFragments: seek/read failed at offset \(fragment.offset): \(error)", tag: "Server", level: .error)
+            }
+        }
+        return result
+    }
+
+    /// Scan a moof+mdat chunk and rewrite tfdt baseMediaDecodeTime values in-place.
+    /// For each traf inside a moof:
+    /// 1. Parse tfhd → extract track_ID
+    /// 2. Find tfdt → read version byte
+    /// 3. Compute newTfdt = UInt64(sourceTime * Double(timescale))
+    /// 4. Write newTfdt (big-endian) over the existing baseMediaDecodeTime field
+    private nonisolated static func rewriteTfdtInPlace(
+        _ data: inout Data,
+        sourceTime: Double,
+        trackTimescales: [UInt32: UInt32]
+    ) {
+        let dataLen = data.count
+        var pos = 0
+
+        // Iterate top-level boxes in this chunk
+        while pos + 8 <= dataLen {
+            guard let box = MP4BoxParser.readBoxHeader(data: data, at: pos) else { break }
+            let boxSize = Int(box.size)
+            if boxSize < 8 { break }
+            let boxEnd = pos + boxSize
+            if boxEnd > dataLen { break }
+
+            if box.type == "moof" {
+                // Iterate children of moof
+                var moofChild = pos + 8
+                while moofChild + 8 <= boxEnd {
+                    guard let child = MP4BoxParser.readBoxHeader(data: data, at: moofChild) else { break }
+                    let childSize = Int(child.size)
+                    if childSize < 8 { break }
+                    let childEnd = moofChild + childSize
+                    if childEnd > boxEnd { break }
+
+                    if child.type == "traf" {
+                        rewriteTfdtInTraf(&data, trafStart: moofChild, trafEnd: childEnd, sourceTime: sourceTime, trackTimescales: trackTimescales)
+                    }
+
+                    moofChild = childEnd
+                }
+            }
+
+            pos = boxEnd
+        }
+    }
+
+    /// Rewrite tfdt inside a single traf box.
+    /// Extracts track_ID from tfhd, then finds tfdt and overwrites baseMediaDecodeTime.
+    private nonisolated static func rewriteTfdtInTraf(
+        _ data: inout Data,
+        trafStart: Int,
+        trafEnd: Int,
+        sourceTime: Double,
+        trackTimescales: [UInt32: UInt32]
+    ) {
+        var trackID: UInt32?
+        var tfdtPos: Int?
+        var tfdtVersion: UInt8?
+
+        // Scan traf children for tfhd and tfdt
+        var offset = trafStart + 8
+        while offset + 8 <= trafEnd {
+            guard let box = MP4BoxParser.readBoxHeader(data: data, at: offset) else { break }
+            let boxSize = Int(box.size)
+            if boxSize < 8 { break }
+            let boxEnd = offset + boxSize
+            if boxEnd > trafEnd { break }
+
+            if box.type == "tfhd" {
+                // tfhd layout: [header][version(1)+flags(3)][track_ID(4)]
+                let idOffset = offset + 8 + 4 // skip header + version/flags
+                if idOffset + 4 <= boxEnd {
+                    trackID = data.withUnsafeBytes { ptr in
+                        ptr.load(fromByteOffset: idOffset, as: UInt32.self).bigEndian
+                    }
+                }
+            } else if box.type == "tfdt" {
+                // tfdt layout: [header][version(1)+flags(3)][baseMediaDecodeTime]
+                let versionOffset = offset + 8
+                if versionOffset + 4 <= boxEnd {
+                    tfdtPos = offset
+                    tfdtVersion = data[versionOffset]
+                }
+            }
+
+            offset = boxEnd
+        }
+
+        // Rewrite tfdt if we found both track_ID and tfdt
+        guard let tid = trackID, let pos = tfdtPos, let version = tfdtVersion else { return }
+        guard let timescale = trackTimescales[tid] else {
+            TransmuxLog.log("rewriteTfdt: unknown track_ID \(tid), skipping", tag: "Server", level: .warn)
+            return
+        }
+
+        let newTfdt = UInt64(sourceTime * Double(timescale))
+        let valueOffset = pos + 8 + 4 // header + version/flags
+
+        if version == 1 {
+            // 64-bit baseMediaDecodeTime
+            guard valueOffset + 8 <= trafEnd else { return }
+            var bigEndian = newTfdt.bigEndian
+            withUnsafeBytes(of: &bigEndian) { src in
+                data.replaceSubrange(valueOffset..<(valueOffset + 8), with: src)
+            }
+        } else {
+            // 32-bit baseMediaDecodeTime (v0)
+            guard valueOffset + 4 <= trafEnd else { return }
+            if newTfdt > UInt64(UInt32.max) {
+                TransmuxLog.log("rewriteTfdt: newTfdt \(newTfdt) overflows UInt32 for track \(tid), skipping", tag: "Server", level: .warn)
+                return
+            }
+            var bigEndian = UInt32(newTfdt).bigEndian
+            withUnsafeBytes(of: &bigEndian) { src in
+                data.replaceSubrange(valueOffset..<(valueOffset + 4), with: src)
+            }
         }
     }
 
@@ -624,7 +854,7 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        print("[TransmuxServer] HEAD -> 200 Content-Length: \(fileSize)")
+        TransmuxLog.log("HEAD 200 CL=\(fileSize)", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
@@ -695,7 +925,7 @@ public actor TransmuxServer {
             }
             if waitedFileSize <= rangeStart {
                 let resp = "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */\(totalSize)\r\nConnection: close\r\n\r\n"
-                print("[TransmuxServer] GET 416 — rangeStart \(rangeStart) >= fileSize \(waitedFileSize)")
+                TransmuxLog.log("GET 416 rangeStart=\(rangeStart) fileSize=\(waitedFileSize)", tag: "Server", level: .warn)
                 connection.send(content: Data(resp.utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                     connection.cancel()
                 })
@@ -714,12 +944,12 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        print("[TransmuxServer] GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength) (file: \(currentFileSize), complete=\(isComplete))")
+        TransmuxLog.log("GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength)", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, completion: .contentProcessed { error in
             if let error = error {
-                print("[TransmuxServer] Failed to send headers: \(error)")
+                TransmuxLog.log("Send headers failed: \(error)", tag: "Server", level: .error)
                 connection.cancel()
                 return
             }
@@ -751,13 +981,12 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        let currentSize = Self.currentFileSize(filePath)
-        print("[TransmuxServer] GET 200 OK CL=\(totalSize) (file: \(currentSize), complete=\(isComplete))")
+        TransmuxLog.log("GET 200 CL=\(totalSize)", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, completion: .contentProcessed { error in
             if let error = error {
-                print("[TransmuxServer] Failed to send headers: \(error)")
+                TransmuxLog.log("Send headers failed: \(error)", tag: "Server", level: .error)
                 connection.cancel()
                 return
             }
@@ -787,7 +1016,7 @@ public actor TransmuxServer {
     ) {
         DispatchQueue.global(qos: .userInitiated).async {
             guard let fileHandle = FileHandle(forReadingAtPath: filePath) else {
-                print("[TransmuxServer] Cannot open file: \(filePath)")
+                TransmuxLog.log("Cannot open file: \(filePath)", tag: "Server", level: .error)
                 connection.cancel()
                 return
             }
@@ -797,7 +1026,7 @@ public actor TransmuxServer {
                 do {
                     try fileHandle.seek(toOffset: UInt64(offset))
                 } catch {
-                    print("[TransmuxServer] Seek to \(offset) failed: \(error)")
+                    TransmuxLog.log("Seek to \(offset) failed: \(error)", tag: "Server", level: .error)
                     connection.cancel()
                     return
                 }
@@ -816,13 +1045,13 @@ public actor TransmuxServer {
 
                 if data.isEmpty {
                     if lastKnownComplete {
-                        print("[TransmuxServer] EOF at \(currentOffset) after serving \(bytesToServe - remaining) bytes (transmux complete)")
+                        TransmuxLog.log("EOF at \(currentOffset) served=\(bytesToServe - remaining)B", tag: "Server")
                         break
                     }
 
                     emptyReadCount += 1
                     if emptyReadCount >= maxEmptyReads {
-                        print("[TransmuxServer] Timeout at offset \(currentOffset) after \(bytesToServe - remaining) bytes served")
+                        TransmuxLog.log("Timeout at offset \(currentOffset) served=\(bytesToServe - remaining)B", tag: "Server", level: .warn)
                         break
                     }
 
@@ -834,7 +1063,7 @@ public actor TransmuxServer {
                         do {
                             try fileHandle.seek(toOffset: UInt64(currentOffset))
                         } catch {
-                            print("[TransmuxServer] Re-seek failed at \(currentOffset)")
+                            TransmuxLog.log("Re-seek failed at \(currentOffset)", tag: "Server", level: .error)
                             break
                         }
                     }
@@ -869,7 +1098,7 @@ public actor TransmuxServer {
                 semaphore.wait()
 
                 if sendError != nil {
-                    print("[TransmuxServer] Client disconnected at offset \(currentOffset) (\(bytesToServe - remaining) bytes served)")
+                    TransmuxLog.log("Client disconnected at \(currentOffset) served=\(bytesToServe - remaining)B", tag: "Server")
                     break
                 }
             }

@@ -99,16 +99,25 @@ extension VideoPlayerProtocol {
 
 // MARK: - AVPlayer Metadata Helper
 
-/// Helper for creating AVMetadataItem objects for AVPlayerItem.externalMetadata.
-/// These appear in Control Center, Lock Screen, AirPlay displays, and Apple TV.
+import MediaPlayer
+
+/// Helper for setting Now Playing metadata that appears in Control Center, Lock Screen, and AirPlay displays.
+/// Uses MPNowPlayingInfoCenter which works across all Apple platforms.
 enum PlayerMetadataHelper {
 
-    /// Create AVMetadataItem array from MetadataResult for AVPlayerItem.externalMetadata.
-    /// - Parameter metadata: The enriched metadata from TMDB/iTunes/etc.
-    /// - Returns: Array of AVMetadataItem for AVPlayerItem.externalMetadata
-    static func makeExternalMetadata(from metadata: MetadataResult) -> [AVMetadataItem] {
-        var items: [AVMetadataItem] = []
-
+    /// Set the Now Playing info for Control Center / Lock Screen / AirPlay.
+    /// Call this when playback starts or when the current item changes.
+    /// - Parameters:
+    ///   - metadata: The enriched metadata from TMDB/iTunes/etc.
+    ///   - duration: Total duration of the media in seconds
+    ///   - currentTime: Current playback position in seconds
+    ///   - playbackRate: Current playback rate (1.0 = normal, 0.0 = paused)
+    static func setNowPlayingInfo(
+        from metadata: MetadataResult,
+        duration: Double,
+        currentTime: Double = 0,
+        playbackRate: Double = 1.0
+    ) {
         // Title - format depends on content type
         let displayTitle: String
         if metadata.mediaType == .episode, let showTitle = metadata.showTitle {
@@ -123,107 +132,95 @@ enum PlayerMetadataHelper {
             displayTitle = metadata.title
         }
 
-        if let item = makeMetadataItem(identifier: .commonKeyTitle, value: displayTitle) {
-            items.append(item)
-        }
-
-        // Sort title (for alphabetical sorting in media libraries)
-        if let item = makeMetadataItem(identifier: .id3MetadataSortTitle, value: displayTitle) {
-            items.append(item)
-        }
-
         // Artist/Director/Creator
-        let creator: String?
+        let artist: String
         if metadata.mediaType == .movie {
-            creator = metadata.director
+            artist = metadata.director ?? "Unknown Director"
         } else {
-            creator = metadata.showTitle ?? metadata.director
-        }
-        if let creator, let item = makeMetadataItem(identifier: .commonKeyArtist, value: creator) {
-            items.append(item)
+            artist = metadata.showTitle ?? metadata.director ?? "Unknown"
         }
 
-        // Genre
-        if let firstGenre = metadata.genre.first,
-           let item = makeMetadataItem(identifier: .quickTimeMetadataGenre, value: firstGenre) {
-            items.append(item)
+        var nowPlayingInfo: [String: Any] = [
+            MPMediaItemPropertyTitle: displayTitle,
+            MPMediaItemPropertyArtist: artist,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: playbackRate,
+            MPNowPlayingInfoPropertyMediaType: metadata.mediaType == .movie
+                ? MPNowPlayingInfoMediaType.video.rawValue
+                : MPNowPlayingInfoMediaType.video.rawValue
+        ]
+
+        // Add genre if available
+        if let firstGenre = metadata.genre.first {
+            nowPlayingInfo[MPMediaItemPropertyGenre] = firstGenre
         }
 
-        // Synopsis/Description
-        if let plot = metadata.plot,
-           let item = makeMetadataItem(identifier: .commonKeyDescription, value: plot) {
-            items.append(item)
-        }
-
-        // Rating
-        if let rating = metadata.rating {
-            let ratingText = metadata.ratingSource != nil
-                ? "\(metadata.ratingSource!): \(String(format: "%.1f", rating))"
-                : String(format: "%.1f/10", rating)
-            if let item = makeMetadataItem(identifier: .iTunesMetadataContentRating, value: ratingText) {
-                items.append(item)
-            }
-        }
-
-        // Year/Release Date
+        // Add year if available
         if let year = metadata.year {
-            if let item = makeMetadataItem(identifier: .id3MetadataYear, value: String(year)) {
-                items.append(item)
-            }
+            nowPlayingInfo[MPMediaItemPropertyReleaseDate] = String(year)
         }
 
-        // Content rating (e.g., "TV-MA", "R")
-        if let advisory = metadata.contentAdvisoryRating,
-           let item = makeMetadataItem(identifier: .iTunesMetadataContentAdvisoryRating, value: advisory) {
-            items.append(item)
-        }
-
-        return items
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
+        print("[PlayerMetadataHelper] Set Now Playing info: \(displayTitle)")
     }
 
-    /// Create an AVMetadataItem with a string value.
-    static func makeMetadataItem(identifier: AVMetadataIdentifier, value: String) -> AVMetadataItem? {
-        let item = AVMutableMetadataItem()
-        item.identifier = identifier
-        item.value = value as NSString
-        item.extendedLanguageTag = "und" // language-agnostic
-        return item
+    /// Update the current playback position in the Now Playing info.
+    /// Call this periodically during playback to keep the progress bar in sync.
+    static func updatePlaybackProgress(currentTime: Double, playbackRate: Double) {
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        info[MPNowPlayingInfoPropertyPlaybackRate] = playbackRate
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
-    /// Create an AVMetadataItem with data value (for artwork).
-    static func makeMetadataItem(identifier: AVMetadataIdentifier, data: Data) -> AVMetadataItem? {
-        let item = AVMutableMetadataItem()
-        item.identifier = identifier
-        item.value = data as NSData
-        item.extendedLanguageTag = "und"
-        return item
-    }
-
-    /// Load artwork asynchronously and add to external metadata.
-    /// - Parameters:
-    ///   - metadata: The metadata containing posterURL
-    ///   - playerItem: The AVPlayerItem to update
-    static func loadArtwork(from metadata: MetadataResult, into playerItem: AVPlayerItem) {
+    /// Load and set the artwork for Now Playing info.
+    /// Call this asynchronously after setting the basic info.
+    static func loadArtwork(from metadata: MetadataResult) {
         guard let posterURLString = metadata.posterURL ?? metadata.artworkURLs.first,
               let posterURL = URL(string: posterURLString) else { return }
 
         Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: posterURL)
-                guard let artworkItem = makeMetadataItem(identifier: .commonKeyArtwork, data: data) else { return }
+
+                #if os(macOS)
+                // On macOS, create NSImage from data
+                let image = NSImage(data: data)
+                #else
+                // On iOS/tvOS, create UIImage from data
+                let image = UIImage(data: data)
+                #endif
 
                 await MainActor.run {
-                    var currentMetadata = playerItem.externalMetadata
-                    // Remove any existing artwork
-                    currentMetadata.removeAll { $0.identifier == .commonKeyArtwork }
-                    currentMetadata.append(artworkItem)
-                    playerItem.externalMetadata = currentMetadata
+                    guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+
+                    #if os(macOS)
+                    if let image = image {
+                        // On macOS, we can set the artwork via MPMediaItemArtwork
+                        let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                        info[MPMediaItemPropertyArtwork] = artwork
+                    }
+                    #else
+                    if let image = image {
+                        let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                        info[MPMediaItemPropertyArtwork] = artwork
+                    }
+                    #endif
+
+                    MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+                    print("[PlayerMetadataHelper] Artwork loaded and set")
                 }
             } catch {
-                // Artwork loading failed silently - not critical
                 print("[PlayerMetadataHelper] Failed to load artwork: \(error)")
             }
         }
+    }
+
+    /// Clear the Now Playing info when playback stops.
+    static func clearNowPlayingInfo() {
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        print("[PlayerMetadataHelper] Cleared Now Playing info")
     }
 }
 

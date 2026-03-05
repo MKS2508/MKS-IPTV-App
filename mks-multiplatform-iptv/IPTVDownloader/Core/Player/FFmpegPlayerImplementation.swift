@@ -32,6 +32,17 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     /// Stored metadata to pass to the inner AVPlayer after transmux starts
     private var pendingMetadata: MetadataResult?
 
+    /// Seek handle for pre-warming the transmux pipeline on seek requests.
+    /// Set during load() from the transmux session.
+    private var seekHandle: ActiveTransmux?
+
+    /// Debounce work item for transmux pre-warm during scrubbing.
+    /// AVPlayer seek fires immediately (UI responsiveness), but the
+    /// transmux pipeline seek is delayed by 150ms to avoid flooding
+    /// the remux loop with intermediate positions.
+    private var seekDebounceWorkItem: DispatchWorkItem?
+    private let seekDebounceInterval: TimeInterval = 0.15
+
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
     }
@@ -49,7 +60,10 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     }
 
     func load(url: URL, metadata: MetadataResult?) {
-        print("[FFmpegPlayer] Loading URL: \(url)")
+        // Start structured logging session
+        PlayerLog.startSession(playerType: "FFmpeg", url: url.absoluteString)
+        PlayerLog.log("LOAD", category: "lifecycle", fields: ["url": url.absoluteString])
+
         isTransmuxing = true
         error = nil
         pendingMetadata = metadata
@@ -58,7 +72,12 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             do {
                 // Step 0: Preflight -- validate stream reachability before transmux
                 let preflight = await StreamPreflight.check(url: url)
-                print("[FFmpegPlayer] Preflight: \(preflight.summary)")
+                PlayerLog.log("PREFLIGHT", category: "network", fields: [
+                    "reachable": preflight.isReachable,
+                    "httpStatus": preflight.httpStatus ?? -1,
+                    "contentLength": preflight.contentLength ?? -1,
+                    "summary": preflight.summary
+                ])
 
                 guard preflight.isReachable else {
                     self.isTransmuxing = false
@@ -66,13 +85,22 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                         NSError(domain: "StreamPreflight", code: preflight.httpStatus ?? -1,
                                 userInfo: [NSLocalizedDescriptionKey: "Stream unreachable: \(preflight.error ?? "unknown")"])
                     )
-                    print("[FFmpegPlayer] Preflight failed -- aborting transmux")
+                    PlayerLog.networkError(
+                        httpStatus: preflight.httpStatus,
+                        error: preflight.error,
+                        currentTime: 0
+                    )
                     return
                 }
 
                 // Step 1: Start progressive transmux (returns after header written)
                 let session = try await TransmuxingService.shared.startTransmux(from: url)
                 self.transmuxSessionID = session.sessionID
+                self.seekHandle = session.seekHandle
+                PlayerLog.log("TRANSMUX_STARTED", category: "transmux", fields: [
+                    "sessionID": session.sessionID,
+                    "expectedSize": session.expectedSize
+                ])
 
                 // Step 2: Start HTTP server serving both m3u8 playlist and mp4 byte ranges.
                 // HLSSegmenter (created by TransmuxingService) generates a byte-range HLS
@@ -81,9 +109,11 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 var effectiveSize = session.expectedSize
                 if effectiveSize <= 0, let preflightSize = preflight.contentLength, preflightSize > 0 {
                     effectiveSize = preflightSize
-                    print("[FFmpegPlayer] Using preflight contentLength as expectedSize: \(effectiveSize)")
+                    PlayerLog.log("SIZE_OVERRIDE", category: "transmux", fields: [
+                        "from": "preflight",
+                        "size": preflightSize
+                    ])
                 }
-                print("[FFmpegPlayer] expectedSize=\(effectiveSize), session.expectedSize=\(session.expectedSize)")
 
                 let serverSession = try await TransmuxServer.shared.start(
                     filePath: session.outputPath,
@@ -93,16 +123,35 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                     initSegmentSize: session.initSegmentSize,
                     seekHandle: session.seekHandle
                 )
+                PlayerLog.log("SERVER_STARTED", category: "transmux", fields: [
+                    "localURL": serverSession.localURL.absoluteString
+                ])
 
                 // Step 3: Load the HLS playlist URL — AVPlayer handles HLS natively.
                 // The playlist is VOD+ENDLIST from the start, so AVPlayer sees full
                 // duration immediately and allows seeking to any position.
                 let hlsURL = serverSession.localURL
-                print("[FFmpegPlayer] Loading VOD HLS playlist: \(hlsURL)")
+                PlayerLog.log("HLS_LOAD", category: "transmux", fields: [
+                    "url": hlsURL.absoluteString
+                ])
                 self.isTransmuxing = false
                 self.avPlayer = AVPlayerImplementation()
                 self.avPlayer?.load(url: hlsURL, metadata: self.pendingMetadata)
                 self.setupBindings()
+
+                // Wire GlitchDetector feedback loop: react to playback glitches
+                // by signaling the transmux pipeline for corrective action.
+                self.avPlayer?.glitchDetector?.onGlitch = { [weak self] event in
+                    guard let self, let handle = self.seekHandle else { return }
+                    switch event.type {
+                    case .bufferStarvation:
+                        handle.requestAggressiveFlush()
+                    case .seekLatency, .seekFailure:
+                        handle.adjustCooldown(seekWasClean: false)
+                    default:
+                        break
+                    }
+                }
 
                 // Observe transmux completion for logging/cleanup only.
                 // No reloadAsVOD needed — playlist is already VOD from the start.
@@ -112,18 +161,20 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                     .first()
                     .receive(on: DispatchQueue.main)
                     .sink { _ in
-                        print("[FFmpegPlayer] Transmux complete — sequential transmux finished (VOD playlist was already active)")
+                        PlayerLog.log("TRANSMUX_COMPLETE", category: "transmux", fields: [:])
                     }
                     .store(in: &self.cancellables)
 
                 // Step 4: Auto-play to trigger AVPlayer buffering
-                print("[FFmpegPlayer] Auto-playing to trigger buffering...")
+                PlayerLog.log("AUTOPLAY", category: "lifecycle", fields: [:])
                 self.avPlayer?.play()
                 self.isPlaying = true
             } catch {
                 self.isTransmuxing = false
                 self.error = .unknown(error)
-                print("[FFmpegPlayer] Transmux failed: \(error)")
+                PlayerLog.log("TRANSMUX_FAILED", category: "transmux", level: .critical, fields: [
+                    "error": error.localizedDescription
+                ])
             }
         }
     }
@@ -137,8 +188,13 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     }
 
     func stop() {
+        PlayerLog.log("STOP", category: "lifecycle", fields: [:])
+
+        seekDebounceWorkItem?.cancel()
+        seekDebounceWorkItem = nil
         avPlayer?.stop()
         avPlayer = nil
+        seekHandle = nil
         cancellables.removeAll()
 
         if let sessionID = transmuxSessionID {
@@ -149,10 +205,32 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             }
             transmuxSessionID = nil
         }
+
+        PlayerLog.endSession()
     }
 
     func seek(to time: Double) {
+        // ALWAYS forward to AVPlayer immediately — UI must remain responsive.
+        // AVPlayer may serve from the segment cache or already-buffered data.
         avPlayer?.seek(to: time)
+
+        // DEBOUNCE the pre-warm signal to the transmux pipeline.
+        // During fast scrubbing, only the LAST position matters. Without debouncing,
+        // 10+ seeks in 2 seconds causes the remux loop to spend more time seeking
+        // than producing data (each av_seek_frame + timestamp rebase + cooldown).
+        seekDebounceWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self, let handle = self.seekHandle, let seg = handle.segmenter else { return }
+            let targetDuration = seg.targetSegmentDuration
+            let targetSegEnd = (floor(time / targetDuration) + 1) * targetDuration
+            let buffered = seg.latestBufferedSourceTime()
+            if buffered < targetSegEnd - 0.05 {
+                handle.requestSeek(to: time)
+            }
+        }
+        seekDebounceWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + seekDebounceInterval, execute: workItem)
     }
 
     /// Returns the inner AVPlayer's view when transmux is complete.
@@ -223,6 +301,15 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         avPlayer.progressPublisher
             .sink { [weak self] progress in
                 self?.progressSubject.send(progress)
+            }
+            .store(in: &cancellables)
+
+        // Forward playback position to ActiveTransmux for backpressure.
+        // Throttled to every 2s to minimize overhead.
+        avPlayer.$currentTime
+            .throttle(for: .seconds(2), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] time in
+                self?.seekHandle?.updatePlaybackPosition(time)
             }
             .store(in: &cancellables)
     }

@@ -31,6 +31,7 @@ struct TransmuxCLI {
         let doSeek = args.contains("--seek")
         let testSeek = args.contains("--test-seek")
         let interactive = args.contains("--interactive")
+        let serveTest = args.contains("--serve-test")
         let seekTime = (doSeek || testSeek) ? getArgValue(for: doSeek ? "--seek" : "--test-seek") ?? 300.0 : 0.0
         let duration = getArgValue(for: "--duration") ?? 10.0
         let verbose = args.contains("--verbose")
@@ -79,7 +80,10 @@ struct TransmuxCLI {
                 }
             }
 
-            if interactive {
+            if serveTest {
+                // --- Server test mode: starts TransmuxServer and simulates segment requests ---
+                await runServeTest(session: session, verbose: verbose)
+            } else if interactive {
                 // --- Interactive mode: read stdin for SEEK/STATUS/STOP commands ---
                 await runInteractive(session: session, verbose: verbose)
             } else if testSeek {
@@ -184,6 +188,170 @@ struct TransmuxCLI {
 
         // stdin closed or STOP received
         print("Interactive session ending")
+    }
+
+    // MARK: - Serve Test
+
+    /// Starts TransmuxServer alongside the transmux pipeline and simulates
+    /// segment requests via URLSession. Tests cache hits, mmap reads, and prefetch.
+    ///
+    /// Flow:
+    /// 1. Wait for transmux to produce some data
+    /// 2. Start TransmuxServer on localhost
+    /// 3. Request segments sequentially (tests mmap + prefetch)
+    /// 4. Re-request same segments (tests cache hits)
+    /// 5. Request far-ahead segment (tests seek + polling)
+    /// 6. Report results from log
+    static func runServeTest(session: ProgressiveTransmuxSession, verbose: Bool) async {
+        print("[SERVE-TEST] Starting server test...")
+
+        // Step 1: Wait for initial content
+        print("[SERVE-TEST] Step 1: Waiting for initial content...")
+        let ready = await waitForContent(session: session, minSeconds: 30.0, timeout: 15.0)
+        if !ready {
+            print("[SERVE-TEST] WARNING: Timed out waiting for 30s of content")
+        }
+        let initialTime = session.segmenter.latestBufferedSourceTime()
+        print("[SERVE-TEST] Initial content ready: \(String(format: "%.1f", initialTime))s buffered")
+
+        // Step 2: Start TransmuxServer
+        print("[SERVE-TEST] Step 2: Starting TransmuxServer...")
+        do {
+            let serverSession = try await TransmuxServer.shared.start(
+                filePath: session.outputPath,
+                playlistPath: session.playlistPath,
+                expectedSize: session.expectedSize,
+                segmenter: session.segmenter,
+                initSegmentSize: session.initSegmentSize,
+                seekHandle: session.seekHandle
+            )
+            let baseURL = serverSession.localURL.absoluteString.replacingOccurrences(of: "/stream.m3u8", with: "")
+            print("[SERVE-TEST] Server started at \(baseURL)")
+
+            // Step 3: Request init segment
+            print("[SERVE-TEST] Step 3: Requesting init.mp4...")
+            let initData = await fetchSegment(baseURL: baseURL, path: "/init.mp4")
+            print("[SERVE-TEST]   init.mp4: \(initData?.count ?? 0) bytes")
+
+            // Step 4: Request first 5 segments sequentially (tests mmap + prefetch)
+            print("[SERVE-TEST] Step 4: Requesting segments 0-4 (first serve — mmap + prefetch)...")
+            var firstServeBytes: [Int] = []
+            for i in 0..<5 {
+                let segPath = "/seg_\(String(format: "%03d", i)).mp4"
+                let data = await fetchSegment(baseURL: baseURL, path: segPath)
+                let bytes = data?.count ?? 0
+                firstServeBytes.append(bytes)
+                print("[SERVE-TEST]   seg_\(String(format: "%03d", i)): \(bytes) bytes")
+            }
+
+            // Step 5: Re-request same segments (should hit cache)
+            print("[SERVE-TEST] Step 5: Re-requesting segments 0-4 (expect cache hits)...")
+            var cacheServeBytes: [Int] = []
+            for i in 0..<5 {
+                let segPath = "/seg_\(String(format: "%03d", i)).mp4"
+                let data = await fetchSegment(baseURL: baseURL, path: segPath)
+                let bytes = data?.count ?? 0
+                cacheServeBytes.append(bytes)
+                print("[SERVE-TEST]   seg_\(String(format: "%03d", i)): \(bytes) bytes")
+            }
+
+            // Step 6: Request a far-ahead segment (tests seek or immediate from already-produced data)
+            let farSegIndex = 100  // ~600s into a 6s segment file
+            print("[SERVE-TEST] Step 6: Requesting far segment seg_\(String(format: "%03d", farSegIndex))...")
+            let farData = await fetchSegment(baseURL: baseURL, path: "/seg_\(String(format: "%03d", farSegIndex)).mp4")
+            print("[SERVE-TEST]   seg_\(String(format: "%03d", farSegIndex)): \(farData?.count ?? 0) bytes")
+
+            // Step 7: Re-request far segment (should hit cache)
+            print("[SERVE-TEST] Step 7: Re-requesting far segment (expect cache hit)...")
+            let farCacheData = await fetchSegment(baseURL: baseURL, path: "/seg_\(String(format: "%03d", farSegIndex)).mp4")
+            print("[SERVE-TEST]   seg_\(String(format: "%03d", farSegIndex)): \(farCacheData?.count ?? 0) bytes")
+
+            // Wait a moment for logs to flush
+            try? await Task.sleep(for: .milliseconds(500))
+
+            // Step 8: Analyze logs
+            print("")
+            print("[SERVE-TEST] === RESULTS ===")
+            analyzeServeLogs()
+
+            // Verify data integrity
+            print("")
+            print("[SERVE-TEST] === DATA INTEGRITY ===")
+            var allMatch = true
+            for i in 0..<5 {
+                let match = firstServeBytes[i] == cacheServeBytes[i]
+                if !match { allMatch = false }
+                print("  seg_\(String(format: "%03d", i)): first=\(firstServeBytes[i])B cache=\(cacheServeBytes[i])B \(match ? "OK" : "MISMATCH")")
+            }
+            print("  All segments match: \(allMatch ? "YES" : "NO")")
+
+            // Stop server
+            await TransmuxServer.shared.stop()
+            print("")
+            print("[SERVE-TEST] Server stopped. Test complete.")
+
+        } catch {
+            print("[SERVE-TEST] ERROR: \(error.localizedDescription)")
+        }
+    }
+
+    /// Fetch a segment from the local TransmuxServer.
+    static func fetchSegment(baseURL: String, path: String) async -> Data? {
+        guard let url = URL(string: baseURL + path) else { return nil }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode != 200 {
+                    print("[SERVE-TEST]   HTTP \(httpResponse.statusCode) for \(path)")
+                    return nil
+                }
+            }
+            return data
+        } catch {
+            print("[SERVE-TEST]   ERROR fetching \(path): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Parse the transmux log and report segment serve statistics.
+    static func analyzeServeLogs() {
+        let logPath = "/tmp/mks-iptv-transmux.log"
+        guard let contents = try? String(contentsOfFile: logPath, encoding: .utf8) else {
+            print("  Cannot read log file")
+            return
+        }
+
+        let lines = contents.components(separatedBy: "\n")
+        var sourceCounts: [String: Int] = [:]
+        var totalServes = 0
+
+        for line in lines {
+            // Match segment served lines with source=
+            if line.contains("[Segment]") && line.contains("source=") {
+                totalServes += 1
+                // Extract source value
+                if let range = line.range(of: "source=") {
+                    let afterSource = line[range.upperBound...]
+                    let source = String(afterSource.prefix(while: { $0 != " " && $0 != "," && $0 != "]" }))
+                    sourceCounts[source, default: 0] += 1
+                }
+            }
+        }
+
+        print("  Total segment serves: \(totalServes)")
+        for (source, count) in sourceCounts.sorted(by: { $0.key < $1.key }) {
+            print("    \(source): \(count)")
+        }
+
+        // Check for cache hits specifically
+        let cacheHits = sourceCounts["cache-hit"] ?? 0
+        print("")
+        print("  Cache hits: \(cacheHits)")
+        print("  Cache hit rate: \(totalServes > 0 ? String(format: "%.0f", Double(cacheHits) / Double(totalServes) * 100) : "0")%")
+
+        // Check for errors
+        let errors = lines.filter { $0.contains("write_frame ERROR") }.count
+        print("  Write errors: \(errors)")
     }
 
     // MARK: - Seek Test
@@ -373,6 +541,7 @@ struct TransmuxCLI {
 
         OPTIONS:
             --interactive           Interactive mode: read SEEK/STATUS/STOP from stdin
+            --serve-test            Full server test: start TransmuxServer, fetch segments, verify cache/mmap/prefetch
             --seek TIME             Seek to TIME seconds (one-shot seek during remux)
             --test-seek TIME        Run automated seek test with log validation
             --duration SECONDS      Duration to run transmux (default: 10 seconds)
@@ -384,6 +553,9 @@ struct TransmuxCLI {
 
             # Transmux for 30 seconds
             transmux-cli movie.mkv --duration 30
+
+            # Full server test with cache/mmap/prefetch validation
+            transmux-cli movie.mkv --serve-test --verbose
 
             # Interactive mode (used by web backend)
             transmux-cli movie.mkv --interactive --verbose

@@ -22,12 +22,44 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     @Published var isReady: Bool = false
     @Published var isBuffering: Bool = false
     @Published var error: PlayerError?
-    
+
     private(set) var player: AVPlayer?
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
     private let progressSubject = PassthroughSubject<Double, Never>()
+
+    /// Stored metadata for Now Playing info (Control Center / Lock Screen / AirPlay)
+    private var pendingMetadata: MetadataResult?
+
+    /// Glitch detection and monitoring.
+    /// Internal access allows FFmpegPlayerImplementation to wire the feedback callback.
+    private(set) var glitchDetector: GlitchDetector?
+
+    /// Track seek start time for latency measurement
+    private var seekStartTime: Date?
+    private var seekTargetPosition: Double?
+
+    /// Track last position for external seek detection
+    private var lastReportedTime: Double = 0
+    private var seekObserver: Any?
+
+    // MARK: - External Seek Detection
+
+    /// Último tiempo sampleado para detectar saltos
+    private var lastSampledTime: Double = 0
+
+    /// Timestamp del último sample
+    private var lastSampleDate: Date?
+
+    /// Flag para evitar detectar el mismo seek múltiples veces
+    private var isProcessingExternalSeek: Bool = false
+
+    /// Tiempo objetivo del seek externo detectado
+    private var externalSeekTarget: Double?
+
+    /// Tiempo cuando se detectó el seek externo
+    private var externalSeekDetectedAt: Date?
     
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
@@ -93,19 +125,19 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     func load(url: URL, metadata: MetadataResult?) {
         stop()
 
-        print("[AVPlayerImplementation] Loading URL: \(url)")
+        // Start structured logging session
+        PlayerLog.startSession(playerType: "AVPlayer", url: url.absoluteString)
+
+        // Initialize glitch detector
+        glitchDetector = GlitchDetector.forAVPlayer(sessionID: PlayerLog.sessionID)
+        glitchDetector?.reset()
+
+        PlayerLog.log("LOAD", category: "lifecycle", fields: ["url": url.absoluteString])
 
         playerItem = AVPlayerItem(url: url)
 
-        // Set external metadata for Control Center / Lock Screen / AirPlay
-        if let metadata {
-            let externalMetadata = PlayerMetadataHelper.makeExternalMetadata(from: metadata)
-            playerItem?.externalMetadata = externalMetadata
-            print("[AVPlayerImplementation] Set \(externalMetadata.count) metadata items for: \(metadata.title)")
-
-            // Load artwork asynchronously (poster image)
-            PlayerMetadataHelper.loadArtwork(from: metadata, into: playerItem!)
-        }
+        // Store metadata for Now Playing info (Control Center / Lock Screen / AirPlay)
+        self.pendingMetadata = metadata
 
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
@@ -122,8 +154,17 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     func load(asset: AVURLAsset) {
         stop()
 
-        print("[AVPlayerImplementation] Loading asset with resource loader, URL: \(asset.url)")
-        print("[AVPlayerImplementation] Asset resourceLoader delegate: \(String(describing: asset.resourceLoader.delegate))")
+        // Start structured logging session
+        PlayerLog.startSession(playerType: "AVPlayer", url: asset.url.absoluteString)
+
+        // Initialize glitch detector
+        glitchDetector = GlitchDetector.forAVPlayer(sessionID: PlayerLog.sessionID)
+        glitchDetector?.reset()
+
+        PlayerLog.log("LOAD_ASSET", category: "lifecycle", fields: [
+            "url": asset.url.absoluteString,
+            "hasResourceLoader": asset.resourceLoader.delegate != nil
+        ])
 
         // Only require "playable" — NOT "duration". For fragmented MP4 with
         // empty_moov, the moov atom has duration=0 and there's no mfra box until
@@ -135,7 +176,10 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Don't wait for large buffer — start playback as soon as first frames are available
         player?.automaticallyWaitsToMinimizeStalling = false
 
-        print("[AVPlayerImplementation] AVPlayer created, playerItem.status=\(playerItem?.status.rawValue ?? -1), waitToMinimizeStalling=false")
+        PlayerLog.log("PLAYER_CREATED", category: "lifecycle", fields: [
+            "status": playerItem?.status.rawValue ?? -1,
+            "waitToMinimizeStalling": false
+        ])
 
         setupObservers()
     }
@@ -144,36 +188,97 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         player?.play()
         player?.rate = rate
         isPlaying = true
+
+        PlayerLog.stateChange(from: "paused", to: "playing", playerType: "AVPlayer")
+
+        // Set Now Playing info for Control Center / Lock Screen / AirPlay
+        if let metadata = pendingMetadata {
+            PlayerMetadataHelper.setNowPlayingInfo(
+                from: metadata,
+                duration: duration,
+                currentTime: currentTime,
+                playbackRate: Double(rate)
+            )
+            // Load artwork asynchronously
+            PlayerMetadataHelper.loadArtwork(from: metadata)
+        }
     }
-    
+
     func pause() {
         player?.pause()
         isPlaying = false
+
+        PlayerLog.stateChange(from: "playing", to: "paused", playerType: "AVPlayer")
+
+        // Update playback rate to 0 in Now Playing info
+        if pendingMetadata != nil {
+            PlayerMetadataHelper.updatePlaybackProgress(currentTime: currentTime, playbackRate: 0)
+        }
     }
-    
+
     func stop() {
         player?.pause()
-        
+
         if let timeObserver = timeObserver {
             player?.removeTimeObserver(timeObserver)
             self.timeObserver = nil
         }
-        
+
+        // Remover TODOS los observers de notificaciones
         NotificationCenter.default.removeObserver(self)
         cancellables.removeAll()
-        
+
         player = nil
         playerItem = nil
         isPlaying = false
         isReady = false
         currentTime = 0
         duration = 0
+
+        // Reset tracking state for external seek detection
+        lastSampledTime = 0
+        lastSampleDate = nil
+        isProcessingExternalSeek = false
+        externalSeekTarget = nil
+        externalSeekDetectedAt = nil
+
+        // Clear glitch detector
+        glitchDetector?.reset()
+        glitchDetector = nil
+
+        // End logging session
+        PlayerLog.endSession()
+
+        // Clear Now Playing info
+        PlayerMetadataHelper.clearNowPlayingInfo()
+        pendingMetadata = nil
     }
     
     func seek(to time: Double) {
+        // Track seek start for latency measurement
+        let currentPosition = currentTime
+        glitchDetector?.seekStarted(target: time, currentPosition: currentPosition)
+        seekStartTime = Date()
+        seekTargetPosition = time
+
         let cmTime = CMTime(seconds: time, preferredTimescale: 1000)
-        player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-            self?.currentTime = time
+        player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            guard let self = self else { return }
+            self.currentTime = time
+
+            // Track seek completion and report any latency glitches
+            if finished {
+                self.glitchDetector?.seekCompleted(actualPosition: time, duration: self.duration)
+            } else {
+                // Seek was cancelled or interrupted
+                PlayerLog.log("SEEK_CANCELLED", category: "timing", level: .warning, fields: [
+                    "target": String(format: "%.3f", time),
+                    "from": String(format: "%.3f", currentPosition)
+                ])
+            }
+
+            self.seekStartTime = nil
+            self.seekTargetPosition = nil
         }
     }
     
@@ -202,8 +307,11 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         let position = player?.currentTime() ?? .zero
         let wasPlaying = rate > 0
 
-        print("[AVPlayerImplementation] Reloading with NEW AVPlayer instance — URL: \(urlAsset.url)")
-        print("[AVPlayerImplementation] Current position: \(position.seconds)s, wasPlaying: \(wasPlaying)")
+        PlayerLog.log("RELOAD", category: "lifecycle", fields: [
+            "url": urlAsset.url.absoluteString,
+            "position": String(format: "%.3f", position.seconds),
+            "wasPlaying": wasPlaying
+        ])
 
         // Tear down old observers
         if let timeObserver = timeObserver {
@@ -220,7 +328,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         player?.volume = volume
         player?.automaticallyWaitsToMinimizeStalling = false
 
-        print("[AVPlayerImplementation] New AVPlayer created, re-attaching observers...")
+        PlayerLog.log("RELOAD_PLAYER_CREATED", category: "lifecycle", fields: [:])
 
         // Re-attach observers to new player/item
         setupObservers()
@@ -228,7 +336,10 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Restore position and playback state
         if position.seconds > 0 {
             player?.seek(to: position, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-                print("[AVPlayerImplementation] Seek to \(position.seconds)s complete, resuming: \(wasPlaying)")
+                PlayerLog.log("RELOAD_SEEK_COMPLETE", category: "lifecycle", fields: [
+                    "position": String(format: "%.3f", position.seconds),
+                    "resuming": wasPlaying
+                ])
                 if wasPlaying {
                     self?.play()
                 }
@@ -243,60 +354,126 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Observe player item status
         playerItem?.publisher(for: \.status)
             .sink { [weak self] status in
+                guard let self = self else { return }
                 switch status {
                 case .readyToPlay:
-                    self?.isReady = true
-                    let dur = self?.playerItem?.duration.seconds ?? 0
-                    let isIndefinite = self?.playerItem?.duration.isIndefinite ?? false
-                    self?.duration = dur
-                    print("[AVPlayerImplementation] Ready to play, duration: \(dur)s, indefinite: \(isIndefinite)")
+                    self.isReady = true
+                    let dur = self.playerItem?.duration.seconds ?? 0
+                    let isIndefinite = self.playerItem?.duration.isIndefinite ?? false
+                    self.duration = dur
+                    PlayerLog.log("READY", category: "lifecycle", fields: [
+                        "duration": String(format: "%.1f", dur),
+                        "indefinite": isIndefinite
+                    ])
                 case .failed:
-                    if let error = self?.playerItem?.error {
-                        self?.error = .unknown(error)
-                        print("[AVPlayerImplementation] Failed to load: \(error)")
-                        print("[AVPlayerImplementation] Error details: \((error as NSError).domain) code=\((error as NSError).code) \((error as NSError).localizedDescription)")
-                        if let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? NSError {
-                            print("[AVPlayerImplementation] Underlying error: \(underlying.domain) code=\(underlying.code) \(underlying.localizedDescription)")
+                    if let error = self.playerItem?.error {
+                        self.error = .unknown(error)
+                        let nsError = error as NSError
+                        PlayerLog.log("FAILED", category: "lifecycle", level: .critical, fields: [
+                            "domain": nsError.domain,
+                            "code": nsError.code,
+                            "message": nsError.localizedDescription
+                        ])
+                        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+                            PlayerLog.log("UNDERLYING_ERROR", category: "lifecycle", level: .critical, fields: [
+                                "domain": underlying.domain,
+                                "code": underlying.code,
+                                "message": underlying.localizedDescription
+                            ])
                         }
                     }
                 case .unknown:
-                    let itemError = self?.playerItem?.error
-                    let playerError = self?.player?.error
-                    print("[AVPlayerImplementation] Unknown status — itemError=\(String(describing: itemError)), playerError=\(String(describing: playerError))")
+                    let itemError = self.playerItem?.error
+                    let playerError = self.player?.error
+                    PlayerLog.log("UNKNOWN_STATUS", category: "lifecycle", level: .warning, fields: [
+                        "itemError": itemError?.localizedDescription ?? "nil",
+                        "playerError": playerError?.localizedDescription ?? "nil"
+                    ])
                 @unknown default:
                     break
                 }
             }
             .store(in: &cancellables)
-        
-        // Observe playback progress
+
+        // Observe playback progress with glitch detection sampling
         let interval = CMTime(seconds: 0.1, preferredTimescale: 1000)
         timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self = self else { return }
             let seconds = time.seconds
-            if seconds.isFinite {
-                self?.currentTime = seconds
-                self?.progressSubject.send(seconds)
+            guard seconds.isFinite else { return }
+
+            let now = Date()
+
+            // Detectar seek externo por delta grande
+            if self.isPlaying && !self.isProcessingExternalSeek {
+                let timeDelta = seconds - self.lastSampledTime
+                let absTimeDelta = abs(timeDelta)
+
+                // Umbral: salto > 3 segundos = seek externo
+                // (No consideramos saltos pequeños que pueden ser normales)
+                if absTimeDelta > 3.0 {
+                    // Verificar que no sea un seek interno (nuestro seek(to:) setea seekTargetPosition)
+                    if self.seekTargetPosition == nil {
+                        self.reportExternalSeek(
+                            from: self.lastSampledTime,
+                            to: seconds,
+                            source: "periodicObserver",
+                            delta: timeDelta
+                        )
+                    }
+                }
+            }
+
+            // Actualizar tracking
+            self.lastSampledTime = seconds
+            self.lastSampleDate = now
+            self.currentTime = seconds
+            self.progressSubject.send(seconds)
+
+            // Sample for glitch detection
+            self.glitchDetector?.sample(
+                currentTime: seconds,
+                duration: self.duration,
+                playbackRate: self.rate,
+                isPlaying: self.isPlaying,
+                bufferAhead: self.bufferingDetail.loadedRangeAhead
+            )
+
+            // Update Now Playing progress every 5 seconds (throttled)
+            // This keeps Control Center / Lock Screen progress bar in sync
+            if self.pendingMetadata != nil && Int(seconds) % 5 == 0 {
+                self.updateNowPlayingProgress()
             }
         }
-        
+
         // Observe playback end
         NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
             .sink { [weak self] _ in
                 self?.isPlaying = false
-                print("[AVPlayerImplementation] Playback ended")
+                PlayerLog.log("PLAYBACK_ENDED", category: "lifecycle", fields: [:])
             }
             .store(in: &cancellables)
-        
+
         // Observe buffering state via timeControlStatus
         player?.publisher(for: \.timeControlStatus)
             .sink { [weak self] status in
-                guard let self else { return }
+                guard let self = self else { return }
                 switch status {
                 case .waitingToPlayAtSpecifiedRate:
                     let reason = self.player?.reasonForWaitingToPlay
                     self.isBuffering = true
-                    print("[AVPlayerImplementation] Buffering — reason: \(reason?.rawValue ?? "unknown")")
+                    PlayerLog.bufferingChange(
+                        reason: reason?.rawValue,
+                        bufferAhead: self.bufferingDetail.loadedRangeAhead,
+                        currentTime: self.currentTime
+                    )
                 case .playing:
+                    if self.isBuffering {
+                        // Log buffer recovery
+                        PlayerLog.log("PLAYING", category: "lifecycle", fields: [
+                            "bufferAhead": String(format: "%.2f", self.bufferingDetail.loadedRangeAhead ?? 0)
+                        ])
+                    }
                     self.isBuffering = false
                 case .paused:
                     self.isBuffering = false
@@ -311,8 +488,227 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] error in
                 self?.error = .unknown(error)
-                print("[AVPlayerImplementation] Error occurred: \(error)")
+                PlayerLog.log("ERROR", category: "lifecycle", level: .critical, fields: [
+                    "message": error.localizedDescription
+                ])
             }
             .store(in: &cancellables)
+
+        // MARK: - AVPlayer Notifications for Glitch Detection
+
+        // AVPlayerItemTimeJumped - Detecta discontinuidades de tiempo (seeks externos)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemTimeJumped(_:)),
+            name: .AVPlayerItemTimeJumped,
+            object: playerItem
+        )
+
+        // AVPlayerItemPlaybackStalled - Detecta stalls explícitos
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemPlaybackStalled(_:)),
+            name: .AVPlayerItemPlaybackStalled,
+            object: playerItem
+        )
+
+        // AVPlayerItemNewErrorLogEntry - Errores detallados
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemNewErrorLogEntry(_:)),
+            name: .AVPlayerItemNewErrorLogEntry,
+            object: playerItem
+        )
+
+        // AVPlayerItemFailedToPlayToEndTime - Playback failure
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemFailedToPlayToEndTime(_:)),
+            name: .AVPlayerItemFailedToPlayToEndTime,
+            object: playerItem
+        )
+
+        // MARK: - Buffer State KVO
+
+        // isPlaybackBufferEmpty - Buffer vacío (binario)
+        playerItem?.publisher(for: \.isPlaybackBufferEmpty)
+            .removeDuplicates()
+            .sink { [weak self] isEmpty in
+                guard let self = self, isEmpty else { return }
+                PlayerLog.log("BUFFER_EMPTY_KVO", category: "buffer", level: .critical, fields: [
+                    "currentTime": String(format: "%.1f", self.currentTime)
+                ])
+                self.glitchDetector?.reportGlitch(
+                    type: .bufferStarvation,
+                    currentTime: self.currentTime,
+                    duration: self.duration,
+                    playbackRate: self.rate,
+                    message: "Playback buffer is empty (KVO)"
+                )
+            }
+            .store(in: &cancellables)
+
+        // isPlaybackLikelyToKeepUp - Buffer suficiente
+        playerItem?.publisher(for: \.isPlaybackLikelyToKeepUp)
+            .removeDuplicates()
+            .sink { [weak self] likelyToKeepUp in
+                guard let self = self else { return }
+                if !likelyToKeepUp && self.isPlaying {
+                    PlayerLog.log("BUFFER_UNLIKELY_KEEPUP", category: "buffer", level: .warning, fields: [
+                        "currentTime": String(format: "%.1f", self.currentTime)
+                    ])
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Update Now Playing progress (called throttled from time observer)
+    private func updateNowPlayingProgress() {
+        guard pendingMetadata != nil else { return }
+        PlayerMetadataHelper.updatePlaybackProgress(
+            currentTime: currentTime,
+            playbackRate: isPlaying ? Double(rate) : 0
+        )
+    }
+
+    // MARK: - Glitch Data Access
+
+    /// Get recent glitch events for debug overlay.
+    func recentGlitchEvents(limit: Int = 5) async -> [GlitchEvent] {
+        await glitchDetector?.history.recentEvents(limit: limit) ?? []
+    }
+
+    /// Get glitch session summary for debug overlay.
+    func glitchSessionSummary() async -> GlitchSessionSummary? {
+        await glitchDetector?.history.summary()
+    }
+
+    // MARK: - Notification Handlers
+
+    @objc private func playerItemTimeJumped(_ notification: Notification) {
+        guard let _ = notification.object as? AVPlayerItem,
+              let player = player else { return }
+
+        let currentTime = player.currentTime().seconds
+        let timeDelta = abs(currentTime - lastSampledTime)
+
+        // AVPlayerItemTimeJumped se dispara para discontinuidades grandes
+        // Verificar que sea un seek real (salto grande mientras playing)
+        guard isPlaying && timeDelta > 1.0 else { return }
+
+        PlayerLog.log("TIME_JUMP_NOTIFICATION", category: "timing", level: .warning, fields: [
+            "from": String(format: "%.1f", lastSampledTime),
+            "to": String(format: "%.1f", currentTime),
+            "delta": String(format: "%.1f", timeDelta)
+        ])
+
+        // Reportar como seek externo si no estamos ya procesando uno
+        if !isProcessingExternalSeek {
+            reportExternalSeek(from: lastSampledTime, to: currentTime, source: "notification")
+        }
+    }
+
+    @objc private func playerItemPlaybackStalled(_ notification: Notification) {
+        PlayerLog.log("PLAYBACK_STALLED_NOTIFICATION", category: "buffer", level: .warning, fields: [
+            "currentTime": String(format: "%.1f", currentTime)
+        ])
+
+        glitchDetector?.reportGlitch(
+            type: .bufferStarvation,
+            currentTime: currentTime,
+            duration: duration,
+            playbackRate: rate,
+            message: "Playback stalled (AVPlayerItemPlaybackStalled)"
+        )
+    }
+
+    @objc private func playerItemNewErrorLogEntry(_ notification: Notification) {
+        guard let item = notification.object as? AVPlayerItem,
+              let errorLog = item.errorLog(),
+              let lastEvent = errorLog.events.last else { return }
+
+        PlayerLog.log("ERROR_LOG_ENTRY", category: "error", level: .critical, fields: [
+            "errorStatusCode": lastEvent.errorStatusCode,
+            "errorDomain": lastEvent.errorDomain,
+            "uri": lastEvent.uri ?? "nil"
+        ])
+    }
+
+    @objc private func playerItemFailedToPlayToEndTime(_ notification: Notification) {
+        let errorDesc = notification.userInfo?["AVPlayerItemFailedToPlayToEndTimeErrorKey"] as? String ?? "unknown"
+        PlayerLog.log("PLAYBACK_FAILED", category: "lifecycle", level: .critical, fields: [
+            "currentTime": String(format: "%.1f", currentTime),
+            "duration": String(format: "%.1f", duration),
+            "error": errorDesc
+        ])
+
+        // Near-EOF recovery: if we're within the last 5% of the content,
+        // treat this as a natural end of playback rather than an error.
+        // The last HLS segment often has incomplete data that triggers this
+        // notification even though playback is effectively done.
+        if duration > 0 && currentTime > duration * 0.95 {
+            PlayerLog.log("NEAR_END_RECOVERY", category: "lifecycle", fields: [
+                "currentTime": String(format: "%.1f", currentTime),
+                "duration": String(format: "%.1f", duration),
+                "percentComplete": String(format: "%.1f", (currentTime / duration) * 100)
+            ])
+            isPlaying = false
+            return
+        }
+
+        glitchDetector?.reportGlitch(
+            type: .networkError,
+            currentTime: currentTime,
+            duration: duration,
+            playbackRate: 0,
+            message: "Playback failed to reach end: \(errorDesc)"
+        )
+
+        // Recovery attempt: reload the current item after a brief delay.
+        // Creates a fresh AVPlayer instance which re-fetches the HLS playlist.
+        PlayerLog.log("ATTEMPTING_RELOAD", category: "lifecycle", level: .warning, fields: [
+            "currentTime": String(format: "%.1f", currentTime)
+        ])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.reloadCurrentItem()
+        }
+    }
+
+    // MARK: - External Seek Detection
+
+    private func reportExternalSeek(from: Double, to: Double, source: String, delta: Double? = nil) {
+        let timeDelta = delta ?? (to - from)
+
+        PlayerLog.log("EXTERNAL_SEEK_DETECTED", category: "timing", level: .warning, fields: [
+            "from": String(format: "%.1f", from),
+            "to": String(format: "%.1f", to),
+            "delta": String(format: "%.1f", timeDelta),
+            "source": source,
+            "isPlaying": isPlaying
+        ])
+
+        // Marcar que estamos procesando un seek externo
+        isProcessingExternalSeek = true
+        externalSeekTarget = to
+        externalSeekDetectedAt = Date()
+
+        // Reportar al glitch detector
+        glitchDetector?.reportGlitch(
+            type: .externalSeek,
+            currentTime: to,
+            duration: duration,
+            playbackRate: rate,
+            metrics: GlitchMetrics(
+                seekTarget: to,
+                seekActual: to,
+                seekLatencyMs: 0  // No conocemos cuándo empezó exactamente
+            ),
+            message: "External seek via \(source): jumped \(String(format: "%.1f", abs(timeDelta)))s"
+        )
+
+        // Resetear flag después de un tiempo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.isProcessingExternalSeek = false
+        }
     }
 }

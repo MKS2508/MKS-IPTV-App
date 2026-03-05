@@ -67,6 +67,9 @@ public actor TransmuxServer {
     private var initSegmentSize: Int64 = 0
     /// Seek handle for redirecting the sequential transmux to a new input position
     private var seekHandle: ActiveTransmux?
+    /// LRU cache for served segment data (post-tfdt rewrite).
+    /// Cache hits serve instantly without pipeline involvement.
+    private var segmentCache: SegmentCache?
     /// Set to true when stop() is called; prevents polling loops from logging errors on deleted files
     private var stopped = false
 
@@ -105,6 +108,7 @@ public actor TransmuxServer {
         self.initSegmentSize = initSegmentSize
         self.seekHandle = seekHandle
         self.isComplete = false
+        self.segmentCache = SegmentCache()
 
         let port = try findAvailablePort()
         self.currentPort = port
@@ -186,6 +190,8 @@ public actor TransmuxServer {
         segmenter = nil
         initSegmentSize = 0
         seekHandle = nil
+        segmentCache?.clear()
+        segmentCache = nil
 
         TransmuxLog.log("STOPPED", tag: "Server")
         TransmuxLog.flush()
@@ -253,6 +259,7 @@ public actor TransmuxServer {
         let seg = self.segmenter
         let initSize = self.initSegmentSize
         let handle = self.seekHandle
+        let cache = self.segmentCache
 
         let path = request.path
 
@@ -298,7 +305,8 @@ public actor TransmuxServer {
                 filePath: filePath,
                 segmenter: seg,
                 seekHandle: handle,
-                isComplete: complete
+                isComplete: complete,
+                cache: cache
             )
         } else {
             // Fallback: existing byte-range handler for direct mp4 access
@@ -424,6 +432,23 @@ public actor TransmuxServer {
         })
     }
 
+    // MARK: - Next-Segment Prefetch
+
+    /// Trigger an immediate HLSSegmenter scan after serving a segment.
+    /// This eliminates the 300ms scan timer delay for the next segment: when
+    /// AVPlayer requests segment N+1 moments later, the data is already discovered.
+    /// Deterministic prefetch (no prediction) — same approach as production CDNs.
+    private nonisolated static func prefetchNextSegment(
+        segIndex: Int,
+        segmenter: HLSSegmenter
+    ) {
+        let targetDuration = segmenter.targetSegmentDuration
+        let totalDuration = segmenter.totalDuration
+        let nextStartTime = Double(segIndex + 1) * targetDuration
+        guard nextStartTime < totalDuration else { return }
+        segmenter.triggerScan()
+    }
+
     // MARK: - Segment Handler
 
     /// Serve a virtual segment (seg_NNN.mp4) by reading the corresponding moof+mdat
@@ -441,7 +466,8 @@ public actor TransmuxServer {
         filePath: String,
         segmenter: HLSSegmenter,
         seekHandle: ActiveTransmux?,
-        isComplete: Bool
+        isComplete: Bool,
+        cache: SegmentCache?
     ) {
         // Parse segment index from URL: /seg_042.mp4 → 42
         guard let segIndexStr = path.components(separatedBy: "/").last?
@@ -464,7 +490,15 @@ public actor TransmuxServer {
         let latestTime = segmenter.latestTransmuxedTime()
         let lastSeek = seekHandle?.lastSeekTarget
 
-        // Segment request logged only when seek is needed (below)
+        // Step 0: Cache check — serve instantly from LRU cache if available.
+        // The cache stores post-tfdt-rewritten segment data from previous serves.
+        // Backward seeks to previously-visited positions hit the cache and avoid
+        // the entire pipeline (no av_seek_frame, no polling, no disk read).
+        if let cached = cache?.get(segmentIndex: segIndex) {
+            TransmuxLog.segmentServed(segIndex: segIndex, startTime: startTime, endTime: endTime, bytes: cached.count, fragments: 0, source: "cache-hit", latestBuffered: latestBuffered)
+            Self.sendSegmentResponse(connection: connection, data: cached, segIndex: segIndex, source: "cache-hit")
+            return
+        }
 
         // Step 1: Immediate fullness check — serve if transmux has produced
         // enough data to cover the full segment time range. We require
@@ -476,19 +510,46 @@ public actor TransmuxServer {
         if latestBuffered >= endTime - fullnessEpsilon {
             let fragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
             if !fragments.isEmpty {
-                let segData = Self.readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
+                let segData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
                 if !segData.isEmpty {
                     TransmuxLog.segmentServed(segIndex: segIndex, startTime: startTime, endTime: endTime, bytes: segData.count, fragments: fragments.count, source: "immediate", latestBuffered: latestBuffered)
+                    cache?.put(segmentIndex: segIndex, data: segData)
                     Self.sendSegmentResponse(connection: connection, data: segData, segIndex: segIndex, source: "immediate")
+                    Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
                     return
                 }
             }
         }
 
-        // No seek handle or transmux is complete with no data — respond 404
-        guard let handle = seekHandle, !isComplete else {
+        // No seek handle — can't produce data. Respond 404.
+        guard let handle = seekHandle else {
             TransmuxLog.segmentEvent("404 no-seek-handle", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "none", extra: "complete=\(isComplete)")
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        // Transmux already complete but immediate fullness check above didn't find data.
+        // Try serving partial fragments for this time range (common for the last segment
+        // where declared duration exceeds actual remaining data).
+        if isComplete {
+            segmenter.triggerScan()
+            let partialFragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+            if !partialFragments.isEmpty {
+                let partialData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: partialFragments, trackTimescales: segmenter.trackTimescales)
+                if !partialData.isEmpty {
+                    TransmuxLog.segmentServed(segIndex: segIndex, startTime: startTime, endTime: endTime, bytes: partialData.count, fragments: partialFragments.count, source: "eof-partial", latestBuffered: latestBuffered)
+                    cache?.put(segmentIndex: segIndex, data: partialData)
+                    Self.sendSegmentResponse(connection: connection, data: partialData, segIndex: segIndex, source: "eof-partial")
+                    Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
+                    return
+                }
+            }
+            // Truly no data for this range — segment is beyond actual content
+            TransmuxLog.segmentEvent("EOF-EMPTY", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "eof", extra: "transmux complete, no fragments for range")
+            let response = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
             })
@@ -571,7 +632,15 @@ public actor TransmuxServer {
                 }
 
                 for _ in 0..<pollCount {
-                    Thread.sleep(forTimeInterval: interval)
+                    // Event-driven wait: when a seek was triggered, use the semaphore
+                    // to wake up immediately when post-seek data is ready, instead of
+                    // sleeping the full interval. Falls back to Thread.sleep for
+                    // sequential catch-up (no seek triggered).
+                    if seekTriggered {
+                        let _ = handle.waitForSeekData(timeout: interval)
+                    } else {
+                        Thread.sleep(forTimeInterval: interval)
+                    }
                     totalPolls += 1
 
                     // Force HLSSegmenter to scan disk NOW instead of waiting for 300ms timer
@@ -583,6 +652,32 @@ public actor TransmuxServer {
                     // e.g., bufferedTime=35.999 should pass for endTime=36.0.
                     let bufferedTime = segmenter.latestBufferedSourceTime()
                     guard bufferedTime >= endTime - fullnessEpsilon else {
+                        // LIVE COMPLETION CHECK: Transmux may have finished during polling.
+                        // The stale `isComplete` snapshot won't reflect this — check the
+                        // live flag on the handle instead. Serve partial data if available.
+                        if handle.isTransmuxComplete {
+                            segmenter.triggerScan()
+                            let eofFragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+                            if !eofFragments.isEmpty {
+                                let eofData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: eofFragments, trackTimescales: segmenter.trackTimescales)
+                                if !eofData.isEmpty {
+                                    let elapsed = Date().timeIntervalSince(pollStart)
+                                    TransmuxLog.segmentServed(segIndex: segIndex, startTime: startTime, endTime: endTime, bytes: eofData.count, fragments: eofFragments.count, source: "eof-during-poll", latestBuffered: bufferedTime, extra: "polls=\(totalPolls) elapsed=\(String(format: "%.2f", elapsed))s")
+                                    cache?.put(segmentIndex: segIndex, data: eofData)
+                                    Self.sendSegmentResponse(connection: connection, data: eofData, segIndex: segIndex, source: "eof-during-poll")
+                                    Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
+                                    return
+                                }
+                            }
+                            // Transmux complete but no data for this range — empty 200
+                            TransmuxLog.segmentEvent("EOF-EMPTY-POLL", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "eof", extra: "transmux completed during poll, no fragments")
+                            let emptyResp = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
+                            connection.send(content: emptyResp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                                connection.cancel()
+                            })
+                            return
+                        }
+
                         // Log only when truly stalled (phase 2+)
                         if totalPolls % 80 == 0 {
                             TransmuxLog.log(
@@ -596,7 +691,7 @@ public actor TransmuxServer {
                     // Fullness gate passed — check for actual segment byte ranges
                     let fragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
                     if !fragments.isEmpty {
-                        let segData = Self.readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
+                        let segData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: fragments, trackTimescales: segmenter.trackTimescales)
                         if !segData.isEmpty {
                             let elapsed = Date().timeIntervalSince(pollStart)
                             let source = seekTriggered ? "seek-redirect" : "sequential-wait"
@@ -610,7 +705,9 @@ public actor TransmuxServer {
                                 latestBuffered: bufferedTime,
                                 extra: "polls=\(totalPolls) elapsed=\(String(format: "%.2f", elapsed))s phase=\(phaseIdx+1)"
                             )
+                            cache?.put(segmentIndex: segIndex, data: segData)
                             Self.sendSegmentResponse(connection: connection, data: segData, segIndex: segIndex, source: source)
+                            Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
                             return
                         }
                     }
@@ -635,8 +732,69 @@ public actor TransmuxServer {
 
             // Timeout — did not produce full segment data in ~11.5s
             let elapsed = Date().timeIntervalSince(pollStart)
-            let finalBuffered = segmenter.latestBufferedSourceTime()
+            var finalBuffered = segmenter.latestBufferedSourceTime()
             let finalLatest = segmenter.latestTransmuxedTime()
+
+            // Tier 1: Retry seek if no seek was triggered during the main polling loop.
+            // The sequential transmux may have stalled. Give it one more chance with a
+            // fresh seek and 3 seconds of fast polling.
+            if !seekTriggered && !handle.isTransmuxComplete {
+                TransmuxLog.seekEvent(
+                    "RETRY SEEK trigger",
+                    seekTime: startTime,
+                    latestTime: finalLatest,
+                    lastSeekTarget: handle.lastSeekTarget,
+                    extra: "seg_\(String(format: "%03d", segIndex)) timeout-retry"
+                )
+                handle.requestSeek(to: startTime)
+                for _ in 0..<30 {
+                    Thread.sleep(forTimeInterval: 0.1)
+                    segmenter.triggerScan()
+                    let retryBuffered = segmenter.latestBufferedSourceTime()
+                    if retryBuffered >= endTime - fullnessEpsilon {
+                        let retryFragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+                        if !retryFragments.isEmpty {
+                            let retryData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: retryFragments, trackTimescales: segmenter.trackTimescales)
+                            if !retryData.isEmpty {
+                                let totalElapsed = Date().timeIntervalSince(pollStart)
+                                TransmuxLog.segmentServed(
+                                    segIndex: segIndex, startTime: startTime, endTime: endTime,
+                                    bytes: retryData.count, fragments: retryFragments.count,
+                                    source: "retry-seek", latestBuffered: retryBuffered,
+                                    extra: "elapsed=\(String(format: "%.2f", totalElapsed))s"
+                                )
+                                cache?.put(segmentIndex: segIndex, data: retryData)
+                                Self.sendSegmentResponse(connection: connection, data: retryData, segIndex: segIndex, source: "retry-seek")
+                                Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
+                                return
+                            }
+                        }
+                    }
+                    // Check if transmux completed during retry
+                    if handle.isTransmuxComplete { break }
+                }
+                finalBuffered = segmenter.latestBufferedSourceTime()
+            }
+
+            // Tier 2: Serve partial fragments if any exist for this range
+            segmenter.triggerScan()
+            let timeoutFragments = segmenter.realSegments(inTimeRange: startTime, end: endTime)
+            if !timeoutFragments.isEmpty {
+                let timeoutData = Self.readAndRewriteFragmentsMmap(filePath: filePath, fragments: timeoutFragments, trackTimescales: segmenter.trackTimescales)
+                if !timeoutData.isEmpty {
+                    TransmuxLog.segmentServed(
+                        segIndex: segIndex, startTime: startTime, endTime: endTime,
+                        bytes: timeoutData.count, fragments: timeoutFragments.count,
+                        source: "timeout-partial", latestBuffered: finalBuffered,
+                        extra: "polls=\(totalPolls) elapsed=\(String(format: "%.2f", elapsed))s phase=\(currentPhaseIdx+1)"
+                    )
+                    cache?.put(segmentIndex: segIndex, data: timeoutData)
+                    Self.sendSegmentResponse(connection: connection, data: timeoutData, segIndex: segIndex, source: "timeout-partial")
+                    Self.prefetchNextSegment(segIndex: segIndex, segmenter: segmenter)
+                    return
+                }
+            }
+
             TransmuxLog.segmentEvent(
                 "TIMEOUT 404",
                 segIndex: segIndex,
@@ -683,6 +841,55 @@ public actor TransmuxServer {
             } catch {
                 TransmuxLog.log("readAndRewriteFragments: seek/read failed at offset \(fragment.offset): \(error)", tag: "Server", level: .error)
             }
+        }
+        return result
+    }
+
+    /// mmap-based variant of readAndRewriteFragments for faster I/O.
+    /// Uses memory-mapped file access instead of FileHandle seek+read,
+    /// eliminating per-fragment kernel syscall overhead. Falls back to
+    /// FileHandle on mmap failure (e.g., file too new or OS limit).
+    ///
+    /// Safe for growing files: maps with current fstat size, reads only
+    /// within bounds, and unmaps immediately after use (short-lived mapping).
+    private nonisolated static func readAndRewriteFragmentsMmap(
+        filePath: String,
+        fragments: [HLSSegmenter.RealFragment],
+        trackTimescales: [UInt32: UInt32]
+    ) -> Data {
+        let fd = open(filePath, O_RDONLY)
+        guard fd >= 0 else {
+            return readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: trackTimescales)
+        }
+        defer { close(fd) }
+
+        var stat_buf = stat()
+        guard fstat(fd, &stat_buf) == 0 else {
+            return readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: trackTimescales)
+        }
+        let fileSize = Int(stat_buf.st_size)
+        guard fileSize > 0 else { return Data() }
+
+        guard let mapped = mmap(nil, fileSize, PROT_READ, MAP_SHARED, fd, 0),
+              mapped != MAP_FAILED else {
+            return readAndRewriteFragments(filePath: filePath, fragments: fragments, trackTimescales: trackTimescales)
+        }
+        defer { munmap(mapped, fileSize) }
+
+        let shouldRewrite = !trackTimescales.isEmpty
+        var result = Data()
+
+        for fragment in fragments {
+            let offset = Int(fragment.offset)
+            let length = Int(fragment.length)
+            guard offset >= 0 && length > 0 && offset + length <= fileSize else { continue }
+
+            // Copy from mapped region (copy required since rewriteTfdtInPlace mutates)
+            var chunk = Data(bytes: mapped.advanced(by: offset), count: length)
+            if shouldRewrite && !chunk.isEmpty {
+                rewriteTfdtInPlace(&chunk, sourceTime: fragment.sourceStartTime, trackTimescales: trackTimescales)
+            }
+            result.append(chunk)
         }
         return result
     }

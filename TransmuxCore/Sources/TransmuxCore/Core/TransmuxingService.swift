@@ -784,9 +784,9 @@ public actor TransmuxingService {
         // First audio output index (for backward compat with single-audio DTS logging)
         let firstAudioOutputIdx: Int32 = audioTrackInfos.first.map { Int32($0.outputStreamIndex) } ?? -1
 
-        // Seek cooldown: require minimum time between seeks to prevent cascading
+        // Seek cooldown: require minimum time between seeks to prevent cascading.
+        // Uses adaptive cooldown from ActiveTransmux (starts at 0.8s, adjusts per seek).
         var lastSeekCompletionTime: Date? = nil
-        let seekCooldownSeconds: TimeInterval = 2.0
 
         while !handle.isCancelled {
             // Check for seek request BEFORE reading next packet.
@@ -799,11 +799,12 @@ public actor TransmuxingService {
             // seeks cascade faster than audio can be rebased, leaving audio at a
             // stale DTS offset → permanent A/V desync.
             if !seekPending, let seekTime = handle.consumeSeekRequest() {
-                // Check cooldown: prevent rapid seeks that overwhelm timestamp rebasing
+                // Check adaptive cooldown: prevent rapid seeks that overwhelm timestamp rebasing
+                let seekCooldown = handle.cooldownSeconds
                 if let lastCompletion = lastSeekCompletionTime {
                     let elapsed = Date().timeIntervalSince(lastCompletion)
-                    if elapsed < seekCooldownSeconds {
-                        TransmuxLog.remux("REJECTING seek, cooldown not met (elapsed=\(String(format: "%.1f", elapsed))s, required=\(seekCooldownSeconds)s)", level: .warn)
+                    if elapsed < seekCooldown {
+                        TransmuxLog.remux("REJECTING seek, cooldown not met (elapsed=\(String(format: "%.1f", elapsed))s, required=\(String(format: "%.2f", seekCooldown))s)", level: .warn)
                         continue
                     }
                 }
@@ -1056,6 +1057,9 @@ public actor TransmuxingService {
                         globalOffsetComputed = true
                         seekPending = false
                         lastSeekCompletionTime = Date()
+                        handle.adjustCooldown(seekWasClean: skippedPacketsAfterSeek < 20)
+                        // Signal TransmuxServer that post-seek data is being produced
+                        handle.signalSeekDataReady()
 
                         // Write buffered video keyframe
                         for videoPkt in bufferedVideoKeyframes {
@@ -1213,10 +1217,45 @@ public actor TransmuxingService {
             }
             packetCount += 1
 
+            // BACKPRESSURE: Throttle when production is too far ahead of playback.
+            // Check every 100 packets (not every packet — amortize overhead).
+            // Never throttle during seeks, early playback, or shortly after a seek.
+            if packetCount % 100 == 0 && !seekPending {
+                let productionTime = segmenter.latestBufferedSourceTime()
+                let consumerTime = handle.currentPlaybackPosition
+                let lead = productionTime - consumerTime
+
+                let inEarlyPlayback = consumerTime < 30.0
+                let recentSeek = lastSeekCompletionTime.map { Date().timeIntervalSince($0) < 30.0 } ?? false
+
+                if !inEarlyPlayback && !recentSeek && lead > 120.0 {
+                    TransmuxLog.remux("THROTTLE pausing (lead=\(Int(lead))s, production=\(String(format: "%.0f", productionTime))s, playback=\(String(format: "%.0f", consumerTime))s)")
+                    while !handle.isCancelled && !handle.hasSeekPending {
+                        Thread.sleep(forTimeInterval: 0.5)
+                        let currentLead = segmenter.latestBufferedSourceTime() - handle.currentPlaybackPosition
+                        if currentLead < 60.0 { break }
+                    }
+                    TransmuxLog.remux("THROTTLE resumed")
+                }
+            }
+
+            // Check if player layer requested aggressive flushing (e.g., buffer starvation).
+            // Resetting packetCount re-activates the ultra-aggressive flush pattern below.
+            if handle.aggressiveFlushRequested {
+                packetCount = 0
+                TransmuxLog.remux("AGGRESSIVE-FLUSH activated, resetting packetCount")
+            }
+
             // Flush AVIO buffer to disk periodically for progressive playback.
-            // Aggressive at start (every 50 packets) so AVPlayer gets first fragments
-            // ASAP, then less frequent (every 500 packets) to reduce syscall overhead.
-            if packetCount < 500 {
+            // Ultra-aggressive after seek (every 10 packets for first 100) to get the
+            // target segment to disk ~3x faster. Then moderate (every 50 for next 400),
+            // then infrequent (every 500) to reduce syscall overhead.
+            // packetCount resets to 0 on each seek, so this pattern auto-activates.
+            if packetCount < 100 {
+                if packetCount % 10 == 0 {
+                    avio_flush(outCtx.pointee.pb)
+                }
+            } else if packetCount < 500 {
                 if packetCount % 50 == 0 {
                     avio_flush(outCtx.pointee.pb)
                 }
@@ -1270,6 +1309,9 @@ public actor TransmuxingService {
 
         // Finalize HLS segmenter — writes #EXT-X-ENDLIST
         segmenter.markComplete()
+
+        // Mark handle as complete (live flag for polling loops in TransmuxServer)
+        handle.markTransmuxComplete()
 
         // Write sentinel file so TransmuxServer knows transmux is done
         let sentinelPath = outputDir.appendingPathComponent(".transmux_complete").path

@@ -936,6 +936,23 @@ public actor TransmuxingService {
                             continue
                         }
                         videoKeyframeReceived = true
+                        // Communicate actual keyframe source time to segmenter (not seek target).
+                        // av_seek_frame(BACKWARD) lands at the nearest keyframe BEFORE the target.
+                        // If we use the seek target (594s) but the keyframe is at 587s, AVPlayer
+                        // displays 587s content at the 594s position = brief "wrong scene" flash.
+                        // Using actual keyframe time lets AVPlayer handle decode lead-in correctly.
+                        // Use DTS if available, otherwise fall back to PTS.
+                        let keyframeTicks = rawDtsBefore != AV_NOPTS ? rawDtsBefore : rawPtsBefore
+                        if keyframeTicks != AV_NOPTS {
+                            var inputTbNum: Int32 = 0, inputTbDen: Int32 = 0
+                            mks_stream_get_time_base(inCtx, Int32(streamIndex), &inputTbNum, &inputTbDen)
+                            if inputTbDen > 0 {
+                                let actualKeyframeSourceTime = Double(keyframeTicks) * Double(inputTbNum) / Double(inputTbDen)
+                                segmenter.updatePostSeekSourceTime(actualKeyframeSourceTime)
+                                let seekTarget = handle.lastSeekTarget ?? 0
+                                TransmuxLog.remux("POST-SEEK keyframe at source \(String(format: "%.3f", actualKeyframeSourceTime))s (target was \(String(format: "%.1f", seekTarget))s)")
+                            }
+                        }
                         // First video keyframe after seek
                     }
                     // Video keyframes fall through to the offset computation block below
@@ -1058,8 +1075,7 @@ public actor TransmuxingService {
                         seekPending = false
                         lastSeekCompletionTime = Date()
                         handle.adjustCooldown(seekWasClean: skippedPacketsAfterSeek < 20)
-                        // Signal TransmuxServer that post-seek data is being produced
-                        handle.signalSeekDataReady()
+                        // NOTE: signalSeekDataReady() moved to AFTER flush+scan below
 
                         // Write buffered video keyframe
                         for videoPkt in bufferedVideoKeyframes {
@@ -1171,6 +1187,23 @@ public actor TransmuxingService {
                             TransmuxLog.remux("SEEK #\(totalSeekCount) OK vOff=\(videoOffset) | no buffered audio")
                         }
 
+                        // Force post-seek data to disk immediately, then wake TransmuxServer.
+                        //
+                        // Critical sequence:
+                        // 1. Flush interleaver — av_interleaved_write_frame(nil) forces FFmpeg's
+                        //    internal interleaver to write the current fragment (moof+mdat) to the
+                        //    AVIO buffer. Without this, the post-seek keyframe + audio sit in the
+                        //    interleaver waiting for the NEXT keyframe to trigger a fragment flush.
+                        //    This was causing video freeze: avio_flush wrote nothing because the
+                        //    AVIO buffer was empty (data stuck in interleaver).
+                        // 2. Flush AVIO — writes the fragment from AVIO buffer to disk.
+                        // 3. Scan — HLSSegmenter discovers the new segment.
+                        // 4. Signal — wakes TransmuxServer polling loop.
+                        av_interleaved_write_frame(outCtx, nil)
+                        avio_flush(outCtx.pointee.pb)
+                        segmenter.triggerScan()
+                        handle.signalSeekDataReady()
+
                         // Current packet (4th+ keyframe) needs to continue processing normally
                         // Fall through to normal packet write below
                     }
@@ -1247,11 +1280,12 @@ public actor TransmuxingService {
             }
 
             // Flush AVIO buffer to disk periodically for progressive playback.
-            // Ultra-aggressive after seek (every 10 packets for first 100) to get the
-            // target segment to disk ~3x faster. Then moderate (every 50 for next 400),
-            // then infrequent (every 500) to reduce syscall overhead.
+            // Ultra-aggressive after seek: every packet for first 20 (video KF + initial
+            // audio that form the target segment), then every 10 for 20-100, then moderate.
             // packetCount resets to 0 on each seek, so this pattern auto-activates.
-            if packetCount < 100 {
+            if packetCount < 20 {
+                avio_flush(outCtx.pointee.pb)
+            } else if packetCount < 100 {
                 if packetCount % 10 == 0 {
                     avio_flush(outCtx.pointee.pb)
                 }

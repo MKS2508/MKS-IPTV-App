@@ -135,27 +135,18 @@ class PlayerFactory {
             return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
         }
 
-        // 3. Unknown format - check if it looks like a stream
+        // 3. Live stream → AVPlayer (native HLS/TS handling)
         let path = url.path.lowercased()
         if path.contains("/live/") || path.hasSuffix(".m3u8") {
             print("[PlayerFactory] Live stream detected → AVPlayer")
             return createPlayer(type: .avplayer, url: url, metadata: metadata)
         }
 
-        // 4. VOD with unknown format - default to FFmpeg transmux (safest for IPTV)
-        if path.contains("/movie/") || path.contains("/series/") {
-            print("[PlayerFactory] VOD with unknown format → FFmpeg transmux pipeline (default)")
-            return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
-        }
-
-        // 5. VLCKit available → VLC fallback (wide format, no PiP in 3.x)
-        if VLCPlayerImplementation.isAvailable() {
-            print("[PlayerFactory] Unknown format (\(detectedFormat)) → VLCKit fallback")
-            return createPlayer(type: .vlc, url: url, metadata: metadata)
-        }
-
-        // 6. Last resort: FFmpeg transmux (better chance than AVPlayer for non-native)
-        print("[PlayerFactory] Unknown format (\(detectedFormat)) → FFmpeg transmux (last resort)")
+        // 4. Everything else → FFmpeg transmux (safest for IPTV content)
+        // This covers: VOD with unknown format, proxy URLs (localhost),
+        // and any other URL that doesn't match native formats.
+        // VLC is still available via manual player selection.
+        print("[PlayerFactory] Non-native/unknown format (\(detectedFormat)) → FFmpeg transmux pipeline")
         return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
     }
 

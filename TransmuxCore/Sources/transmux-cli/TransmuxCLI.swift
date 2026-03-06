@@ -32,14 +32,17 @@ struct TransmuxCLI {
         let testSeek = args.contains("--test-seek")
         let interactive = args.contains("--interactive")
         let serveTest = args.contains("--serve-test")
+        let serve = args.contains("--serve")
         let seekTime = (doSeek || testSeek) ? getArgValue(for: doSeek ? "--seek" : "--test-seek") ?? 300.0 : 0.0
         let duration = getArgValue(for: "--duration") ?? 10.0
         let verbose = args.contains("--verbose")
 
         if verbose {
-            print("TransmuxCore CLI v1.2.0")
+            print("TransmuxCore CLI v1.3.0")
             print("Input: \(inputURL)")
-            if interactive {
+            if serve {
+                print("SERVE mode: HTTP server + interactive seek commands")
+            } else if interactive {
                 print("INTERACTIVE mode: reading commands from stdin")
             } else if testSeek {
                 print("TEST-SEEK mode: will seek to \(String(format: "%.1f", seekTime))s and validate logs")
@@ -80,7 +83,10 @@ struct TransmuxCLI {
                 }
             }
 
-            if serveTest {
+            if serve {
+                // --- Serve mode: HTTP server + interactive seek commands ---
+                await runServe(session: session, verbose: verbose)
+            } else if serveTest {
                 // --- Server test mode: starts TransmuxServer and simulates segment requests ---
                 await runServeTest(session: session, verbose: verbose)
             } else if interactive {
@@ -188,6 +194,339 @@ struct TransmuxCLI {
 
         // stdin closed or STOP received
         print("Interactive session ending")
+    }
+
+    // MARK: - Serve Mode (Interactive Server)
+
+    /// Starts TransmuxServer and enters an interactive command loop.
+    /// The server stays running until the user types STOP/QUIT or presses Ctrl+C.
+    /// Point AVPlayer, HLS.js, or a browser at the printed URL to stream.
+    ///
+    /// Commands:
+    ///   SEEK <seconds>   — Seek the transmux pipeline to the given source time
+    ///   STATUS           — Print current state (buffered time, segments, server port)
+    ///   SEGMENTS [N]     — List the last N real segments (default 10)
+    ///   TFDT <seg>       — Fetch a segment via HTTP and dump its tfdt values
+    ///   LOG [N]          — Print last N lines from the transmux log (default 30)
+    ///   STOP / QUIT      — Shutdown server and exit
+    static func runServe(session: ProgressiveTransmuxSession, verbose: Bool) async {
+        print("[SERVE] Waiting for initial content...")
+        let ready = await waitForContent(session: session, minSeconds: 12.0, timeout: 20.0)
+        if !ready {
+            print("[SERVE] WARNING: Timed out waiting for 12s of content, starting server anyway")
+        }
+        let initialTime = session.segmenter.latestBufferedSourceTime()
+        print("[SERVE] Initial content ready: \(String(format: "%.1f", initialTime))s buffered")
+
+        // Start TransmuxServer
+        do {
+            let serverSession = try await TransmuxServer.shared.start(
+                filePath: session.outputPath,
+                playlistPath: session.playlistPath,
+                expectedSize: session.expectedSize,
+                segmenter: session.segmenter,
+                initSegmentSize: session.initSegmentSize,
+                seekHandle: session.seekHandle
+            )
+            let baseURL = serverSession.localURL.absoluteString.replacingOccurrences(of: "/stream.m3u8", with: "")
+
+            print("")
+            print("=========================================")
+            print("  TransmuxServer running on port \(serverSession.port)")
+            print("")
+            print("  Playlist:  \(serverSession.localURL)")
+            print("  Init seg:  \(baseURL)/init.mp4")
+            print("  Segments:  \(baseURL)/seg_000.mp4 ... seg_\(String(format: "%03d", session.segmenter.totalSegmentCount - 1)).mp4")
+            print("  Duration:  \(String(format: "%.1f", session.duration))s (\(session.segmenter.totalSegmentCount) virtual segments)")
+            print("")
+            print("  Log file:  /tmp/mks-iptv-transmux.log")
+            print("  Tail logs: tail -f /tmp/mks-iptv-transmux.log")
+            print("")
+            print("  Commands: SEEK <s> | STATUS | SEGMENTS [N] | TFDT <seg> | LOG [N] | STOP")
+            print("=========================================")
+            print("")
+
+            // Handle Ctrl+C — just exit (same as other CLI modes).
+            // Server cleanup happens via OS process teardown.
+            signal(SIGINT) { _ in
+                print("\n[SERVE] Interrupted — exiting")
+                exit(0)
+            }
+
+            // Interactive command loop
+            print("> ", terminator: "")
+            fflush(stdout)
+
+            while let line = readLine() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    print("> ", terminator: "")
+                    fflush(stdout)
+                    continue
+                }
+
+                let parts = trimmed.split(separator: " ", maxSplits: 1)
+                let cmd = String(parts[0]).uppercased()
+
+                switch cmd {
+                case "STOP", "QUIT", "EXIT", "Q":
+                    print("[SERVE] Shutting down...")
+                    await TransmuxServer.shared.stop()
+                    return
+
+                case "SEEK":
+                    guard parts.count > 1, let time = Double(parts[1]) else {
+                        print("[SERVE] Usage: SEEK <seconds>")
+                        break
+                    }
+                    guard time >= 0, time <= session.duration else {
+                        print("[SERVE] Out of range. Duration is \(String(format: "%.1f", session.duration))s")
+                        break
+                    }
+                    let bufferedBefore = session.segmenter.latestBufferedSourceTime()
+                    print("[SERVE] Seeking to \(String(format: "%.1f", time))s (currently buffered: \(String(format: "%.1f", bufferedBefore))s)")
+                    session.seekHandle.requestSeek(to: time)
+
+                    // Poll for seek completion (check log for SEEK OK marker)
+                    let seekDone = await waitForSeekInLog(timeout: 12.0)
+                    let bufferedAfter = session.segmenter.latestBufferedSourceTime()
+                    if seekDone {
+                        print("[SERVE] Seek complete. Buffered: \(String(format: "%.1f", bufferedAfter))s")
+                    } else {
+                        print("[SERVE] Seek may still be processing. Buffered: \(String(format: "%.1f", bufferedAfter))s")
+                    }
+
+                    // Show post-seek tfdt log entries
+                    printRecentTfdtLogs(lastN: 15)
+
+                case "STATUS":
+                    let buffered = session.segmenter.latestBufferedSourceTime()
+                    let transmuxed = session.segmenter.latestTransmuxedTime()
+                    let seekGen = session.seekHandle.seekGeneration
+                    let lastSeek = session.seekHandle.lastSeekTarget
+                    let complete = session.seekHandle.isTransmuxComplete
+                    print("[STATUS]")
+                    print("  Buffered source time: \(String(format: "%.3f", buffered))s")
+                    print("  Latest transmuxed:    \(String(format: "%.3f", transmuxed))s")
+                    print("  Total duration:       \(String(format: "%.1f", session.duration))s")
+                    print("  Seek generation:      \(seekGen)")
+                    if let ls = lastSeek {
+                        print("  Last seek target:     \(String(format: "%.1f", ls))s")
+                    }
+                    print("  Transmux complete:    \(complete)")
+                    print("  Server URL:           \(serverSession.localURL)")
+
+                case "SEGMENTS", "SEGS":
+                    let count = parts.count > 1 ? (Int(parts[1]) ?? 10) : 10
+                    printSegmentInfo(session: session, lastN: count)
+
+                case "TFDT":
+                    guard parts.count > 1, let segIdx = Int(parts[1]) else {
+                        print("[SERVE] Usage: TFDT <segment_index>")
+                        break
+                    }
+                    await fetchAndDumpTfdt(baseURL: baseURL, segIndex: segIdx, segmenter: session.segmenter)
+
+                case "LOG":
+                    let count = parts.count > 1 ? (Int(parts[1]) ?? 30) : 30
+                    printRecentLog(lastN: count)
+
+                case "HELP", "?":
+                    print("Commands:")
+                    print("  SEEK <seconds>   Seek transmux pipeline to source time")
+                    print("  STATUS           Show current state")
+                    print("  SEGMENTS [N]     List last N real segments (default 10)")
+                    print("  TFDT <seg>       Fetch segment via HTTP, dump tfdt values")
+                    print("  LOG [N]          Print last N log lines (default 30)")
+                    print("  STOP             Shutdown and exit")
+
+                default:
+                    print("[SERVE] Unknown command: \(trimmed). Type HELP for commands.")
+                }
+
+                print("> ", terminator: "")
+                fflush(stdout)
+            }
+
+            // stdin closed
+            print("[SERVE] stdin closed — shutting down...")
+            await TransmuxServer.shared.stop()
+
+        } catch {
+            print("[SERVE] ERROR starting server: \(error.localizedDescription)")
+        }
+    }
+
+    /// Wait for the latest "SEEK #N OK" line to appear in the log.
+    static func waitForSeekInLog(timeout: Double) async -> Bool {
+        let logPath = "/tmp/mks-iptv-transmux.log"
+        // Snapshot current SEEK OK count
+        let initialCount: Int
+        if let contents = try? String(contentsOfFile: logPath, encoding: .utf8) {
+            initialCount = contents.components(separatedBy: " OK vOff=").count - 1
+        } else {
+            initialCount = 0
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let contents = try? String(contentsOfFile: logPath, encoding: .utf8) {
+                let currentCount = contents.components(separatedBy: " OK vOff=").count - 1
+                if currentCount > initialCount {
+                    return true
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return false
+    }
+
+    /// Print recent tfdt-related log lines for post-seek analysis.
+    static func printRecentTfdtLogs(lastN: Int) {
+        let logPath = "/tmp/mks-iptv-transmux.log"
+        guard let contents = try? String(contentsOfFile: logPath, encoding: .utf8) else { return }
+        let lines = contents.components(separatedBy: "\n")
+        let tfdtLines = lines.filter { $0.contains("tfdt ") || $0.contains("POST-SEEK") || $0.contains("SEEK #") }
+        let recent = tfdtLines.suffix(lastN)
+        if !recent.isEmpty {
+            print("[TFDT LOG] Last \(recent.count) tfdt/seek entries:")
+            for line in recent {
+                print("  \(line)")
+            }
+        }
+    }
+
+    /// Print info about the last N real segments discovered by the segmenter.
+    static func printSegmentInfo(session: ProgressiveTransmuxSession, lastN: Int) {
+        let targetDuration = session.segmenter.targetSegmentDuration
+        let allFragments = session.segmenter.realSegments(inTimeRange: 0, end: session.duration + 60)
+        let total = allFragments.count
+        let display = Array(allFragments.suffix(lastN))
+
+        print("[SEGMENTS] \(total) real fragments total (showing last \(display.count)):")
+        print("  idx    srcTime      virt_seg     bytes")
+        for (i, frag) in display.enumerated() {
+            let globalIdx = total - display.count + i
+            let virtSeg = Int(frag.sourceStartTime / targetDuration)
+            let srcTime = String(format: "%.3f", frag.sourceStartTime) + "s"
+            let segName = "seg_\(String(format: "%03d", virtSeg))"
+            print("  \(globalIdx)\t \(srcTime)\t \(segName)\t \(frag.length)B")
+        }
+    }
+
+    /// Fetch a segment via HTTP and parse/dump the tfdt values from its moof boxes.
+    static func fetchAndDumpTfdt(baseURL: String, segIndex: Int, segmenter: HLSSegmenter) async {
+        let path = "/seg_\(String(format: "%03d", segIndex)).mp4"
+        print("[TFDT] Fetching \(path)...")
+
+        guard let data = await fetchSegment(baseURL: baseURL, path: path) else {
+            print("[TFDT] Failed to fetch segment (404 or error)")
+            return
+        }
+        print("[TFDT] Got \(data.count) bytes. Parsing moof boxes...")
+
+        // Walk top-level boxes to find moof, then parse traf→{tfhd, tfdt}
+        var pos = 0
+        var fragCount = 0
+        while pos + 8 <= data.count {
+            guard let box = readBoxHeader(data: data, at: pos) else { break }
+            let boxSize = Int(box.size)
+            if boxSize < 8 { break }
+            let boxEnd = pos + boxSize
+            if boxEnd > data.count { break }
+
+            if box.type == "moof" {
+                fragCount += 1
+                // Parse moof children for traf
+                var child = pos + 8
+                while child + 8 <= boxEnd {
+                    guard let childBox = readBoxHeader(data: data, at: child) else { break }
+                    let childSize = Int(childBox.size)
+                    if childSize < 8 { break }
+                    let childEnd = child + childSize
+                    if childEnd > boxEnd { break }
+
+                    if childBox.type == "traf" {
+                        parseTrafForDump(data: data, trafStart: child, trafEnd: childEnd, timescales: segmenter.trackTimescales)
+                    }
+                    child = childEnd
+                }
+            }
+            pos = boxEnd
+        }
+        print("[TFDT] \(fragCount) moof boxes in segment")
+    }
+
+    /// Parse a single traf and print track_ID + tfdt info.
+    private static func parseTrafForDump(data: Data, trafStart: Int, trafEnd: Int, timescales: [UInt32: UInt32]) {
+        var trackID: UInt32?
+        var tfdtValue: UInt64?
+        var tfdtVersion: UInt8?
+
+        var offset = trafStart + 8
+        while offset + 8 <= trafEnd {
+            guard let box = readBoxHeader(data: data, at: offset) else { break }
+            let boxSize = Int(box.size)
+            if boxSize < 8 { break }
+            let boxEnd = offset + boxSize
+            if boxEnd > trafEnd { break }
+
+            if box.type == "tfhd" {
+                let idOffset = offset + 8 + 4
+                if idOffset + 4 <= boxEnd {
+                    trackID = data.withUnsafeBytes { ptr in
+                        ptr.loadUnaligned(fromByteOffset: idOffset, as: UInt32.self).bigEndian
+                    }
+                }
+            } else if box.type == "tfdt" {
+                let vOffset = offset + 8
+                if vOffset + 4 <= boxEnd {
+                    tfdtVersion = data[vOffset]
+                    if tfdtVersion == 1, vOffset + 4 + 8 <= boxEnd {
+                        tfdtValue = data.withUnsafeBytes { ptr in
+                            ptr.loadUnaligned(fromByteOffset: vOffset + 4, as: UInt64.self).bigEndian
+                        }
+                    } else if vOffset + 4 + 4 <= boxEnd {
+                        tfdtValue = UInt64(data.withUnsafeBytes { ptr in
+                            ptr.loadUnaligned(fromByteOffset: vOffset + 4, as: UInt32.self).bigEndian
+                        })
+                    }
+                }
+            }
+            offset = boxEnd
+        }
+
+        if let tid = trackID, let tfdt = tfdtValue {
+            let ts = timescales[tid] ?? 90000
+            let seconds = Double(tfdt) / Double(ts)
+            print("  track=\(tid) tfdt=\(tfdt) ts=\(ts) -> \(String(format: "%.3f", seconds))s (v\(tfdtVersion ?? 0))")
+        }
+    }
+
+    /// Minimal box header reader for segment parsing (same logic as MP4BoxParser).
+    private static func readBoxHeader(data: Data, at offset: Int) -> (size: Int64, type: String)? {
+        guard offset + 8 <= data.count else { return nil }
+        let size32 = data.withUnsafeBytes { ptr in
+            ptr.loadUnaligned(fromByteOffset: offset, as: UInt32.self).bigEndian
+        }
+        let typeBytes = data.subdata(in: (offset + 4)..<(offset + 8))
+        let type = String(bytes: typeBytes, encoding: .ascii) ?? "????"
+        return (Int64(size32), type)
+    }
+
+    /// Print last N lines from the transmux log file.
+    static func printRecentLog(lastN: Int) {
+        let logPath = "/tmp/mks-iptv-transmux.log"
+        guard let contents = try? String(contentsOfFile: logPath, encoding: .utf8) else {
+            print("[LOG] Cannot read \(logPath)")
+            return
+        }
+        let lines = contents.components(separatedBy: "\n").filter { !$0.isEmpty }
+        let recent = Array(lines.suffix(lastN))
+        print("[LOG] Last \(recent.count) lines:")
+        for line in recent {
+            print("  \(line)")
+        }
     }
 
     // MARK: - Serve Test
@@ -540,14 +879,21 @@ struct TransmuxCLI {
             <input>                 Input file path or HTTP(S) URL
 
         OPTIONS:
-            --interactive           Interactive mode: read SEEK/STATUS/STOP from stdin
-            --serve-test            Full server test: start TransmuxServer, fetch segments, verify cache/mmap/prefetch
+            --serve                 Start HTTP server + interactive command loop for manual testing
+            --interactive           Interactive mode: read SEEK/STATUS/STOP from stdin (no HTTP server)
+            --serve-test            Automated server test: fetch segments, verify cache/mmap/prefetch
             --seek TIME             Seek to TIME seconds (one-shot seek during remux)
             --test-seek TIME        Run automated seek test with log validation
             --duration SECONDS      Duration to run transmux (default: 10 seconds)
             --verbose               Enable verbose output
 
         EXAMPLES:
+            # Interactive server mode — start HTTP server, seek manually, inspect logs
+            transmux-cli movie.mkv --serve --verbose
+
+            # Same, with a remote MKV
+            transmux-cli "http://iptv.example.com/movie.mkv" --serve --verbose
+
             # Basic transmux for 10 seconds
             transmux-cli movie.mkv
 
@@ -557,7 +903,7 @@ struct TransmuxCLI {
             # Full server test with cache/mmap/prefetch validation
             transmux-cli movie.mkv --serve-test --verbose
 
-            # Interactive mode (used by web backend)
+            # Interactive mode (used by web backend, no HTTP server)
             transmux-cli movie.mkv --interactive --verbose
 
             # One-shot seek at 5 minutes
@@ -566,8 +912,13 @@ struct TransmuxCLI {
             # Automated seek test with validation (recommended for CI)
             transmux-cli movie.mkv --test-seek 300
 
-            # Remote URL with verbose output
-            transmux-cli http://example.com/stream.mkv --verbose
+        SERVE MODE COMMANDS:
+            SEEK <seconds>          Seek transmux pipeline to source time
+            STATUS                  Show buffered time, seek generation, server URL
+            SEGMENTS [N]            List last N real segments (default 10)
+            TFDT <segment_index>    Fetch segment via HTTP, dump tfdt decode times
+            LOG [N]                 Print last N transmux log lines (default 30)
+            STOP / QUIT             Shutdown server and exit
 
         OUTPUT:
             Transmuxed files are written to /tmp/mks-iptv-transmux-<sessionID>/

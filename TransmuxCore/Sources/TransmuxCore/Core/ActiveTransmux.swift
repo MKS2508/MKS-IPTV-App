@@ -10,6 +10,7 @@ public class ActiveTransmux {
     private var _cancelled = false
     private var _seekRequest: Double? = nil
     private var _lastSeekTarget: Double?
+    private var _seekGeneration: UInt64 = 0
     private var _isTransmuxComplete = false
     private var _cooldownSeconds: TimeInterval = 0.8
     private let _seekDataSemaphore = DispatchSemaphore(value: 0)
@@ -40,6 +41,16 @@ public class ActiveTransmux {
         lock.lock()
         _isTransmuxComplete = true
         lock.unlock()
+    }
+
+    /// Monotonic seek generation counter. Incremented on every requestSeek().
+    /// Used by TransmuxServer polling loops to detect stale requests: if
+    /// seekGeneration has advanced past the snapshot taken at dispatch time,
+    /// the segment request belongs to an old seek and should be aborted (404).
+    public var seekGeneration: UInt64 {
+        lock.lock()
+        defer { lock.unlock() }
+        return _seekGeneration
     }
 
     /// The most recent seek target time (source seconds).
@@ -155,6 +166,7 @@ public class ActiveTransmux {
     /// The output context stays the same, so all moof+mdat remain compatible.
     public func requestSeek(to timeSeconds: Double) {
         lock.lock()
+        _seekGeneration += 1
         _seekRequest = timeSeconds
         _lastSeekTarget = timeSeconds
         lock.unlock()

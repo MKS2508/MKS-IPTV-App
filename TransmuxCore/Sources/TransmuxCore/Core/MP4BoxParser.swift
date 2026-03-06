@@ -81,7 +81,7 @@ public enum MP4BoxParser {
         guard offset + 8 <= data.count else { return nil }
 
         let size32 = data.withUnsafeBytes { ptr -> UInt32 in
-            ptr.load(fromByteOffset: offset, as: UInt32.self).bigEndian
+            ptr.loadUnaligned(fromByteOffset: offset, as: UInt32.self).bigEndian
         }
 
         let typeStart = offset + 4
@@ -92,7 +92,7 @@ public enum MP4BoxParser {
             // Extended 64-bit size
             guard offset + 16 <= data.count else { return nil }
             let size64 = data.withUnsafeBytes { ptr -> UInt64 in
-                ptr.load(fromByteOffset: offset + 8, as: UInt64.self).bigEndian
+                ptr.loadUnaligned(fromByteOffset: offset + 8, as: UInt64.self).bigEndian
             }
             return BoxHeader(size: Int64(size64), type: type, headerSize: 16)
         }

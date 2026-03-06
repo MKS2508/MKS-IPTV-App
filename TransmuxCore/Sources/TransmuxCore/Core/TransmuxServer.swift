@@ -591,6 +591,11 @@ public actor TransmuxServer {
             seekTriggered = true
         }
 
+        // Capture seek generation at dispatch time. If a new seek arrives while
+        // this polling loop runs, seekGeneration advances → we detect staleness
+        // and abort with 404 instead of serving wrong-position data to AVPlayer.
+        let seekGenAtDispatch = handle.seekGeneration
+
         // Step 4: Polling loop with FULLNESS GATE
         DispatchQueue.global(qos: .userInitiated).async {
             // Phase 1: 30 × 100ms = 3s   (fast — sequential catch-up)
@@ -642,6 +647,17 @@ public actor TransmuxServer {
                         Thread.sleep(forTimeInterval: interval)
                     }
                     totalPolls += 1
+
+                    // STALE CHECK: abort if a newer seek has arrived since dispatch.
+                    // Serving old-position data after a seek causes visible "jump to old content".
+                    if handle.seekGeneration > seekGenAtDispatch {
+                        TransmuxLog.log("seg_\(String(format: "%03d", segIndex)): STALE (gen \(seekGenAtDispatch)\u{2192}\(handle.seekGeneration))", tag: "Server")
+                        let staleResp = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+                        connection.send(content: staleResp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                            connection.cancel()
+                        })
+                        return
+                    }
 
                     // Force HLSSegmenter to scan disk NOW instead of waiting for 300ms timer
                     segmenter.triggerScan()
@@ -734,6 +750,16 @@ public actor TransmuxServer {
             let elapsed = Date().timeIntervalSince(pollStart)
             var finalBuffered = segmenter.latestBufferedSourceTime()
             let finalLatest = segmenter.latestTransmuxedTime()
+
+            // STALE CHECK before timeout fallback
+            if handle.seekGeneration > seekGenAtDispatch {
+                TransmuxLog.log("seg_\(String(format: "%03d", segIndex)): STALE at timeout (gen \(seekGenAtDispatch)\u{2192}\(handle.seekGeneration))", tag: "Server")
+                let staleResp = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+                connection.send(content: staleResp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+                return
+            }
 
             // Tier 1: Retry seek if no seek was triggered during the main polling loop.
             // The sequential transmux may have stalled. Give it one more chance with a
@@ -879,10 +905,13 @@ public actor TransmuxServer {
         let shouldRewrite = !trackTimescales.isEmpty
         var result = Data()
 
-        for fragment in fragments {
+        for (idx, fragment) in fragments.enumerated() {
             let offset = Int(fragment.offset)
             let length = Int(fragment.length)
-            guard offset >= 0 && length > 0 && offset + length <= fileSize else { continue }
+            guard offset >= 0 && length > 0 && offset + length <= fileSize else {
+                TransmuxLog.log("FRAG[\(idx)] SKIP: offset=\(offset) len=\(length) fileSize=\(fileSize)", tag: "Server", level: .warn)
+                continue
+            }
 
             // Copy from mapped region (copy required since rewriteTfdtInPlace mutates)
             var chunk = Data(bytes: mapped.advanced(by: offset), count: length)
@@ -965,7 +994,7 @@ public actor TransmuxServer {
                 let idOffset = offset + 8 + 4 // skip header + version/flags
                 if idOffset + 4 <= boxEnd {
                     trackID = data.withUnsafeBytes { ptr in
-                        ptr.load(fromByteOffset: idOffset, as: UInt32.self).bigEndian
+                        ptr.loadUnaligned(fromByteOffset: idOffset, as: UInt32.self).bigEndian
                     }
                 }
             } else if box.type == "tfdt" {
@@ -993,6 +1022,17 @@ public actor TransmuxServer {
         if version == 1 {
             // 64-bit baseMediaDecodeTime
             guard valueOffset + 8 <= trafEnd else { return }
+            let oldTfdt = data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: valueOffset, as: UInt64.self).bigEndian
+            }
+            TransmuxLog.log("tfdt track=\(tid) ts=\(timescale) old=\(oldTfdt)(\(String(format: "%.3f", Double(oldTfdt) / Double(timescale)))s) new=\(newTfdt)(\(String(format: "%.3f", sourceTime))s)", tag: "Server", level: .debug)
+            // Skip rewrite when old and new are close — preserves original per-track
+            // timing for pre-seek segments where the video-derived sourceStartTime
+            // differs slightly from the audio's actual DTS (~72ms typical).
+            let diffTicks = newTfdt > oldTfdt ? newTfdt - oldTfdt : oldTfdt - newTfdt
+            if diffTicks < UInt64(timescale / 2) {
+                return  // Within 0.5s tolerance — keep original tfdt
+            }
             var bigEndian = newTfdt.bigEndian
             withUnsafeBytes(of: &bigEndian) { src in
                 data.replaceSubrange(valueOffset..<(valueOffset + 8), with: src)
@@ -1003,6 +1043,15 @@ public actor TransmuxServer {
             if newTfdt > UInt64(UInt32.max) {
                 TransmuxLog.log("rewriteTfdt: newTfdt \(newTfdt) overflows UInt32 for track \(tid), skipping", tag: "Server", level: .warn)
                 return
+            }
+            let oldTfdt = UInt64(data.withUnsafeBytes { ptr in
+                ptr.loadUnaligned(fromByteOffset: valueOffset, as: UInt32.self).bigEndian
+            })
+            TransmuxLog.log("tfdt track=\(tid) ts=\(timescale) old=\(oldTfdt)(\(String(format: "%.3f", Double(oldTfdt) / Double(timescale)))s) new=\(UInt32(newTfdt))(\(String(format: "%.3f", sourceTime))s)", tag: "Server", level: .debug)
+            // Skip rewrite when old and new are close (same tolerance as v1 branch)
+            let diffTicks = newTfdt > oldTfdt ? newTfdt - oldTfdt : oldTfdt - newTfdt
+            if diffTicks < UInt64(timescale / 2) {
+                return  // Within 0.5s tolerance — keep original tfdt
             }
             var bigEndian = UInt32(newTfdt).bigEndian
             withUnsafeBytes(of: &bigEndian) { src in

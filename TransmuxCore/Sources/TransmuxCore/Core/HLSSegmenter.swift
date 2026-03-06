@@ -154,6 +154,18 @@ public class HLSSegmenter {
     /// duration instead of being buffered. Reduces post-seek latency by ~one segment duration.
     private var emitNextSegmentImmediately = false
 
+    /// Update the post-seek source time with the actual keyframe time.
+    /// Called by TransmuxingService after identifying the first video keyframe
+    /// post-seek. Replaces the original seek target with the true keyframe DTS
+    /// so that tfdt rewriting maps to the actual content position.
+    public func updatePostSeekSourceTime(_ actualTime: Double) {
+        scanQueue.sync {
+            if self.pendingSeekSourceTime != nil {
+                self.pendingSeekSourceTime = actualTime
+            }
+        }
+    }
+
     public func notifySeekDiscontinuity(seekTargetTime: Double) {
         scanQueue.sync {
             self.scanForNewSegments()      // pick up any data flushed before seek
@@ -432,6 +444,7 @@ public class HLSSegmenter {
                             sourceToOutputOffset = startTimeSec - seekTarget
                             sourceStartTimeSec = seekTarget
                             pendingSeekSourceTime = nil
+                            TransmuxLog.segmenter("POST-SEEK BUFFERED seg[\(segments.count)] outputDts=\(String(format: "%.3f", startTimeSec))s srcTime=\(String(format: "%.3f", seekTarget))s newOffset=\(String(format: "%.3f", sourceToOutputOffset)) track=\(buffered.trackID) dur=\(String(format: "%.3f", duration))s")
                         } else {
                             // Normal segment: reverse the mapping
                             sourceStartTimeSec = startTimeSec - sourceToOutputOffset
@@ -476,6 +489,8 @@ public class HLSSegmenter {
                         } else {
                             sourceStartTimeSec = startTimeSec - sourceToOutputOffset
                         }
+
+                        TransmuxLog.segmenter("POST-SEEK IMMEDIATE seg[\(segments.count)] outputDts=\(String(format: "%.3f", startTimeSec))s srcTime=\(String(format: "%.3f", sourceStartTimeSec))s offset=\(String(format: "%.3f", sourceToOutputOffset)) track=\(rawTrackID) ts=\(effectiveTimescale) bytes=\(rawSize) at=\(rawOffset)")
 
                         let segment = Segment(
                             index: segments.count,

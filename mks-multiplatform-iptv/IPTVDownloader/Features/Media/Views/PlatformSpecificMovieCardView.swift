@@ -37,14 +37,13 @@ struct EnhancedMovieTagProvider: TagContentProvider {
     func expandedTags() -> [(icon: String, text: String)] {
         var tags = [(String, String)]()
         
-        // Formato de fecha mejorado
+        // Formato de fecha mejorado (added is a Unix epoch timestamp string)
         if let added = movie.added {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            if let date = formatter.date(from: added) {
-                formatter.dateFormat = "MMM d, yyyy"
-                let formattedDate = formatter.string(from: date)
-                tags.append((customIcon(for: "added") ?? "calendar.badge.plus", "Added: \(formattedDate)"))
+            if let ts = TimeInterval(added) {
+                let date = Date(timeIntervalSince1970: ts)
+                let fmt = DateFormatter()
+                fmt.dateFormat = "MMM d, yyyy"
+                tags.append((customIcon(for: "added") ?? "calendar.badge.plus", "Added: \(fmt.string(from: date))"))
             } else {
                 tags.append((customIcon(for: "added") ?? "calendar.badge.plus", "Added: \(added)"))
             }

@@ -169,7 +169,14 @@ struct MovieTagProvider: TagContentProvider {
         }
         
         if let added = movie.added {
-            tags.append((getIconName(for: "added"), "Added: \(added)"))
+            if let ts = TimeInterval(added) {
+                let date = Date(timeIntervalSince1970: ts)
+                let fmt = DateFormatter()
+                fmt.dateStyle = .medium
+                tags.append((getIconName(for: "added"), "Added: \(fmt.string(from: date))"))
+            } else {
+                tags.append((getIconName(for: "added"), "Added: \(added)"))
+            }
         }
         
         if let containerExtension = movie.containerExtension {

@@ -115,16 +115,14 @@ struct MediaListView: View {
         VStack(spacing: 0) {
             // Categories indicator section
             categoriesIndicatorSection
-            
+
             // Content type selector section
             contentTypeSelectorSection
-            
+
             // Main content or state views
             mainContentOrStateViews
         }
-        #if os(macOS)
         .frame(maxHeight: .infinity)
-        #endif
     }
     
     // Categories Indicator Section
@@ -172,6 +170,7 @@ struct MediaListView: View {
                 stateViews
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // Content using universal grid container

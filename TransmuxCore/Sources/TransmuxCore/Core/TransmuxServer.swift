@@ -56,7 +56,10 @@ public actor TransmuxServer {
     private var listener: NWListener?
     private var activeConnections: [NWConnection] = []
     private var filePath: String?
-    private var playlistPath: String?
+    /// Always points to stream.m3u8 (the media playlist with segments).
+    private var mediaPlaylistPath: String?
+    /// Points to master.m3u8 when multi-audio or subtitles exist, nil otherwise.
+    private var masterPlaylistPath: String?
     private var expectedSize: Int64 = 0
     private var isComplete = false
     private var currentPort: UInt16 = 0
@@ -84,9 +87,19 @@ public actor TransmuxServer {
     /// Called after avformat_write_header succeeds and HLSSegmenter has written
     /// the VOD playlist. Waits for the NWListener to reach `.ready` state
     /// before returning, so AVPlayer can connect immediately.
+    ///
+    /// - Parameters:
+    ///   - filePath: Path to the growing fMP4 file (stream.mp4).
+    ///   - playlistPath: Entry playlist — master.m3u8 when multi-audio/subtitles exist, stream.m3u8 otherwise.
+    ///   - mediaPlaylistPath: Always stream.m3u8. When nil, defaults to `playlistPath` (single-variant case).
+    ///   - expectedSize: Expected final file size for Content-Length headers.
+    ///   - segmenter: HLS segmenter for time-based segment lookups.
+    ///   - initSegmentSize: Size of the init segment (ftyp+moov) in stream.mp4.
+    ///   - seekHandle: Handle for redirecting the sequential transmux to a new input position.
     public func start(
         filePath: String,
         playlistPath: String,
+        mediaPlaylistPath: String? = nil,
         expectedSize: Int64,
         segmenter: HLSSegmenter,
         initSegmentSize: Int64,
@@ -102,7 +115,14 @@ public actor TransmuxServer {
 
         self.stopped = false
         self.filePath = filePath
-        self.playlistPath = playlistPath
+        // mediaPlaylistPath is ALWAYS stream.m3u8
+        self.mediaPlaylistPath = mediaPlaylistPath ?? playlistPath
+        // masterPlaylistPath is set only when playlistPath differs from media (multi-audio/subs)
+        if let media = mediaPlaylistPath, media != playlistPath {
+            self.masterPlaylistPath = playlistPath
+        } else {
+            self.masterPlaylistPath = nil
+        }
         self.expectedSize = expectedSize
         self.segmenter = segmenter
         self.initSegmentSize = initSegmentSize
@@ -157,7 +177,15 @@ public actor TransmuxServer {
             nwListener.start(queue: self.networkQueue)
         }
 
-        guard let url = URL(string: "http://localhost:\(port)/stream.m3u8") else {
+        // Use LAN IP for AirPlay compatibility: Apple TV resolves localhost to itself.
+        let host = Self.getLANIPAddress() ?? "localhost"
+        if host == "localhost" {
+            TransmuxLog.log("WARNING: Could not determine LAN IP, AirPlay may not work", tag: "Server", level: .warn)
+        }
+
+        // Entry URL: master.m3u8 when multi-variant, stream.m3u8 when single-variant
+        let entryFile = self.masterPlaylistPath != nil ? "master.m3u8" : "stream.m3u8"
+        guard let url = URL(string: "http://\(host):\(port)/\(entryFile)") else {
             throw ServerError.invalidFilePath
         }
 
@@ -183,7 +211,8 @@ public actor TransmuxServer {
         listener?.cancel()
         listener = nil
         filePath = nil
-        playlistPath = nil
+        mediaPlaylistPath = nil
+        masterPlaylistPath = nil
         expectedSize = 0
         isComplete = false
         currentPort = 0
@@ -255,7 +284,8 @@ public actor TransmuxServer {
 
         let expectedSize = self.expectedSize
         let complete = self.isComplete
-        let playlist = self.playlistPath
+        let mediaPlaylist = self.mediaPlaylistPath
+        let masterPlaylist = self.masterPlaylistPath
         let seg = self.segmenter
         let initSize = self.initSegmentSize
         let handle = self.seekHandle
@@ -265,17 +295,25 @@ public actor TransmuxServer {
 
         // Route based on request path
         if path.hasSuffix(".m3u8") {
-            // HLS playlist (master, media, or subtitle)
-            // For sub_*.m3u8, serve from the output directory
+            // HLS playlist routing — disambiguate master, media, and subtitle playlists.
+            // CRITICAL: /stream.m3u8 MUST always resolve to the media playlist (with segments),
+            // and /master.m3u8 MUST resolve to the master playlist (with renditions).
+            // Previously both resolved to the same file, causing an infinite redirect loop.
             let resolvedPlaylistPath: String?
-            if path.contains("sub_"), let playlist = playlist {
-                let dir = (playlist as NSString).deletingLastPathComponent
+            if path.contains("sub_"), let media = mediaPlaylist {
+                // Subtitle playlist: resolve from the same directory as the media playlist
+                let dir = (media as NSString).deletingLastPathComponent
                 let fileName = (path as NSString).lastPathComponent
                 resolvedPlaylistPath = (dir as NSString).appendingPathComponent(fileName)
-            } else if path.contains("master") || path.contains("stream") {
-                resolvedPlaylistPath = playlist
+            } else if path.contains("stream") {
+                // Media playlist (segments): ALWAYS stream.m3u8
+                resolvedPlaylistPath = mediaPlaylist
+            } else if path.contains("master") {
+                // Master playlist (renditions): master.m3u8 when it exists, fallback to media
+                resolvedPlaylistPath = masterPlaylist ?? mediaPlaylist
             } else {
-                resolvedPlaylistPath = playlist
+                // Unknown .m3u8 — try media playlist as fallback
+                resolvedPlaylistPath = mediaPlaylist
             }
 
             if let resolvedPath = resolvedPlaylistPath {
@@ -287,9 +325,9 @@ public actor TransmuxServer {
                 }
             }
         } else if path.hasSuffix(".vtt") {
-            // WebVTT subtitle file
-            if let playlist = playlist {
-                let dir = (playlist as NSString).deletingLastPathComponent
+            // WebVTT subtitle file — resolve from the same directory as the media playlist
+            if let media = mediaPlaylist {
+                let dir = (media as NSString).deletingLastPathComponent
                 let fileName = (path as NSString).lastPathComponent
                 let vttPath = (dir as NSString).appendingPathComponent(fileName)
                 handleGetVTT(connection: connection, vttPath: vttPath)
@@ -1383,6 +1421,54 @@ public actor TransmuxServer {
             }
         }
         throw ServerError.portExhausted
+    }
+
+    // MARK: - LAN IP Address
+
+    /// Determine the device's LAN IP address for AirPlay compatibility.
+    /// Apple TV resolves `localhost` to itself, so we need the actual LAN IP
+    /// so AirPlay Video can fetch segments from this device over the network.
+    ///
+    /// Scans IPv4 interfaces, preferring en0 (WiFi). Filters out loopback (127.x.x.x)
+    /// and link-local (169.254.x.x) addresses. Works on iOS, macOS, and tvOS.
+    private nonisolated static func getLANIPAddress() -> String? {
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return nil }
+        defer { freeifaddrs(ifaddr) }
+
+        var bestIP: String?
+        var fallbackIP: String?
+
+        var current: UnsafeMutablePointer<ifaddrs>? = firstAddr
+        while let addr = current {
+            defer { current = addr.pointee.ifa_next }
+
+            // Only IPv4 (AF_INET)
+            guard addr.pointee.ifa_addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+
+            // Extract interface name and IP
+            let name = String(cString: addr.pointee.ifa_name)
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let result = getnameinfo(
+                addr.pointee.ifa_addr, socklen_t(addr.pointee.ifa_addr.pointee.sa_len),
+                &hostname, socklen_t(hostname.count),
+                nil, 0, NI_NUMERICHOST
+            )
+            guard result == 0 else { continue }
+            let ip = String(cString: hostname)
+
+            // Skip loopback and link-local
+            if ip.hasPrefix("127.") || ip.hasPrefix("169.254.") { continue }
+
+            // Prefer en0 (WiFi on Apple devices)
+            if name == "en0" {
+                bestIP = ip
+            } else if fallbackIP == nil {
+                fallbackIP = ip
+            }
+        }
+
+        return bestIP ?? fallbackIP
     }
 }
 

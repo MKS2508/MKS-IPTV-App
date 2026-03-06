@@ -64,6 +64,7 @@ public class HLSSegmenter {
     public let totalDuration: Double
     public let targetSegmentDuration: Double = 6.0
     public private(set) var totalSegmentCount: Int
+    public let audioTracks: [AudioTrackInfo]
     public let subtitleTracks: [SubtitleTrackInfo]
 
     private var segments: [Segment] = []
@@ -102,15 +103,16 @@ public class HLSSegmenter {
 
     // MARK: - Init
 
-    public init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64, duration: Double, subtitleTracks: [SubtitleTrackInfo] = []) {
+    public init(fmp4Path: String, playlistPath: String, initSegmentSize: Int64, duration: Double, audioTracks: [AudioTrackInfo] = [], subtitleTracks: [SubtitleTrackInfo] = []) {
         self.fmp4Path = fmp4Path
         self.playlistPath = playlistPath
         self.initSegmentSize = initSegmentSize
         self.totalDuration = duration
         self.totalSegmentCount = max(1, Int(ceil(duration / 6.0)))
+        self.audioTracks = audioTracks
         self.subtitleTracks = subtitleTracks
         self.scanOffset = initSegmentSize
-        TransmuxLog.segmenter("Created: fmp4=\(fmp4Path), playlist=\(playlistPath), initSize=\(initSegmentSize), duration=\(String(format: "%.1f", duration))s, virtualSegments=\(totalSegmentCount), subtitles=\(subtitleTracks.count)")
+        TransmuxLog.segmenter("Created: fmp4=\(fmp4Path), playlist=\(playlistPath), initSize=\(initSegmentSize), duration=\(String(format: "%.1f", duration))s, virtualSegments=\(totalSegmentCount), audio=\(audioTracks.count), subtitles=\(subtitleTracks.count)")
     }
 
     // MARK: - Public API
@@ -745,44 +747,77 @@ public class HLSSegmenter {
     // MARK: - Master Playlist (multivariant with subtitles)
 
     /// Write a multivariant (master) HLS playlist that references the media playlist
-    /// and any subtitle renditions via `#EXT-X-MEDIA:TYPE=SUBTITLES`.
+    /// with audio renditions (`#EXT-X-MEDIA:TYPE=AUDIO`) and/or subtitle renditions
+    /// (`#EXT-X-MEDIA:TYPE=SUBTITLES`).
     ///
-    /// Only call when `subtitleTracks` is non-empty. When there are no subtitles,
-    /// the single `stream.m3u8` media playlist is used directly as the entry point.
+    /// Only call when `audioTracks.count > 1` or `subtitleTracks` is non-empty.
+    /// When there's a single audio track and no subtitles, the single `stream.m3u8`
+    /// media playlist is used directly as the entry point (no master needed).
+    ///
+    /// Audio tracks are listed WITHOUT a `URI` attribute because they are multiplexed
+    /// in the same fMP4 file. AVPlayer reads the track metadata from the moov atom
+    /// and uses the `#EXT-X-MEDIA` entries to populate the audio track selector.
     public func writeMasterPlaylist(to path: String) {
-        guard !subtitleTracks.isEmpty else { return }
+        guard audioTracks.count > 1 || !subtitleTracks.isEmpty else { return }
 
         let playlistDir = (path as NSString).deletingLastPathComponent
+        let hasMultiAudio = audioTracks.count > 1
+        let hasSubtitles = !subtitleTracks.isEmpty
 
         var m3u8 = "#EXTM3U\n"
 
-        // Subtitle renditions
-        for (idx, sub) in subtitleTracks.enumerated() {
-            let isDefault = idx == 0 && !sub.isForced ? "YES" : "NO"
-            let autoSelect = isDefault == "YES" ? "YES" : "NO"
-            let forced = sub.isForced ? "YES" : "NO"
-            let name = sub.title.isEmpty ? sub.language.uppercased() : sub.title
-            let subPlaylistName = "sub_\(sub.language)_\(idx).m3u8"
+        // Audio renditions (multiplexed — no URI, tracks live in the same fMP4)
+        if hasMultiAudio {
+            m3u8 += "\n"
+            for (idx, audio) in audioTracks.enumerated() {
+                let isDefault = audio.isDefault ? "YES" : "NO"
+                let autoSelect = "YES"
+                let name = audio.title.isEmpty
+                    ? (audio.language == "und" ? "Track \(idx + 1)" : audio.language.uppercased())
+                    : audio.title
+                let channels = audio.channels > 0 ? "\(audio.channels)" : "2"
 
-            m3u8 += "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"\(name)\","
-            m3u8 += "DEFAULT=\(isDefault),AUTOSELECT=\(autoSelect),FORCED=\(forced),"
-            m3u8 += "LANGUAGE=\"\(sub.language)\",URI=\"\(subPlaylistName)\"\n"
-
-            // Write the per-subtitle m3u8 playlist (single segment covering full duration)
-            writeSubtitlePlaylist(
-                to: (playlistDir as NSString).appendingPathComponent(subPlaylistName),
-                vttFileName: sub.vttFileName
-            )
+                m3u8 += "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\","
+                m3u8 += "NAME=\"\(name)\","
+                m3u8 += "DEFAULT=\(isDefault),AUTOSELECT=\(autoSelect),"
+                m3u8 += "LANGUAGE=\"\(audio.language)\","
+                m3u8 += "CHANNELS=\"\(channels)\"\n"
+            }
         }
 
+        // Subtitle renditions
+        if hasSubtitles {
+            m3u8 += "\n"
+            for (idx, sub) in subtitleTracks.enumerated() {
+                let isDefault = idx == 0 && !sub.isForced ? "YES" : "NO"
+                let autoSelect = isDefault == "YES" ? "YES" : "NO"
+                let forced = sub.isForced ? "YES" : "NO"
+                let name = sub.title.isEmpty ? sub.language.uppercased() : sub.title
+                let subPlaylistName = "sub_\(sub.language)_\(idx).m3u8"
+
+                m3u8 += "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"\(name)\","
+                m3u8 += "DEFAULT=\(isDefault),AUTOSELECT=\(autoSelect),FORCED=\(forced),"
+                m3u8 += "LANGUAGE=\"\(sub.language)\",URI=\"\(subPlaylistName)\"\n"
+
+                // Write the per-subtitle m3u8 playlist (single segment covering full duration)
+                writeSubtitlePlaylist(
+                    to: (playlistDir as NSString).appendingPathComponent(subPlaylistName),
+                    vttFileName: sub.vttFileName
+                )
+            }
+        }
+
+        // Stream variant pointing to the media playlist, referencing audio and/or subtitle groups
         m3u8 += "\n"
-        // Stream variant pointing to the media playlist, referencing subtitle group
-        m3u8 += "#EXT-X-STREAM-INF:BANDWIDTH=5000000,SUBTITLES=\"subs\"\n"
+        var streamInf = "#EXT-X-STREAM-INF:BANDWIDTH=5000000"
+        if hasMultiAudio { streamInf += ",AUDIO=\"audio\"" }
+        if hasSubtitles { streamInf += ",SUBTITLES=\"subs\"" }
+        m3u8 += streamInf + "\n"
         m3u8 += "stream.m3u8\n"
 
         do {
             try m3u8.write(toFile: path, atomically: true, encoding: .utf8)
-            TransmuxLog.segmenter("Wrote master playlist with \(subtitleTracks.count) subtitle tracks")
+            TransmuxLog.segmenter("Wrote master playlist: \(audioTracks.count) audio + \(subtitleTracks.count) subtitle tracks")
         } catch {
             TransmuxLog.segmenter("ERROR: Failed to write master playlist: \(error)", level: .error)
         }

@@ -62,27 +62,37 @@ struct EnhancedSerieTagProvider: TagContentProvider {
             tags.append(("megaphone.fill", "Creator: \(director)"))
         }
         
-        // Fecha de lanzamiento formateada
+        // Fecha de lanzamiento formateada (may be epoch timestamp or yyyy-MM-dd)
         if !serie.releaseDate.isEmpty {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            if let date = formatter.date(from: serie.releaseDate) {
-                formatter.dateFormat = "MMMM d, yyyy"
-                let formattedDate = formatter.string(from: date)
-                tags.append(("calendar.badge.clock", "First Aired: \(formattedDate)"))
+            let fmt = DateFormatter()
+            let date: Date?
+            if let ts = TimeInterval(serie.releaseDate) {
+                date = Date(timeIntervalSince1970: ts)
+            } else {
+                fmt.dateFormat = "yyyy-MM-dd"
+                date = fmt.date(from: serie.releaseDate)
+            }
+            if let date {
+                fmt.dateFormat = "MMMM d, yyyy"
+                tags.append(("calendar.badge.clock", "First Aired: \(fmt.string(from: date))"))
             } else {
                 tags.append(("calendar", "First Aired: \(serie.releaseDate)"))
             }
         }
-        
-        // Fecha de última modificación (útil para saber si hay actualizaciones)
+
+        // Fecha de última modificación (may be epoch timestamp or yyyy-MM-dd)
         if !serie.lastModified.isEmpty {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            if let date = formatter.date(from: serie.lastModified) {
-                formatter.dateFormat = "MMM d, yyyy"
-                let formattedDate = formatter.string(from: date)
-                tags.append(("arrow.triangle.2.circlepath", "Updated: \(formattedDate)"))
+            let fmt = DateFormatter()
+            let date: Date?
+            if let ts = TimeInterval(serie.lastModified) {
+                date = Date(timeIntervalSince1970: ts)
+            } else {
+                fmt.dateFormat = "yyyy-MM-dd"
+                date = fmt.date(from: serie.lastModified)
+            }
+            if let date {
+                fmt.dateFormat = "MMM d, yyyy"
+                tags.append(("arrow.triangle.2.circlepath", "Updated: \(fmt.string(from: date))"))
             }
         }
         

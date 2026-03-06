@@ -4,12 +4,15 @@ import Foundation
 
 /// Thread-safe structured logger for player events.
 /// Mirrors TransmuxLog design for consistency across the codebase.
-/// Output file: /tmp/mks-iptv-player.log
+/// Output file: <temporaryDirectory>/mks-iptv-player.log
 enum PlayerLog {
 
     // MARK: - Configuration
 
-    public static let filePath = "/tmp/mks-iptv-player.log"
+    public static let filePath: String = {
+        let dir = FileManager.default.temporaryDirectory.path
+        return (dir as NSString).appendingPathComponent("mks-iptv-player.log")
+    }()
     private static let queue = DispatchQueue(label: "PlayerLog.write", qos: .utility)
     private static let dateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()

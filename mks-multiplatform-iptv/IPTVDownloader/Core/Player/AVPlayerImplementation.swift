@@ -139,6 +139,17 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Store metadata for Now Playing info (Control Center / Lock Screen / AirPlay)
         self.pendingMetadata = metadata
 
+        // Set externalMetadata on the AVPlayerItem so AVPlayerViewController can display
+        // title, artist, and artwork in its UI, Control Center, Lock Screen, and AirPlay.
+        // Without this, AVPlayerViewController overrides MPNowPlayingInfoCenter with empty metadata.
+        // NOTE: externalMetadata is an AVKit extension available only on iOS/tvOS, not macOS.
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        if let metadata = metadata, let item = playerItem {
+            item.externalMetadata = PlayerMetadataHelper.buildExternalMetadata(from: metadata)
+            PlayerMetadataHelper.loadExternalArtwork(for: item, from: metadata)
+        }
+        #endif
+
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
         // For HLS via TransmuxServer, let AVPlayer buffer properly before starting.
@@ -191,6 +202,20 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         PlayerLog.stateChange(from: "paused", to: "playing", playerType: "AVPlayer")
 
+        // Register remote commands (idempotent — only runs once per session).
+        // Without this, macOS ignores MPNowPlayingInfoCenter entirely.
+        if pendingMetadata != nil {
+            PlayerMetadataHelper.setupRemoteTransportControls(
+                onPlay: { [weak self] in self?.play() },
+                onPause: { [weak self] in self?.pause() },
+                onToggle: { [weak self] in
+                    guard let self else { return }
+                    self.isPlaying ? self.pause() : self.play()
+                },
+                onSeek: { [weak self] time in self?.seek(to: time) }
+            )
+        }
+
         // Set Now Playing info for Control Center / Lock Screen / AirPlay
         if let metadata = pendingMetadata {
             PlayerMetadataHelper.setNowPlayingInfo(
@@ -199,7 +224,6 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 currentTime: currentTime,
                 playbackRate: Double(rate)
             )
-            // Load artwork asynchronously
             PlayerMetadataHelper.loadArtwork(from: metadata)
         }
     }
@@ -210,9 +234,10 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         PlayerLog.stateChange(from: "playing", to: "paused", playerType: "AVPlayer")
 
-        // Update playback rate to 0 in Now Playing info
+        // Update playback state and rate in Now Playing info
         if pendingMetadata != nil {
             PlayerMetadataHelper.updatePlaybackProgress(currentTime: currentTime, playbackRate: 0)
+            PlayerMetadataHelper.setPlaybackStatePaused()
         }
     }
 
@@ -249,7 +274,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // End logging session
         PlayerLog.endSession()
 
-        // Clear Now Playing info
+        // Teardown remote commands and clear Now Playing info
+        PlayerMetadataHelper.teardownRemoteTransportControls()
         PlayerMetadataHelper.clearNowPlayingInfo()
         pendingMetadata = nil
     }
@@ -324,6 +350,15 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Create NEW AVPlayer and AVPlayerItem — forces fresh HLS playlist parse
         // This is the key: replaceCurrentItem(with:) doesn't reset HLS state machine
         playerItem = AVPlayerItem(url: urlAsset.url)
+
+        // Re-apply external metadata on the new item so NowPlaying survives reload
+        #if os(iOS) || os(tvOS) || os(visionOS)
+        if let metadata = pendingMetadata, let item = playerItem {
+            item.externalMetadata = PlayerMetadataHelper.buildExternalMetadata(from: metadata)
+            PlayerMetadataHelper.loadExternalArtwork(for: item, from: metadata)
+        }
+        #endif
+
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
         player?.automaticallyWaitsToMinimizeStalling = false

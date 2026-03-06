@@ -9,53 +9,29 @@ struct GridLayoutContainer<Content: View>: View {
     #if os(iOS)
     private let cardMinWidth: CGFloat = 140
     private let cardMaxWidth: CGFloat = 200
-    private let minColumns: CGFloat = 2
-    private let maxColumns: CGFloat = 5
     private let gridSpacing: CGFloat = 14
     private let horizontalPadding: CGFloat = 16
     private let verticalPadding: CGFloat = 16
     #else
     private let cardMinWidth: CGFloat = 150
     private let cardMaxWidth: CGFloat = 220
-    private let minColumns: CGFloat = 3
-    private let maxColumns: CGFloat = 7
     private let gridSpacing: CGFloat = 16
     private let horizontalPadding: CGFloat = 20
     private let verticalPadding: CGFloat = 20
     #endif
 
-    /// Dynamic column width calculation based on available width
-    private func calculateColumnWidth(availableWidth: CGFloat) -> CGFloat {
-        let usableWidth = availableWidth - (horizontalPadding * 2)
-        let columnCount = max(minColumns, min(maxColumns, floor(usableWidth / cardMinWidth)))
-        let totalSpacing = (columnCount - 1) * gridSpacing
-        let columnWidth = (usableWidth - totalSpacing) / columnCount
-
-        return min(cardMaxWidth, max(cardMinWidth, columnWidth))
-    }
-
-    /// Correct grid configuration following Apple guidelines
-    private func columns(for availableWidth: CGFloat) -> [GridItem] {
-        let columnWidth = calculateColumnWidth(availableWidth: availableWidth)
-        return [GridItem(.adaptive(minimum: columnWidth, maximum: cardMaxWidth),
-                 spacing: gridSpacing, alignment: .top)]
-    }
-
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                LazyVGrid(columns: columns(for: geometry.size.width), spacing: gridSpacing) {
-                    content()
-                }
-                .padding(.horizontal, horizontalPadding)
-                .padding(.vertical, verticalPadding)
+        ScrollView {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: cardMinWidth, maximum: cardMaxWidth), spacing: gridSpacing, alignment: .top)],
+                spacing: gridSpacing
+            ) {
+                content()
             }
-            // Proper scroll configuration
-            .scrollIndicators(.automatic)
-            .scrollContentBackground(.automatic)
-            // Let navigation handle safe areas naturally
-            .clipped() // Prevent overflow
+            .padding(.horizontal, horizontalPadding)
+            .padding(.vertical, verticalPadding)
         }
+        .scrollIndicators(.automatic)
     }
 }
 

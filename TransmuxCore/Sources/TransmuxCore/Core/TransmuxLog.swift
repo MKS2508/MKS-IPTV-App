@@ -1,7 +1,7 @@
 import Foundation
 
 /// Thread-safe buffered file logger for the transmux pipeline.
-/// Writes timestamped entries to `/tmp/mks-iptv-transmux.log`.
+/// Writes timestamped entries to `<temporaryDirectory>/mks-iptv-transmux.log`.
 /// Also mirrors to stdout via `print()` for Xcode console.
 ///
 /// ## Buffering
@@ -23,9 +23,9 @@ import Foundation
 /// TransmuxLog.flush()  // before reading log or at session end
 /// ```
 ///
-/// Tail the file live:
+/// Tail the file live (macOS):
 /// ```bash
-/// tail -f /tmp/mks-iptv-transmux.log
+/// tail -f $TMPDIR/mks-iptv-transmux.log
 /// ```
 public enum TransmuxLog {
 
@@ -53,8 +53,11 @@ public enum TransmuxLog {
 
     // MARK: - Configuration
 
-    /// Log file path — easy to tail from terminal.
-    public static let filePath = "/tmp/mks-iptv-transmux.log"
+    /// Log file path — uses the system temporary directory (sandbox-safe on iOS).
+    public static let filePath: String = {
+        let dir = FileManager.default.temporaryDirectory.path
+        return (dir as NSString).appendingPathComponent("mks-iptv-transmux.log")
+    }()
 
     private static let queue = DispatchQueue(label: "TransmuxLog.write", qos: .utility)
     private static let dateFormatter: DateFormatter = {
@@ -216,7 +219,10 @@ public enum TransmuxLog {
         guard let h = FileHandle(forWritingAtPath: filePath) else {
             // Fallback: create the file and try again
             FileManager.default.createFile(atPath: filePath, contents: nil)
-            let fallback = FileHandle(forWritingAtPath: filePath)!
+            guard let fallback = FileHandle(forWritingAtPath: filePath) else {
+                // Cannot write to log file — fail silently instead of crashing
+                return FileHandle.nullDevice
+            }
             persistentHandle = fallback
             return fallback
         }

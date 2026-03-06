@@ -68,6 +68,10 @@ struct NativeAVPlayerView: NSViewRepresentable {
         view.controlsStyle = .floating
         view.allowsPictureInPicturePlayback = true
         view.showsFullScreenToggleButton = true
+        // Disable automatic NowPlaying updates — AVPlayerView would override
+        // our manually-set MPNowPlayingInfoCenter metadata with empty data
+        // (macOS AVKit doesn't support externalMetadata on AVPlayerItem).
+        view.updatesNowPlayingInfoCenter = false
         return view
     }
 

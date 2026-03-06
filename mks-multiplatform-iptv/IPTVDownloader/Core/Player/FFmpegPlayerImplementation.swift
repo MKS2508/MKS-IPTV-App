@@ -118,6 +118,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 let serverSession = try await TransmuxServer.shared.start(
                     filePath: session.outputPath,
                     playlistPath: session.playlistPath,
+                    mediaPlaylistPath: session.mediaPlaylistPath,
                     expectedSize: effectiveSize,
                     segmenter: session.segmenter,
                     initSegmentSize: session.initSegmentSize,

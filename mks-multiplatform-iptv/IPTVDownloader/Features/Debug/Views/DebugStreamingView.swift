@@ -9,6 +9,9 @@ import AppKit
 struct DebugStreamingView: View {
     @StateObject private var viewModel: DebugStreamingViewModel
     @EnvironmentObject var profile: IPTVProfile
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @State private var selectedTab = ContentTab.movies
     @State private var selectedItem: DebugStreamItem?
     @State private var showingPlayer = false
@@ -19,6 +22,7 @@ struct DebugStreamingView: View {
     @State private var selectedLiveTVCategory: String = "all"
     @State private var showingCategoryURLs = false
     @State private var activeProxySession: StreamProxy.ProxySession?
+    @State private var activeMetadata: MetadataResult?
 
     /// Threshold for URL length above which we use the proxy.
     /// FFmpeg n6.1 has a buffer overflow on URLs >~500 chars.
@@ -50,12 +54,14 @@ struct DebugStreamingView: View {
             .fullscreenPlayer(
                 isPresented: $showingPlayer,
                 player: activePlayer,
-                title: activePlayerLabel
+                title: activePlayerLabel,
+                metadata: activeMetadata
             )
             .onChange(of: showingPlayer) { _, isShowing in
                 if !isShowing {
                     activePlayer?.stop()
                     activePlayer = nil
+                    activeMetadata = nil
                     if let session = activeProxySession {
                         Task { await StreamProxy.shared.stop(sessionID: session.id) }
                         activeProxySession = nil
@@ -512,10 +518,14 @@ struct DebugStreamingView: View {
                 }
             }
 
+            // Fetch enriched metadata before creating the player
+            let metadata = await fetchEnrichedMetadata(for: item)
+            activeMetadata = metadata
+
             let startTime = Date()
 
             // PlayerFactory auto-selects best player based on file extension
-            let player: any VideoPlayerProtocol = PlayerFactory.shared.createPlayer(for: playbackURL)
+            let player: any VideoPlayerProtocol = PlayerFactory.shared.createPlayer(for: playbackURL, metadata: metadata)
 
             let playerType = detectPlayerType(player)
             let initTime = Date().timeIntervalSince(startTime)
@@ -525,9 +535,15 @@ struct DebugStreamingView: View {
             viewModel.updateItemState(item.id, totalLatency: initTime)
 
             player.play()
+            #if os(macOS)
+            let label = "\(item.title) — \(playerType.displayName) — \(item.fileExtension)"
+            PlayerWindowManager.shared.present(player: player, title: label, metadata: metadata)
+            openWindow(id: "player")
+            #else
             activePlayer = player
             activePlayerLabel = "\(item.title) — \(playerType.displayName) — \(item.fileExtension)"
             showingPlayer = true
+            #endif
             viewModel.log("Playback started", type: .success)
         }
     }
@@ -587,7 +603,11 @@ struct DebugStreamingView: View {
                 }
             }
 
-            let player = PlayerFactory.shared.createPlayer(type: playerType, url: playbackURL)
+            // Fetch enriched metadata before creating the player
+            let metadata = await fetchEnrichedMetadata(for: item)
+            activeMetadata = metadata
+
+            let player = PlayerFactory.shared.createPlayer(type: playerType, url: playbackURL, metadata: metadata)
             let actualType = detectPlayerType(player)
 
             if actualType != playerType {
@@ -595,9 +615,15 @@ struct DebugStreamingView: View {
             }
 
             player.play()
+            #if os(macOS)
+            let label = "\(item.title) — \(actualType.displayName) (forced) — \(item.fileExtension)"
+            PlayerWindowManager.shared.present(player: player, title: label, metadata: metadata)
+            openWindow(id: "player")
+            #else
             activePlayer = player
             activePlayerLabel = "\(item.title) — \(actualType.displayName) (forced) — \(item.fileExtension)"
             showingPlayer = true
+            #endif
             viewModel.log("Playback started with \(actualType.displayName)", type: .success)
         }
     }
@@ -654,14 +680,94 @@ struct DebugStreamingView: View {
                 }
             }
 
-            let player = PlayerFactory.shared.createPlayer(for: playbackURL)
+            // Build episode metadata from available info
+            let episodeMetadata = MetadataResult(
+                title: episode.title,
+                plot: episode.info.plot.isEmpty ? nil : episode.info.plot,
+                posterURL: episode.info.movieImage.isEmpty ? nil : episode.info.movieImage,
+                providerName: "DebugView",
+                confidence: 0.5,
+                mediaType: .episode,
+                seasonNumber: episode.season,
+                episodeNumber: episode.episodeNum,
+                episodeTitle: episode.title,
+                showTitle: serie.title
+            )
+            activeMetadata = episodeMetadata
+
+            let player = PlayerFactory.shared.createPlayer(for: playbackURL, metadata: episodeMetadata)
             let playerType = detectPlayerType(player)
             player.play()
 
+            #if os(macOS)
+            let label = "\(serie.title) — \(episode.title) — \(playerType.displayName)"
+            PlayerWindowManager.shared.present(player: player, title: label, metadata: episodeMetadata)
+            openWindow(id: "player")
+            #else
             activePlayer = player
             activePlayerLabel = "\(serie.title) — \(episode.title) — \(playerType.displayName)"
             showingPlayer = true
+            #endif
             viewModel.log("Episode playback started with \(playerType.displayName)", type: .success)
+        }
+    }
+
+    // MARK: - Enriched Metadata Fetch
+
+    /// Fetch enriched metadata for a DebugStreamItem by fetching full movie/series details
+    /// from the IPTV API, then looking up enriched metadata (TMDB, etc.) via EnrichedMediaStore.
+    /// Falls back to basic metadata from the item title if enrichment fails.
+    private func fetchEnrichedMetadata(for item: DebugStreamItem) async -> MetadataResult? {
+        viewModel.log("Fetching enriched metadata for \"\(item.title)\"...", type: .info)
+
+        do {
+            switch item.type {
+            case .movie:
+                let detail = try await viewModel.movieService.fetchMovieDetails(movieId: item.id)
+                viewModel.log("Got movie detail: \(detail.movieData.name)", type: .info)
+
+                // Try enriched metadata from TMDB/providers
+                if let enriched = await EnrichedMediaStore.shared.getEnrichedMetadata(
+                    for: detail.movieData,
+                    tmdbId: detail.movieData.tmdbIdInt
+                ) {
+                    viewModel.log("Enriched metadata: \(enriched.title) [\(enriched.providerName), confidence: \(String(format: "%.0f%%", enriched.confidence * 100))]", type: .success)
+                    return enriched
+                }
+
+                // Fallback: build MetadataResult from IPTV detail data
+                viewModel.log("No enriched metadata — using IPTV detail data", type: .warning)
+                return MetadataResult(
+                    title: detail.movieData.formattedTitle,
+                    year: detail.movieData.year.flatMap { Int($0) },
+                    genre: detail.genre.isEmpty ? [] : detail.genre.components(separatedBy: ", "),
+                    plot: detail.plot.isEmpty ? nil : detail.plot,
+                    director: detail.director.isEmpty ? nil : detail.director,
+                    cast: detail.cast,
+                    rating: detail.rating.flatMap { Double($0) },
+                    posterURL: detail.movieImage.isEmpty ? detail.movieData.streamIcon : detail.movieImage,
+                    backdropURL: detail.backdropPath?.first,
+                    artworkURLs: detail.backdropPath ?? [],
+                    tmdbId: detail.movieData.tmdbIdInt,
+                    providerName: "IPTV",
+                    confidence: 0.7,
+                    mediaType: .movie
+                )
+
+            case .series:
+                // Series items don't have a direct stream URL — this shouldn't be called
+                viewModel.log("Series enrichment not supported in direct play", type: .warning)
+                return nil
+            }
+        } catch {
+            viewModel.log("Failed to fetch metadata: \(error.localizedDescription)", type: .warning)
+            // Fallback: minimal metadata with just the title
+            return MetadataResult(
+                title: item.title,
+                providerName: "DebugView",
+                confidence: 0.3,
+                mediaType: item.type == .movie ? .movie : .series
+            )
         }
     }
 

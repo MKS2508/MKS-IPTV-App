@@ -54,7 +54,11 @@ public struct SubtitleTrackInfo: Sendable {
 public struct ProgressiveTransmuxSession {
     public let sessionID: String
     public let outputPath: String
+    /// Entry playlist URL: master.m3u8 when multi-audio or subtitles exist, stream.m3u8 otherwise.
     public let playlistPath: String
+    /// Always points to the media playlist (stream.m3u8). Used by TransmuxServer
+    /// to disambiguate /stream.m3u8 from /master.m3u8 requests.
+    public let mediaPlaylistPath: String
     public let expectedSize: Int64
     public let duration: Double
     public let segmenter: HLSSegmenter
@@ -708,25 +712,27 @@ public actor TransmuxingService {
         }
 
         // Create HLS segmenter with known duration to generate a VOD playlist upfront
-        // When subtitles exist, create a master playlist structure
+        // When subtitles or multi-audio exist, create a master playlist structure
         let playlistDir = outputDir
         let mediaPlaylistPath = playlistDir.appendingPathComponent("stream.m3u8").path
-        let masterPlaylistPath = subtitleTrackInfos.isEmpty
-            ? mediaPlaylistPath
-            : playlistDir.appendingPathComponent("master.m3u8").path
+        let needsMasterPlaylist = audioTrackInfos.count > 1 || !subtitleTrackInfos.isEmpty
+        let masterPlaylistPath = needsMasterPlaylist
+            ? playlistDir.appendingPathComponent("master.m3u8").path
+            : mediaPlaylistPath
 
         let segmenter = HLSSegmenter(
             fmp4Path: mp4Path,
             playlistPath: mediaPlaylistPath,
             initSegmentSize: headerFileSize,
             duration: durationSeconds,
+            audioTracks: audioTrackInfos,
             subtitleTracks: subtitleTrackInfos
         )
         segmenter.start()
         handle.segmenter = segmenter
 
-        // Write master playlist if subtitles exist
-        if !subtitleTrackInfos.isEmpty {
+        // Write master playlist if multi-audio or subtitles exist
+        if needsMasterPlaylist {
             segmenter.writeMasterPlaylist(to: masterPlaylistPath)
         }
 
@@ -734,11 +740,12 @@ public actor TransmuxingService {
 
         // Resume the continuation: caller gets the session and can start AVPlayer.
         // Pass the ActiveTransmux handle so TransmuxServer can request seek-redirects.
-        // The entry playlist URL is master.m3u8 when subtitles exist, stream.m3u8 otherwise.
+        // The entry playlist URL is master.m3u8 when multi-audio or subtitles exist, stream.m3u8 otherwise.
         let session = ProgressiveTransmuxSession(
             sessionID: sessionID,
             outputPath: mp4Path,
-            playlistPath: subtitleTrackInfos.isEmpty ? mediaPlaylistPath : masterPlaylistPath,
+            playlistPath: masterPlaylistPath,
+            mediaPlaylistPath: mediaPlaylistPath,
             expectedSize: expectedSize,
             duration: durationSeconds,
             segmenter: segmenter,

@@ -309,6 +309,9 @@ struct LiveChannelDetailSheet: View {
     let onClose: () -> Void
     
     @EnvironmentObject var profile: IPTVProfile
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @State private var showInlinePlayer = false
     @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var showFullscreenPlayer = false
@@ -514,9 +517,15 @@ struct LiveChannelDetailSheet: View {
 
         let player = PlayerFactory.shared.createPlayer(for: url)
         player.play()
+        #if os(macOS)
+        PlayerWindowManager.shared.present(player: player, title: channel.name)
+        openWindow(id: "player")
+        self.isLoading = false
+        #else
         self.activePlayer = player
         self.showInlinePlayer = true
         self.isLoading = false
+        #endif
         LiveLogger.debug("Playback started via PlayerFactory")
     }
     

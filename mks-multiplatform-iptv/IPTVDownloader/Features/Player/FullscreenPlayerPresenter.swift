@@ -1,10 +1,11 @@
 import SwiftUI
 
-// MARK: - Fullscreen Player Modifier
+// MARK: - Fullscreen Player Modifier (iOS/tvOS only)
 
 /// Manages presentation of a fullscreen native system player.
 /// - iOS/tvOS: uses `.fullScreenCover` for immersive presentation
-/// - macOS: uses `.sheet` with large frame
+/// - macOS: no-op — macOS uses a separate `Window(id: "player")` scene instead
+#if !os(macOS)
 struct FullscreenPlayerModifier: ViewModifier {
     @Binding var isPresented: Bool
     let player: (any VideoPlayerProtocol)?
@@ -14,21 +15,12 @@ struct FullscreenPlayerModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            #if os(iOS) || os(tvOS)
             .fullScreenCover(isPresented: $isPresented) {
                 if let player {
                     fullscreenContent(player: player)
                         .ignoresSafeArea()
                 }
             }
-            #elseif os(macOS)
-            .sheet(isPresented: $isPresented) {
-                if let player {
-                    fullscreenContent(player: player)
-                        .frame(minWidth: 960, idealWidth: 1280, minHeight: 540, idealHeight: 720)
-                }
-            }
-            #endif
     }
 
     @ViewBuilder
@@ -49,16 +41,17 @@ struct FullscreenPlayerModifier: ViewModifier {
         )
         .background(Color.black)
         .ignoresSafeArea()
-        #if os(macOS)
-        .onExitCommand(perform: dismiss)
-        #endif
     }
 }
+#endif
 
 // MARK: - View Extension
 
 extension View {
     /// Present a fullscreen native system player.
+    /// - iOS/tvOS: presents via `.fullScreenCover`
+    /// - macOS: no-op (macOS uses `Window(id: "player")` via `PlayerWindowManager`)
+    ///
     /// - Parameters:
     ///   - isPresented: Binding controlling presentation
     ///   - player: The video player protocol instance
@@ -73,6 +66,9 @@ extension View {
         metadata: MetadataResult? = nil,
         stopOnDismiss: Bool = true
     ) -> some View {
+        #if os(macOS)
+        self
+        #else
         modifier(FullscreenPlayerModifier(
             isPresented: isPresented,
             player: player,
@@ -80,5 +76,6 @@ extension View {
             metadata: metadata,
             stopOnDismiss: stopOnDismiss
         ))
+        #endif
     }
 }

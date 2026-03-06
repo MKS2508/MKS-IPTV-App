@@ -22,9 +22,15 @@ struct MediaDetailSheet: View {
     private var movieDetail: MovieDetail? { detail as? MovieDetail }
 
     @EnvironmentObject private var downloadManager: DownloadManager
+    @EnvironmentObject private var profile: IPTVProfile
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     // MARK: - State
 
+    @State private var showingPlayer = false
+    @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var enrichedMetadata: MetadataResult?
     @State private var metadataCandidates: [ScoredMetadataResult] = []
     @State private var selectedTab: DetailTab = .overview
@@ -41,11 +47,23 @@ struct MediaDetailSheet: View {
         for: .downloadsDirectory, in: .userDomainMask
     ).first!
 
-    #if os(macOS)
-    private let headerMaxHeight: CGFloat = 350
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isCompact: Bool { horizontalSizeClass == .compact }
     #else
-    private let headerMaxHeight: CGFloat = 400
+    private var isCompact: Bool { false }
     #endif
+
+    private var headerMaxHeight: CGFloat {
+        #if os(macOS)
+        return 350
+        #else
+        return isCompact ? 300 : 400
+        #endif
+    }
+
+    private var posterWidth: CGFloat { isCompact ? 85 : 110 }
+    private var posterHeight: CGFloat { posterWidth * 1.5 }
 
     // MARK: - Tabs
 
@@ -87,6 +105,18 @@ struct MediaDetailSheet: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .fullscreenPlayer(
+            isPresented: $showingPlayer,
+            player: activePlayer,
+            title: detail.cleanTitle,
+            metadata: enrichedMetadata
+        )
+        .onChange(of: showingPlayer) { _, isShowing in
+            if !isShowing {
+                activePlayer?.stop()
+                activePlayer = nil
+            }
+        }
         .task {
             await loadEnrichedMetadata()
             if let serie = serieDetail {
@@ -126,6 +156,7 @@ struct MediaDetailSheet: View {
             .padding(.bottom, 20)
         }
         .frame(height: headerMaxHeight)
+        .clipped()
     }
 
     @ViewBuilder
@@ -139,6 +170,8 @@ struct MediaDetailSheet: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
                         .transition(.opacity)
                 case .failure:
                     fallbackBackdrop
@@ -184,12 +217,15 @@ struct MediaDetailSheet: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
                         .transition(.opacity)
                 default:
                     posterPlaceholder
                 }
             }
-            .frame(width: 110, height: 165)
+            .frame(width: posterWidth, height: posterHeight)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall))
             .shadow(color: .black.opacity(0.5), radius: 10, y: 5)
         } else {
@@ -200,7 +236,7 @@ struct MediaDetailSheet: View {
     private var posterPlaceholder: some View {
         RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall)
             .fill(AppColors.surface)
-            .frame(width: 110, height: 165)
+            .frame(width: posterWidth, height: posterHeight)
             .overlay {
                 Image(systemName: detail.mediaType == .movie ? "film" : "tv")
                     .font(.largeTitle)
@@ -222,7 +258,7 @@ struct MediaDetailSheet: View {
 
             // Title
             Text(detail.cleanTitle)
-                .font(.title2.weight(.bold))
+                .font(isCompact ? .headline.weight(.bold) : .title2.weight(.bold))
                 .foregroundStyle(.white)
                 .lineLimit(2)
 
@@ -288,6 +324,9 @@ struct MediaDetailSheet: View {
         }
         if detail.isHDR { parts.append("HDR") }
 
+        #if os(iOS)
+        if isCompact { return Array(parts.prefix(3)) }
+        #endif
         return parts
     }
 
@@ -320,13 +359,15 @@ struct MediaDetailSheet: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        HStack(spacing: 10) {
-            Button {
-                // Play — reuse existing navigation
-                navigateToItem()
-            } label: {
+        let layout = isCompact
+            ? AnyLayout(VStackLayout(spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 10))
+
+        layout {
+            Button { playContent() } label: {
                 Label("Play", systemImage: "play.fill")
                     .font(.caption.weight(.semibold))
+                    .frame(maxWidth: isCompact ? .infinity : nil)
             }
             .buttonStyle(.appGlassProminent)
 
@@ -336,6 +377,7 @@ struct MediaDetailSheet: View {
             } label: {
                 Label("Download", systemImage: "arrow.down.circle")
                     .font(.caption.weight(.medium))
+                    .frame(maxWidth: isCompact ? .infinity : nil)
             }
             .buttonStyle(.appGlass)
         }
@@ -485,7 +527,7 @@ struct MediaDetailSheet: View {
                                 episode: episode,
                                 serieName: detail.cleanTitle,
                                 onPlay: {
-                                    // Play episode
+                                    playEpisode(episode)
                                 },
                                 onDownload: {
                                     downloadEpisode = episode
@@ -686,13 +728,63 @@ struct MediaDetailSheet: View {
 
     // MARK: - Helpers
 
-    private func navigateToItem() {
-        switch detail.mediaType {
-        case .movie:
-            selectedView = NavigationDestination.movies.rawValue
-        case .series:
-            selectedView = NavigationDestination.series.rawValue
+    private func playContent() {
+        if let movie = movieDetail {
+            let urlString = IPTVConfiguration.buildMovieURL(
+                profile: profile,
+                vodID: String(movie.movieData.streamId),
+                vodExtension: movie.movieData.containerExtension ?? "mkv"
+            )
+            guard let url = URL(string: urlString) else { return }
+            let player = PlayerFactory.shared.createPlayer(for: url, metadata: enrichedMetadata)
+            player.play()
+            #if os(macOS)
+            PlayerWindowManager.shared.present(player: player, title: detail.cleanTitle, metadata: enrichedMetadata)
+            openWindow(id: "player")
+            #else
+            activePlayer = player
+            showingPlayer = true
+            #endif
+        } else if let serie = serieDetail,
+                  let firstSeason = serie.seasons.first,
+                  let firstEpisode = serie.episodes[firstSeason.id]?.first {
+            playEpisode(firstEpisode)
         }
+    }
+
+    private func playEpisode(_ episode: SerieDetail.Episode) {
+        let urlString = IPTVConfiguration.buildSeriesURL(
+            profile: profile,
+            vodID: episode.id,
+            vodExtension: episode.containerExtension
+        )
+        guard let url = URL(string: urlString) else { return }
+
+        let episodeMetadata = MetadataResult(
+            title: "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum)) — \(episode.title)",
+            genre: enrichedMetadata?.genre ?? [],
+            plot: episode.info.plot.isEmpty ? nil : episode.info.plot,
+            rating: enrichedMetadata?.rating,
+            posterURL: episode.info.movieImage.isEmpty ? enrichedMetadata?.posterURL : episode.info.movieImage,
+            providerName: enrichedMetadata?.providerName ?? "IPTV",
+            confidence: enrichedMetadata?.confidence ?? 0.5,
+            mediaType: .episode,
+            seasonNumber: episode.season,
+            episodeNumber: episode.episodeNum,
+            episodeTitle: episode.title,
+            showTitle: detail.cleanTitle
+        )
+
+        let player = PlayerFactory.shared.createPlayer(for: url, metadata: episodeMetadata)
+        player.play()
+        #if os(macOS)
+        let epTitle = "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum)) — \(episode.title)"
+        PlayerWindowManager.shared.present(player: player, title: epTitle, metadata: episodeMetadata)
+        openWindow(id: "player")
+        #else
+        activePlayer = player
+        showingPlayer = true
+        #endif
     }
 
     private func loadEnrichedMetadata() async {
@@ -719,6 +811,14 @@ struct EpisodeRowView: View {
     let onPlay: () -> Void
     let onDownload: () -> Void
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var thumbWidth: CGFloat { sizeClass == .compact ? 90 : 120 }
+    #else
+    private let thumbWidth: CGFloat = 120
+    #endif
+    private var thumbHeight: CGFloat { thumbWidth * 68 / 120 }
+
     var body: some View {
         HStack(spacing: 12) {
             // Episode thumbnail
@@ -729,16 +829,18 @@ struct EpisodeRowView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .frame(width: thumbWidth, height: thumbHeight)
+                            .clipped()
                     default:
                         AppColors.surface
                     }
                 }
-                .frame(width: 120, height: 68)
+                .frame(width: thumbWidth, height: thumbHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(AppColors.surface)
-                    .frame(width: 120, height: 68)
+                    .frame(width: thumbWidth, height: thumbHeight)
                     .overlay {
                         Image(systemName: "play.rectangle")
                             .foregroundStyle(AppColors.textTertiary)

@@ -137,10 +137,10 @@ struct MediaCardViewiOS: View {
     private let posterAspectRatio: CGFloat = 2/3
     private let overlayBlurRadius: CGFloat = 16
     private let textGlowRadius: CGFloat = 6
-    private let detailsPadding: CGFloat = 12
-    private let titleFontSize: CGFloat = 16
-    private let detailsFontSize: CGFloat = 14
-    private let smallDetailsFontSize: CGFloat = 12
+    private let detailsPadding: CGFloat = 10
+    private let titleFontSize: CGFloat = 14
+    private let detailsFontSize: CGFloat = 11
+    private let smallDetailsFontSize: CGFloat = 10
     #else
     private let posterAspectRatio: CGFloat = 2/3
     private let overlayBlurRadius: CGFloat = 20
@@ -190,7 +190,7 @@ struct MediaCardViewiOS: View {
                 .offset(y: isDetailsExpanded ? 0 : 10)
         }
         .aspectRatio(posterAspectRatio, contentMode: .fit)
-        .cornerRadius(config.cornerRadius)
+        .clipShape(RoundedRectangle(cornerRadius: config.cornerRadius, style: .continuous))
         .overlay(borderOverlay)
         .shadow(
             color: .black.opacity(isTapped ? 0.2 : 0.1),
@@ -204,9 +204,22 @@ struct MediaCardViewiOS: View {
         .animation(config.expandAnimation, value: isDetailsExpanded)
         .zIndex(isDetailsExpanded ? 1 : 0)
         .contentShape(RoundedRectangle(cornerRadius: config.cornerRadius))
-        .simultaneousGesture(tapGesture)
-        .simultaneousGesture(longPressGesture)
-        .simultaneousGesture(DragGesture().onChanged { _ in }) // Permitir scroll en listas
+        .onTapGesture {
+            withAnimation(config.expandAnimation) {
+                isDetailsExpanded.toggle()
+            }
+            handleTapFeedback()
+        }
+        .onLongPressGesture(minimumDuration: 0.3) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                isTapped = false
+            }
+            onViewDetails()
+        } onPressingChanged: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isTapped = pressing
+            }
+        }
         .transition(.asymmetric(
             insertion: .opacity.combined(with: .scale(scale: 0.95)),
             removal: .opacity
@@ -218,29 +231,8 @@ struct MediaCardViewiOS: View {
     }
     
     // MARK: - Gestos
-    private var tapGesture: some Gesture {
-        TapGesture()
-            .onEnded { _ in
-                withAnimation(config.expandAnimation) {
-                    isDetailsExpanded.toggle()
-                }
-                handleTapFeedback()
-            }
-    }
-
-    private var longPressGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .onChanged { _ in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isTapped = true
-                }
-            }
-            .onEnded { _ in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isTapped = false
-                }
-            }
-    }
+    // Using .onTapGesture and .onLongPressGesture on the body instead of
+    // .simultaneousGesture which competed with ScrollView's scroll gesture.
     
     // MARK: - Subvistas
     private func posterImage() -> some View {
@@ -254,7 +246,8 @@ struct MediaCardViewiOS: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .drawingGroup()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
                 case .failure:
                     PlaceholderView(
                         systemImage: mediaCardType.placeholderIcon,
@@ -288,10 +281,15 @@ struct MediaCardViewiOS: View {
                 .shadow(color: .black.opacity(0.8), radius: textGlowRadius, x: 0, y: 2)
                 .matchedGeometryEffect(id: "\(mediaCardType.id)-title", in: namespace)
             
-            HStack {
-                // Tags básicos
-                HStack(spacing: 6) {
-                    ForEach(Array(tagProvider.basicTags().enumerated()), id: \.offset) { _, tag in
+            HStack(spacing: 4) {
+                // Tags básicos (limit to 2 on iOS for narrow cards)
+                #if os(iOS)
+                let visibleTags = Array(tagProvider.basicTags().prefix(2))
+                #else
+                let visibleTags = tagProvider.basicTags()
+                #endif
+                HStack(spacing: 4) {
+                    ForEach(Array(visibleTags.enumerated()), id: \.offset) { _, tag in
                         TagView(
                             icon: tag.icon,
                             text: tag.text,
@@ -300,9 +298,9 @@ struct MediaCardViewiOS: View {
                         )
                     }
                 }
-                
-                Spacer()
-                
+
+                Spacer(minLength: 2)
+
                 if isDetailsExpanded {
                     detailButton
                 } else {

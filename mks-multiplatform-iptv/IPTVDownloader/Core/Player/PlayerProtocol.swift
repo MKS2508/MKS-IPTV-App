@@ -102,16 +102,103 @@ extension VideoPlayerProtocol {
 import MediaPlayer
 
 /// Helper for setting Now Playing metadata that appears in Control Center, Lock Screen, and AirPlay displays.
-/// Uses MPNowPlayingInfoCenter which works across all Apple platforms.
+/// Uses MPNowPlayingInfoCenter + MPRemoteCommandCenter which works across all Apple platforms.
+///
+/// ## Why both MPRemoteCommandCenter AND MPNowPlayingInfoCenter?
+/// The system only recognizes an app as an active media session when **remote commands are registered**.
+/// Without at least play/pause handlers in `MPRemoteCommandCenter.shared()`, setting `nowPlayingInfo`
+/// has no effect — the Now Playing widget never appears. This is especially critical on macOS where
+/// `AVPlayerView` doesn't automatically register commands when `updatesNowPlayingInfoCenter = false`.
 enum PlayerMetadataHelper {
+
+    /// Whether remote commands are currently registered.
+    private(set) static var isRemoteCommandsActive = false
+
+    // MARK: - Remote Transport Controls
+
+    /// Register remote command handlers so the system recognizes this app as an active media session.
+    /// Without this, `MPNowPlayingInfoCenter.default().nowPlayingInfo` is completely ignored
+    /// and the Now Playing widget never appears.
+    ///
+    /// Call once during the first `play()`. Idempotent — calling again after setup is a no-op.
+    ///
+    /// - Parameters:
+    ///   - onPlay: Called when the user taps play in Control Center / Lock Screen / AirPlay remote.
+    ///   - onPause: Called when the user taps pause.
+    ///   - onToggle: Called when the user taps the play/pause toggle (headphones, keyboard).
+    ///   - onSeek: Called when the user scrubs the progress bar. Receives target time in seconds.
+    static func setupRemoteTransportControls(
+        onPlay: @escaping () -> Void,
+        onPause: @escaping () -> Void,
+        onToggle: @escaping () -> Void,
+        onSeek: @escaping (Double) -> Void
+    ) {
+        guard !isRemoteCommandsActive else { return }
+        isRemoteCommandsActive = true
+
+        let cc = MPRemoteCommandCenter.shared()
+
+        cc.playCommand.isEnabled = true
+        cc.playCommand.addTarget { _ in onPlay(); return .success }
+
+        cc.pauseCommand.isEnabled = true
+        cc.pauseCommand.addTarget { _ in onPause(); return .success }
+
+        cc.togglePlayPauseCommand.isEnabled = true
+        cc.togglePlayPauseCommand.addTarget { _ in onToggle(); return .success }
+
+        cc.changePlaybackPositionCommand.isEnabled = true
+        cc.changePlaybackPositionCommand.addTarget { event in
+            guard let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            onSeek(e.positionTime)
+            return .success
+        }
+
+        cc.skipForwardCommand.isEnabled = true
+        cc.skipForwardCommand.preferredIntervals = [15]
+        cc.skipForwardCommand.addTarget { event in
+            guard let e = event as? MPSkipIntervalCommandEvent,
+                  let elapsed = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double
+            else { return .commandFailed }
+            onSeek(elapsed + e.interval)
+            return .success
+        }
+
+        cc.skipBackwardCommand.isEnabled = true
+        cc.skipBackwardCommand.preferredIntervals = [15]
+        cc.skipBackwardCommand.addTarget { event in
+            guard let e = event as? MPSkipIntervalCommandEvent,
+                  let elapsed = MPNowPlayingInfoCenter.default().nowPlayingInfo?[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double
+            else { return .commandFailed }
+            onSeek(max(0, elapsed - e.interval))
+            return .success
+        }
+
+        print("[PlayerMetadataHelper] Remote transport controls registered")
+    }
+
+    /// Remove all remote command handlers. Call during `stop()`.
+    static func teardownRemoteTransportControls() {
+        guard isRemoteCommandsActive else { return }
+
+        let cc = MPRemoteCommandCenter.shared()
+        cc.playCommand.removeTarget(nil)
+        cc.pauseCommand.removeTarget(nil)
+        cc.togglePlayPauseCommand.removeTarget(nil)
+        cc.changePlaybackPositionCommand.removeTarget(nil)
+        cc.skipForwardCommand.removeTarget(nil)
+        cc.skipBackwardCommand.removeTarget(nil)
+
+        isRemoteCommandsActive = false
+        print("[PlayerMetadataHelper] Remote transport controls removed")
+    }
+
+    // MARK: - Now Playing Info
 
     /// Set the Now Playing info for Control Center / Lock Screen / AirPlay.
     /// Call this when playback starts or when the current item changes.
-    /// - Parameters:
-    ///   - metadata: The enriched metadata from TMDB/iTunes/etc.
-    ///   - duration: Total duration of the media in seconds
-    ///   - currentTime: Current playback position in seconds
-    ///   - playbackRate: Current playback rate (1.0 = normal, 0.0 = paused)
+    ///
+    /// Also sets `playbackState = .playing` which is required for the Now Playing widget to appear.
     static func setNowPlayingInfo(
         from metadata: MetadataResult,
         duration: Double,
@@ -121,7 +208,6 @@ enum PlayerMetadataHelper {
         // Title - format depends on content type
         let displayTitle: String
         if metadata.mediaType == .episode, let showTitle = metadata.showTitle {
-            // Series episode: "Show Title - S01E05 - Episode Title"
             let season = metadata.seasonNumber ?? 1
             let episode = metadata.episodeNumber ?? 1
             let episodePart = metadata.episodeTitle ?? metadata.title
@@ -146,23 +232,24 @@ enum PlayerMetadataHelper {
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
             MPNowPlayingInfoPropertyPlaybackRate: playbackRate,
-            MPNowPlayingInfoPropertyMediaType: metadata.mediaType == .movie
-                ? MPNowPlayingInfoMediaType.video.rawValue
-                : MPNowPlayingInfoMediaType.video.rawValue
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue
         ]
 
-        // Add genre if available
         if let firstGenre = metadata.genre.first {
             nowPlayingInfo[MPMediaItemPropertyGenre] = firstGenre
         }
-
-        // Add year if available
         if let year = metadata.year {
             nowPlayingInfo[MPMediaItemPropertyReleaseDate] = String(year)
         }
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
-        print("[PlayerMetadataHelper] Set Now Playing info: \(displayTitle)")
+        MPNowPlayingInfoCenter.default().playbackState = .playing
+        print("[PlayerMetadataHelper] Set Now Playing: \(displayTitle) (duration: \(String(format: "%.0f", duration))s)")
+    }
+
+    /// Update playback state to paused in the Now Playing session.
+    static func setPlaybackStatePaused() {
+        MPNowPlayingInfoCenter.default().playbackState = .paused
     }
 
     /// Update the current playback position in the Now Playing info.
@@ -185,10 +272,8 @@ enum PlayerMetadataHelper {
                 let (data, _) = try await URLSession.shared.data(from: posterURL)
 
                 #if os(macOS)
-                // On macOS, create NSImage from data
                 let image = NSImage(data: data)
                 #else
-                // On iOS/tvOS, create UIImage from data
                 let image = UIImage(data: data)
                 #endif
 
@@ -197,7 +282,6 @@ enum PlayerMetadataHelper {
 
                     #if os(macOS)
                     if let image = image {
-                        // On macOS, we can set the artwork via MPMediaItemArtwork
                         let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                         info[MPMediaItemPropertyArtwork] = artwork
                     }
@@ -220,7 +304,109 @@ enum PlayerMetadataHelper {
     /// Clear the Now Playing info when playback stops.
     static func clearNowPlayingInfo() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
         print("[PlayerMetadataHelper] Cleared Now Playing info")
+    }
+
+    // MARK: - AVPlayerItem External Metadata (iOS / tvOS only)
+
+    /// Build an array of `AVMetadataItem` for `AVPlayerItem.externalMetadata`.
+    ///
+    /// `AVPlayerViewController` reads `externalMetadata` to populate:
+    /// - The player UI overlay (title bar)
+    /// - Control Center / Lock Screen (NowPlaying)
+    /// - AirPlay display on the remote device
+    ///
+    /// Without this, `AVPlayerViewController` publishes empty metadata and overrides
+    /// any manually-set `MPNowPlayingInfoCenter` info.
+    ///
+    /// NOTE: `externalMetadata` is an AVKit extension on `AVPlayerItem` available only
+    /// on iOS 12.2+ and tvOS. On macOS, it does not exist — macOS relies on
+    /// `MPNowPlayingInfoCenter` set in `setNowPlayingInfo()` above, with
+    /// `AVPlayerView.updatesNowPlayingInfoCenter = false` to prevent override.
+    ///
+    /// Reference: WWDC 2022 — "Explore media metadata publishing and playback interactions"
+    #if os(iOS) || os(tvOS) || os(visionOS)
+    static func buildExternalMetadata(from metadata: MetadataResult) -> [AVMetadataItem] {
+        var items: [AVMetadataItem] = []
+
+        // Title
+        let displayTitle: String
+        if metadata.mediaType == .episode, let showTitle = metadata.showTitle {
+            let season = metadata.seasonNumber ?? 1
+            let episode = metadata.episodeNumber ?? 1
+            let episodePart = metadata.episodeTitle ?? metadata.title
+            displayTitle = "\(showTitle) - S\(String(format: "%02d", season))E\(String(format: "%02d", episode)) - \(episodePart)"
+        } else if metadata.mediaType == .series, let showTitle = metadata.showTitle {
+            displayTitle = showTitle
+        } else {
+            displayTitle = metadata.title
+        }
+        items.append(makeMetadataItem(identifier: .commonIdentifierTitle, value: displayTitle as NSString))
+
+        // Artist / Director / Show Title
+        let artist: String
+        if metadata.mediaType == .movie {
+            artist = metadata.director ?? "Unknown Director"
+        } else {
+            artist = metadata.showTitle ?? metadata.director ?? "Unknown"
+        }
+        items.append(makeMetadataItem(identifier: .commonIdentifierArtist, value: artist as NSString))
+
+        // Description / Plot
+        if let plot = metadata.plot, !plot.isEmpty {
+            items.append(makeMetadataItem(identifier: .commonIdentifierDescription, value: plot as NSString))
+        }
+
+        // Genre
+        if let firstGenre = metadata.genre.first {
+            items.append(makeMetadataItem(identifier: .quickTimeMetadataGenre, value: firstGenre as NSString))
+        }
+
+        // Creation date (year)
+        if let year = metadata.year {
+            items.append(makeMetadataItem(identifier: .commonIdentifierCreationDate, value: String(year) as NSString))
+        }
+
+        return items
+    }
+
+    /// Asynchronously download artwork and append it to `AVPlayerItem.externalMetadata`.
+    /// Must be called after `playerItem.externalMetadata` has been set with text metadata.
+    static func loadExternalArtwork(for playerItem: AVPlayerItem, from metadata: MetadataResult) {
+        guard let posterURLString = metadata.posterURL ?? metadata.artworkURLs.first,
+              let posterURL = URL(string: posterURLString) else { return }
+
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: posterURL)
+                guard UIImage(data: data) != nil else { return }
+
+                await MainActor.run {
+                    let artworkItem = makeMetadataItem(identifier: .commonIdentifierArtwork, value: data as NSData)
+                    var existing = playerItem.externalMetadata
+                    existing.append(artworkItem)
+                    playerItem.externalMetadata = existing
+                    print("[PlayerMetadataHelper] External artwork set on AVPlayerItem")
+                }
+            } catch {
+                print("[PlayerMetadataHelper] Failed to load external artwork: \(error)")
+            }
+        }
+    }
+    /// Build minimal externalMetadata with just a title (for cases without full MetadataResult).
+    static func buildTitleOnlyMetadata(title: String) -> [AVMetadataItem] {
+        [makeMetadataItem(identifier: .commonIdentifierTitle, value: title as NSString)]
+    }
+    #endif
+
+    /// Create a single `AVMetadataItem` with the given identifier and value.
+    private static func makeMetadataItem(identifier: AVMetadataIdentifier, value: NSCopying & NSObjectProtocol) -> AVMetadataItem {
+        let item = AVMutableMetadataItem()
+        item.identifier = identifier
+        item.value = value
+        item.extendedLanguageTag = "und"
+        return item.copy() as! AVMetadataItem
     }
 }
 

@@ -1,5 +1,8 @@
 import SwiftUI
 import TransmuxCore
+#if os(iOS)
+import AVFoundation
+#endif
 
 @main
 struct mks_iptv_downloaderApp: App {
@@ -12,6 +15,9 @@ struct mks_iptv_downloaderApp: App {
         StderrFilter.install()
         TransmuxingService.configure(streamProxy: StreamProxyAdapter())
         Self.configurePlayerEngines()
+        #if os(iOS)
+        Self.configureAudioSession()
+        #endif
     }
 
     var body: some Scene {
@@ -46,6 +52,15 @@ struct mks_iptv_downloaderApp: App {
             }
         }
         #endif
+
+        #if os(macOS)
+        Window("Now Playing", id: "player") {
+            MacOSPlayerWindowView()
+                .preferredColorScheme(.dark)
+        }
+        .defaultSize(width: 1280, height: 720)
+        .defaultPosition(.center)
+        #endif
     }
 }
 
@@ -55,4 +70,17 @@ extension mks_iptv_downloaderApp {
     static func configurePlayerEngines() {
         print("[Player] Using FFmpeg transmux pipeline (TransmuxCore) + AVPlayer")
     }
+
+    #if os(iOS)
+    static func configureAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay])
+            try session.setActive(true)
+            print("[Audio] AVAudioSession configured: .playback, .moviePlayback")
+        } catch {
+            print("[Audio] Failed to configure AVAudioSession: \(error)")
+        }
+    }
+    #endif
 }

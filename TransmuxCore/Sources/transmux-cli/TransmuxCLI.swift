@@ -223,22 +223,40 @@ struct TransmuxCLI {
             let serverSession = try await TransmuxServer.shared.start(
                 filePath: session.outputPath,
                 playlistPath: session.playlistPath,
+                mediaPlaylistPath: session.mediaPlaylistPath,
                 expectedSize: session.expectedSize,
                 segmenter: session.segmenter,
                 initSegmentSize: session.initSegmentSize,
                 seekHandle: session.seekHandle
             )
-            let baseURL = serverSession.localURL.absoluteString.replacingOccurrences(of: "/stream.m3u8", with: "")
+            let baseURL = serverSession.localURL.absoluteString
+                .replacingOccurrences(of: "/master.m3u8", with: "")
+                .replacingOccurrences(of: "/stream.m3u8", with: "")
 
             print("")
             print("=========================================")
             print("  TransmuxServer running on port \(serverSession.port)")
             print("")
-            print("  Playlist:  \(serverSession.localURL)")
+            print("  Entry URL: \(serverSession.localURL)")
             print("  Init seg:  \(baseURL)/init.mp4")
             print("  Segments:  \(baseURL)/seg_000.mp4 ... seg_\(String(format: "%03d", session.segmenter.totalSegmentCount - 1)).mp4")
             print("  Duration:  \(String(format: "%.1f", session.duration))s (\(session.segmenter.totalSegmentCount) virtual segments)")
+            print("  Audio:     \(session.audioTracks.count) track(s)")
+            print("  Subtitles: \(session.subtitleTracks.count) track(s)")
             print("")
+
+            // Print master playlist content for debugging
+            if session.audioTracks.count > 1 || !session.subtitleTracks.isEmpty {
+                let masterPath = (session.mediaPlaylistPath as NSString).deletingLastPathComponent + "/master.m3u8"
+                if let masterContent = try? String(contentsOfFile: masterPath, encoding: .utf8) {
+                    print("  Master playlist (master.m3u8):")
+                    for line in masterContent.components(separatedBy: "\n") {
+                        print("    \(line)")
+                    }
+                    print("")
+                }
+            }
+
             print("  Log file:  /tmp/mks-iptv-transmux.log")
             print("  Tail logs: tail -f /tmp/mks-iptv-transmux.log")
             print("")
@@ -559,12 +577,15 @@ struct TransmuxCLI {
             let serverSession = try await TransmuxServer.shared.start(
                 filePath: session.outputPath,
                 playlistPath: session.playlistPath,
+                mediaPlaylistPath: session.mediaPlaylistPath,
                 expectedSize: session.expectedSize,
                 segmenter: session.segmenter,
                 initSegmentSize: session.initSegmentSize,
                 seekHandle: session.seekHandle
             )
-            let baseURL = serverSession.localURL.absoluteString.replacingOccurrences(of: "/stream.m3u8", with: "")
+            let baseURL = serverSession.localURL.absoluteString
+                .replacingOccurrences(of: "/master.m3u8", with: "")
+                .replacingOccurrences(of: "/stream.m3u8", with: "")
             print("[SERVE-TEST] Server started at \(baseURL)")
 
             // Step 3: Request init segment

@@ -18,6 +18,11 @@ struct mks_iptv_downloaderApp: App {
         #if os(iOS)
         Self.configureAudioSession()
         #endif
+
+        // Request notification permission (async, non-blocking)
+        Task {
+            _ = await DownloadNotificationService.shared.requestPermission()
+        }
     }
 
     var body: some Scene {
@@ -75,8 +80,7 @@ extension mks_iptv_downloaderApp {
     static func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay])
-            try session.setActive(true)
+            try session.setCategory(.playback, mode: .moviePlayback)
             print("[Audio] AVAudioSession configured: .playback, .moviePlayback")
         } catch {
             print("[Audio] Failed to configure AVAudioSession: \(error)")

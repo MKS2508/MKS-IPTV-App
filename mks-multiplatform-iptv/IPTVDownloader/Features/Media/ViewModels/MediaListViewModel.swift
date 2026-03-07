@@ -302,6 +302,6 @@ class MediaListViewModel: ObservableObject {
     }
     
     func getSerie(by id: Int) -> Serie? {
-        return series.first { $0.id == id }
+        return series.first { $0.seriesId == id }
     }
 }

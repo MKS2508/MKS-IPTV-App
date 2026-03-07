@@ -13,7 +13,7 @@ import Foundation
 
 /// Single source of truth for media type classification.
 /// Replaces the former `LibraryMediaType` (MediaListViewModel) and `MediaType` (DownloadItem).
-enum MediaType: Sendable {
+enum MediaType: String, Sendable, Codable {
     case movie
     case series
 }

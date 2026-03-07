@@ -317,6 +317,8 @@ struct CacheDebugView: View {
         case .metadata:     return "tag"
         case .epg:          return "calendar"
         case .matchTable:   return "arrow.left.arrow.right"
+        case .categories:   return "folder"
+        case .liveChannels: return "tv"
         }
     }
 
@@ -327,6 +329,8 @@ struct CacheDebugView: View {
         case .metadata:     return .orange
         case .epg:          return .green
         case .matchTable:   return .cyan
+        case .categories:   return .yellow
+        case .liveChannels: return .red
         }
     }
 }

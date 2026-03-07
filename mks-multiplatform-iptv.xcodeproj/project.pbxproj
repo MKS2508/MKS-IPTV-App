@@ -7,16 +7,53 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0534110F2F5C65B800A6C87F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0534110E2F5C65B800A6C87F /* WidgetKit.framework */; };
+		053411112F5C65B800A6C87F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 053411102F5C65B800A6C87F /* SwiftUI.framework */; };
+		0534111E2F5C65B900A6C87F /* MKSDownloadActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05548F942F5626330060E2DD /* TransmuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F932F5626330060E2DD /* TransmuxCore */; };
 		05548F962F5626330060E2DD /* transmux-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F952F5626330060E2DD /* transmux-cli */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		0534111C2F5C65B900A6C87F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 058CC0672D39C8CF006E00BF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0534110B2F5C65B800A6C87F;
+			remoteInfo = MKSDownloadActivityWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		053411232F5C65B900A6C87F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0534111E2F5C65B900A6C87F /* MKSDownloadActivityWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MKSDownloadActivityWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0534110E2F5C65B800A6C87F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
+		053411102F5C65B800A6C87F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
 		057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplataforma-tvos-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplatform-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		053411222F5C65B900A6C87F /* Exceptions for "MKSDownloadActivityWidget" folder in "MKSDownloadActivityWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0534110B2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension */;
+		};
 		058CC0E02D39C9E9006E00BF /* Exceptions for "mks-multiplatform-iptv" folder in "mks-multiplatform-iptv" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -27,6 +64,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		053411122F5C65B800A6C87F /* MKSDownloadActivityWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				053411222F5C65B900A6C87F /* Exceptions for "MKSDownloadActivityWidget" folder in "MKSDownloadActivityWidgetExtension" target */,
+			);
+			path = MKSDownloadActivityWidget;
+			sourceTree = "<group>";
+		};
 		057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "mks-multiplataforma-tvos-iptv";
@@ -43,6 +88,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		053411092F5C65B800A6C87F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				053411112F5C65B800A6C87F /* SwiftUI.framework in Frameworks */,
+				0534110F2F5C65B800A6C87F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		057C1B982D95EAC20059601D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -62,11 +116,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0534110D2F5C65B800A6C87F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0534110E2F5C65B800A6C87F /* WidgetKit.framework */,
+				053411102F5C65B800A6C87F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		058CC0662D39C8CF006E00BF = {
 			isa = PBXGroup;
 			children = (
 				058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */,
 				057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
+				053411122F5C65B800A6C87F /* MKSDownloadActivityWidget */,
+				0534110D2F5C65B800A6C87F /* Frameworks */,
 				058CC0702D39C8CF006E00BF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -76,6 +141,7 @@
 			children = (
 				058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */,
 				057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */,
+				0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -83,6 +149,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0534110B2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0534111F2F5C65B900A6C87F /* Build configuration list for PBXNativeTarget "MKSDownloadActivityWidgetExtension" */;
+			buildPhases = (
+				053411082F5C65B800A6C87F /* Sources */,
+				053411092F5C65B800A6C87F /* Frameworks */,
+				0534110A2F5C65B800A6C87F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				053411122F5C65B800A6C87F /* MKSDownloadActivityWidget */,
+			);
+			name = MKSDownloadActivityWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = MKSDownloadActivityWidgetExtension;
+			productReference = 0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		057C1B9A2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 057C1BA82D95EAC30059601D /* Build configuration list for PBXNativeTarget "mks-multiplataforma-tvos-iptv" */;
@@ -110,10 +198,12 @@
 				058CC06B2D39C8CF006E00BF /* Sources */,
 				058CC06C2D39C8CF006E00BF /* Frameworks */,
 				058CC06D2D39C8CF006E00BF /* Resources */,
+				053411232F5C65B900A6C87F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				0534111D2F5C65B900A6C87F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */,
@@ -130,9 +220,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1620;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 1620;
 				TargetAttributes = {
+					0534110B2F5C65B800A6C87F = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					057C1B9A2D95EAC20059601D = {
 						CreatedOnToolsVersion = 16.2;
 					};
@@ -160,11 +253,19 @@
 			targets = (
 				058CC06E2D39C8CF006E00BF /* mks-multiplatform-iptv */,
 				057C1B9A2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
+				0534110B2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		0534110A2F5C65B800A6C87F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		057C1B992D95EAC20059601D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -182,6 +283,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		053411082F5C65B800A6C87F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		057C1B972D95EAC20059601D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -198,7 +306,101 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		0534111D2F5C65B900A6C87F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0534110B2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension */;
+			targetProxy = 0534111C2F5C65B900A6C87F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		053411202F5C65B900A6C87F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MKSDownloadActivityWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MKSDownloadActivityWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv22.MKSDownloadActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		053411212F5C65B900A6C87F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QL3NVUPD27;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MKSDownloadActivityWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MKSDownloadActivityWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv22.MKSDownloadActivityWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
 		057C1BA62D95EAC30059601D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -402,7 +604,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mmmks-multiplatform-iptv";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = dev.mks2508.iptv22;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.mks2508.iptv22;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -449,7 +651,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mks-multiplatform-iptv";
+				PRODUCT_BUNDLE_IDENTIFIER = "dev.mks2508.mmmks-multiplatform-iptv";
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = dev.mks2508.iptv22;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.mks2508.iptv22;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -468,6 +670,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0534111F2F5C65B900A6C87F /* Build configuration list for PBXNativeTarget "MKSDownloadActivityWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				053411202F5C65B900A6C87F /* Debug */,
+				053411212F5C65B900A6C87F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		057C1BA82D95EAC30059601D /* Build configuration list for PBXNativeTarget "mks-multiplataforma-tvos-iptv" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

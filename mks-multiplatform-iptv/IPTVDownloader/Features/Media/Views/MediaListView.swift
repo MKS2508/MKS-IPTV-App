@@ -8,8 +8,7 @@ struct MediaListView: View {
     // MARK: - Properties
     
     @ObservedObject var viewModel: MediaListViewModel
-    @State private var movieDetailViewModel: MovieDetailViewModel?
-    @State private var serieDetailViewModel: SerieDetailViewModel?
+    @State private var detailViewModel: MediaDetailViewModel?
     
     // Computed services based on environment profile
     private var movieService: MovieService {
@@ -215,7 +214,7 @@ struct MediaListView: View {
                 movie: movie,
                 namespace: animation,
                 onViewDetails: {
-                    showMovieDetail(for: movie.streamId)
+                    showMovieDetail(for: movie)
                 }
             )
             .matchedGeometryEffect(id: "movie-\(movie.id)", in: animation)
@@ -230,7 +229,7 @@ struct MediaListView: View {
                 movie: movie,
                 namespace: animation,
                 onViewDetails: {
-                    showMovieDetail(for: movie.streamId)
+                    showMovieDetail(for: movie)
                 }
             )
             .matchedGeometryEffect(id: "movie-\(movie.id)", in: animation)
@@ -241,7 +240,7 @@ struct MediaListView: View {
             ))
             .onTapGesture {
                 // Asegurarnos de que en macOS también se llame a showMovieDetail
-                showMovieDetail(for: movie.streamId)
+                showMovieDetail(for: movie)
             }
             #endif
         }
@@ -519,28 +518,16 @@ struct MediaListView: View {
     }
     #endif
     
-    // Full Screen Cover Content — uses unified MediaDetailSheet
+    // Full Screen Cover Content — uses progressive loading wrapper
     #if os(iOS)
     private var fullScreenCoverContent: some View {
         Group {
-            if selectedMediaItemId != nil {
-                if let movieDetailViewModel = movieDetailViewModel,
-                   let movieDetail = movieDetailViewModel.movieDetail {
-                    MediaDetailSheet(
-                        detail: movieDetail,
-                        onDismiss: dismissMediaDetail,
-                        selectedView: $selectedView
-                    )
-                } else if let serieDetailViewModel = serieDetailViewModel,
-                          let serieDetail = serieDetailViewModel.serieDetail {
-                    MediaDetailSheet(
-                        detail: serieDetail,
-                        onDismiss: dismissMediaDetail,
-                        selectedView: $selectedView
-                    )
-                } else {
-                    errorDetailView
-                }
+            if selectedMediaItemId != nil, let vm = detailViewModel {
+                MediaDetailSheetWithProgress(
+                    viewModel: vm,
+                    onDismiss: dismissMediaDetail,
+                    selectedView: $selectedView
+                )
             } else {
                 errorDetailView
             }
@@ -551,24 +538,12 @@ struct MediaListView: View {
     #if os(macOS)
     private var macOSDetailContent: some View {
         Group {
-            if selectedMediaItemId != nil {
-                if let movieDetailViewModel = movieDetailViewModel,
-                   let movieDetail = movieDetailViewModel.movieDetail {
-                    MediaDetailSheet(
-                        detail: movieDetail,
-                        onDismiss: dismissMediaDetail,
-                        selectedView: $selectedView
-                    )
-                } else if let serieDetailViewModel = serieDetailViewModel,
-                          let serieDetail = serieDetailViewModel.serieDetail {
-                    MediaDetailSheet(
-                        detail: serieDetail,
-                        onDismiss: dismissMediaDetail,
-                        selectedView: $selectedView
-                    )
-                } else {
-                    errorDetailView
-                }
+            if selectedMediaItemId != nil, let vm = detailViewModel {
+                MediaDetailSheetWithProgress(
+                    viewModel: vm,
+                    onDismiss: dismissMediaDetail,
+                    selectedView: $selectedView
+                )
             } else {
                 errorDetailView
             }
@@ -747,31 +722,35 @@ struct MediaListView: View {
 
     // MARK: - Helper Methods
 
-    func showMovieDetail(for movieId: Int) {
+    func showMovieDetail(for movie: Movie) {
         Task {
             await MainActor.run {
-                selectedMediaItemId = movieId
-                // Initialize ViewModels if needed
-                initializeDetailViewModelsIfNeeded()
-                
+                selectedMediaItemId = movie.streamId
+                initializeDetailViewModelIfNeeded()
+
+                // Set preview immediately for progressive loading
+                detailViewModel?.setMoviePreview(movie)
+
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingDetail = true
                 }
             }
-            
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            if let movieDetailViewModel = movieDetailViewModel {
-                await movieDetailViewModel.fetchMovieDetails(for: movieId)
+
+            // Small delay for smooth animation, then show detail with preview
+            try? await Task.sleep(nanoseconds: 100_000_000)
+
+            await MainActor.run {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    showingFullScreenDetail = true
+                }
             }
-            
+
+            // Fetch full details in background
+            await detailViewModel?.fetchMovieDetails(for: movie.streamId, preview: movie)
+
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingDetail = false
-                }
-                
-                // Show detail view even if there's an error (error view will be displayed)
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showingFullScreenDetail = true
                 }
             }
         }
@@ -780,28 +759,32 @@ struct MediaListView: View {
     func showSerieDetail(for serie: Serie) {
         Task {
             await MainActor.run {
-                selectedMediaItemId = serie.id
-                // Initialize ViewModels if needed
-                initializeDetailViewModelsIfNeeded()
-                
+                selectedMediaItemId = serie.seriesId
+                initializeDetailViewModelIfNeeded()
+
+                // Set preview immediately for progressive loading
+                detailViewModel?.setSeriePreview(serie)
+
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingDetail = true
                 }
             }
-            
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            if let serieDetailViewModel = serieDetailViewModel {
-                await serieDetailViewModel.fetchSerieDetails(for: serie.id)
+
+            // Small delay for smooth animation, then show detail with preview
+            try? await Task.sleep(nanoseconds: 100_000_000)
+
+            await MainActor.run {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    showingFullScreenDetail = true
+                }
             }
+            
+            // Fetch full details in background
+            await detailViewModel?.fetchSerieDetails(for: serie.seriesId, preview: serie)
             
             await MainActor.run {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isLoadingDetail = false
-                }
-                
-                // Show detail view even if there's an error (error view will be displayed)
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    showingFullScreenDetail = true
                 }
             }
         }
@@ -820,8 +803,7 @@ struct MediaListView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             selectedMediaItemId = nil
             isLoadingDetail = false
-            movieDetailViewModel?.reset()
-            serieDetailViewModel?.reset()
+            detailViewModel?.softReset()
         }
     }
     
@@ -857,12 +839,9 @@ extension MediaListView {
     // MARK: - ViewModel Initialization
 
     @MainActor
-    private func initializeDetailViewModelsIfNeeded() {
-        if movieDetailViewModel == nil {
-            movieDetailViewModel = MovieDetailViewModel(movieService: movieService)
-        }
-        if serieDetailViewModel == nil {
-            serieDetailViewModel = SerieDetailViewModel(movieService: movieService)
+    private func initializeDetailViewModelIfNeeded() {
+        if detailViewModel == nil {
+            detailViewModel = MediaDetailViewModel(movieService: movieService)
         }
     }
 }

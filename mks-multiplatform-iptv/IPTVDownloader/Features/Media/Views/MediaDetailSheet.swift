@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MediaDetailSheet: View {
     /// Unified detail item — either MovieDetail or SerieDetail,
@@ -43,9 +44,17 @@ struct MediaDetailSheet: View {
     @State private var downloadStartedBanner = false
     @State private var selectedFormat: VideoDownloader.OutputFormat = .mp4
     @State private var playWhileDownloading = false
+    @State private var showFolderPicker = false
+    @State private var saveToPhotos = false
+    #if os(macOS)
     @State private var selectedFolder: URL = FileManager.default.urls(
         for: .downloadsDirectory, in: .userDomainMask
     ).first!
+    #else
+    @State private var selectedFolder: URL = FileManager.default.urls(
+        for: .documentDirectory, in: .userDomainMask
+    ).first!
+    #endif
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -636,6 +645,69 @@ struct MediaDetailSheet: View {
             }
             .toggleStyle(SwitchToggleStyle(tint: AppColors.accent))
 
+            Divider()
+
+            // Save location
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Save Location")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    #if os(macOS)
+                    pickFolderMacOS()
+                    #else
+                    showFolderPicker = true
+                    #endif
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(AppColors.accent)
+                        Text(selectedFolder.lastPathComponent)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            #if os(iOS)
+            .fileImporter(
+                isPresented: $showFolderPicker,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                if case .success(let urls) = result, let url = urls.first {
+                    if url.startAccessingSecurityScopedResource() {
+                        selectedFolder = url
+                    }
+                }
+            }
+            #endif
+
+            // Save to Photos option (iOS only)
+            #if os(iOS)
+            Toggle(isOn: $saveToPhotos) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Save to Photos", systemImage: "photo.on.rectangle")
+                        .font(.subheadline)
+                    Text("Also save to your photo library")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(SwitchToggleStyle(tint: AppColors.accent))
+            #endif
+
             Spacer()
 
             // Download button
@@ -667,6 +739,7 @@ struct MediaDetailSheet: View {
                 vodExtension: episode.containerExtension,
                 outputFormat: selectedFormat,
                 playWhileDownloading: playWhileDownloading,
+                saveToPhotos: saveToPhotos,
                 downloadPathParam: selectedFolder.path,
                 genre: detail.detailGenre,
                 runtimeMinutes: nil,
@@ -675,12 +748,13 @@ struct MediaDetailSheet: View {
             )
         } else if let movie = movieDetail {
             downloadManager.startDownload(
-                vodID: String(movie.tmdbId),
+                vodID: String(movie.movieData.streamId),
                 title: detail.cleanTitle,
                 type: .movie,
                 vodExtension: movie.movieData.containerExtension ?? "mkv",
                 outputFormat: selectedFormat,
                 playWhileDownloading: playWhileDownloading,
+                saveToPhotos: saveToPhotos,
                 downloadPathParam: selectedFolder.path,
                 tmdbId: movie.tmdbId,
                 genre: detail.detailGenre,
@@ -703,6 +777,25 @@ struct MediaDetailSheet: View {
             }
         }
     }
+
+    // MARK: - Folder Picker (macOS)
+
+    #if os(macOS)
+    private func pickFolderMacOS() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = selectedFolder
+        panel.prompt = "Select"
+        panel.message = "Choose download location"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            selectedFolder = url
+        }
+    }
+    #endif
 
     // MARK: - Download Banner
 

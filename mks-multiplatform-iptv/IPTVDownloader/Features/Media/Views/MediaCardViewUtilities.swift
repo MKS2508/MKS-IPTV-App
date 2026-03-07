@@ -74,7 +74,7 @@ struct CardAppearanceConfig: Equatable {
         maxVisibleTags: 3,
         iconMappings: [
             "year": "calendar",
-            "quality": "hd",
+            "quality": "video",
             "codec": "cpu",
             "source": "opticaldisc",
             "hdr": "sun.max",
@@ -95,7 +95,7 @@ struct CardAppearanceConfig: Equatable {
         maxVisibleTags: 3,
         iconMappings: [
             "year": "calendar",
-            "quality": "hd",
+            "quality": "video",
             "codec": "cpu",
             "source": "opticaldisc",
             "hdr": "sun.max",
@@ -205,7 +205,7 @@ struct MovieTagProvider: TagContentProvider {
      func defaultIconForTag(_ type: String) -> String {
         switch type {
         case "year": return "calendar"
-        case "quality": return "hd"
+        case "quality": return "video"
         case "codec": return "cpu"
         case "source": return "opticaldisc"
         case "hdr": return "sun.max"
@@ -286,7 +286,7 @@ struct SerieTagProvider: TagContentProvider {
     private func defaultIconForTag(_ type: String) -> String {
         switch type {
         case "year": return "calendar"
-        case "quality": return "hd"
+        case "quality": return "video"
         case "codec": return "cpu"
         case "source": return "opticaldisc"
         case "hdr": return "sun.max"

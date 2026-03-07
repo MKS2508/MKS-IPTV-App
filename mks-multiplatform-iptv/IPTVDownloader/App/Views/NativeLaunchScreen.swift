@@ -12,8 +12,11 @@ import SwiftUI
 /// - Uses skeleton loading pattern (shows app structure)
 /// - Subtle loading indicators
 /// - Seamless transition to main app content
+/// - Error state with retry button when network fails
 struct NativeLaunchScreen: View {
     let loadingStatus: String
+    var isError: Bool = false
+    var retryAction: (() -> Void)? = nil
 
     var body: some View {
         ZStack {
@@ -33,10 +36,51 @@ struct NativeLaunchScreen: View {
             .ignoresSafeArea()
 
             // Content
-            contentView
+            if isError {
+                errorContentView
+            } else {
+                contentView
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Loading \(loadingStatus)")
+        .accessibilityLabel(isError ? "Error: \(loadingStatus)" : "Loading \(loadingStatus)")
+    }
+
+    // MARK: - Error Content
+
+    private var errorContentView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 56))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 8) {
+                Text("Unable to Connect")
+                    .font(.title2.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                Text(loadingStatus)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
+            if let retryAction {
+                Button(action: retryAction) {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                        .font(.body.weight(.medium))
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color(red: 0.863, green: 0.165, blue: 0.157))
+            }
+
+            Spacer()
+        }
     }
 
     // MARK: - Content
@@ -129,4 +173,12 @@ struct NativeLaunchScreen: View {
 
 #Preview("Native Launch Screen") {
     NativeLaunchScreen(loadingStatus: "Connecting to server...")
+}
+
+#Preview("Error State") {
+    NativeLaunchScreen(
+        loadingStatus: "Connection error. Please check your internet.",
+        isError: true,
+        retryAction: { print("Retry tapped") }
+    )
 }

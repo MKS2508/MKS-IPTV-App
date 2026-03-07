@@ -9,7 +9,21 @@
 		<key>NSExceptionDomains</key>
 		<dict/>
 	</dict>
-	<!-- Native Launch Screen Configuration for iOS 14+ -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save downloaded videos to your photo library</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.mks.iptv.download-continuation</string>
+	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

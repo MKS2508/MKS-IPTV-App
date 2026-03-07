@@ -14,6 +14,8 @@ enum CacheTTL: String, CaseIterable, Sendable {
     case metadata
     case epg
     case matchTable
+    case categories
+    case liveChannels
 
     var freshTTL: TimeInterval {
         switch self {
@@ -22,6 +24,8 @@ enum CacheTTL: String, CaseIterable, Sendable {
         case .metadata:     return 86400   // 24 hours
         case .epg:          return 14400   // 4 hours
         case .matchTable:   return 14400   // 4 hours
+        case .categories:   return 3600    // 1 hour
+        case .liveChannels: return 1800    // 30 minutes
         }
     }
 
@@ -32,6 +36,8 @@ enum CacheTTL: String, CaseIterable, Sendable {
         case .metadata:     return 259200  // 72 hours
         case .epg:          return 43200   // 12 hours
         case .matchTable:   return 43200   // 12 hours
+        case .categories:   return 172800  // 48 hours
+        case .liveChannels: return 86400   // 24 hours
         }
     }
 
@@ -42,6 +48,8 @@ enum CacheTTL: String, CaseIterable, Sendable {
         case .metadata:     return "Metadata"
         case .epg:          return "EPG"
         case .matchTable:   return "Match Table"
+        case .categories:   return "Categories"
+        case .liveChannels: return "Live Channels"
         }
     }
 
@@ -53,11 +61,15 @@ enum CacheTTL: String, CaseIterable, Sendable {
         case .metadata:     return "metadata_,enriched_"
         case .epg:          return "epg_data"
         case .matchTable:   return "epg_match_table"
+        case .categories:   return "categories_"
+        case .liveChannels: return "live_channels"
         }
     }
 
     /// Determine the CacheTTL for a given cache file name.
     static func ttlForFile(named name: String) -> CacheTTL? {
+        if name.hasPrefix("categories_") { return .categories }
+        if name.hasPrefix("live_channels") { return .liveChannels }
         if name.hasPrefix("media_list_") { return .mediaList }
         if name.hasPrefix("movie_detail_") || name.hasPrefix("serie_detail_") { return .mediaDetail }
         if name.hasPrefix("metadata_") || name.hasPrefix("enriched_") { return .metadata }
@@ -168,6 +180,14 @@ class CacheManager {
         return "media_list_\(type)_\(category)"
     }
 
+    private func categoriesKey(type: String) -> String {
+        "categories_\(type)"
+    }
+
+    private func liveChannelsKey() -> String {
+        "live_channels"
+    }
+
     // MARK: - Stale-While-Revalidate Generic
 
     /// Read from disk cache with stale-while-revalidate semantics.
@@ -237,6 +257,26 @@ class CacheManager {
         )
     }
 
+    // MARK: - Categories SWR
+
+    func getCachedMovieCategoriesSWR() -> CacheResult<[MovieCategory]>? {
+        getCacheWithStaleness(key: categoriesKey(type: "movies"), type: [MovieCategory].self, ttl: .categories)
+    }
+
+    func getCachedSeriesCategoriesSWR() -> CacheResult<[SeriesCategory]>? {
+        getCacheWithStaleness(key: categoriesKey(type: "series"), type: [SeriesCategory].self, ttl: .categories)
+    }
+
+    func getCachedLiveChannelCategoriesSWR() -> CacheResult<[LiveChannelCategory]>? {
+        getCacheWithStaleness(key: categoriesKey(type: "live"), type: [LiveChannelCategory].self, ttl: .categories)
+    }
+
+    // MARK: - Live Channels SWR
+
+    func getCachedLiveChannelsSWR() -> CacheResult<[LiveChannel]>? {
+        getCacheWithStaleness(key: liveChannelsKey(), type: [LiveChannel].self, ttl: .liveChannels)
+    }
+
     // MARK: - Legacy Accessors (Binary TTL — kept for backward compatibility)
 
     func getCachedMovieDetail(id: Int) -> MovieDetail? {
@@ -271,6 +311,22 @@ class CacheManager {
 
     func cacheSeries(_ series: [Serie], categoryId: String? = nil) {
         saveCache(series, key: mediaListKey(type: "series", categoryId: categoryId))
+    }
+
+    func cacheMovieCategories(_ categories: [MovieCategory]) {
+        saveCache(categories, key: categoriesKey(type: "movies"))
+    }
+
+    func cacheSeriesCategories(_ categories: [SeriesCategory]) {
+        saveCache(categories, key: categoriesKey(type: "series"))
+    }
+
+    func cacheLiveChannelCategories(_ categories: [LiveChannelCategory]) {
+        saveCache(categories, key: categoriesKey(type: "live"))
+    }
+
+    func cacheLiveChannels(_ channels: [LiveChannel]) {
+        saveCache(channels, key: liveChannelsKey())
     }
 
     // MARK: - Generic Cache Operations

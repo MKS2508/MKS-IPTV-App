@@ -23,7 +23,9 @@ struct Serie: Identifiable, Codable, Equatable, TitleParseable {
     let episodeRunTime: String
     let categoryId: String
     
-    var id: Int { seriesId }
+    let id = UUID()
+    
+    var apiId: Int { seriesId }
     
     enum CodingKeys: String, CodingKey {
         case number = "num"

@@ -38,6 +38,10 @@ final class MediaDetailViewModel {
     /// The loaded serie detail (nil if loading movie or not loaded)
     var serieDetail: SerieDetail?
 
+    /// Preview data from grid (available immediately while loading full detail)
+    var moviePreview: Movie?
+    var seriePreview: Serie?
+
     /// Loading state
     var isLoading = false
 
@@ -49,6 +53,11 @@ final class MediaDetailViewModel {
 
     /// Whether data was loaded from cache
     var loadedFromCache = false
+
+    /// Whether we have full detail loaded (vs just preview)
+    var hasFullDetail: Bool {
+        movieDetail != nil || serieDetail != nil
+    }
 
     // MARK: - Private Properties
 
@@ -64,14 +73,34 @@ final class MediaDetailViewModel {
 
     // MARK: - Public API
 
-    /// Fetch details for a movie
-    func fetchMovieDetails(for movieId: Int, forceRefresh: Bool = false) async {
+    /// Set preview from grid (shows immediately while loading full detail)
+    func setMoviePreview(_ movie: Movie) {
+        self.moviePreview = movie
+        self.seriePreview = nil
+        self.currentType = .movie(id: movie.streamId)
+    }
+
+    /// Set preview from grid (shows immediately while loading full detail)
+    func setSeriePreview(_ serie: Serie) {
+        self.seriePreview = serie
+        self.moviePreview = nil
+        self.currentType = .serie(id: serie.seriesId)
+    }
+
+    /// Fetch details for a movie (with optional preview for immediate display)
+    func fetchMovieDetails(for movieId: Int, preview: Movie? = nil, forceRefresh: Bool = false) async {
+        if let preview = preview {
+            setMoviePreview(preview)
+        }
         currentType = .movie(id: movieId)
         await fetchDetails(forceRefresh: forceRefresh)
     }
 
-    /// Fetch details for a serie
-    func fetchSerieDetails(for serieId: Int, forceRefresh: Bool = false) async {
+    /// Fetch details for a serie (with optional preview for immediate display)
+    func fetchSerieDetails(for serieId: Int, preview: Serie? = nil, forceRefresh: Bool = false) async {
+        if let preview = preview {
+            setSeriePreview(preview)
+        }
         currentType = .serie(id: serieId)
         await fetchDetails(forceRefresh: forceRefresh)
     }
@@ -90,6 +119,14 @@ final class MediaDetailViewModel {
         isRefreshing = false
         loadedFromCache = false
         currentType = nil
+    }
+
+    /// Soft reset: clears error/loading state but preserves loaded detail data.
+    /// Reopening the same item is instant since movieDetail/serieDetail are retained.
+    func softReset() {
+        error = nil
+        isLoading = false
+        isRefreshing = false
     }
 
     /// Set movie detail directly (when provided externally)

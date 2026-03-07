@@ -17,9 +17,13 @@ extension UserDefaults {
             if let storedPath = UserDefaults.standard.string(forKey: downloadPathKey) {
                 return storedPath
             }
-            // Si no existe, devolver la carpeta de descargas por defecto
-            let downloadsDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-            return downloadsDirectory.path
+            // macOS: ~/Downloads, iOS: app Documents directory
+            #if os(macOS)
+            let directory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+            #else
+            let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            #endif
+            return directory.path
         }
         set {
             UserDefaults.standard.setValue(newValue, forKey: downloadPathKey)

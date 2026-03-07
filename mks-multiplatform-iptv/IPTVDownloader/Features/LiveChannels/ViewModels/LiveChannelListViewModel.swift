@@ -18,6 +18,7 @@ class LiveChannelListViewModel: ObservableObject {
     @Published private(set) var error: Error?
 
     private let liveChannelService: MovieService
+    private let cacheManager = CacheManager.shared
     private var didLoadChannels = false
     private let logger = Logger(subsystem: "LiveChannelListViewModel", category: "LiveTV")
 
@@ -28,25 +29,37 @@ class LiveChannelListViewModel: ObservableObject {
     }
 
     func loadChannels() async {
-        guard !didLoadChannels else { 
+        guard !didLoadChannels else {
             logger.debug("📋 Channels already loaded, skipping...")
-            return 
+            return
         }
 
-        logger.info("🔄 Starting to load live channels...")
+        // SWR: try cache first
+        if let cached = cacheManager.getCachedLiveChannelsSWR() {
+            logger.info("📦 Loaded \(cached.value.count) channels from cache (stale: \(cached.isStale))")
+            liveChannels = orderByAddedDesc(cached.value)
+            didLoadChannels = true
+
+            if cached.isStale {
+                Task { await refreshChannelsInBackground() }
+            }
+            return
+        }
+
+        // No cache: fetch from network
+        logger.info("🔄 Starting to load live channels from network...")
         isLoading = true
         error = nil
 
         do {
             logger.debug("📡 Fetching channels from API...")
-            liveChannels = try await liveChannelService.fetchLiveChannels()
-            logger.info("✅ Fetched \(self.liveChannels.count) channels successfully")
-            
-            liveChannels = orderByAddedDesc(liveChannels) // Apply default sorting
-            logger.debug("📊 Channels sorted by added date")
-            
+            let fetched = try await liveChannelService.fetchLiveChannels()
+            logger.info("✅ Fetched \(fetched.count) channels successfully")
+
+            liveChannels = orderByAddedDesc(fetched)
             didLoadChannels = true
-            logger.info("🏁 Channel loading completed")
+            cacheManager.cacheLiveChannels(fetched)
+            logger.debug("💾 Channels cached to disk")
         } catch {
             logger.error("❌ Failed to load channels: \(error.localizedDescription)")
             self.error = error
@@ -58,24 +71,42 @@ class LiveChannelListViewModel: ObservableObject {
     func refreshChannels() async {
         logger.info("🔄 Refreshing channels...")
         didLoadChannels = false
-        await loadChannels()
+        isLoading = true
+        error = nil
+
+        do {
+            let fetched = try await liveChannelService.fetchLiveChannels()
+            liveChannels = orderByAddedDesc(fetched)
+            didLoadChannels = true
+            cacheManager.cacheLiveChannels(fetched)
+        } catch {
+            self.error = error
+        }
+
+        isLoading = false
+    }
+
+    /// Background refresh: silently fetch from network and update cache + published array
+    private func refreshChannelsInBackground() async {
+        logger.info("🔄 Background-refreshing live channels...")
+        do {
+            let fetched = try await liveChannelService.fetchLiveChannels()
+            liveChannels = orderByAddedDesc(fetched)
+            cacheManager.cacheLiveChannels(fetched)
+            logger.info("✅ Background refresh: \(fetched.count) channels updated")
+        } catch {
+            logger.error("⚠️ Background refresh failed (non-fatal): \(error.localizedDescription)")
+        }
     }
 
     func filterChannels(searchText: String) -> [LiveChannel] {
-        logger.debug("🔍 filterChannels called with searchText: '\(searchText)'")
-        logger.debug("🔍 liveChannels.count = \(self.liveChannels.count)")
-        
-        guard !searchText.isEmpty else { 
-            logger.debug("🔍 searchText is empty, returning all \(self.liveChannels.count) channels")
-            return self.liveChannels 
+        guard !searchText.isEmpty else {
+            return self.liveChannels
         }
-        
-        logger.debug("🔍 Filtering channels with search text: '\(searchText)'")
-        let filtered = self.liveChannels.filter { channel in
+
+        return self.liveChannels.filter { channel in
             channel.name.localizedCaseInsensitiveContains(searchText)
         }
-        logger.debug("🔍 Filtered result: \(filtered.count) channels")
-        return filtered
     }
 
     func getChannel(by id: Int) -> LiveChannel? {
@@ -112,23 +143,6 @@ class LiveChannelListViewModel: ObservableObject {
 
     func loadExampleChannels(_ channels: [LiveChannel]) {
         self.liveChannels = channels
-    }
-    
-    func loadLiveChannels() async {
-        guard !didLoadChannels else { return }
-        
-        isLoading = true
-        error = nil
-        
-        do {
-            liveChannels = try await liveChannelService.fetchLiveChannels()
-            liveChannels = orderByAddedDesc(liveChannels) // Apply default sorting
-            didLoadChannels = true
-        } catch {
-            self.error = error
-        }
-        
-        isLoading = false
     }
 
     // Method to apply a specific sorting

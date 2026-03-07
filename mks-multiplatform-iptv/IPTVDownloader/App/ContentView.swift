@@ -116,10 +116,25 @@ struct ContentView: View {
             // Native launch screen following Apple HIG
             NativeLaunchScreen(loadingStatus: loader.loadingStatus.displayText)
                 .transition(.opacity.animation(.easeInOut(duration: 0.25)))
+        } else if let loader = dataLoader, loader.hasLoadingError, !loader.hasCachedData {
+            // Error state with no cached data — show error screen with retry
+            NativeLaunchScreen(
+                loadingStatus: loader.loadingStatus.displayText,
+                isError: true,
+                retryAction: {
+                    Task {
+                        await loader.retryLoading()
+                    }
+                }
+            )
+            .transition(.opacity.animation(.easeInOut(duration: 0.25)))
         } else if let loader = dataLoader {
             PlatformNavigationView(
                 sidebarContent: { sidebarContent },
                 detailContent: { detailContent(loader: loader) },
+                tabContent: { destination in
+                    AnyView(destinationView(for: destination, loader: loader))
+                },
                 selectedItem: $selectedView
             )
             .toolbar {
@@ -372,6 +387,7 @@ struct ContentView: View {
 
         case .downloads:
             DownloadsView()
+                .environmentObject(downloadManager)
                 #if os(macOS)
                 .environmentObject(touchBarManager)
                 #endif

@@ -25,6 +25,9 @@ import SwiftUI
 struct PlatformNavigationView<SidebarContent: View, DetailContent: View>: View {
     @ViewBuilder let sidebarContent: () -> SidebarContent
     @ViewBuilder let detailContent: () -> DetailContent
+    /// Destination-based content builder for iPhone TabView.
+    /// Each tab renders its own content based on the destination, avoiding shared-state issues.
+    var tabContent: ((NavigationDestination) -> AnyView)? = nil
     @Binding var selectedItem: String?
 
     // MARK: - Environment
@@ -133,8 +136,13 @@ struct PlatformNavigationView<SidebarContent: View, DetailContent: View>: View {
         TabView(selection: $selectedItem) {
             ForEach(NavigationDestination.displayable, id: \.rawValue) { destination in
                 NavigationStack {
-                    detailContent()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if let tabContent {
+                        tabContent(destination)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        detailContent()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
                 .tabItem {
                     Label(destination.displayName, systemImage: destination.iconName)

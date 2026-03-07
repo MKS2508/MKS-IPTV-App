@@ -68,7 +68,7 @@ struct EnhancedMovieTagProvider: TagContentProvider {
             default:
                 description = "Quality: \(quality)"
             }
-            tags.append((customIcon(for: "quality") ?? "hd", description))
+            tags.append((customIcon(for: "quality") ?? "video", description))
         }
         
         // Advertencia de contenido para adultos más notoria

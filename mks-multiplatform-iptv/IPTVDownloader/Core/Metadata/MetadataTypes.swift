@@ -44,7 +44,7 @@ enum MetadataError: LocalizedError {
 // MARK: - Tagging Status
 
 /// Tracks the state of metadata enrichment for a download
-enum MetadataTaggingStatus: Equatable, Sendable {
+enum MetadataTaggingStatus: Equatable, Sendable, Codable {
     case pending
     case enriching
     case tagging
@@ -66,20 +66,73 @@ enum MetadataTaggingStatus: Equatable, Sendable {
             return false
         }
     }
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case type, message
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .pending:
+            try container.encode("pending", forKey: .type)
+        case .enriching:
+            try container.encode("enriching", forKey: .type)
+        case .tagging:
+            try container.encode("tagging", forKey: .type)
+        case .completed:
+            try container.encode("completed", forKey: .type)
+        case .failed(let message):
+            try container.encode("failed", forKey: .type)
+            try container.encode(message, forKey: .message)
+        case .skipped:
+            try container.encode("skipped", forKey: .type)
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        switch type {
+        case "pending": self = .pending
+        case "enriching": self = .enriching
+        case "tagging": self = .tagging
+        case "completed": self = .completed
+        case "failed":
+            let message = try container.decode(String.self, forKey: .message)
+            self = .failed(message)
+        case "skipped": self = .skipped
+        default: self = .pending
+        }
+    }
 }
 
 // MARK: - Scored Metadata Result
 
 /// A metadata result paired with its heuristic match score.
 /// Used for presenting multiple candidates to the user for selection.
-struct ScoredMetadataResult: Identifiable, Sendable {
-    let id = UUID()
+struct ScoredMetadataResult: Identifiable, Sendable, Codable {
+    var id: UUID
     let result: MetadataResult
     let score: Double
 
     /// Human-readable match percentage (0–100)
     var matchPercentage: Int {
         Int((score * 100).rounded())
+    }
+
+    init(result: MetadataResult, score: Double) {
+        self.id = UUID()
+        self.result = result
+        self.score = score
+    }
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case id, result, score
     }
 }
 

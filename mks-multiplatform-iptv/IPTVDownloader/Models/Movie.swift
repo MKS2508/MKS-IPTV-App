@@ -21,7 +21,9 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
     let customSid: String?
     let directSource: String?
     
-    var id: Int { streamId }
+    let id = UUID()
+    
+    var apiId: Int { streamId }
     
     enum CodingKeys: String, CodingKey {
         case name
@@ -80,7 +82,7 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
     }
 
     static func == (lhs: Movie, rhs: Movie) -> Bool {
-        lhs.id == rhs.id
+        lhs.streamId == rhs.streamId
     }
 }
 

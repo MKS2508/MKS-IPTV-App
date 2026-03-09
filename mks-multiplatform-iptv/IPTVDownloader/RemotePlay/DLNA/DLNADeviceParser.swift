@@ -80,6 +80,11 @@ enum DLNADeviceParser {
     /// - Parameter parsed: Parsed device information
     /// - Returns: RemoteDevice ready for use in RemotePlayManager
     static func toRemoteDevice(_ parsed: ParsedDevice) -> RemoteDevice {
+        // Determine device type based on available services:
+        // - AVTransport present → DLNA MediaRenderer (full playback control)
+        // - No AVTransport → DIAL/Cast device (not yet supported for playback)
+        let deviceType: DeviceType = parsed.avTransportControlURL != nil ? .dlna : .chromecast
+
         var metadata: [String: String] = [
             "udn": parsed.udn,
             "baseURL": parsed.baseURL.absoluteString
@@ -107,7 +112,7 @@ enum DLNADeviceParser {
         return RemoteDevice(
             id: parsed.udn,
             name: parsed.friendlyName,
-            type: .dlna,
+            type: deviceType,
             capabilities: parsed.capabilities,
             isConnected: false,
             metadata: metadata
@@ -147,6 +152,8 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
     private var currentIconMimetype: String?
     private var currentIconURL: String?
     private var bestIconURL: URL?
+    private var bestIconIsPNG: Bool = false
+    private var bestIconSize: Int = 0
 
     // Error tracking
     var lastError: String?
@@ -161,9 +168,12 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
     func parse(_ data: Data) -> DLNADeviceParser.ParsedDevice? {
         let parser = XMLParser(data: data)
         parser.delegate = self
+        // Process namespaces so we get the localName without prefixes
+        parser.shouldProcessNamespaces = true
 
         guard parser.parse() else {
             lastError = "XML parsing failed"
+            print("[DLNAParser] XML parsing failed, raw data length: \(data.count)")
             return nil
         }
 
@@ -184,6 +194,26 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
         let avTransport = services.first { $0.type.contains("AVTransport") }
         let renderingControl = services.first { $0.type.contains("RenderingControl") }
         let connectionManager = services.first { $0.type.contains("ConnectionManager") }
+
+        print("[DLNAParser] Device: \(friendlyName ?? "?")")
+        print("[DLNAParser] Base URL: \(resolvedBaseURL.absoluteString)")
+        print("[DLNAParser] Services found: \(services.count)")
+        for svc in services {
+            print("[DLNAParser]   type=\(svc.type) controlURL=\(svc.controlURL ?? "nil") eventSubURL=\(svc.eventSubURL ?? "nil")")
+        }
+        if services.isEmpty {
+            // Dump first 2000 chars of raw XML for debugging
+            let rawXML = String(data: data, encoding: .utf8) ?? "<binary data>"
+            print("[DLNAParser] WARNING: 0 services parsed! Raw XML (first 2000 chars):")
+            print(String(rawXML.prefix(2000)))
+        }
+        print("[DLNAParser] AVTransport: \(avTransport != nil ? "found" : "MISSING")")
+        if let ctrl = avTransport?.controlURL {
+            let resolved = resolveURL(ctrl, base: resolvedBaseURL)
+            print("[DLNAParser] AVTransport controlURL raw='\(ctrl)' resolved=\(resolved?.absoluteString ?? "nil")")
+        } else if avTransport != nil {
+            print("[DLNAParser] WARNING: AVTransport found but controlURL is nil!")
+        }
 
         // Build capabilities based on available services
         var caps: DeviceCapabilities = [.video, .audio]
@@ -291,15 +321,20 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
                 let size = (currentIconWidth ?? 0) * (currentIconHeight ?? 0)
 
                 if let resolvedURL = resolveURL(url, base: baseURL) {
-                    // Update best icon if this one is better
                     if bestIconURL == nil {
+                        // First valid icon
                         bestIconURL = resolvedURL
-                    } else if isPNG && mimetype.contains("png") == false {
+                        bestIconIsPNG = isPNG
+                        bestIconSize = size
+                    } else if isPNG && !bestIconIsPNG {
                         // Prefer PNG over JPEG
                         bestIconURL = resolvedURL
-                    } else if size > 48 * 48 {
-                        // Prefer larger icons
+                        bestIconIsPNG = isPNG
+                        bestIconSize = size
+                    } else if isPNG == bestIconIsPNG && size > bestIconSize {
+                        // Same format, prefer larger
                         bestIconURL = resolvedURL
+                        bestIconSize = size
                     }
                 }
             }

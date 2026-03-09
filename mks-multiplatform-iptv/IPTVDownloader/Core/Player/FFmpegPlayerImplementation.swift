@@ -43,6 +43,9 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     private var seekDebounceWorkItem: DispatchWorkItem?
     private let seekDebounceInterval: TimeInterval = 0.15
 
+    /// The original source URL passed to load(url:).
+    private(set) var sourceURL: URL?
+
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
     }
@@ -60,6 +63,8 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     }
 
     func load(url: URL, metadata: MetadataResult?) {
+        self.sourceURL = url
+
         // Start structured logging session
         PlayerLog.startSession(playerType: "FFmpeg", url: url.absoluteString)
         PlayerLog.log("LOAD", category: "lifecycle", fields: ["url": url.absoluteString])

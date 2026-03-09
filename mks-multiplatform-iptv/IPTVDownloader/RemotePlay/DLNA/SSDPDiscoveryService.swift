@@ -6,10 +6,17 @@
 //
 
 import Foundation
-import Network
 
 /// Discovers DLNA MediaRenderer devices via SSDP multicast (239.255.255.250:1900).
-/// Uses Network.framework for UDP multicast and unicast communication.
+///
+/// ## Architecture
+/// Uses POSIX BSD sockets for SSDP because Network.framework's `NWConnection`
+/// creates a "connected" UDP socket that filters incoming packets by remote address.
+/// SSDP responses are unicast from each device's own IP, not from the multicast
+/// address, so they get silently dropped by connected sockets.
+///
+/// An unconnected UDP socket (`sendto`/`recvfrom`) correctly receives responses
+/// from any source address.
 ///
 /// ## Usage
 /// ```swift
@@ -31,31 +38,37 @@ final class SSDPDiscoveryService: @unchecked Sendable {
     /// Maximum wait time for M-SEARCH responses (MX header value).
     private static let searchMX: Int = 3
 
+    /// Interval between periodic re-discovery sweeps.
+    private static let rediscoveryInterval: TimeInterval = 30.0
+
+    /// Number of discovery cycles before a device is considered stale.
+    private static let maxMissedCycles: Int = 3
+
+    /// Receive timeout per recvfrom call (seconds).
+    private static let recvTimeoutSec: Int = 5
+
     /// Device types to search for (MediaRenderer for playback).
     private static let searchTargets: [String] = [
         "urn:schemas-upnp-org:device:MediaRenderer:1",
         "urn:schemas-upnp-org:device:MediaRenderer:2",
-        "urn:dial-multiscreen-org:service:dial:1"  // DIAL protocol (some smart TVs)
+        "urn:dial-multiscreen-org:service:dial:1"
     ]
 
     // MARK: - Properties
 
-    /// UDP connection for listening to SSDP messages.
-    private var listenerConnection: NWConnection?
-
-    /// UDP connection for sending M-SEARCH messages.
-    private var searchConnection: NWConnection?
-
-    /// Queue for network operations.
-    private let networkQueue = DispatchQueue(label: "SSDPDiscovery.network", qos: .utility)
-
     /// Discovered devices keyed by UDN.
     private(set) var discoveredDevices: [String: RemoteDevice] = [:]
+
+    /// Tracks how many cycles each device has been unseen (for TTL expiry).
+    private var deviceMissedCycles: [String: Int] = [:]
+
+    /// Set of device UDNs seen in the current discovery cycle.
+    private var devicesSeenThisCycle: Set<String> = []
 
     /// Callback when a new device is discovered.
     var onDeviceFound: ((RemoteDevice) -> Void)?
 
-    /// Callback when a device is removed (failed to refresh).
+    /// Callback when a device is removed (stale or failed to refresh).
     var onDeviceLost: ((String) -> Void)?
 
     /// Whether discovery is currently active.
@@ -64,44 +77,43 @@ final class SSDPDiscoveryService: @unchecked Sendable {
     /// Active device description fetch tasks.
     private var fetchTasks: [String: Task<Void, Never>] = [:]
 
+    /// Periodic re-discovery task.
+    private var rediscoveryTask: Task<Void, Never>?
+
+    /// Background task for the current M-SEARCH send+receive cycle.
+    private var searchTask: Task<Void, Never>?
+
     // MARK: - Lifecycle
 
     deinit {
-        // Cleanup connections directly since deinit can't call MainActor methods
-        listenerConnection?.cancel()
-        searchConnection?.cancel()
+        searchTask?.cancel()
         fetchTasks.values.forEach { $0.cancel() }
+        rediscoveryTask?.cancel()
     }
 
     // MARK: - Public API
 
     /// Start SSDP discovery for DLNA MediaRenderer devices.
-    /// Sends M-SEARCH messages and listens for responses.
     func startDiscovery() {
         guard !isDiscovering else { return }
         isDiscovering = true
 
-        // Start UDP listener for M-SEARCH responses
-        startUDPListener()
-
-        // Send M-SEARCH for immediate discovery
-        sendMSearchMessages()
+        performSearch()
+        startPeriodicRediscovery()
     }
 
     /// Stop SSDP discovery and cleanup resources.
     func stopDiscovery() {
         isDiscovering = false
 
-        // Cancel pending fetch tasks
+        rediscoveryTask?.cancel()
+        rediscoveryTask = nil
+
+        searchTask?.cancel()
+        searchTask = nil
+
         fetchTasks.values.forEach { $0.cancel() }
         fetchTasks.removeAll()
-
-        // Cancel connections
-        listenerConnection?.cancel()
-        listenerConnection = nil
-
-        searchConnection?.cancel()
-        searchConnection = nil
     }
 
     /// Refresh discovery by sending new M-SEARCH messages.
@@ -110,233 +122,220 @@ final class SSDPDiscoveryService: @unchecked Sendable {
             startDiscovery()
             return
         }
-        sendMSearchMessages()
+
+        searchTask?.cancel()
+        performSearch()
     }
 
     /// Clear all discovered devices.
     func clearDevices() {
         let previousDeviceIds = discoveredDevices.keys
         discoveredDevices.removeAll()
+        deviceMissedCycles.removeAll()
 
         for deviceId in previousDeviceIds {
             onDeviceLost?(deviceId)
         }
     }
 
-    // MARK: - UDP Listener
+    // MARK: - Periodic Re-Discovery
 
-    /// Start UDP listener for M-SEARCH responses on port 1900.
-    private func startUDPListener() {
-        // Bind to SSDP port for receiving responses
-        let localEndpoint = NWEndpoint.hostPort(
-            host: .ipv4(.any),
-            port: .init(rawValue: 0)!  // Use ephemeral port, we'll send to multicast
+    private func startPeriodicRediscovery() {
+        rediscoveryTask?.cancel()
+        rediscoveryTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(SSDPDiscoveryService.rediscoveryInterval))
+                guard !Task.isCancelled else { break }
+                await self?.performRediscoveryCycle()
+            }
+        }
+    }
+
+    private func performRediscoveryCycle() {
+        expireStaleDevices()
+        devicesSeenThisCycle.removeAll()
+        searchTask?.cancel()
+        performSearch()
+    }
+
+    private func expireStaleDevices() {
+        for deviceId in discoveredDevices.keys {
+            if devicesSeenThisCycle.contains(deviceId) {
+                deviceMissedCycles[deviceId] = 0
+            } else {
+                deviceMissedCycles[deviceId, default: 0] += 1
+            }
+        }
+
+        let expiredIds = deviceMissedCycles.filter { $0.value >= SSDPDiscoveryService.maxMissedCycles }.map(\.key)
+        for deviceId in expiredIds {
+            discoveredDevices.removeValue(forKey: deviceId)
+            deviceMissedCycles.removeValue(forKey: deviceId)
+            onDeviceLost?(deviceId)
+        }
+    }
+
+    // MARK: - M-SEARCH via POSIX Sockets
+
+    /// Send M-SEARCH messages on all targets and listen for responses.
+    /// Runs the blocking socket I/O on a background task.
+    private func performSearch() {
+        searchTask = Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            for target in SSDPDiscoveryService.searchTargets {
+                guard !Task.isCancelled else { break }
+                await self.sendAndReceive(target: target)
+            }
+        }
+    }
+
+    /// Create an unconnected UDP socket, sendto() the M-SEARCH, and recvfrom()
+    /// responses for `recvTimeoutSec` seconds from ANY source IP.
+    nonisolated private func sendAndReceive(target: String) async {
+        // Create UDP socket
+        let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
+        guard fd >= 0 else {
+            print("[SSDP] Failed to create socket: \(String(cString: strerror(errno)))")
+            return
+        }
+        defer { close(fd) }
+
+        // Set receive timeout so recvfrom doesn't block forever
+        var timeout = timeval(
+            tv_sec: SSDPDiscoveryService.recvTimeoutSec,
+            tv_usec: 0
         )
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
 
-        let parameters = NWParameters.udp
-        parameters.allowLocalEndpointReuse = true
+        // Allow address reuse
+        var reuseAddr: Int32 = 1
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, socklen_t(MemoryLayout<Int32>.size))
 
-        let connection = NWConnection(to: localEndpoint, using: parameters)
+        // Build multicast destination address
+        var destAddr = sockaddr_in()
+        destAddr.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        destAddr.sin_family = sa_family_t(AF_INET)
+        destAddr.sin_port = SSDPDiscoveryService.ssdpPort.bigEndian
+        inet_pton(AF_INET, SSDPDiscoveryService.ssdpMulticastAddress, &destAddr.sin_addr)
 
-        connection.stateUpdateHandler = { [weak self, connection] state in
-            switch state {
-            case .ready:
-                // Start receiving - use captured connection reference
-                connection.receiveMessage { data, _, _, error in
-                    if let data = data, error == nil {
-                        self?.handleSSDPMessage(data)
-                    }
-                    // Continue receiving
-                    connection.receiveMessage { data, _, _, error in
-                        if let data = data, error == nil {
-                            self?.handleSSDPMessage(data)
-                        }
+        // Build M-SEARCH message
+        let message = "M-SEARCH * HTTP/1.1\r\nHOST: \(SSDPDiscoveryService.ssdpMulticastAddress):\(SSDPDiscoveryService.ssdpPort)\r\nMAN: \"ssdp:discover\"\r\nMX: \(SSDPDiscoveryService.searchMX)\r\nST: \(target)\r\nUSER-AGENT: MKS-IPTV/1.0 UPnP/1.1\r\n\r\n"
+
+        // Send M-SEARCH via sendto (unconnected — responses come from any IP)
+        message.withCString { ptr in
+            withUnsafePointer(to: &destAddr) { addrPtr in
+                addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                    let sent = sendto(fd, ptr, strlen(ptr), 0, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
+                    if sent < 0 {
+                        print("[SSDP] sendto failed for \(target): \(String(cString: strerror(errno)))")
                     }
                 }
-            case .failed(let error):
-                print("[SSDP] Listener failed: \(error)")
-            default:
-                break
             }
         }
 
-        connection.start(queue: networkQueue)
-        listenerConnection = connection
-    }
+        // Receive loop — recvfrom returns responses from any source IP
+        // Runs until timeout or task cancellation
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while !Task.isCancelled {
+            var senderAddr = sockaddr_in()
+            var senderAddrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
 
-    /// Continuous receive loop for UDP messages.
-    private func receiveLoop(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] data, _, _, error in
-            if let data = data, error == nil {
-                self?.handleSSDPMessage(data)
+            let bytesRead = withUnsafeMutablePointer(to: &senderAddr) { addrPtr in
+                addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
+                    recvfrom(fd, &buffer, buffer.count, 0, sa, &senderAddrLen)
+                }
             }
-            // Continue receiving
-            self?.receiveLoop(on: connection)
+
+            // Timeout or error → stop receiving for this target
+            if bytesRead <= 0 { break }
+
+            let data = Data(bytes: buffer, count: bytesRead)
+            await handleSSDPResponse(data)
         }
     }
 
-    // MARK: - M-SEARCH
+    // MARK: - Response Handling
 
-    /// Send M-SEARCH messages for all target types.
-    private func sendMSearchMessages() {
-        for target in SSDPDiscoveryService.searchTargets {
-            sendMSearch(target: target)
-        }
-    }
-
-    /// Send a single M-SEARCH message for the specified search target.
-    private func sendMSearch(target: String) {
-        let message = buildMSearchMessage(target: target)
-        guard let data = message.data(using: .utf8) else { return }
-
-        let endpoint = NWEndpoint.hostPort(
-            host: .init(SSDPDiscoveryService.ssdpMulticastAddress),
-            port: .init(rawValue: SSDPDiscoveryService.ssdpPort)!
-        )
-
-        let connection = NWConnection(to: endpoint, using: .udp)
-        connection.stateUpdateHandler = { [weak self, weak connection] state in
-            switch state {
-            case .ready:
-                connection?.send(content: data, completion: .contentProcessed { error in
-                    if let error = error {
-                        print("[SSDP] M-SEARCH send error: \(error)")
-                    }
-                    // Close connection after sending
-                    connection?.cancel()
-                })
-            case .failed(let error):
-                print("[SSDP] M-SEARCH connection failed: \(error)")
-                connection?.cancel()
-            default:
-                break
-            }
-        }
-
-        connection.start(queue: networkQueue)
-    }
-
-    /// Build M-SEARCH message for UPnP device discovery.
-    private func buildMSearchMessage(target: String) -> String {
-        """
-        M-SEARCH * HTTP/1.1\r
-        HOST: \(SSDPDiscoveryService.ssdpMulticastAddress):\(SSDPDiscoveryService.ssdpPort)\r
-        MAN: "ssdp:discover"\r
-        MX: \(SSDPDiscoveryService.searchMX)\r
-        ST: \(target)\r
-        USER-AGENT: MKS-IPTV/1.0 UPnP/1.1\r
-        \r
-
-        """
-    }
-
-    // MARK: - Message Handling
-
-    /// Handle incoming SSDP message (NOTIFY or M-SEARCH response).
-    private func handleSSDPMessage(_ data: Data) {
+    /// Parse an SSDP response and dispatch device fetch to MainActor.
+    nonisolated private func handleSSDPResponse(_ data: Data) async {
         guard let message = String(data: data, encoding: .utf8) else { return }
 
-        // Parse SSDP headers
         let headers = parseSSDPHeaders(message)
-
-        // Check if this is a MediaRenderer device
         guard isMediaRenderer(headers: headers) else { return }
 
-        // Extract LOCATION URL
         guard let locationString = headers["LOCATION"],
               let locationURL = URL(string: locationString) else { return }
 
-        // Extract USN (Unique Service Name) as device identifier
         guard let usn = headers["USN"] else { return }
-
-        // Extract UDN from USN (format: uuid:device-uuid or uuid:device-uuid::urn:...)
         let udn = extractUDN(from: usn)
 
-        // Avoid duplicate fetches
-        guard !discoveredDevices.keys.contains(udn), !fetchTasks.keys.contains(udn) else { return }
+        await MainActor.run { [weak self] in
+            guard let self else { return }
 
-        // Fetch device description in background
-        let task = Task<Void, Never> { [weak self] in
-            await self?.fetchAndParseDeviceDescription(
-                locationURL: locationURL,
-                udn: udn
-            )
+            self.devicesSeenThisCycle.insert(udn)
+
+            // Already known — just reset TTL
+            if self.discoveredDevices.keys.contains(udn) {
+                self.deviceMissedCycles[udn] = 0
+                return
+            }
+
+            // Already fetching
+            guard self.fetchTasks[udn] == nil else { return }
+
+            // Fetch device description
+            let task = Task<Void, Never> {
+                await self.fetchAndParseDeviceDescription(locationURL: locationURL, udn: udn)
+            }
+            self.fetchTasks[udn] = task
         }
-
-        fetchTasks[udn] = task
     }
 
-    /// Parse SSDP message headers into a dictionary.
-    private func parseSSDPHeaders(_ message: String) -> [String: String] {
-        var headers: [String: String] = [:]
+    // MARK: - Header Parsing
 
+    nonisolated private func parseSSDPHeaders(_ message: String) -> [String: String] {
+        var headers: [String: String] = [:]
         let lines = message.components(separatedBy: "\r\n")
         for line in lines {
-            let colonIndex = line.firstIndex(of: ":")
-            guard let index = colonIndex else { continue }
-
-            let key = String(line[..<index]).uppercased()
-            let value = String(line[line.index(after: index)...]).trimmingCharacters(in: .whitespaces)
+            guard let colonIndex = line.firstIndex(of: ":") else { continue }
+            let key = String(line[..<colonIndex]).uppercased()
+            let value = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
             headers[key] = value
         }
-
         return headers
     }
 
-    /// Check if the SSDP headers indicate a MediaRenderer device.
-    private func isMediaRenderer(headers: [String: String]) -> Bool {
-        // Check ST (Search Target) or NT (Notification Type)
-        let searchTarget = headers["ST"] ?? headers["NT"] ?? ""
-
-        // Accept MediaRenderer devices
-        return searchTarget.contains("MediaRenderer") ||
-               searchTarget.contains("dial-multiscreen-org")
+    nonisolated private func isMediaRenderer(headers: [String: String]) -> Bool {
+        let st = headers["ST"] ?? headers["NT"] ?? ""
+        return st.contains("MediaRenderer") || st.contains("dial-multiscreen-org")
     }
 
-    /// Extract UDN from USN header value.
-    private func extractUDN(from usn: String) -> String {
-        // USN format: uuid:device-uuid or uuid:device-uuid::urn:...
-        if let uuidRange = usn.range(of: "uuid:([a-fA-F0-9-]+)", options: .regularExpression) {
-            return String(usn[uuidRange])
+    nonisolated private func extractUDN(from usn: String) -> String {
+        if let range = usn.range(of: "uuid:([a-fA-F0-9-]+)", options: .regularExpression) {
+            return String(usn[range])
         }
         return usn
     }
 
     // MARK: - Device Description Fetch
 
-    /// Fetch and parse UPnP device description XML.
-    private func fetchAndParseDeviceDescription(
-        locationURL: URL,
-        udn: String
-    ) async {
+    private func fetchAndParseDeviceDescription(locationURL: URL, udn: String) async {
         do {
-            let parsedDevice = try await DLNADeviceParser.parse(from: locationURL)
+            let parsed = try await DLNADeviceParser.parse(from: locationURL)
+            let device = DLNADeviceParser.toRemoteDevice(parsed)
 
-            // Convert to RemoteDevice
-            let remoteDevice = RemoteDevice.dlna(
-                id: parsedDevice.udn,
-                name: parsedDevice.friendlyName,
-                capabilities: parsedDevice.capabilities,
-                controlURL: parsedDevice.avTransportControlURL?.absoluteString ?? "",
-                eventSubURL: parsedDevice.avTransportEventSubURL?.absoluteString,
-                iconURL: parsedDevice.iconURL?.absoluteString,
-                manufacturer: parsedDevice.manufacturer,
-                modelName: parsedDevice.modelName,
-                baseURL: parsedDevice.baseURL.absoluteString
-            )
-
-            // Store and notify on main actor
             await MainActor.run { [weak self] in
                 guard let self else { return }
-                self.discoveredDevices[udn] = remoteDevice
+                self.discoveredDevices[udn] = device
+                self.deviceMissedCycles[udn] = 0
                 self.fetchTasks.removeValue(forKey: udn)
-                self.onDeviceFound?(remoteDevice)
+                self.onDeviceFound?(device)
             }
         } catch {
-            // Failed to parse device description
+            print("[SSDP] Failed to parse device at \(locationURL): \(error)")
             await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.fetchTasks.removeValue(forKey: udn)
+                self?.fetchTasks.removeValue(forKey: udn)
             }
         }
     }

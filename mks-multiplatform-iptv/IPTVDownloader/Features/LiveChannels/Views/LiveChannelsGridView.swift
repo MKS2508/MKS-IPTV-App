@@ -309,6 +309,7 @@ struct LiveChannelDetailSheet: View {
     let onClose: () -> Void
     
     @EnvironmentObject var profile: IPTVProfile
+    @Environment(RemotePlayManager.self) private var remotePlayManager
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -453,6 +454,21 @@ struct LiveChannelDetailSheet: View {
                         
                         // External players row
                         HStack(spacing: 16) {
+                            // Cast to remote device
+                            if remotePlayManager.connectedDevice != nil {
+                                Button(action: castChannel) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "tv.fill")
+                                        Text("Cast")
+                                    }
+                                }
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
+                                .background(Color.cyan)
+                                .foregroundColor(.white)
+                                .cornerRadius(20)
+                            }
+
                             // Open in VLC button
                             OpenInVLCButton(urlProvider: {
                                 return IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
@@ -540,6 +556,25 @@ struct LiveChannelDetailSheet: View {
         isLoading = false
     }
     
+    /// Cast live channel to connected remote device.
+    private func castChannel() {
+        guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
+                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: urlString) else { return }
+
+        let metadata = MetadataResult(
+            title: channel.name,
+            genre: [],
+            providerName: "IPTV",
+            confidence: 1.0,
+            mediaType: .movie
+        )
+
+        Task {
+            try? await remotePlayManager.load(url: url, metadata: metadata)
+        }
+    }
+
     private func copyChannelURL() {
         let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
         

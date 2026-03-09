@@ -54,8 +54,14 @@ struct MKSPlayerView: View {
     var onRequestFullscreen: (() -> Void)? = nil
     var presentationMode: MKSPlayerPresentationMode = .inline
 
+    @Environment(RemotePlayManager.self) private var remotePlayManager
+
     @State private var showMetadata = true
     @State private var showDebugOverlay = UserDefaults.showPlayerDebugOverlay
+    /// Whether local player was playing before casting started (to resume on disconnect).
+    @State private var wasPlayingBeforeCast = false
+    /// Whether we already loaded content on the current Cast connection.
+    @State private var didLoadOnCastDevice = false
     #if os(macOS)
     @State private var macOSOverlayVisible = true
     @State private var overlayHideTask: Task<Void, Never>?
@@ -129,8 +135,28 @@ struct MKSPlayerView: View {
             }
             #endif
 
-            if let onDismiss, presentationMode == .inline {
-                dismissButton(action: onDismiss)
+            // Top-trailing player controls (cast + dismiss)
+            VStack(alignment: .trailing, spacing: 8) {
+                RemotePlayButton()
+                    .buttonStyle(.plain)
+                    .adaptiveGlass(in: Capsule())
+
+                if let onDismiss, presentationMode == .inline {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(.white)
+                    }
+                    .adaptiveGlass(in: Circle())
+                }
+            }
+            .padding()
+
+            // RemotePlay casting overlay (replaces player surface when active)
+            if remotePlayManager.connectedDevice != nil {
+                castingOverlay
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         #if os(macOS)
@@ -150,6 +176,15 @@ struct MKSPlayerView: View {
             }
         }
         #endif
+        .onChange(of: remotePlayManager.connectedDevice?.id) { oldId, newId in
+            if newId != nil, oldId == nil {
+                // Device just connected — auto-load content and pause local player
+                handleCastConnected()
+            } else if newId == nil, oldId != nil {
+                // Device disconnected — resume local player
+                handleCastDisconnected()
+            }
+        }
         .ignoresSafeArea(.all, edges: .bottom)
     }
 
@@ -241,6 +276,106 @@ struct MKSPlayerView: View {
                 .padding(.trailing, 12)
                 .padding(.bottom, 12)
             }
+        }
+    }
+
+    // MARK: - Casting Overlay
+
+    /// Full-screen overlay that replaces the player surface when casting.
+    /// Shows device name, content title, and playback controls.
+    @ViewBuilder
+    private var castingOverlay: some View {
+        ZStack {
+            // Dark background covering the player
+            Color.black
+                .ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer()
+
+                // Casting indicator
+                Image(systemName: "tv.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.green)
+
+                if let deviceName = remotePlayManager.connectedDevice?.name {
+                    Text("Casting to \(deviceName)")
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+
+                if !title.isEmpty {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+
+                Spacer()
+
+                // Playback controls from RemotePlayOverlay
+                RemotePlayOverlay()
+
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: - Cast Connection Handling
+
+    /// Called when a Cast device connects — auto-load content on Cast device.
+    /// Local player keeps playing (AirPlay-like simultaneous mode).
+    /// Both consumers (AVPlayer + Cast device) read from the same TransmuxServer.
+    private func handleCastConnected() {
+        guard let sourceURL = player.sourceURL else {
+            print("[Cast] No sourceURL on player — cannot auto-load on Cast device")
+            return
+        }
+
+        // Remember if local player was playing (for disconnect resume logic)
+        wasPlayingBeforeCast = player.isPlaying
+        didLoadOnCastDevice = true
+
+        // DON'T pause local playback — keep transmux pipeline running.
+        // Both local AVPlayer and Cast device consume the same TransmuxServer stream.
+
+        // Get current position to start Cast device from the same point
+        let startPosition = player.currentTime
+
+        // Load content on Cast device
+        Task {
+            do {
+                try await remotePlayManager.load(
+                    url: sourceURL,
+                    metadata: metadata,
+                    startPosition: startPosition
+                )
+                print("[Cast] Content loaded on device at position \(String(format: "%.1f", startPosition))s — local player continues")
+            } catch {
+                print("[Cast] Failed to load on device: \(error.localizedDescription)")
+                didLoadOnCastDevice = false
+            }
+        }
+    }
+
+    /// Called when Cast device disconnects — resume local playback.
+    private func handleCastDisconnected() {
+        guard didLoadOnCastDevice else { return }
+        didLoadOnCastDevice = false
+
+        // Get the last known position from the Cast device to sync local player
+        let castPosition = remotePlayManager.deviceState?.currentTime ?? player.currentTime
+
+        // Seek local player to the Cast device's last position
+        if castPosition > 0 {
+            player.seek(to: castPosition)
+        }
+
+        // Resume local playback if it was playing before cast
+        if wasPlayingBeforeCast {
+            player.play()
         }
     }
 

@@ -44,6 +44,9 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     private var lastReportedTime: Double = 0
     private var seekObserver: Any?
 
+    /// The original source URL passed to load(url:).
+    private(set) var sourceURL: URL?
+
     // MARK: - External Seek Detection
 
     /// Último tiempo sampleado para detectar saltos
@@ -124,6 +127,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
     func load(url: URL, metadata: MetadataResult?) {
         stop()
+
+        self.sourceURL = url
 
         // Start structured logging session
         PlayerLog.startSession(playerType: "AVPlayer", url: url.absoluteString)

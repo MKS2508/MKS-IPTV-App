@@ -61,19 +61,26 @@ struct DevicePickerSheet: View {
                             description: Text("Make sure your TV or media player is on and connected to the same WiFi network.")
                         )
                     } else {
-                        ForEach(devices) { device in
+                        // Filter out connected device from available list to avoid duplicate
+                        let availableDevices = devices.filter { $0.id != selectedDevice?.id }
+                        ForEach(availableDevices) { device in
+                            let isSupportedType = true
                             DeviceRow(
                                 device: device,
                                 isSelected: selectedDevice?.id == device.id,
-                                isHovered: hoveredDeviceId == device.id
+                                isHovered: hoveredDeviceId == device.id,
+                                isUnsupported: !isSupportedType
                             )
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                onDeviceSelected(device)
+                                if isSupportedType {
+                                    onDeviceSelected(device)
+                                }
                             }
                             .onHover { isHovered in
                                 hoveredDeviceId = isHovered ? device.id : nil
                             }
+                            .opacity(isSupportedType ? 1.0 : 0.6)
                         }
                     }
                 } header: {
@@ -136,6 +143,7 @@ private struct DeviceRow: View {
     let device: RemoteDevice
     let isSelected: Bool
     let isHovered: Bool
+    var isUnsupported: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -159,7 +167,12 @@ private struct DeviceRow: View {
                         .foregroundColor(device.type.accentColor)
                         .cornerRadius(4)
 
-                    if let manufacturer = device.manufacturer {
+                    if isUnsupported {
+                        Text("Coming soon")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    } else if let manufacturer = device.manufacturer {
                         Text(manufacturer)
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -173,6 +186,9 @@ private struct DeviceRow: View {
             if isSelected {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+            } else if isUnsupported {
+                Image(systemName: "clock")
+                    .foregroundStyle(.secondary)
             } else if isHovered {
                 Image(systemName: "circle")
                     .foregroundStyle(.secondary)

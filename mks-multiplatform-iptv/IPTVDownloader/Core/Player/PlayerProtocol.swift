@@ -60,6 +60,10 @@ protocol VideoPlayerProtocol: ObservableObject {
 
     /// Detailed buffering metrics for debug overlay and contextual buffering UI.
     var bufferingDetail: PlayerBufferingDetail { get }
+
+    /// The original source URL that was passed to `load(url:)`.
+    /// Used by RemotePlay to send the content URL to Cast/DLNA devices.
+    var sourceURL: URL? { get }
 }
 
 // MARK: - Buffering Detail
@@ -90,6 +94,7 @@ extension VideoPlayerProtocol {
     var underlyingAVPlayer: AVPlayer? { nil }
     var isBuffering: Bool { false }
     var bufferingDetail: PlayerBufferingDetail { .idle }
+    var sourceURL: URL? { nil }
 
     /// Default implementation that ignores metadata (for players that don't support it)
     func load(url: URL, metadata: MetadataResult?) {

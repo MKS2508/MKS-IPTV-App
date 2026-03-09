@@ -1,13 +1,15 @@
 #if os(macOS)
 import SwiftUI
+import AppKit
 
 /// Content view for the macOS `Window(id: "player")` scene.
 ///
 /// Reads from `PlayerWindowManager.shared` to display the active player.
-/// When no content is playing, shows a placeholder. The window title bar
-/// displays the content title via `.navigationTitle`.
+/// When no content is playing, the window closes itself automatically
+/// so it doesn't linger as an empty window on app launch or after playback ends.
 struct MacOSPlayerWindowView: View {
     private let manager = PlayerWindowManager.shared
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Group {
@@ -19,16 +21,10 @@ struct MacOSPlayerWindowView: View {
                     presentationMode: .fullscreen
                 )
             } else {
-                Color.black
-                    .overlay {
-                        VStack(spacing: 16) {
-                            Image(systemName: "play.tv")
-                                .font(.system(size: 48))
-                                .foregroundStyle(.secondary)
-                            Text("No content playing")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
+                // No content — close the window immediately
+                Color.clear
+                    .onAppear {
+                        closePlayerWindow()
                     }
             }
         }
@@ -36,6 +32,23 @@ struct MacOSPlayerWindowView: View {
         .navigationTitle(manager.title.isEmpty ? "Now Playing" : manager.title)
         .onDisappear {
             manager.dismiss()
+        }
+    }
+
+    /// Close the player window via NSApplication when there's no content.
+    /// SwiftUI's `dismiss` only works for sheets/popovers, so we find
+    /// the actual NSWindow by its identifier and close it directly.
+    private func closePlayerWindow() {
+        DispatchQueue.main.async {
+            for window in NSApplication.shared.windows {
+                if window.identifier?.rawValue.contains("player") == true
+                    || window.title == "Now Playing" {
+                    window.close()
+                    return
+                }
+            }
+            // Fallback: try dismiss (works in some contexts)
+            dismiss()
         }
     }
 }

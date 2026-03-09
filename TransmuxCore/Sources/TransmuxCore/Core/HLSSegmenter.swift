@@ -809,6 +809,11 @@ public class HLSSegmenter {
 
         // Stream variant pointing to the media playlist, referencing audio and/or subtitle groups
         m3u8 += "\n"
+        // CODECS attribute omitted - Shaka Player will determine codecs from init.mp4.
+        // Hardcoding codecs is problematic because:
+        // - Video profile/level varies per content (Main/High Profile, different levels)
+        // - Audio codec may vary (AAC-LC, HE-AAC, AC3, EAC3)
+        // The init segment's avcC/esds boxes contain the actual codec parameters.
         var streamInf = "#EXT-X-STREAM-INF:BANDWIDTH=5000000"
         if hasMultiAudio { streamInf += ",AUDIO=\"audio\"" }
         if hasSubtitles { streamInf += ",SUBTITLES=\"subs\"" }

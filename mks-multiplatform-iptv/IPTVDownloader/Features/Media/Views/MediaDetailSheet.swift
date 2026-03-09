@@ -24,6 +24,7 @@ struct MediaDetailSheet: View {
 
     @EnvironmentObject private var downloadManager: DownloadManager
     @EnvironmentObject private var profile: IPTVProfile
+    @Environment(RemotePlayManager.self) private var remotePlayManager
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -379,6 +380,22 @@ struct MediaDetailSheet: View {
                     .frame(maxWidth: isCompact ? .infinity : nil)
             }
             .buttonStyle(.appGlassProminent)
+
+            if remotePlayManager.connectedDevice != nil {
+                Button { castContent() } label: {
+                    Label("Cast", systemImage: "tv.fill")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: isCompact ? .infinity : nil)
+                }
+                .buttonStyle(.appGlass)
+
+                Button { castDirectContent() } label: {
+                    Label("Cast Direct", systemImage: "dot.radiowaves.left.and.right")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: isCompact ? .infinity : nil)
+                }
+                .buttonStyle(.appGlass)
+            }
 
             Button {
                 downloadEpisode = nil
@@ -878,6 +895,103 @@ struct MediaDetailSheet: View {
         activePlayer = player
         showingPlayer = true
         #endif
+    }
+
+    /// Cast content to connected remote device instead of playing locally.
+    private func castContent() {
+        if let movie = movieDetail {
+            let urlString = IPTVConfiguration.buildMovieURL(
+                profile: profile,
+                vodID: String(movie.movieData.streamId),
+                vodExtension: movie.movieData.containerExtension ?? "mkv"
+            )
+            guard let url = URL(string: urlString) else { return }
+            Task {
+                try? await remotePlayManager.load(url: url, metadata: enrichedMetadata)
+            }
+        } else if let serie = serieDetail,
+                  let firstSeason = serie.seasons.first,
+                  let firstEpisode = serie.episodes[firstSeason.id]?.first {
+            castEpisode(firstEpisode)
+        }
+    }
+
+    /// Cast content directly to the connected remote device (Solo Cast mode).
+    /// Sends the original IPTV URL as-is — no transmuxing, no local playback.
+    private func castDirectContent() {
+        if let movie = movieDetail {
+            let urlString = IPTVConfiguration.buildMovieURL(
+                profile: profile,
+                vodID: String(movie.movieData.streamId),
+                vodExtension: movie.movieData.containerExtension ?? "mkv"
+            )
+            guard let url = URL(string: urlString) else { return }
+            Task {
+                try? await remotePlayManager.loadDirect(url: url, metadata: enrichedMetadata)
+            }
+        } else if let serie = serieDetail,
+                  let firstSeason = serie.seasons.first,
+                  let firstEpisode = serie.episodes[firstSeason.id]?.first {
+            castDirectEpisode(firstEpisode)
+        }
+    }
+
+    /// Cast a specific episode directly to connected remote device (Solo Cast mode).
+    private func castDirectEpisode(_ episode: SerieDetail.Episode) {
+        let urlString = IPTVConfiguration.buildSeriesURL(
+            profile: profile,
+            vodID: episode.id,
+            vodExtension: episode.containerExtension
+        )
+        guard let url = URL(string: urlString) else { return }
+
+        let episodeMetadata = MetadataResult(
+            title: "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum)) — \(episode.title)",
+            genre: enrichedMetadata?.genre ?? [],
+            plot: episode.info.plot.isEmpty ? nil : episode.info.plot,
+            rating: enrichedMetadata?.rating,
+            posterURL: episode.info.movieImage.isEmpty ? enrichedMetadata?.posterURL : episode.info.movieImage,
+            providerName: enrichedMetadata?.providerName ?? "IPTV",
+            confidence: enrichedMetadata?.confidence ?? 0.5,
+            mediaType: .episode,
+            seasonNumber: episode.season,
+            episodeNumber: episode.episodeNum,
+            episodeTitle: episode.title,
+            showTitle: detail.cleanTitle
+        )
+
+        Task {
+            try? await remotePlayManager.loadDirect(url: url, metadata: episodeMetadata)
+        }
+    }
+
+    /// Cast a specific episode to connected remote device.
+    private func castEpisode(_ episode: SerieDetail.Episode) {
+        let urlString = IPTVConfiguration.buildSeriesURL(
+            profile: profile,
+            vodID: episode.id,
+            vodExtension: episode.containerExtension
+        )
+        guard let url = URL(string: urlString) else { return }
+
+        let episodeMetadata = MetadataResult(
+            title: "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum)) — \(episode.title)",
+            genre: enrichedMetadata?.genre ?? [],
+            plot: episode.info.plot.isEmpty ? nil : episode.info.plot,
+            rating: enrichedMetadata?.rating,
+            posterURL: episode.info.movieImage.isEmpty ? enrichedMetadata?.posterURL : episode.info.movieImage,
+            providerName: enrichedMetadata?.providerName ?? "IPTV",
+            confidence: enrichedMetadata?.confidence ?? 0.5,
+            mediaType: .episode,
+            seasonNumber: episode.season,
+            episodeNumber: episode.episodeNum,
+            episodeTitle: episode.title,
+            showTitle: detail.cleanTitle
+        )
+
+        Task {
+            try? await remotePlayManager.load(url: url, metadata: episodeMetadata)
+        }
     }
 
     private func loadEnrichedMetadata() async {

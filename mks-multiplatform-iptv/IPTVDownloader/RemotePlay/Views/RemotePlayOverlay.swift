@@ -18,7 +18,11 @@ struct RemotePlayOverlay: View {
     // MARK: - State
 
     @State private var isDragging = false
-    @State private var dragOffset: CGFloat = 0
+    @State private var dragProgress: Double = 0
+
+    /// Pending volume value for debounced sending.
+    @State private var pendingVolume: Float?
+    @State private var volumeDebounceTask: Task<Void, Never>?
 
     // MARK: - Computed Properties
 
@@ -44,7 +48,11 @@ struct RemotePlayOverlay: View {
 
     private var progress: Double {
         guard duration > 0 else { return 0 }
-        return currentTime / duration
+        return isDragging ? dragProgress : (currentTime / duration)
+    }
+
+    private var displayTime: Double {
+        isDragging ? dragProgress * duration : currentTime
     }
 
     private var volume: Float {
@@ -91,7 +99,7 @@ struct RemotePlayOverlay: View {
 
                 // Playback controls
                 VStack(spacing: 16) {
-                    // Progress bar
+                    // Progress bar with seek gesture
                     VStack(spacing: 4) {
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
@@ -104,22 +112,38 @@ struct RemotePlayOverlay: View {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(Color.accentColor)
                                     .frame(width: geometry.size.width * progress, height: 4)
+
+                                // Seek thumb (visible during drag)
+                                if isDragging {
+                                    Circle()
+                                        .fill(Color.accentColor)
+                                        .frame(width: 12, height: 12)
+                                        .offset(x: geometry.size.width * progress - 6)
+                                }
                             }
+                            .contentShape(Rectangle().size(width: geometry.size.width, height: 24))
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        isDragging = true
+                                        let fraction = max(0, min(1, value.location.x / geometry.size.width))
+                                        dragProgress = fraction
+                                    }
+                                    .onEnded { value in
+                                        let fraction = max(0, min(1, value.location.x / geometry.size.width))
+                                        let seekTime = fraction * duration
+                                        isDragging = false
+                                        Task {
+                                            try? await remotePlayManager.seek(to: seekTime)
+                                        }
+                                    }
+                            )
                         }
-                        .frame(height: 4)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { _ in
-                                    isDragging = true
-                                }
-                                .onEnded { _ in
-                                    isDragging = false
-                                }
-                        )
+                        .frame(height: 12)
 
                         // Time labels
                         HStack {
-                            Text(formatTime(currentTime))
+                            Text(formatTime(displayTime))
                                 .font(.caption)
                                 .monospacedDigit()
                             Spacer()
@@ -178,7 +202,7 @@ struct RemotePlayOverlay: View {
                     }
                     .padding(.vertical, 8)
 
-                    // Volume control
+                    // Volume control with debounce
                     HStack(spacing: 12) {
                         Button {
                             Task {
@@ -193,9 +217,7 @@ struct RemotePlayOverlay: View {
                         Slider(value: Binding(
                             get: { volume },
                             set: { newVolume in
-                                Task {
-                                    try? await remotePlayManager.setVolume(newVolume)
-                                }
+                                debouncedSetVolume(newVolume)
                             }
                         ))
                         .frame(maxWidth: 150)
@@ -220,6 +242,18 @@ struct RemotePlayOverlay: View {
     }
 
     // MARK: - Helpers
+
+    /// Debounce volume changes — only sends SOAP request after 250ms of no changes.
+    private func debouncedSetVolume(_ newVolume: Float) {
+        pendingVolume = newVolume
+        volumeDebounceTask?.cancel()
+        volumeDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let volume = pendingVolume else { return }
+            try? await remotePlayManager.setVolume(volume)
+            pendingVolume = nil
+        }
+    }
 
     private func formatTime(_ seconds: Double) -> String {
         let totalSeconds = Int(seconds)

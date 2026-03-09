@@ -34,6 +34,7 @@ struct mks_iptv_downloaderApp: App {
                         .environmentObject(DownloadManager(profile: profile))
                         .environmentObject(profilesManager)
                         .environmentObject(profile)
+                        .environment(RemotePlayManager.shared)
                 } else {
                     IPTVProfilesView(manager: profilesManager)
                 }
@@ -62,9 +63,12 @@ struct mks_iptv_downloaderApp: App {
         Window("Now Playing", id: "player") {
             MacOSPlayerWindowView()
                 .preferredColorScheme(.dark)
+                .environment(RemotePlayManager.shared)
         }
         .defaultSize(width: 1280, height: 720)
         .defaultPosition(.center)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
         #endif
     }
 }

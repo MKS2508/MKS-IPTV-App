@@ -102,3 +102,13 @@ protocol RemoteDeviceControllerFactory: Sendable {
     /// - Throws: RemotePlayError if controller creation fails
     func createController(for device: RemoteDevice) throws -> any RemoteDeviceController
 }
+
+// MARK: - DLNA Controller Factory
+
+/// Factory for creating DLNA controllers.
+struct DLNAControllerFactory: RemoteDeviceControllerFactory {
+    /// Creates a DLNAController for the given DLNA device.
+    func createController(for device: RemoteDevice) throws -> any RemoteDeviceController {
+        try DLNAController(device: device)
+    }
+}

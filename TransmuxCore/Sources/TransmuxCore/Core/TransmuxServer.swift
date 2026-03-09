@@ -75,6 +75,14 @@ public actor TransmuxServer {
     private var segmentCache: SegmentCache?
     /// Set to true when stop() is called; prevents polling loops from logging errors on deleted files
     private var stopped = false
+    /// Cast mode: directory containing .ts segments and .m3u8 playlist for simple file serving
+    private var castDirectory: String?
+    /// DLNA mode: when true, adds DLNA-specific response headers (transferMode, contentFeatures, keep-alive)
+    /// to all served responses. Set via `setDLNAMode(_:)`. Works with the normal transmux pipeline.
+    private var dlnaMode = false
+    /// DLNA direct file serving: path to the original file (not transmuxed).
+    /// DLNA TVs need standard MP4/MKV with full moov — not fMP4 fragments.
+    private var dlnaFilePath: String?
 
     private let networkQueue = DispatchQueue(label: "TransmuxServer.network", qos: .userInitiated)
     private let portRange: Range<UInt16> = 8100..<8200
@@ -193,10 +201,193 @@ public actor TransmuxServer {
         return Session(localURL: url, port: port)
     }
 
+    /// Start serving Cast MPEG-TS content from a directory.
+    /// Much simpler than the fMP4 progressive serving mode — just serves
+    /// .m3u8 and .ts files directly from disk. No segmenter, no init segment,
+    /// no tfdt rewriting. Used for Cast devices whose MPL only supports MPEG-TS.
+    ///
+    /// - Parameter directory: Path to the directory containing .ts segments and stream.m3u8
+    public func startCast(directory: String) async throws -> Session {
+        if listener != nil {
+            stop()
+        }
+
+        guard FileManager.default.fileExists(atPath: directory) else {
+            throw ServerError.invalidFilePath
+        }
+
+        self.stopped = false
+        self.castDirectory = directory
+        self.filePath = nil
+        self.mediaPlaylistPath = nil
+        self.masterPlaylistPath = nil
+        self.expectedSize = 0
+        self.segmenter = nil
+        self.initSegmentSize = 0
+        self.seekHandle = nil
+        self.isComplete = false
+        self.segmentCache = nil
+
+        let port = try findAvailablePort()
+        self.currentPort = port
+
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+        let nwListener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        self.listener = nwListener
+
+        nwListener.newConnectionHandler = { [weak self] connection in
+            Task { [weak self] in
+                await self?.handleConnection(connection)
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            nwListener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    TransmuxLog.log("CAST LISTEN :\(port)", tag: "Server")
+                    if !resumed {
+                        resumed = true
+                        continuation.resume()
+                    }
+                case .failed(let error):
+                    TransmuxLog.log("Cast listener failed: \(error)", tag: "Server", level: .error)
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: ServerError.portExhausted)
+                    }
+                default:
+                    break
+                }
+            }
+
+            nwListener.start(queue: self.networkQueue)
+        }
+
+        let host = Self.getLANIPAddress() ?? "localhost"
+        if host == "localhost" {
+            TransmuxLog.log("WARNING: Could not determine LAN IP, Cast may not work", tag: "Server", level: .warn)
+        }
+
+        guard let url = URL(string: "http://\(host):\(port)/stream.m3u8") else {
+            throw ServerError.invalidFilePath
+        }
+
+        TransmuxLog.log("CAST SERVING \(url) (dir: \(directory))", tag: "Server")
+        return Session(localURL: url, port: port)
+    }
+
+    /// Enable or disable DLNA mode. When enabled, adds DLNA-specific response headers
+    /// (transferMode.dlna.org, contentFeatures.dlna.org, Connection: keep-alive)
+    /// to all served responses. Can be used with startDLNA() or start() (transmux pipeline).
+    public func setDLNAMode(_ enabled: Bool) {
+        dlnaMode = enabled
+        TransmuxLog.log("DLNA mode \(enabled ? "ENABLED" : "DISABLED")", tag: "Server")
+    }
+
+    /// Start serving a growing MPEG-TS file for DLNA playback.
+    /// The remux loop writes to the file in the background while this server
+    /// serves it via HTTP range requests with DLNA headers.
+    ///
+    /// - Parameters:
+    ///   - filePath: Path to the growing .ts file
+    ///   - expectedSize: Estimated final file size (from input bitrate)
+    /// - Returns: Session with the LAN-accessible URL
+    public func startDLNA(filePath: String, expectedSize: Int64) async throws -> Session {
+        if listener != nil {
+            stop()
+        }
+
+        self.stopped = false
+        self.dlnaFilePath = filePath
+        self.dlnaMode = true
+        self.filePath = filePath
+        self.mediaPlaylistPath = nil
+        self.masterPlaylistPath = nil
+        self.expectedSize = expectedSize
+        self.isComplete = false  // File is growing — remux in progress
+        self.segmenter = nil
+        self.initSegmentSize = 0
+        self.seekHandle = nil
+        self.segmentCache = nil
+        self.castDirectory = nil
+
+        let port = try findAvailablePort()
+        self.currentPort = port
+
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+        let nwListener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        self.listener = nwListener
+
+        nwListener.newConnectionHandler = { [weak self] connection in
+            Task { [weak self] in
+                await self?.handleConnection(connection)
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            nwListener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    TransmuxLog.log("DLNA LISTEN :\(port)", tag: "Server")
+                    if !resumed {
+                        resumed = true
+                        continuation.resume()
+                    }
+                case .failed(let error):
+                    TransmuxLog.log("DLNA listener failed: \(error)", tag: "Server", level: .error)
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: ServerError.portExhausted)
+                    }
+                default:
+                    break
+                }
+            }
+
+            nwListener.start(queue: self.networkQueue)
+        }
+
+        let host = Self.getLANIPAddress() ?? "localhost"
+        if host == "localhost" {
+            TransmuxLog.log("WARNING: Could not determine LAN IP, DLNA may not work", tag: "Server", level: .warn)
+        }
+
+        // Serve at /stream.ts — the fallback handler in dispatchRequest() will serve it
+        // with DLNA headers since dlnaMode=true
+        guard let url = URL(string: "http://\(host):\(port)/stream.ts") else {
+            throw ServerError.invalidFilePath
+        }
+
+        TransmuxLog.log("DLNA SERVING \(url) (est \(expectedSize / 1_048_576)MB)", tag: "Server")
+        return Session(localURL: url, port: port)
+    }
+
     /// Mark the transmux as complete. After this, empty reads mean real EOF.
     public func setComplete() {
         isComplete = true
         TransmuxLog.log("Transmux complete \u{2014} EOF on empty reads", tag: "Server")
+    }
+
+    /// Update expected size to the actual final file size.
+    /// Called when DLNA transmux completes and the real size is known.
+    public func setExpectedSize(_ size: Int64) {
+        expectedSize = size
+        TransmuxLog.log("Expected size updated to \(size) (\(size / 1_048_576)MB)", tag: "Server")
     }
 
     /// Stop serving and clean up all connections.
@@ -221,6 +412,9 @@ public actor TransmuxServer {
         seekHandle = nil
         segmentCache?.clear()
         segmentCache = nil
+        castDirectory = nil
+        dlnaMode = false
+        dlnaFilePath = nil
 
         TransmuxLog.log("STOPPED", tag: "Server")
         TransmuxLog.flush()
@@ -274,6 +468,12 @@ public actor TransmuxServer {
     }
 
     private func dispatchRequest(_ request: HTTPRequestParser.Request, connection: NWConnection) {
+        // Cast mode: serve files directly from the output directory
+        if let castDir = self.castDirectory {
+            dispatchCastRequest(request, connection: connection, directory: castDir)
+            return
+        }
+
         guard let filePath = self.filePath else {
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
@@ -290,6 +490,7 @@ public actor TransmuxServer {
         let initSize = self.initSegmentSize
         let handle = self.seekHandle
         let cache = self.segmentCache
+        let isDLNA = self.dlnaMode
 
         let path = request.path
 
@@ -348,11 +549,12 @@ public actor TransmuxServer {
             )
         } else {
             // Fallback: existing byte-range handler for direct mp4 access
+            // DLNA TVs use this path to pull the fMP4 via HTTP range requests.
             switch request.method {
             case .head:
-                handleHead(connection: connection, filePath: filePath, expectedSize: expectedSize)
+                handleHead(connection: connection, filePath: filePath, expectedSize: expectedSize, dlnaMode: isDLNA)
             case .get:
-                handleGet(connection: connection, filePath: filePath, expectedSize: expectedSize, isComplete: complete, rangeHeader: request.rangeHeader)
+                handleGet(connection: connection, filePath: filePath, expectedSize: expectedSize, isComplete: complete, rangeHeader: request.rangeHeader, dlnaMode: isDLNA)
             }
         }
     }
@@ -587,7 +789,7 @@ public actor TransmuxServer {
             }
             // Truly no data for this range — segment is beyond actual content
             TransmuxLog.segmentEvent("EOF-EMPTY", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "eof", extra: "transmux complete, no fragments for range")
-            let response = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
+            let response = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()
             })
@@ -725,7 +927,7 @@ public actor TransmuxServer {
                             }
                             // Transmux complete but no data for this range — empty 200
                             TransmuxLog.segmentEvent("EOF-EMPTY-POLL", segIndex: segIndex, startTime: startTime, endTime: endTime, source: "eof", extra: "transmux completed during poll, no fragments")
-                            let emptyResp = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8)
+                            let emptyResp = Data("HTTP/1.1 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n".utf8)
                             connection.send(content: emptyResp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                                 connection.cancel()
                             })
@@ -1137,18 +1339,24 @@ public actor TransmuxServer {
 
     // MARK: - HEAD Handler (MP4)
 
-    private nonisolated func handleHead(connection: NWConnection, filePath: String, expectedSize: Int64) {
+    private nonisolated func handleHead(connection: NWConnection, filePath: String, expectedSize: Int64, dlnaMode: Bool = false) {
         let fileSize: Int64 = expectedSize > 0 ? expectedSize : Self.currentFileSize(filePath)
+        let contentType = Self.mimeType(for: filePath)
 
         var header = "HTTP/1.1 200 OK\r\n"
-        header += "Content-Type: video/mp4\r\n"
+        header += "Content-Type: \(contentType)\r\n"
         header += "Content-Length: \(fileSize)\r\n"
         header += "Accept-Ranges: bytes\r\n"
         header += "Access-Control-Allow-Origin: *\r\n"
-        header += "Connection: close\r\n"
+        if dlnaMode {
+            header += Self.dlnaHeaders()
+            header += "Connection: keep-alive\r\n"
+        } else {
+            header += "Connection: close\r\n"
+        }
         header += "\r\n"
 
-        TransmuxLog.log("HEAD 200 CL=\(fileSize)", tag: "Server")
+        TransmuxLog.log("HEAD 200 CL=\(fileSize)\(dlnaMode ? " [DLNA]" : "")", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
@@ -1175,7 +1383,8 @@ public actor TransmuxServer {
         filePath: String,
         expectedSize: Int64,
         isComplete: Bool,
-        rangeHeader: String?
+        rangeHeader: String?,
+        dlnaMode: Bool = false
     ) {
         let totalSize: Int64 = expectedSize > 0 ? expectedSize : max(Self.currentFileSize(filePath), 1)
 
@@ -1229,16 +1438,22 @@ public actor TransmuxServer {
 
         // Cases 1 & 2: respond with 206 and the FULL requested Content-Range.
         // FigHTTP requires Content-Length to match the requested range exactly.
+        let contentType = Self.mimeType(for: filePath)
         var header = "HTTP/1.1 206 Partial Content\r\n"
         header += "Content-Range: bytes \(rangeStart)-\(rangeEnd)/\(totalSize)\r\n"
         header += "Content-Length: \(contentLength)\r\n"
-        header += "Content-Type: video/mp4\r\n"
+        header += "Content-Type: \(contentType)\r\n"
         header += "Accept-Ranges: bytes\r\n"
         header += "Access-Control-Allow-Origin: *\r\n"
-        header += "Connection: close\r\n"
+        if dlnaMode {
+            header += Self.dlnaHeaders()
+            header += "Connection: keep-alive\r\n"
+        } else {
+            header += "Connection: close\r\n"
+        }
         header += "\r\n"
 
-        TransmuxLog.log("GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength)", tag: "Server")
+        TransmuxLog.log("GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength)\(dlnaMode ? " [DLNA]" : "")", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, completion: .contentProcessed { error in
@@ -1427,6 +1642,34 @@ public actor TransmuxServer {
 
     /// Determine the device's LAN IP address for AirPlay compatibility.
     /// Apple TV resolves `localhost` to itself, so we need the actual LAN IP
+    // MARK: - DLNA Headers
+
+    /// DLNA-specific HTTP headers added when dlnaMode is enabled.
+    /// These headers tell DLNA TVs how to handle the content:
+    /// - transferMode.dlna.org: Streaming (allows seeking)
+    /// - contentFeatures.dlna.org: OP=01 (range supported), CI=0 (not transcoded)
+    /// - Accept-Ranges: bytes (explicit range support)
+    /// Determine MIME type from file path extension.
+    private nonisolated static func mimeType(for filePath: String) -> String {
+        let ext = (filePath as NSString).pathExtension.lowercased()
+        switch ext {
+        case "mp4", "m4v": return "video/mp4"
+        case "ts", "m2ts": return "video/mp2t"
+        case "mkv": return "video/x-matroska"
+        case "avi": return "video/x-msvideo"
+        case "mov": return "video/quicktime"
+        case "m3u8": return "application/x-mpegURL"
+        default: return "video/mp4"
+        }
+    }
+
+    private nonisolated static func dlnaHeaders() -> String {
+        var h = ""
+        h += "transferMode.dlna.org: Streaming\r\n"
+        h += "contentFeatures.dlna.org: DLNA.ORG_PN=*;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n"
+        return h
+    }
+
     /// so AirPlay Video can fetch segments from this device over the network.
     ///
     /// Scans IPv4 interfaces, preferring en0 (WiFi). Filters out loopback (127.x.x.x)
@@ -1469,6 +1712,103 @@ public actor TransmuxServer {
         }
 
         return bestIP ?? fallbackIP
+    }
+
+    // MARK: - Cast Mode Handlers
+
+    /// Dispatch requests in Cast mode — serve files directly from the output directory.
+    /// Supports .m3u8 playlists and .ts segment files. CORS headers are included for Cast.
+    private func dispatchCastRequest(_ request: HTTPRequestParser.Request, connection: NWConnection, directory: String) {
+        let path = request.path
+        let fileName = (path as NSString).lastPathComponent
+
+        // Security: only serve .m3u8 and .ts files
+        guard fileName.hasSuffix(".m3u8") || fileName.hasSuffix(".ts") else {
+            TransmuxLog.log("CAST 404 unsupported: \(path)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        let filePath = (directory as NSString).appendingPathComponent(fileName)
+
+        // For .ts segments that don't exist yet, poll briefly (transmux in progress)
+        if fileName.hasSuffix(".ts") && !FileManager.default.fileExists(atPath: filePath) {
+            handleCastSegmentWait(connection: connection, filePath: filePath, fileName: fileName)
+            return
+        }
+
+        // Serve the file
+        handleCastServeFile(connection: connection, filePath: filePath, fileName: fileName)
+    }
+
+    /// Serve a static file (.m3u8 or .ts) from the Cast output directory.
+    private nonisolated func handleCastServeFile(connection: NWConnection, filePath: String, fileName: String) {
+        guard let data = FileManager.default.contents(atPath: filePath) else {
+            TransmuxLog.log("CAST 404 \(fileName)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        let contentType: String
+        if fileName.hasSuffix(".m3u8") {
+            contentType = "application/vnd.apple.mpegurl"
+        } else {
+            contentType = "video/mp2t"
+        }
+
+        var header = "HTTP/1.1 200 OK\r\n"
+        header += "Content-Type: \(contentType)\r\n"
+        header += "Content-Length: \(data.count)\r\n"
+        header += "Access-Control-Allow-Origin: *\r\n"
+        if fileName.hasSuffix(".m3u8") {
+            header += "Cache-Control: no-cache, no-store\r\n"
+        } else {
+            header += "Cache-Control: public, max-age=3600\r\n"
+        }
+        header += "Connection: close\r\n"
+        header += "\r\n"
+
+        TransmuxLog.log("CAST 200 \(fileName) \(data.count)B", tag: "Server")
+
+        var responseData = Data(header.utf8)
+        responseData.append(data)
+        connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
+    /// Wait for a .ts segment file to appear on disk (transmux in progress).
+    /// Polls for up to 15 seconds, then returns 404 if the segment never appeared.
+    private nonisolated func handleCastSegmentWait(connection: NWConnection, filePath: String, fileName: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Poll for the segment file: 150 × 100ms = 15s timeout
+            for i in 0..<150 {
+                if FileManager.default.fileExists(atPath: filePath) {
+                    // File exists — but wait a tiny bit for it to be fully written
+                    Thread.sleep(forTimeInterval: 0.05)
+                    self.handleCastServeFile(connection: connection, filePath: filePath, fileName: fileName)
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.1)
+
+                if i > 0 && i % 50 == 0 {
+                    TransmuxLog.log("CAST waiting for \(fileName) (\(i / 10)s)", tag: "Server")
+                }
+            }
+
+            // Timeout
+            TransmuxLog.log("CAST 404 timeout \(fileName)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
     }
 }
 

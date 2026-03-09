@@ -18,6 +18,8 @@ struct RemotePlayButton: View {
     // MARK: - State
 
     @State private var showingDevicePicker = false
+    @State private var connectionError: RemotePlayError?
+    @State private var hasStartedDiscovery = false
 
     // MARK: - Body
 
@@ -59,9 +61,15 @@ struct RemotePlayButton: View {
                 isDiscovering: remotePlayManager.isDiscovering,
                 selectedDevice: remotePlayManager.connectedDevice,
                 onDeviceSelected: { device in
+                    showingDevicePicker = false
                     Task {
-                        showingDevicePicker = false
-                        try? await remotePlayManager.connect(to: device)
+                        do {
+                            try await remotePlayManager.connect(to: device)
+                        } catch let error as RemotePlayError {
+                            connectionError = error
+                        } catch {
+                            connectionError = .unknown(error.localizedDescription)
+                        }
                     }
                 },
                 onRefresh: {
@@ -72,9 +80,24 @@ struct RemotePlayButton: View {
                 }
             )
         }
+        .alert(
+            "Connection Failed",
+            isPresented: Binding(
+                get: { connectionError != nil },
+                set: { if !$0 { connectionError = nil } }
+            ),
+            presenting: connectionError
+        ) { _ in
+            Button("OK") { connectionError = nil }
+        } message: { error in
+            Text(error.errorDescription ?? "Unknown error")
+        }
         .onAppear {
-            // Start discovery when button appears
-            remotePlayManager.startDiscovery()
+            // Start discovery only once (not on every navigation appear)
+            if !hasStartedDiscovery {
+                hasStartedDiscovery = true
+                remotePlayManager.startDiscovery()
+            }
         }
     }
 }

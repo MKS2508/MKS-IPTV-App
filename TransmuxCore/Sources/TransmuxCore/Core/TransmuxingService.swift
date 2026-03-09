@@ -68,6 +68,58 @@ public struct ProgressiveTransmuxSession {
     public let subtitleTracks: [SubtitleTrackInfo]
 }
 
+// MARK: - Cast Transmux Session
+
+/// Result returned after input analysis for a Cast MPEG-TS transmux.
+/// Outputs MPEG-TS segments (.ts) with an HLS EVENT playlist,
+/// compatible with the Default Media Receiver's MPL player.
+/// No init segment, no HLSSegmenter, no seek support — just .ts segments + .m3u8.
+public struct CastTransmuxSession {
+    public let sessionID: String
+    public let outputDir: String
+    public let playlistPath: String   // path to stream.m3u8
+    public let duration: Double
+    public let audioTracks: [AudioTrackInfo]
+    /// Number of segments written so far (updated atomically during remux)
+    public let segmentCounter: CastSegmentCounter
+}
+
+/// Thread-safe counter for tracking how many .ts segments have been written.
+public final class CastSegmentCounter: @unchecked Sendable {
+    private var _count: Int = 0
+    private let lock = NSLock()
+
+    public var count: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _count
+    }
+
+    func increment() {
+        lock.lock()
+        _count += 1
+        lock.unlock()
+    }
+}
+
+// MARK: - DLNA Transmux Session
+
+/// Result returned after the DLNA MPEG-TS transmux header is written.
+/// Outputs a single growing .ts file (not segmented) — MPEG-TS is inherently
+/// streamable with no moov atom, so playback can start immediately.
+/// The remux loop continues on a background thread while the server serves
+/// the growing file via HTTP range requests with DLNA headers.
+public struct DLNATransmuxSession: Sendable {
+    public let sessionID: String
+    /// Path to the growing MPEG-TS output file.
+    public let outputPath: String
+    /// Total content duration in seconds (from input).
+    public let duration: Double
+    /// Expected final file size (estimated from input bitrate).
+    public let expectedSize: Int64
+    public let audioTracks: [AudioTrackInfo]
+}
+
 // MARK: - Transmux Completion Notification
 
 public extension Notification.Name {
@@ -115,7 +167,7 @@ public actor TransmuxingService {
     /// Start transmuxing and return immediately after the fMP4 header is written.
     /// The remux loop continues in the background. Use `cancelTransmux(sessionID:)`
     /// to stop it early.
-    public func startTransmux(from sourceURL: URL) async throws -> ProgressiveTransmuxSession {
+    public func startTransmux(from sourceURL: URL, maxAudioTracks: Int? = nil) async throws -> ProgressiveTransmuxSession {
         let sessionID = UUID().uuidString
         let outputDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("mks-iptv-transmux-\(sessionID)")
@@ -160,6 +212,7 @@ public actor TransmuxingService {
                         handle: handle,
                         proxySessionID: proxySessionID,
                         streamProxy: self.streamProxy,
+                        maxAudioTracks: maxAudioTracks,
                         continuation: continuation
                     )
                 }
@@ -203,6 +256,591 @@ public actor TransmuxingService {
         activeSessions.removeAll()
     }
 
+    // MARK: - Cast MPEG-TS Transmux
+
+    /// Start a Cast-optimized transmux that outputs HLS with MPEG-TS segments.
+    /// The Default Media Receiver's MPL player only supports MPEG-TS, not fMP4.
+    /// Returns after input analysis; the remux loop runs in the background.
+    public func startCastTransmux(from sourceURL: URL) async throws -> CastTransmuxSession {
+        let sessionID = UUID().uuidString
+        let outputDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mks-iptv-cast-\(sessionID)")
+
+        try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        activeSessions[sessionID] = outputDir
+
+        // Resolve input path (same logic as startTransmux)
+        var proxySessionID: Int?
+        let inputPath: String
+        if sourceURL.scheme?.lowercased() == "https" {
+            if let proxy = streamProxy {
+                let proxySession = try await proxy.startProxy(for: sourceURL)
+                proxySessionID = proxySession.id
+                inputPath = proxySession.localURL.absoluteString
+                TransmuxLog.service("Cast: Proxied HTTPS -> \(inputPath)")
+            } else {
+                inputPath = sourceURL.absoluteString
+                TransmuxLog.service("Cast: WARNING: No StreamProxy for HTTPS URL", level: .warn)
+            }
+        } else if sourceURL.scheme == "file" {
+            inputPath = sourceURL.path(percentEncoded: false)
+        } else {
+            inputPath = sourceURL.absoluteString
+        }
+
+        do {
+            let session = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CastTransmuxSession, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    Self.performCastTransmux(
+                        inputPath: inputPath,
+                        outputDir: outputDir,
+                        sessionID: sessionID,
+                        continuation: continuation
+                    )
+                }
+            }
+            return session
+        } catch {
+            if let pid = proxySessionID, let proxy = streamProxy {
+                await proxy.stop(sessionID: pid)
+            }
+            throw error
+        }
+    }
+
+    /// Cast MPEG-TS transmux using FFmpeg's segment muxer.
+    /// Outputs individual .ts segment files and an HLS .m3u8 playlist.
+    /// Much simpler than the fMP4 progressive pipeline — no seeking, no DTS rebasing.
+    private static func performCastTransmux(
+        inputPath: String,
+        outputDir: URL,
+        sessionID: String,
+        continuation: CheckedContinuation<CastTransmuxSession, Error>
+    ) {
+        var inputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var outputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var continuationResumed = false
+
+        mks_log_init(TransmuxLog.filePath)
+
+        // --- Open input ---
+        var inputOptions: OpaquePointer?
+        av_dict_set(&inputOptions, "user_agent", "VLC/3.0.18 LibVLC/3.0.18", 0)
+        av_dict_set(&inputOptions, "timeout", "30000000", 0)
+        av_dict_set(&inputOptions, "reconnect", "1", 0)
+        av_dict_set(&inputOptions, "reconnect_streamed", "1", 0)
+        av_dict_set(&inputOptions, "reconnect_delay_max", "5", 0)
+        av_dict_set(&inputOptions, "probesize", "33554432", 0)
+        av_dict_set(&inputOptions, "analyzeduration", "30000000", 0)
+
+        var ret = avformat_open_input(&inputCtx, inputPath, nil, &inputOptions)
+        av_dict_free(&inputOptions)
+        guard ret >= 0, let inCtx = inputCtx else {
+            continuation.resume(throwing: TransmuxError.processStartFailure(
+                NSError(domain: "FFmpeg", code: Int(ret),
+                        userInfo: [NSLocalizedDescriptionKey: "avformat_open_input failed (\(ret))"])
+            ))
+            return
+        }
+
+        let streamCount = Int(mks_format_get_nb_streams(inCtx))
+        ret = avformat_find_stream_info(inCtx, nil)
+        guard ret >= 0 else {
+            avformat_close_input(&inputCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        let durationSeconds = Double(inCtx.pointee.duration) / Double(AV_TIME_BASE)
+        let bestVideo = av_find_best_stream(inCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0)
+        let bestAudio = av_find_best_stream(inCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nil, 0)
+
+        TransmuxLog.service("CAST SESSION \(sessionID.prefix(8)) | in=\(inputPath) dur=\(String(format: "%.1f", durationSeconds))s")
+
+        // --- Find best audio stream (Cast = single audio only) ---
+        var audioInfo: AudioTrackInfo?
+        if bestAudio >= 0 {
+            var langBuf = [CChar](repeating: 0, count: 64)
+            var titleBuf = [CChar](repeating: 0, count: 256)
+            mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
+            mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
+            let lang = String(cString: langBuf)
+            let title = String(cString: titleBuf)
+            let codecId = Int32(mks_stream_get_codec_id(inCtx, bestAudio))
+            let codecName: String
+            switch codecId {
+            case 86018: codecName = "AAC"
+            case 86019: codecName = "AC3"
+            case 86056: codecName = "EAC3"
+            case 86076: codecName = "OPUS"
+            case 86028: codecName = "FLAC"
+            case 86017: codecName = "MP3"
+            default: codecName = "audio(\(codecId))"
+            }
+            audioInfo = AudioTrackInfo(
+                inputStreamIndex: Int(bestAudio),
+                outputStreamIndex: bestVideo >= 0 ? 1 : 0,
+                language: lang.isEmpty ? "und" : lang,
+                title: title,
+                codecName: codecName,
+                codecId: codecId,
+                channels: Int(mks_stream_get_channels(inCtx, bestAudio)),
+                sampleRate: Int(mks_stream_get_sample_rate(inCtx, bestAudio)),
+                isDefault: true
+            )
+        }
+
+        // --- Allocate output: segment muxer with mpegts format ---
+        let segPattern = outputDir.appendingPathComponent("seg_%03d.ts").path
+        let m3u8Path = outputDir.appendingPathComponent("stream.m3u8").path
+
+        ret = avformat_alloc_output_context2(&outputCtx, nil, "segment", segPattern)
+        guard ret >= 0, let outCtx = outputCtx else {
+            TransmuxLog.service("Cast: segment muxer failed (\(ret)), trying mpegts fallback", level: .warn)
+            // Fallback: try direct mpegts to single file
+            avformat_close_input(&inputCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        // --- Map streams: video + 1 audio ---
+        var streamMapping = [Int](repeating: -1, count: streamCount)
+        var outputStreamIndex: Int32 = 0
+
+        if bestVideo >= 0 {
+            streamMapping[Int(bestVideo)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+            ret = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+            guard ret >= 0 else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                return
+            }
+            outputStreamIndex += 1
+        }
+
+        if bestAudio >= 0 {
+            streamMapping[Int(bestAudio)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+            ret = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
+            guard ret >= 0 else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                return
+            }
+            outputStreamIndex += 1
+        }
+
+        guard outputStreamIndex > 0 else {
+            TransmuxLog.service("Cast: no video or audio streams found", level: .error)
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+            return
+        }
+
+        // --- Configure segment muxer options ---
+        var options: OpaquePointer?
+        av_dict_set(&options, "segment_format", "mpegts", 0)
+        av_dict_set(&options, "segment_time", "6", 0)
+        av_dict_set(&options, "segment_list", m3u8Path, 0)
+        av_dict_set(&options, "segment_list_type", "m3u8", 0)
+        av_dict_set(&options, "segment_list_flags", "live+cache", 0)
+        // Reset timestamps so each segment starts at 0 — NOT needed, we want continuous timestamps
+        // for proper seeking on the Cast player
+        av_dict_set(&options, "reset_timestamps", "0", 0)
+
+        TransmuxLog.service("CAST STREAMS v:\(bestVideo) a:\(bestAudio) | format=segment/mpegts segs=\(segPattern)")
+
+        // --- Write header ---
+        ret = avformat_write_header(outCtx, &options)
+        av_dict_free(&options)
+        guard ret >= 0 else {
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        TransmuxLog.service("Cast: header written, starting remux loop")
+
+        // Create segment counter for tracking progress
+        let segmentCounter = CastSegmentCounter()
+
+        // Resume continuation — caller can start the server while remux continues
+        let audioTracks = audioInfo.map { [$0] } ?? []
+        let session = CastTransmuxSession(
+            sessionID: sessionID,
+            outputDir: outputDir.path,
+            playlistPath: m3u8Path,
+            duration: durationSeconds,
+            audioTracks: audioTracks,
+            segmentCounter: segmentCounter
+        )
+        continuation.resume(returning: session)
+        continuationResumed = true
+
+        // --- Remux loop (simple — no seeking, no DTS rebasing) ---
+        var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
+        var packetCount = 0
+        var lastSegmentFile = ""
+
+        while true {
+            ret = av_read_frame(inCtx, packet)
+            if ret < 0 { break }
+
+            guard let pkt = packet else { break }
+            let streamIndex = Int(pkt.pointee.stream_index)
+
+            guard streamIndex < streamCount, streamMapping[streamIndex] >= 0 else {
+                av_packet_unref(pkt)
+                continue
+            }
+
+            let outStreamIdx = Int32(streamMapping[streamIndex])
+            pkt.pointee.stream_index = outStreamIdx
+            mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
+            mks_packet_clear_pos(pkt)
+
+            ret = av_interleaved_write_frame(outCtx, pkt)
+            if ret < 0 {
+                TransmuxLog.service("Cast: write error (\(ret)) at packet \(packetCount)", level: .error)
+            }
+            packetCount += 1
+
+            // Track segment file creation by checking if the current segment file exists
+            if packetCount % 100 == 0 {
+                let segFile = outputDir.appendingPathComponent("seg_\(String(format: "%03d", segmentCounter.count)).ts").path
+                if segFile != lastSegmentFile && FileManager.default.fileExists(atPath: segFile) {
+                    segmentCounter.increment()
+                    lastSegmentFile = segFile
+                    if segmentCounter.count <= 5 || segmentCounter.count % 20 == 0 {
+                        TransmuxLog.service("Cast: segment \(segmentCounter.count) written")
+                    }
+                }
+            }
+
+            if packetCount % 25000 == 0 {
+                TransmuxLog.service("Cast: PROGRESS \(packetCount / 1000)K packets, \(segmentCounter.count) segments")
+            }
+        }
+
+        av_packet_free(&packet)
+
+        // --- Finalize ---
+        av_write_trailer(outCtx)
+
+        // Do a final segment count
+        var finalSegCount = 0
+        while FileManager.default.fileExists(atPath: outputDir.appendingPathComponent("seg_\(String(format: "%03d", finalSegCount)).ts").path) {
+            finalSegCount += 1
+        }
+
+        TransmuxLog.service("Cast: COMPLETE \(sessionID.prefix(8)) \(packetCount / 1000)K packets \(finalSegCount) segments")
+
+        // Cleanup FFmpeg contexts
+        avformat_free_context(outCtx)
+        avformat_close_input(&inputCtx)
+    }
+
+    // MARK: - DLNA Transmux (Progressive MPEG-TS)
+
+    /// Remux input to a single progressive MPEG-TS file for DLNA playback.
+    /// MPEG-TS has no moov — it's streamable from the first byte. The continuation
+    /// resumes after the header is written; the remux loop continues in the background.
+    /// TransmuxServer serves the growing .ts file with range requests + DLNA headers.
+    public func startDLNATransmux(from sourceURL: URL) async throws -> DLNATransmuxSession {
+        let sessionID = UUID().uuidString
+        let outputDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mks-iptv-dlna-\(sessionID)")
+
+        try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        activeSessions[sessionID] = outputDir
+
+        // Resolve input path
+        var proxySessionID: Int?
+        let inputPath: String
+        if sourceURL.scheme?.lowercased() == "https" {
+            if let proxy = streamProxy {
+                let proxySession = try await proxy.startProxy(for: sourceURL)
+                proxySessionID = proxySession.id
+                inputPath = proxySession.localURL.absoluteString
+                TransmuxLog.service("DLNA: Proxied HTTPS -> \(inputPath)")
+            } else {
+                inputPath = sourceURL.absoluteString
+                TransmuxLog.service("DLNA: WARNING: No StreamProxy for HTTPS URL", level: .warn)
+            }
+        } else if sourceURL.scheme == "file" {
+            inputPath = sourceURL.path(percentEncoded: false)
+        } else {
+            inputPath = sourceURL.absoluteString
+        }
+
+        do {
+            let session = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<DLNATransmuxSession, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    Self.performDLNATransmux(
+                        inputPath: inputPath,
+                        outputDir: outputDir,
+                        sessionID: sessionID,
+                        continuation: continuation
+                    )
+                }
+            }
+            return session
+        } catch {
+            if let pid = proxySessionID, let proxy = streamProxy {
+                await proxy.stop(sessionID: pid)
+            }
+            throw error
+        }
+    }
+
+    /// DLNA transmux: remux to a single MPEG-TS file (progressive, no moov needed).
+    /// Resumes the continuation after the header + first packets are written,
+    /// then continues the remux loop on the background thread.
+    private static func performDLNATransmux(
+        inputPath: String,
+        outputDir: URL,
+        sessionID: String,
+        continuation: CheckedContinuation<DLNATransmuxSession, Error>
+    ) {
+        var inputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var outputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var continuationResumed = false
+
+        mks_log_init(TransmuxLog.filePath)
+
+        // --- Open input ---
+        var inputOptions: OpaquePointer?
+        av_dict_set(&inputOptions, "user_agent", "VLC/3.0.18 LibVLC/3.0.18", 0)
+        av_dict_set(&inputOptions, "timeout", "30000000", 0)
+        av_dict_set(&inputOptions, "reconnect", "1", 0)
+        av_dict_set(&inputOptions, "reconnect_streamed", "1", 0)
+        av_dict_set(&inputOptions, "reconnect_delay_max", "5", 0)
+        av_dict_set(&inputOptions, "probesize", "33554432", 0)
+        av_dict_set(&inputOptions, "analyzeduration", "30000000", 0)
+
+        var ret = avformat_open_input(&inputCtx, inputPath, nil, &inputOptions)
+        av_dict_free(&inputOptions)
+        guard ret >= 0, let inCtx = inputCtx else {
+            continuation.resume(throwing: TransmuxError.processStartFailure(
+                NSError(domain: "FFmpeg", code: Int(ret),
+                        userInfo: [NSLocalizedDescriptionKey: "avformat_open_input failed (\(ret))"])
+            ))
+            return
+        }
+
+        let streamCount = Int(mks_format_get_nb_streams(inCtx))
+        ret = avformat_find_stream_info(inCtx, nil)
+        guard ret >= 0 else {
+            avformat_close_input(&inputCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        let durationSeconds = Double(inCtx.pointee.duration) / Double(AV_TIME_BASE)
+        let bestVideo = av_find_best_stream(inCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0)
+        let bestAudio = av_find_best_stream(inCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nil, 0)
+
+        // Estimate output size from input bitrate (for Content-Length)
+        let bitRate = inCtx.pointee.bit_rate > 0 ? inCtx.pointee.bit_rate : 5_000_000
+        let estimatedSize = Int64(Double(bitRate) / 8.0 * durationSeconds * 1.05) // 5% overhead for TS
+
+        TransmuxLog.service("DLNA SESSION \(sessionID.prefix(8)) | in=\(inputPath) dur=\(String(format: "%.1f", durationSeconds))s est=\(estimatedSize / 1_048_576)MB")
+
+        // --- Find audio track info ---
+        var audioInfo: AudioTrackInfo?
+        if bestAudio >= 0 {
+            var langBuf = [CChar](repeating: 0, count: 64)
+            var titleBuf = [CChar](repeating: 0, count: 256)
+            mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
+            mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
+            let lang = String(cString: langBuf)
+            let title = String(cString: titleBuf)
+            let codecId = Int32(mks_stream_get_codec_id(inCtx, bestAudio))
+            let codecName: String
+            switch codecId {
+            case 86018: codecName = "AAC"
+            case 86019: codecName = "AC3"
+            case 86056: codecName = "EAC3"
+            case 86076: codecName = "OPUS"
+            case 86028: codecName = "FLAC"
+            case 86017: codecName = "MP3"
+            default: codecName = "audio(\(codecId))"
+            }
+            audioInfo = AudioTrackInfo(
+                inputStreamIndex: Int(bestAudio),
+                outputStreamIndex: bestVideo >= 0 ? 1 : 0,
+                language: lang.isEmpty ? "und" : lang,
+                title: title,
+                codecName: codecName,
+                codecId: codecId,
+                channels: Int(mks_stream_get_channels(inCtx, bestAudio)),
+                sampleRate: Int(mks_stream_get_sample_rate(inCtx, bestAudio)),
+                isDefault: true
+            )
+        }
+
+        // --- Allocate output: single MPEG-TS file (no segments, no moov) ---
+        let tsPath = outputDir.appendingPathComponent("stream.ts").path
+
+        ret = avformat_alloc_output_context2(&outputCtx, nil, "mpegts", tsPath)
+        guard ret >= 0, let outCtx = outputCtx else {
+            avformat_close_input(&inputCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        // --- Map streams: video + 1 audio ---
+        var streamMapping = [Int](repeating: -1, count: streamCount)
+        var outputStreamIndex: Int32 = 0
+
+        if bestVideo >= 0 {
+            streamMapping[Int(bestVideo)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+            ret = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+            guard ret >= 0 else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                return
+            }
+            outputStreamIndex += 1
+        }
+
+        if bestAudio >= 0 {
+            streamMapping[Int(bestAudio)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+            ret = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
+            guard ret >= 0 else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                return
+            }
+            outputStreamIndex += 1
+        }
+
+        guard outputStreamIndex > 0 else {
+            TransmuxLog.service("DLNA: no video or audio streams found", level: .error)
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+            return
+        }
+
+        // --- Open output file ---
+        ret = avio_open(&outCtx.pointee.pb, tsPath, AVIO_FLAG_WRITE)
+        guard ret >= 0 else {
+            TransmuxLog.service("DLNA: avio_open failed (\(ret))", level: .error)
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        TransmuxLog.service("DLNA STREAMS v:\(bestVideo) a:\(bestAudio) | format=mpegts output=\(tsPath)")
+
+        // --- Write header ---
+        ret = avformat_write_header(outCtx, nil)
+        guard ret >= 0 else {
+            avio_closep(&outCtx.pointee.pb)
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        TransmuxLog.service("DLNA: header written, starting progressive remux...")
+
+        // Resume continuation immediately — MPEG-TS is streamable from byte 0
+        let audioTracks = audioInfo.map { [$0] } ?? []
+        let session = DLNATransmuxSession(
+            sessionID: sessionID,
+            outputPath: tsPath,
+            duration: durationSeconds,
+            expectedSize: estimatedSize,
+            audioTracks: audioTracks
+        )
+        continuation.resume(returning: session)
+        continuationResumed = true
+
+        // --- Remux loop (background — file grows while server serves it) ---
+        var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
+        var packetCount = 0
+
+        while true {
+            ret = av_read_frame(inCtx, packet)
+            if ret < 0 { break }
+
+            guard let pkt = packet else { break }
+            let streamIndex = Int(pkt.pointee.stream_index)
+
+            guard streamIndex < streamCount, streamMapping[streamIndex] >= 0 else {
+                av_packet_unref(pkt)
+                continue
+            }
+
+            let outStreamIdx = Int32(streamMapping[streamIndex])
+            pkt.pointee.stream_index = outStreamIdx
+            mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
+            mks_packet_clear_pos(pkt)
+
+            ret = av_interleaved_write_frame(outCtx, pkt)
+            if ret < 0 {
+                TransmuxLog.service("DLNA: write error (\(ret)) at packet \(packetCount)", level: .error)
+            }
+            packetCount += 1
+
+            if packetCount % 50000 == 0 {
+                TransmuxLog.service("DLNA: PROGRESS \(packetCount / 1000)K packets")
+            }
+        }
+
+        av_packet_free(&packet)
+
+        // --- Finalize ---
+        av_write_trailer(outCtx)
+        avio_closep(&outCtx.pointee.pb)
+
+        let fileSize: Int64
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: tsPath),
+           let size = attrs[.size] as? Int64 {
+            fileSize = size
+        } else {
+            fileSize = 0
+        }
+
+        TransmuxLog.service("DLNA: COMPLETE \(sessionID.prefix(8)) \(packetCount / 1000)K packets \(fileSize / 1_048_576)MB")
+
+        // Cleanup FFmpeg contexts
+        avformat_free_context(outCtx)
+        avformat_close_input(&inputCtx)
+    }
+
     // MARK: - FFmpeg C API Core (Progressive)
 
     /// Two-phase transmux: resumes the continuation after the header is written,
@@ -214,6 +852,7 @@ public actor TransmuxingService {
         handle: ActiveTransmux,
         proxySessionID: Int?,
         streamProxy: StreamProxyProvider?,
+        maxAudioTracks: Int?,
         continuation: CheckedContinuation<ProgressiveTransmuxSession, Error>
     ) {
         var inputCtx: UnsafeMutablePointer<AVFormatContext>?
@@ -461,9 +1100,14 @@ public actor TransmuxingService {
             }
         }
 
-        // Map ALL audio streams (each gets its own output track)
+        // Map audio streams (limit to maxAudioTracks if set — e.g. Cast requires single audio)
+        var effectiveAudioStreams = audioStreams
+        if let max = maxAudioTracks, effectiveAudioStreams.count > max {
+            TransmuxLog.service("Limiting audio tracks: \(effectiveAudioStreams.count) → \(max) (maxAudioTracks)")
+            effectiveAudioStreams = Array(effectiveAudioStreams.prefix(max))
+        }
         var audioTrackInfos: [AudioTrackInfo] = []
-        for (idx, audio) in audioStreams.enumerated() {
+        for (idx, audio) in effectiveAudioStreams.enumerated() {
             streamMapping[Int(audio.inputIdx)] = Int(outputStreamIndex)
 
             guard let outStream = avformat_new_stream(outCtx, nil) else {

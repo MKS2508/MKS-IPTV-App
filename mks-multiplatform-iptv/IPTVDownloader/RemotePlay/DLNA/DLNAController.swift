@@ -42,7 +42,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     /// Polling interval in seconds.
     private let pollingInterval: TimeInterval = 2.0
 
-    /// Callback for state updates.
+    /// Callback for state updates (connected by RemotePlayManager).
     var onStateUpdate: ((RemoteDeviceState) -> Void)?
 
     // MARK: - Initialization
@@ -110,19 +110,16 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
         do {
             // SetAVTransportURI
+            let setURIAction = DLNASOAPClient.AVTransportAction.setAVTransportURI(
+                instanceId: instanceId,
+                uri: url.absoluteString,
+                metadata: didlMetadata
+            )
             _ = try await DLNASOAPClient.send(
-                action: DLNASOAPClient.AVTransportAction.setAVTransportURI(
-                    instanceId: instanceId,
-                    uri: url.absoluteString,
-                    metadata: didlMetadata
-                ).actionName,
+                action: setURIAction.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
-                arguments: DLNASOAPClient.AVTransportAction.setAVTransportURI(
-                    instanceId: instanceId,
-                    uri: url.absoluteString,
-                    metadata: didlMetadata
-                ).arguments
+                arguments: setURIAction.arguments
             )
 
             // Seek to start position if > 0
@@ -148,17 +145,15 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     func play() async throws {
         do {
+            let action = DLNASOAPClient.AVTransportAction.play(
+                instanceId: instanceId,
+                speed: "1"
+            )
             _ = try await DLNASOAPClient.send(
-                action: DLNASOAPClient.AVTransportAction.play(
-                    instanceId: instanceId,
-                    speed: "1"
-                ).actionName,
+                action: action.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
-                arguments: DLNASOAPClient.AVTransportAction.play(
-                    instanceId: instanceId,
-                    speed: "1"
-                ).arguments
+                arguments: action.arguments
             )
 
             playbackState = .playing
@@ -176,15 +171,14 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     func pause() async throws {
         do {
+            let action = DLNASOAPClient.AVTransportAction.pause(
+                instanceId: instanceId
+            )
             _ = try await DLNASOAPClient.send(
-                action: DLNASOAPClient.AVTransportAction.pause(
-                    instanceId: instanceId
-                ).actionName,
+                action: action.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
-                arguments: DLNASOAPClient.AVTransportAction.pause(
-                    instanceId: instanceId
-                ).arguments
+                arguments: action.arguments
             )
 
             playbackState = .paused
@@ -206,19 +200,16 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         playbackState = .seeking(to: time)
 
         do {
+            let action = DLNASOAPClient.AVTransportAction.seek(
+                instanceId: instanceId,
+                unit: "REL_TIME",
+                target: target
+            )
             _ = try await DLNASOAPClient.send(
-                action: DLNASOAPClient.AVTransportAction.seek(
-                    instanceId: instanceId,
-                    unit: "REL_TIME",
-                    target: target
-                ).actionName,
+                action: action.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
-                arguments: DLNASOAPClient.AVTransportAction.seek(
-                    instanceId: instanceId,
-                    unit: "REL_TIME",
-                    target: target
-                ).arguments
+                arguments: action.arguments
             )
 
             deviceState.currentTime = time
@@ -242,15 +233,14 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     func stop() async throws {
         do {
+            let action = DLNASOAPClient.AVTransportAction.stop(
+                instanceId: instanceId
+            )
             _ = try await DLNASOAPClient.send(
-                action: DLNASOAPClient.AVTransportAction.stop(
-                    instanceId: instanceId
-                ).actionName,
+                action: action.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
-                arguments: DLNASOAPClient.AVTransportAction.stop(
-                    instanceId: instanceId
-                ).arguments
+                arguments: action.arguments
             )
 
             playbackState = .stopped
@@ -275,19 +265,16 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
         let volumeInt = Int((volume * 100).clamped(to: 0...100))
 
+        let action = DLNASOAPClient.RenderingControlAction.setVolume(
+            instanceId: instanceId,
+            channel: defaultChannel,
+            volume: volumeInt
+        )
         _ = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.RenderingControlAction.setVolume(
-                instanceId: instanceId,
-                channel: defaultChannel,
-                volume: volumeInt
-            ).actionName,
+            action: action.actionName,
             serviceType: .renderingControl,
             controlURL: renderingControlURL,
-            arguments: DLNASOAPClient.RenderingControlAction.setVolume(
-                instanceId: instanceId,
-                channel: defaultChannel,
-                volume: volumeInt
-            ).arguments
+            arguments: action.arguments
         )
 
         deviceState.volume = volume
@@ -298,19 +285,16 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             throw RemotePlayError.transportError("No RenderingControl URL available")
         }
 
+        let action = DLNASOAPClient.RenderingControlAction.setMute(
+            instanceId: instanceId,
+            channel: defaultChannel,
+            mute: muted
+        )
         _ = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.RenderingControlAction.setMute(
-                instanceId: instanceId,
-                channel: defaultChannel,
-                mute: muted
-            ).actionName,
+            action: action.actionName,
             serviceType: .renderingControl,
             controlURL: renderingControlURL,
-            arguments: DLNASOAPClient.RenderingControlAction.setMute(
-                instanceId: instanceId,
-                channel: defaultChannel,
-                mute: muted
-            ).arguments
+            arguments: action.arguments
         )
 
         deviceState.isMuted = muted
@@ -319,15 +303,14 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     // MARK: - State Query
 
     func queryPosition() async throws -> (currentTime: Double, duration: Double, isPlaying: Bool) {
+        let posAction = DLNASOAPClient.AVTransportAction.getPositionInfo(
+            instanceId: instanceId
+        )
         let response = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.AVTransportAction.getPositionInfo(
-                instanceId: instanceId
-            ).actionName,
+            action: posAction.actionName,
             serviceType: .avTransport,
             controlURL: controlURL,
-            arguments: DLNASOAPClient.AVTransportAction.getPositionInfo(
-                instanceId: instanceId
-            ).arguments
+            arguments: posAction.arguments
         )
 
         let currentTime = parseTime(response["RelTime"] ?? "00:00:00")
@@ -350,34 +333,30 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         }
 
         // Query volume
+        let volAction = DLNASOAPClient.RenderingControlAction.getVolume(
+            instanceId: instanceId,
+            channel: defaultChannel
+        )
         let volumeResponse = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.RenderingControlAction.getVolume(
-                instanceId: instanceId,
-                channel: defaultChannel
-            ).actionName,
+            action: volAction.actionName,
             serviceType: .renderingControl,
             controlURL: renderingControlURL,
-            arguments: DLNASOAPClient.RenderingControlAction.getVolume(
-                instanceId: instanceId,
-                channel: defaultChannel
-            ).arguments
+            arguments: volAction.arguments
         )
 
         let volumeValue = Float(volumeResponse["CurrentVolume"] ?? "100") ?? 100.0
         let volume = volumeValue / 100.0
 
         // Query mute state
+        let muteAction = DLNASOAPClient.RenderingControlAction.getMute(
+            instanceId: instanceId,
+            channel: defaultChannel
+        )
         let muteResponse = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.RenderingControlAction.getMute(
-                instanceId: instanceId,
-                channel: defaultChannel
-            ).actionName,
+            action: muteAction.actionName,
             serviceType: .renderingControl,
             controlURL: renderingControlURL,
-            arguments: DLNASOAPClient.RenderingControlAction.getMute(
-                instanceId: instanceId,
-                channel: defaultChannel
-            ).arguments
+            arguments: muteAction.arguments
         )
 
         let isMuted = (muteResponse["CurrentMute"] ?? "0") == "1"
@@ -392,15 +371,14 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     /// Query transport info for current state.
     private func queryTransportInfo() async throws -> RemoteDeviceState.TransportState {
+        let action = DLNASOAPClient.AVTransportAction.getTransportInfo(
+            instanceId: instanceId
+        )
         let response = try await DLNASOAPClient.send(
-            action: DLNASOAPClient.AVTransportAction.getTransportInfo(
-                instanceId: instanceId
-            ).actionName,
+            action: action.actionName,
             serviceType: .avTransport,
             controlURL: controlURL,
-            arguments: DLNASOAPClient.AVTransportAction.getTransportInfo(
-                instanceId: instanceId
-            ).arguments
+            arguments: action.arguments
         )
 
         let stateString = response["CurrentTransportState"] ?? "STOPPED"
@@ -438,8 +416,8 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             while !Task.isCancelled {
                 do {
                     let _ = try await self?.queryPosition()
-                    if let state = await self?.deviceState {
-                        await self?.onStateUpdate?(state)
+                    if let state = self?.deviceState {
+                        self?.onStateUpdate?(state)
                     }
                 } catch {
                     // Polling error - device may have disconnected

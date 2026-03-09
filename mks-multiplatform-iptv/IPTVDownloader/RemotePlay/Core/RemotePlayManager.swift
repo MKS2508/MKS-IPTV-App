@@ -130,11 +130,7 @@ final class RemotePlayManager: @unchecked Sendable {
     func disconnect() async {
         guard let controller = activeController else { return }
 
-        do {
-            try await controller.disconnect()
-        } catch {
-            // Ignore disconnect errors
-        }
+        await controller.disconnect()
 
         activeController = nil
         connectedDevice = nil
@@ -171,6 +167,37 @@ final class RemotePlayManager: @unchecked Sendable {
         do {
             try await controller.load(
                 url: lanURL,
+                metadata: metadata,
+                startPosition: startPosition
+            )
+        } catch {
+            playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
+            throw error
+        }
+    }
+
+    /// Load content directly on remote device without URL conversion.
+    /// Used for "Solo Cast" mode — sends the original IPTV URL directly to the Cast device.
+    /// No transmuxing, no local playback, no localhost-to-LAN conversion.
+    /// - Parameters:
+    ///   - url: Remote content URL (IPTV server URL, sent as-is)
+    ///   - metadata: Content metadata for display
+    ///   - startPosition: Starting position in seconds
+    func loadDirect(
+        url: URL,
+        metadata: MetadataResult?,
+        startPosition: Double = 0
+    ) async throws {
+        guard let controller = activeController else {
+            throw RemotePlayError.noActiveSession
+        }
+
+        streamingURL = url
+        currentMetadata = metadata
+
+        do {
+            try await controller.load(
+                url: url,
                 metadata: metadata,
                 startPosition: startPosition
             )
@@ -312,14 +339,51 @@ final class RemotePlayManager: @unchecked Sendable {
         }
     }
 
-    /// Create appropriate controller for device type.
+    /// Create appropriate controller for device type and wire state callbacks.
     private func createController(for device: RemoteDevice) throws -> RemoteDeviceController {
         switch device.type {
         case .dlna:
-            return try DLNAController(device: device)
+            let controller = try DLNAController(device: device)
+            controller.onStateUpdate = { [weak self] state in
+                Task { @MainActor [weak self] in
+                    self?.deviceState = state
+                    // Sync playback state from transport state
+                    switch state.transportState {
+                    case .playing:
+                        self?.playbackState = .playing
+                    case .paused:
+                        self?.playbackState = .paused
+                    case .stopped:
+                        self?.playbackState = .stopped
+                    case .transitioning:
+                        self?.playbackState = .buffering
+                    case .noMedia, .unknown:
+                        break
+                    }
+                }
+            }
+            return controller
         case .chromecast, .googleTV:
-            // Future: return try CastController(device: device)
-            throw RemotePlayError.connectionFailed("Cast not yet implemented")
+            let controller = try CastController(device: device)
+            controller.onStateUpdate = { [weak self] state in
+                Task { @MainActor [weak self] in
+                    self?.deviceState = state
+                    // Sync playback state from transport state
+                    switch state.transportState {
+                    case .playing:
+                        self?.playbackState = .playing
+                    case .paused:
+                        self?.playbackState = .paused
+                    case .stopped:
+                        self?.playbackState = .stopped
+                    case .transitioning:
+                        self?.playbackState = .buffering
+                    case .noMedia, .unknown:
+                        break
+                    }
+                }
+            }
+            return controller
         }
     }
 

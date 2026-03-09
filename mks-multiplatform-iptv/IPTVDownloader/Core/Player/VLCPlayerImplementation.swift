@@ -31,6 +31,9 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
     private var progressTimer: Timer?
     private var mediaPlayer: VLCMediaPlayerType?
     private var media: VLCMediaType?
+
+    /// The original source URL passed to load(url:).
+    private(set) var sourceURL: URL?
     
     var progressPublisher: AnyPublisher<Double, Never> {
         progressSubject.eraseToAnyPublisher()
@@ -59,6 +62,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
     }
 
     private func loadInternal(url: URL) {
+        self.sourceURL = url
         guard VLCPlayerImplementation.isAvailable() else {
             error = .unsupportedFormat
             print("[VLCPlayerImplementation] VLCKit not available")

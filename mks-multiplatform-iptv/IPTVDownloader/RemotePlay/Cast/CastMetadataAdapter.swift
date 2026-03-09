@@ -120,44 +120,128 @@ enum CastMetadataAdapter {
         return result
     }
 
+    // MARK: - Content Type
+
+    /// Derive MIME type from URL file extension for Cast LOAD command.
+    /// Reuses the same extension-to-MIME mapping as DLNA.
+    /// - Parameter url: Content URL.
+    /// - Returns: MIME type string (e.g. "video/mp4").
+    static func contentType(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "mp4", "m4v":
+            return "video/mp4"
+        case "mkv":
+            return "video/x-matroska"
+        case "avi":
+            return "video/x-msvideo"
+        case "ts", "m2ts":
+            return "video/mp2t"
+        case "mov":
+            return "video/quicktime"
+        case "wmv":
+            return "video/x-ms-wmv"
+        case "flv":
+            return "video/x-flv"
+        case "webm":
+            return "video/webm"
+        case "m3u8":
+            return "application/x-mpegURL"
+        default:
+            return "video/mp4"
+        }
+    }
+
+    // MARK: - Cast LOAD Payload
+
+    /// Build the `metadata` dictionary for a Cast LOAD command.
+    /// Returns a dictionary matching the Cast receiver's expected JSON metadata format.
+    ///
+    /// ```json
+    /// {
+    ///   "metadataType": 1,
+    ///   "title": "Movie Title",
+    ///   "images": [{ "url": "https://..." }]
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - metadata: App metadata (title, poster, episode info).
+    ///   - contentURL: The URL of the content being cast.
+    ///   - duration: Optional content duration in seconds.
+    /// - Returns: Dictionary suitable for the `metadata` field of a Cast LOAD media object.
+    static func buildCastLoadPayload(
+        from metadata: MetadataResult?,
+        contentURL: URL,
+        duration: Double?
+    ) -> [String: Any] {
+        var result: [String: Any] = [:]
+
+        let title = formatTitle(from: metadata)
+        result["title"] = title
+        result["metadataType"] = metadataTypeCode(from: metadata)
+
+        // Series-specific fields
+        if let metadata {
+            if let showTitle = metadata.showTitle {
+                result["seriesTitle"] = showTitle
+            }
+            if let season = metadata.seasonNumber {
+                result["season"] = season
+            }
+            if let episode = metadata.episodeNumber {
+                result["episode"] = episode
+            }
+
+            // Images array for poster artwork
+            var images: [[String: Any]] = []
+            if let posterURL = metadata.posterURL {
+                images.append(["url": posterURL])
+            } else if let firstArtwork = metadata.artworkURLs.first {
+                images.append(["url": firstArtwork])
+            }
+            if let backdropURL = metadata.backdropURL {
+                images.append(["url": backdropURL])
+            }
+            if !images.isEmpty {
+                result["images"] = images
+            }
+
+            // Optional subtitle (plot)
+            if let plot = metadata.plot {
+                result["subtitle"] = String(plot.prefix(200))
+            }
+
+            // Release year
+            if let year = metadata.year {
+                result["releaseDate"] = String(year)
+            }
+        }
+
+        return result
+    }
+
+    // MARK: - Metadata Type Code
+
+    /// Map metadata to Cast metadataType code.
+    /// - 0: GENERIC_MEDIA
+    /// - 1: MOVIE
+    /// - 2: TV_SHOW
+    /// - Parameter metadata: App metadata.
+    /// - Returns: Integer metadata type code for Cast.
+    static func metadataTypeCode(from metadata: MetadataResult?) -> Int {
+        guard let metadata else { return 0 }
+
+        if metadata.showTitle != nil {
+            return 2 // TV_SHOW
+        }
+        return 1 // MOVIE
+    }
+
     // MARK: - Title Formatting
 
     /// Format display title for Cast metadata.
-    /// - Episode: "ShowTitle - S01E03 - EpisodeTitle"
-    /// - Series: showTitle
-    /// - Movie: title
+    /// Delegates to DLNAMetadataAdapter.formatTitle for consistent formatting across protocols.
     static func formatTitle(from metadata: MetadataResult?) -> String {
-        guard let metadata = metadata else {
-            return "Unknown"
-        }
-
-        // Episode with all info
-        if let showTitle = metadata.showTitle,
-           let season = metadata.seasonNumber,
-           let episode = metadata.episodeNumber,
-           let episodeTitle = metadata.episodeTitle,
-           season > 0, episode > 0 {
-            let seasonStr = String(format: "%02d", season)
-            let episodeStr = String(format: "%02d", episode)
-            return "\(showTitle) - S\(seasonStr)E\(episodeStr) - \(episodeTitle)"
-        }
-
-        // Episode with show title only
-        if let showTitle = metadata.showTitle,
-           let season = metadata.seasonNumber,
-           let episode = metadata.episodeNumber,
-           season > 0, episode > 0 {
-            let seasonStr = String(format: "%02d", season)
-            let episodeStr = String(format: "%02d", episode)
-            return "\(showTitle) - S\(seasonStr)E\(episodeStr)"
-        }
-
-        // Series with show title
-        if let showTitle = metadata.showTitle {
-            return showTitle
-        }
-
-        // Movie title
-        return metadata.title ?? "Unknown"
+        DLNAMetadataAdapter.formatTitle(from: metadata)
     }
 }

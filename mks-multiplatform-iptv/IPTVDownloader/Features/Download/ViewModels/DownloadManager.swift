@@ -70,7 +70,7 @@ class DownloadManager: ObservableObject {
         }
 
         #if os(iOS)
-        liveActivityManager.endActivity(downloadId: id, finalStatus: "Cancelled")
+        liveActivityManager.endActivity(for: id.uuidString, status: "Cancelled")
         #endif
         downloaders[id] = nil
         persistDownloads()
@@ -92,7 +92,7 @@ class DownloadManager: ObservableObject {
         downloads[index].eta = 0
         #if os(iOS)
         liveActivityManager.updateActivity(
-            downloadId: id, progress: downloads[index].progress,
+            for: id.uuidString, progress: downloads[index].progress,
             speed: 0, eta: 0,
             bytesDownloaded: downloads[index].bytesDownloaded,
             totalBytes: downloads[index].totalBytes,
@@ -324,7 +324,7 @@ class DownloadManager: ObservableObject {
                     }
                     #if os(iOS)
                     self.liveActivityManager.startActivity(
-                        downloadId: downloadId,
+                        downloadId: downloadId.uuidString,
                         title: title,
                         mediaType: type == .movie ? "Movie" : "Series"
                     )
@@ -469,7 +469,7 @@ class DownloadManager: ObservableObject {
                     }
                     #if os(iOS)
                     self.liveActivityManager.startActivity(
-                        downloadId: downloadId,
+                        downloadId: downloadId.uuidString,
                         title: title,
                         mediaType: type == .movie ? "Movie" : "Series"
                     )
@@ -540,7 +540,7 @@ class DownloadManager: ObservableObject {
                 self.downloads[index].status = .converting
                 #if os(iOS)
                 self.liveActivityManager.updateActivity(
-                    downloadId: downloadId,
+                    for: downloadId.uuidString,
                     progress: self.downloads[index].progress,
                     speed: 0, eta: 0,
                     bytesDownloaded: self.downloads[index].bytesDownloaded,
@@ -888,12 +888,23 @@ class DownloadManager: ObservableObject {
         updatedDownload.bytesDownloaded = progress.bytesDownloaded
         downloads[index] = updatedDownload
 
-        // Throttled notification + Live Activity update (every 2 seconds)
+        // Throttled Live Activity / notification update (every 2 seconds)
         let now = Date()
         if let lastUpdate = lastNotificationUpdate[id], now.timeIntervalSince(lastUpdate) < notificationThrottle {
             return
         }
         lastNotificationUpdate[id] = now
+        #if os(iOS)
+        liveActivityManager.updateActivity(
+            for: id.uuidString,
+            progress: progress.percentComplete,
+            speed: progress.speed,
+            eta: progress.eta,
+            bytesDownloaded: progress.bytesDownloaded,
+            totalBytes: progress.totalBytes,
+            status: "Downloading"
+        )
+        #else
         notificationService.updateProgress(
             downloadId: id,
             title: updatedDownload.title,
@@ -902,16 +913,6 @@ class DownloadManager: ObservableObject {
             eta: progress.eta,
             bytesDownloaded: progress.bytesDownloaded,
             totalBytes: progress.totalBytes
-        )
-        #if os(iOS)
-        liveActivityManager.updateActivity(
-            downloadId: id,
-            progress: progress.percentComplete,
-            speed: progress.speed,
-            eta: progress.eta,
-            bytesDownloaded: progress.bytesDownloaded,
-            totalBytes: progress.totalBytes,
-            status: "Downloading"
         )
         #endif
     }
@@ -939,19 +940,16 @@ class DownloadManager: ObservableObject {
 
     // MARK: - Completion Notification Helper
 
-    /// Call after setting .completed on a download item to send the lock screen notification and end Live Activity.
+    /// Call after setting .completed on a download item to end Live Activity (iOS) or send notification (macOS).
     private func sendCompletionNotification(for id: UUID) {
         guard let item = downloads.first(where: { $0.id == id }) else { return }
+        #if os(iOS)
+        liveActivityManager.endActivity(for: id.uuidString, status: "Completed")
+        #else
         notificationService.notifyDownloadComplete(
             downloadId: id,
             title: item.title,
             fileSize: item.totalBytes
-        )
-        #if os(iOS)
-        liveActivityManager.endActivity(
-            downloadId: id,
-            finalStatus: "Completed",
-            totalBytes: item.totalBytes
         )
         #endif
         lastNotificationUpdate[id] = nil
@@ -967,44 +965,48 @@ class DownloadManager: ObservableObject {
                 switch downloadError {
                 case .downloadPaused:
                     downloads[index].status = .paused
-                    notificationService.removeNotification(downloadId: id)
                     #if os(iOS)
                     liveActivityManager.updateActivity(
-                        downloadId: id, progress: downloads[index].progress,
+                        for: id.uuidString, progress: downloads[index].progress,
                         speed: 0, eta: 0,
                         bytesDownloaded: downloads[index].bytesDownloaded,
                         totalBytes: downloads[index].totalBytes,
                         status: "Paused"
                     )
+                    #else
+                    notificationService.removeNotification(downloadId: id)
                     #endif
                 case .downloadCancelled:
                     downloads[index].status = .cancelled
-                    notificationService.removeNotification(downloadId: id)
                     #if os(iOS)
-                    liveActivityManager.endActivity(downloadId: id, finalStatus: "Cancelled")
+                    liveActivityManager.endActivity(for: id.uuidString, status: "Cancelled")
+                    #else
+                    notificationService.removeNotification(downloadId: id)
                     #endif
                 default:
                     downloads[index].status = .failed
                     downloads[index].errorMessage = error.localizedDescription
+                    #if os(iOS)
+                    liveActivityManager.endActivity(for: id.uuidString, status: "Failed")
+                    #else
                     notificationService.notifyDownloadFailed(
                         downloadId: id,
                         title: title,
                         errorMessage: error.localizedDescription
                     )
-                    #if os(iOS)
-                    liveActivityManager.endActivity(downloadId: id, finalStatus: "Failed")
                     #endif
                 }
             } else {
                 downloads[index].status = .failed
                 downloads[index].errorMessage = error.localizedDescription
+                #if os(iOS)
+                liveActivityManager.endActivity(for: id.uuidString, status: "Failed")
+                #else
                 notificationService.notifyDownloadFailed(
                     downloadId: id,
                     title: title,
                     errorMessage: error.localizedDescription
                 )
-                #if os(iOS)
-                liveActivityManager.endActivity(downloadId: id, finalStatus: "Failed")
                 #endif
             }
         }

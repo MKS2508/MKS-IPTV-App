@@ -90,7 +90,7 @@ enum DLNAMetadataAdapter {
         }
 
         // Movie title
-        return metadata.title ?? "Unknown"
+        return metadata.title
     }
 
     // MARK: - Private Helpers
@@ -102,9 +102,36 @@ enum DLNAMetadataAdapter {
         metadata: MetadataResult?
     ) -> String {
         let durationAttr = duration.isEmpty ? "" : " duration=\"\(duration)\""
-        let protocolInfo = "protocolInfo=\"http-get:*:video/mp4:*\""
+        let mimeType = mimeTypeForURL(contentURL)
+        let protocolInfo = "protocolInfo=\"http-get:*:\(mimeType):*\""
 
         return "<res\(durationAttr) \(protocolInfo)>\(xmlEscape(contentURL.absoluteString))</res>"
+    }
+
+    /// Derive MIME type from URL extension for DLNA protocolInfo.
+    private static func mimeTypeForURL(_ url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "mp4", "m4v":
+            return "video/mp4"
+        case "mkv":
+            return "video/x-matroska"
+        case "avi":
+            return "video/x-msvideo"
+        case "ts", "m2ts":
+            return "video/mp2t"
+        case "mov":
+            return "video/quicktime"
+        case "wmv":
+            return "video/x-ms-wmv"
+        case "flv":
+            return "video/x-flv"
+        case "webm":
+            return "video/webm"
+        case "m3u8":
+            return "application/x-mpegURL"
+        default:
+            return "video/*"
+        }
     }
 
     /// Build creator elements (director, actor).

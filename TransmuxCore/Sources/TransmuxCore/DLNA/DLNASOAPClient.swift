@@ -1,26 +1,30 @@
 //
 //  DLNASOAPClient.swift
-//  mks-multiplatform-iptv
+//  TransmuxCore
 //
-//  Created for RemotePlay feature - SOAP request/response for DLNA AVTransport
+//  Sends SOAP requests to DLNA/UPnP control endpoints and parses responses.
+//  Handles AVTransport:1 and RenderingControl:1 service actions.
+//
+//  Ported from mks-multiplatform-iptv RemotePlay/DLNA/DLNASOAPClient.swift,
+//  replacing RemotePlayError with DLNAError for standalone use.
 //
 
 import Foundation
 
 /// Sends SOAP requests to DLNA/UPnP control endpoints and parses responses.
 /// Handles AVTransport:1 and RenderingControl:1 service actions.
-enum DLNASOAPClient {
+public enum DLNASOAPClient {
 
     // MARK: - Service Types
 
     /// UPnP service types supported by this client.
-    enum ServiceType: String, Sendable {
+    public enum ServiceType: String, Sendable {
         case avTransport = "urn:schemas-upnp-org:service:AVTransport:1"
         case renderingControl = "urn:schemas-upnp-org:service:RenderingControl:1"
         case connectionManager = "urn:schemas-upnp-org:service:ConnectionManager:1"
 
         /// SOAP action namespace prefix.
-        var soapPrefix: String {
+        public var soapPrefix: String {
             rawValue
         }
     }
@@ -35,13 +39,13 @@ enum DLNASOAPClient {
     ///   - arguments: Action arguments as name-value pairs
     ///   - timeout: Request timeout in seconds (default: 10)
     /// - Returns: Parsed response as dictionary of element values
-    /// - Throws: RemotePlayError.soapError if the device returns an error
-    static func send(
+    /// - Throws: DLNAError.soapFault if the device returns an error
+    public static func send(
         action: String,
         serviceType: ServiceType,
         controlURL: URL,
         arguments: [(name: String, value: String)] = [],
-        timeout: TimeInterval = 10
+        timeout: TimeInterval = 30
     ) async throws -> [String: String] {
         // Build SOAP envelope
         let envelope = buildEnvelope(
@@ -65,7 +69,7 @@ enum DLNASOAPClient {
 
         // Check HTTP status
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw RemotePlayError.transportError("Invalid HTTP response")
+            throw DLNAError.httpError(statusCode: -1)
         }
 
         // Parse response
@@ -75,12 +79,12 @@ enum DLNASOAPClient {
         if let errorCode = parsedResponse["errorCode"],
            let code = Int(errorCode) {
             let errorDescription = parsedResponse["errorDescription"] ?? "Unknown error"
-            throw RemotePlayError.soapError(code, errorDescription)
+            throw DLNAError.soapFault(code: code, description: errorDescription)
         }
 
         // Check HTTP status for non-200 responses
         if httpResponse.statusCode != 200 {
-            throw RemotePlayError.transportError("HTTP \(httpResponse.statusCode)")
+            throw DLNAError.httpError(statusCode: httpResponse.statusCode)
         }
 
         return parsedResponse
@@ -123,7 +127,7 @@ enum DLNASOAPClient {
     // MARK: - Helpers
 
     /// XML-escape a string for safe embedding in XML.
-    static func xmlEscape(_ string: String) -> String {
+    public static func xmlEscape(_ string: String) -> String {
         string
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
@@ -147,7 +151,7 @@ private final class SOAPResponseParser: NSObject, XMLParserDelegate {
         let parser = XMLParser(data: data)
         parser.delegate = self
         guard parser.parse() else {
-            throw RemotePlayError.transportError("Failed to parse SOAP response")
+            throw DLNAError.parseError("Failed to parse SOAP response")
         }
     }
 
@@ -163,12 +167,10 @@ private final class SOAPResponseParser: NSObject, XMLParserDelegate {
         currentElement = elementName
         currentValue = ""
 
-        // Track if we're in a fault response
         if elementName == "Fault" {
             isInFault = true
         }
 
-        // Track if we're in the Body
         if elementName == "Body" {
             isInBody = true
         }
@@ -181,9 +183,7 @@ private final class SOAPResponseParser: NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         let trimmedValue = currentValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Only store non-empty values
         if !trimmedValue.isEmpty && elementName != "Envelope" && elementName != "Body" {
-            // Map common response elements
             let key = mapElementName(elementName)
             values[key] = trimmedValue
         }
@@ -204,17 +204,14 @@ private final class SOAPResponseParser: NSObject, XMLParserDelegate {
 
     /// Map XML element names to simplified keys.
     private func mapElementName(_ name: String) -> String {
-        // Handle namespace-prefixed elements
         let localName = name.components(separatedBy: ":").last ?? name
-
-        // Map known UPnP error elements
         switch localName {
         case "errorCode":
             return "errorCode"
         case "errorDescription":
             return "errorDescription"
         case "detail":
-            return "errorDescription"  // Some devices use detail for error message
+            return "errorDescription"
         default:
             return localName
         }
@@ -226,7 +223,7 @@ private final class SOAPResponseParser: NSObject, XMLParserDelegate {
 extension DLNASOAPClient {
 
     /// AVTransport action arguments and response keys.
-    enum AVTransportAction {
+    public enum AVTransportAction {
         case setAVTransportURI(instanceId: Int, uri: String, metadata: String?)
         case play(instanceId: Int, speed: String)
         case pause(instanceId: Int)
@@ -238,7 +235,7 @@ extension DLNASOAPClient {
         case getTransportInfo(instanceId: Int)
         case getMediaInfo(instanceId: Int)
 
-        var actionName: String {
+        public var actionName: String {
             switch self {
             case .setAVTransportURI: return "SetAVTransportURI"
             case .play: return "Play"
@@ -253,7 +250,7 @@ extension DLNASOAPClient {
             }
         }
 
-        var arguments: [(name: String, value: String)] {
+        public var arguments: [(name: String, value: String)] {
             switch self {
             case .setAVTransportURI(let instanceId, let uri, let metadata):
                 return [
@@ -305,13 +302,13 @@ extension DLNASOAPClient {
     }
 
     /// RenderingControl action arguments.
-    enum RenderingControlAction {
+    public enum RenderingControlAction {
         case setVolume(instanceId: Int, channel: String, volume: Int)
         case getVolume(instanceId: Int, channel: String)
         case setMute(instanceId: Int, channel: String, mute: Bool)
         case getMute(instanceId: Int, channel: String)
 
-        var actionName: String {
+        public var actionName: String {
             switch self {
             case .setVolume: return "SetVolume"
             case .getVolume: return "GetVolume"
@@ -320,7 +317,7 @@ extension DLNASOAPClient {
             }
         }
 
-        var arguments: [(name: String, value: String)] {
+        public var arguments: [(name: String, value: String)] {
             switch self {
             case .setVolume(let instanceId, let channel, let volume):
                 return [

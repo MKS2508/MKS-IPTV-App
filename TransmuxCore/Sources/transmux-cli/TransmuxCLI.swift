@@ -6,6 +6,46 @@ struct TransmuxCLI {
     static func main() async {
         let args = CommandLine.arguments
 
+        // --discover: standalone SSDP discovery for Cast devices (no input file needed)
+        if args.contains("--discover") {
+            print("TransmuxCore CLI v1.5.0 — SSDP Discovery (Cast)")
+            print("")
+            let timeout = Int(getArgValue(for: "--timeout") ?? 5.0)
+            let devices = discoverCastDevices(timeout: timeout)
+            print("")
+            if devices.isEmpty {
+                print("No Cast devices found.")
+            } else {
+                print("Found \(devices.count) device(s):")
+                for (i, d) in devices.enumerated() {
+                    print("  [\(i + 1)] \(d.name) (\(d.model)) — \(d.ip):\(d.port)")
+                }
+            }
+            exit(0)
+        }
+
+        // --discover-dlna: standalone SSDP discovery for DLNA MediaRenderers (no input file needed)
+        if args.contains("--discover-dlna") {
+            print("TransmuxCore CLI v1.5.0 — SSDP Discovery (DLNA MediaRenderers)")
+            print("")
+            let timeout = Int(getArgValue(for: "--timeout") ?? 5.0)
+            let devices = await discoverDLNADevices(timeout: timeout)
+            print("")
+            if devices.isEmpty {
+                print("No DLNA MediaRenderer devices found.")
+            } else {
+                print("Found \(devices.count) DLNA device(s):")
+                for (i, d) in devices.enumerated() {
+                    print("  [\(i + 1)] \(d.friendlyName) (\(d.modelName ?? "?")) — \(d.ip):\(d.port)")
+                    print("       AVTransport: \(d.avTransportControlURL)")
+                    if let rc = d.renderingControlURL {
+                        print("       RenderingControl: \(rc)")
+                    }
+                }
+            }
+            exit(0)
+        }
+
         guard args.count >= 2 else {
             printUsage()
             exit(1)
@@ -33,14 +73,48 @@ struct TransmuxCLI {
         let interactive = args.contains("--interactive")
         let serveTest = args.contains("--serve-test")
         let serve = args.contains("--serve")
+        let castArg = getArgString(for: "--cast")
+        let castOnly = args.contains("--cast") && castArg == nil // --cast with no argument = discover
+        let castIP: String? = {
+            if let arg = castArg, arg.lowercased() != "discover" {
+                return arg // explicit IP
+            }
+            if castArg?.lowercased() == "discover" || castOnly {
+                return "discover" // will trigger SSDP discovery
+            }
+            return nil
+        }()
+        let dlnaArg = getArgString(for: "--dlna")
+        let dlnaOnly = args.contains("--dlna") && dlnaArg == nil // --dlna with no argument = discover
+        let dlnaTarget: String? = {
+            if let arg = dlnaArg, arg.lowercased() != "discover" {
+                return arg // explicit IP
+            }
+            if dlnaArg?.lowercased() == "discover" || dlnaOnly {
+                return "discover" // will trigger SSDP discovery
+            }
+            return nil
+        }()
         let seekTime = (doSeek || testSeek) ? getArgValue(for: doSeek ? "--seek" : "--test-seek") ?? 300.0 : 0.0
         let duration = getArgValue(for: "--duration") ?? 10.0
         let verbose = args.contains("--verbose")
 
         if verbose {
-            print("TransmuxCore CLI v1.3.0")
+            print("TransmuxCore CLI v1.5.0")
             print("Input: \(inputURL)")
-            if serve {
+            if let ip = castIP {
+                if ip == "discover" {
+                    print("CAST mode: SSDP discovery + TransmuxServer + Cast")
+                } else {
+                    print("CAST mode: TransmuxServer + Cast to \(ip):8009")
+                }
+            } else if let dlna = dlnaTarget {
+                if dlna == "discover" {
+                    print("DLNA mode: SSDP discovery + TransmuxServer + DLNA")
+                } else {
+                    print("DLNA mode: TransmuxServer + DLNA to \(dlna)")
+                }
+            } else if serve {
                 print("SERVE mode: HTTP server + interactive seek commands")
             } else if interactive {
                 print("INTERACTIVE mode: reading commands from stdin")
@@ -54,6 +128,44 @@ struct TransmuxCLI {
         let service = TransmuxingService()
 
         do {
+            let isCastMode = castArg != nil || castOnly
+
+            // Cast mode: use MPEG-TS pipeline (Default Media Receiver's MPL only supports MPEG-TS)
+            if isCastMode {
+                let castSession = try await service.startCastTransmux(from: inputURL)
+                print("Cast transmux started: \(castSession.sessionID)")
+                print("  Output dir: \(castSession.outputDir)")
+                print("  Playlist: \(castSession.playlistPath)")
+                print("  Duration: \(String(format: "%.1f", castSession.duration))s")
+                print("  Format: HLS + MPEG-TS (Cast compatible)")
+
+                if castSession.audioTracks.isEmpty {
+                    print("  Audio tracks: none")
+                } else {
+                    for (i, a) in castSession.audioTracks.enumerated() {
+                        print("  Audio [\(i)]: \(a.codecName) \(a.channels)ch \(a.sampleRate)Hz lang=\(a.language)")
+                    }
+                }
+
+                await runCastMPEGTS(session: castSession, castIP: castIP!, verbose: verbose)
+                await service.cleanup(sessionID: castSession.sessionID)
+                print("Cleanup complete")
+                exit(0)
+            }
+
+            // DLNA mode: transmux to fMP4, serve via TransmuxServer with DLNA headers,
+            // send SetAVTransportURI to the DLNA TV which pulls content via HTTP range requests
+            let isDLNAMode = dlnaArg != nil || dlnaOnly
+            if isDLNAMode {
+                await runDLNA(
+                    inputURL: inputURL,
+                    dlnaTarget: dlnaTarget!,
+                    service: service,
+                    verbose: verbose
+                )
+                exit(0)
+            }
+
             let session = try await service.startTransmux(from: inputURL)
             print("Transmux started: \(session.sessionID)")
             print("  Output: \(session.outputPath)")
@@ -900,7 +1012,16 @@ struct TransmuxCLI {
             <input>                 Input file path or HTTP(S) URL
 
         OPTIONS:
+            --discover              Scan LAN for Cast devices via SSDP (no input file needed)
+            --discover-dlna         Scan LAN for DLNA MediaRenderers via SSDP (no input file needed)
+            --timeout SECONDS       Discovery timeout (default: 5, used with --discover/--discover-dlna)
             --serve                 Start HTTP server + interactive command loop for manual testing
+            --cast [IP|discover]    Start HTTP server + connect to Chromecast + LOAD
+                                    Without IP or with 'discover': auto-discover via SSDP
+                                    With IP: connect directly to that address on port 8009
+            --dlna [IP|discover]    Transmux + serve via HTTP + DLNA playback on TV
+                                    Without IP or with 'discover': auto-discover DLNA devices
+                                    With IP: connect directly (tries common ports/paths)
             --interactive           Interactive mode: read SEEK/STATUS/STOP from stdin (no HTTP server)
             --serve-test            Automated server test: fetch segments, verify cache/mmap/prefetch
             --seek TIME             Seek to TIME seconds (one-shot seek during remux)
@@ -911,6 +1032,24 @@ struct TransmuxCLI {
         EXAMPLES:
             # Interactive server mode — start HTTP server, seek manually, inspect logs
             transmux-cli movie.mkv --serve --verbose
+
+            # Cast to Chromecast — auto-discover device on LAN
+            transmux-cli movie.mkv --cast --verbose
+
+            # Cast to Chromecast — explicit discovery
+            transmux-cli movie.mkv --cast discover --verbose
+
+            # Cast to Chromecast — direct IP (skip discovery)
+            transmux-cli movie.mkv --cast 192.168.1.128 --verbose
+
+            # DLNA playback on TV — auto-discover
+            transmux-cli movie.mkv --dlna --verbose
+
+            # DLNA playback — direct IP (e.g. TELEFUNKEN at 192.168.1.142)
+            transmux-cli movie.mkv --dlna 192.168.1.142 --verbose
+
+            # Discover DLNA devices only (no playback)
+            transmux-cli --discover-dlna
 
             # Same, with a remote MKV
             transmux-cli "http://iptv.example.com/movie.mkv" --serve --verbose
@@ -941,6 +1080,25 @@ struct TransmuxCLI {
             LOG [N]                 Print last N transmux log lines (default 30)
             STOP / QUIT             Shutdown server and exit
 
+        CAST MODE COMMANDS:
+            LOAD [url]              (Re)load media on Chromecast (default: server URL)
+            PLAY                    Resume playback
+            PAUSE                   Pause playback
+            STOP                    Stop media
+            SEEK <seconds>          Seek to position
+            STATUS                  Get media status from device
+            QUIT                    Disconnect and exit
+
+        DLNA MODE COMMANDS:
+            PLAY                    Resume playback
+            PAUSE                   Pause playback
+            STOP                    Stop media
+            SEEK <seconds>          Seek to position (REL_TIME)
+            STATUS                  Get position + transport state
+            VOLUME <0-100>          Set volume (if RenderingControl available)
+            LOAD [url]              (Re)load content on the TV
+            QUIT                    Stop and exit
+
         OUTPUT:
             Transmuxed files are written to /tmp/mks-iptv-transmux-<sessionID>/
             - stream.mp4: Progressive fMP4 output (growing file)
@@ -957,5 +1115,654 @@ struct TransmuxCLI {
             return nil
         }
         return value
+    }
+
+    static func getArgString(for flag: String) -> String? {
+        guard let idx = CommandLine.arguments.firstIndex(of: flag),
+              idx + 1 < CommandLine.arguments.count else {
+            return nil
+        }
+        let val = CommandLine.arguments[idx + 1]
+        // Don't return the next flag as a value
+        if val.hasPrefix("--") { return nil }
+        return val
+    }
+
+    // MARK: - DLNA Mode
+
+    /// DLNA mode: transmux input to regular MP4 (non-fragmented, with moov),
+    /// serve via TransmuxServer with DLNA headers, send SetAVTransportURI to TV.
+    ///
+    /// DLNA TVs need a regular MP4 with full moov atom — not fMP4 fragments.
+    /// The transmux is fast (no re-encoding), then the completed file is served.
+    static func runDLNA(
+        inputURL: URL,
+        dlnaTarget: String,
+        service: TransmuxingService,
+        verbose: Bool
+    ) async {
+        dlnaPrint("DLNA-CLI", "Starting DLNA mode...")
+
+        // Step 1: Resolve the target device
+        let device: DLNADevice
+        if dlnaTarget == "discover" {
+            dlnaPrint("DLNA-CLI", "Step 1: SSDP discovery for DLNA MediaRenderers...")
+            let devices = await discoverDLNADevices(timeout: 5)
+
+            if devices.isEmpty {
+                dlnaPrint("DLNA-CLI", "ERROR: No DLNA MediaRenderer devices found on the network")
+                return
+            }
+
+            if devices.count == 1 {
+                device = devices[0]
+                dlnaPrint("DLNA-CLI", "Found 1 device: \(device.friendlyName) at \(device.ip):\(device.port)")
+            } else {
+                print("")
+                print("Found \(devices.count) DLNA devices:")
+                for (i, d) in devices.enumerated() {
+                    print("  [\(i + 1)] \(d.friendlyName) (\(d.modelName ?? "?")) — \(d.ip):\(d.port)")
+                }
+                print("")
+                print("Select device [1-\(devices.count)]: ", terminator: "")
+                fflush(stdout)
+
+                guard let choice = readLine(),
+                      let idx = Int(choice.trimmingCharacters(in: .whitespaces)),
+                      idx >= 1, idx <= devices.count else {
+                    dlnaPrint("DLNA-CLI", "Invalid selection — exiting")
+                    return
+                }
+                device = devices[idx - 1]
+                dlnaPrint("DLNA-CLI", "Selected: \(device.friendlyName) at \(device.ip):\(device.port)")
+            }
+            print("")
+        } else {
+            // Direct IP — try to construct device by fetching description XML
+            dlnaPrint("DLNA-CLI", "Step 1: Fetching device description from \(dlnaTarget)...")
+            guard let d = await constructDLNADevice(ip: dlnaTarget) else {
+                dlnaPrint("DLNA-CLI", "ERROR: Could not find DLNA device at \(dlnaTarget)")
+                dlnaPrint("DLNA-CLI", "Make sure the TV is on and try --discover-dlna first")
+                return
+            }
+            device = d
+        }
+
+        // Step 2: Transmux to regular MP4 (non-fragmented, with moov via faststart)
+        // Step 2: Start DLNA transmux (MKV/MP4/AVI → progressive MPEG-TS)
+        // MPEG-TS has no moov — streamable from byte 0. Resumes immediately.
+        dlnaPrint("DLNA-CLI", "Step 2: Transmuxing to MPEG-TS (progressive, no moov needed)...")
+        let session: DLNATransmuxSession
+        do {
+            session = try await service.startDLNATransmux(from: inputURL)
+        } catch {
+            dlnaPrint("DLNA-CLI", "ERROR: Transmux failed: \(error.localizedDescription)")
+            return
+        }
+
+        dlnaPrint("DLNA-CLI", "Transmux started: \(session.sessionID.prefix(8))")
+        dlnaPrint("DLNA-CLI", "  Output: \(session.outputPath)")
+        dlnaPrint("DLNA-CLI", "  Duration: \(String(format: "%.1f", session.duration))s")
+        dlnaPrint("DLNA-CLI", "  Estimated size: \(session.expectedSize / 1_048_576)MB")
+
+        // Step 3: Wait a moment for initial content to be written
+        dlnaPrint("DLNA-CLI", "Step 3: Waiting for initial content...")
+        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s for initial buffering
+
+        // Step 4: Start TransmuxServer in DLNA mode (serves growing .ts with DLNA headers)
+        dlnaPrint("DLNA-CLI", "Step 4: Starting HTTP server (DLNA mode)...")
+        do {
+            let serverSession = try await TransmuxServer.shared.startDLNA(
+                filePath: session.outputPath,
+                expectedSize: session.expectedSize
+            )
+
+            dlnaPrint("DLNA-CLI", "Content URL: \(serverSession.localURL)")
+            print("")
+
+            // Background: monitor transmux completion and update server with actual file size
+            let outputPath = session.outputPath
+            Task {
+                var lastSize: Int64 = 0
+                while true {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath)
+                    let currentSize = (attrs?[.size] as? Int64) ?? 0
+                    if currentSize > 0 && currentSize == lastSize {
+                        // File stopped growing — transmux complete
+                        await TransmuxServer.shared.setExpectedSize(currentSize)
+                        await TransmuxServer.shared.setComplete()
+                        dlnaPrint("DLNA-CLI", "Transmux complete: \(currentSize / 1_048_576)MB final")
+                        break
+                    }
+                    lastSize = currentSize
+                }
+            }
+
+            // Step 5: Run interactive DLNA session
+            let title = (inputURL.lastPathComponent as NSString).deletingPathExtension
+            await runDLNASession(
+                device: device,
+                contentURL: serverSession.localURL,
+                title: title,
+                duration: session.duration,
+                verbose: verbose
+            )
+
+            // Cleanup
+            await TransmuxServer.shared.stop()
+            await service.cleanup(sessionID: session.sessionID)
+            dlnaPrint("DLNA-CLI", "Cleanup complete")
+
+        } catch {
+            dlnaPrint("DLNA-CLI", "ERROR: Server start failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Cast Mode (MPEG-TS)
+
+    /// Cast mode using MPEG-TS segments. The Default Media Receiver's MPL only supports
+    /// HLS with MPEG-TS containers — fMP4 causes LOADING state forever.
+    /// This function uses TransmuxServer.startCast() for simple file serving.
+    static func runCastMPEGTS(session: CastTransmuxSession, castIP: String, verbose: Bool) async {
+        // Resolve the target IP
+        let resolvedIP: String
+        if castIP == "discover" {
+            castPrint("CAST-CLI", "Running SSDP discovery...")
+            let devices = discoverCastDevices(timeout: 5)
+
+            if devices.isEmpty {
+                castPrint("CAST-CLI", "ERROR: No Cast devices found on the network")
+                return
+            }
+
+            if devices.count == 1 {
+                let device = devices[0]
+                castPrint("CAST-CLI", "Found 1 device: \(device.name) (\(device.model)) at \(device.ip)")
+                resolvedIP = device.ip
+            } else {
+                print("")
+                print("Found \(devices.count) Cast devices:")
+                for (i, device) in devices.enumerated() {
+                    print("  [\(i + 1)] \(device.name) (\(device.model)) — \(device.ip)")
+                }
+                print("")
+                print("Select device [1-\(devices.count)]: ", terminator: "")
+                fflush(stdout)
+
+                guard let choice = readLine(),
+                      let idx = Int(choice.trimmingCharacters(in: .whitespaces)),
+                      idx >= 1, idx <= devices.count else {
+                    castPrint("CAST-CLI", "Invalid selection — exiting")
+                    return
+                }
+                resolvedIP = devices[idx - 1].ip
+                castPrint("CAST-CLI", "Selected: \(devices[idx - 1].name) at \(resolvedIP)")
+            }
+            print("")
+        } else {
+            resolvedIP = castIP
+        }
+
+        castPrint("CAST-CLI", "Starting Cast (MPEG-TS) session to \(resolvedIP):8009")
+
+        // Step 1: Wait for initial .ts segments to be written
+        castPrint("CAST-CLI", "Step 1: Waiting for MPEG-TS segments...")
+        let ready = await waitForCastContent(session: session, minSegments: 2, timeout: 30.0)
+        if !ready {
+            castPrint("CAST-CLI", "WARNING: Timed out waiting for segments, starting server anyway")
+        }
+
+        // Count available segments
+        var segCount = 0
+        while FileManager.default.fileExists(atPath: (session.outputDir as NSString).appendingPathComponent("seg_\(String(format: "%03d", segCount)).ts")) {
+            segCount += 1
+        }
+        castPrint("CAST-CLI", "\(segCount) segments available")
+
+        // Step 2: Start TransmuxServer in Cast mode
+        castPrint("CAST-CLI", "Step 2: Starting TransmuxServer (Cast/MPEG-TS mode)...")
+        do {
+            let serverSession = try await TransmuxServer.shared.startCast(directory: session.outputDir)
+
+            guard let lanIP = getLANIPAddress() else {
+                castPrint("CAST-CLI", "ERROR: Cannot determine LAN IP address")
+                return
+            }
+
+            let castURLString = serverSession.localURL.absoluteString
+                .replacingOccurrences(of: "localhost", with: lanIP)
+                .replacingOccurrences(of: "127.0.0.1", with: lanIP)
+            guard let castURL = URL(string: castURLString) else {
+                castPrint("CAST-CLI", "ERROR: Cannot build Cast URL")
+                return
+            }
+
+            castPrint("CAST-CLI", "Server URL: \(serverSession.localURL)")
+            castPrint("CAST-CLI", "Cast URL:   \(castURL)")
+            castPrint("CAST-CLI", "LAN IP:     \(lanIP)")
+            castPrint("CAST-CLI", "Format:     HLS + MPEG-TS (Cast compatible)")
+            print("")
+
+            // Step 3: Connect to Chromecast
+            castPrint("CAST-CLI", "Step 3: Connecting to Chromecast at \(resolvedIP):8009...")
+            let socket = CastDebugSocket(host: resolvedIP)
+            let channel = CastDebugChannel(socket: socket)
+
+            do {
+                try await socket.connect()
+                try await channel.connect()
+            } catch {
+                castPrint("CAST-CLI", "ERROR: Cast connection failed: \(error.localizedDescription)")
+                await socket.disconnect()
+                await TransmuxServer.shared.stop()
+                return
+            }
+
+            // Step 4: Send LOAD — HLS with MPEG-TS segments
+            castPrint("CAST-CLI", "Step 4: Sending LOAD (HLS + MPEG-TS)...")
+            do {
+                try await channel.loadMedia(
+                    url: castURL,
+                    contentType: "application/x-mpegurl",
+                    title: "TransmuxCLI Cast",
+                    startTime: 0
+                )
+                castPrint("CAST-CLI", "LOAD succeeded!")
+            } catch {
+                castPrint("CAST-CLI", "ERROR: LOAD failed: \(error.localizedDescription)")
+                castPrint("CAST-CLI", "Continuing in interactive mode to debug...")
+            }
+
+            // Step 5: Interactive command loop
+            print("")
+            print("=========================================")
+            print("  Cast Debug Session Active (MPEG-TS)")
+            print("  Device: \(resolvedIP):8009")
+            print("  Server: \(castURL)")
+            print("  Format: HLS + MPEG-TS")
+            print("")
+            print("  Commands:")
+            print("    LOAD [url]     (Re)load media")
+            print("    PLAY           Resume playback")
+            print("    PAUSE          Pause playback")
+            print("    STOP           Stop media")
+            print("    SEEK <seconds> Seek to position")
+            print("    STATUS         Get media status")
+            print("    SEGS           Count available segments")
+            print("    QUIT           Disconnect and exit")
+            print("=========================================")
+            print("")
+
+            signal(SIGINT) { _ in
+                print("\n[CAST-CLI] Interrupted — exiting")
+                exit(0)
+            }
+
+            print("cast> ", terminator: "")
+            fflush(stdout)
+
+            while let line = readLine() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    print("cast> ", terminator: "")
+                    fflush(stdout)
+                    continue
+                }
+
+                let parts = trimmed.split(separator: " ", maxSplits: 1)
+                let cmd = String(parts[0]).uppercased()
+
+                switch cmd {
+                case "QUIT", "EXIT", "Q":
+                    castPrint("CAST-CLI", "Disconnecting...")
+                    await channel.disconnect()
+                    await TransmuxServer.shared.stop()
+                    return
+
+                case "LOAD":
+                    let loadURL: URL
+                    if parts.count > 1, let customURL = URL(string: String(parts[1])) {
+                        loadURL = customURL
+                    } else {
+                        loadURL = castURL
+                    }
+                    let ct = castContentType(for: loadURL)
+                    castPrint("CAST-CLI", "Loading \(loadURL) (\(ct))...")
+                    do {
+                        try await channel.loadMedia(url: loadURL, contentType: ct, title: "Cast Debug")
+                        castPrint("CAST-CLI", "LOAD OK")
+                    } catch {
+                        castPrint("CAST-CLI", "LOAD FAILED: \(error.localizedDescription)")
+                    }
+
+                case "PLAY":
+                    do { try await channel.play() }
+                    catch { castPrint("CAST-CLI", "PLAY FAILED: \(error.localizedDescription)") }
+
+                case "PAUSE":
+                    do { try await channel.pause() }
+                    catch { castPrint("CAST-CLI", "PAUSE FAILED: \(error.localizedDescription)") }
+
+                case "STOP":
+                    do { try await channel.stop() }
+                    catch { castPrint("CAST-CLI", "STOP FAILED: \(error.localizedDescription)") }
+
+                case "SEEK":
+                    guard parts.count > 1, let time = Double(parts[1]) else {
+                        castPrint("CAST-CLI", "Usage: SEEK <seconds>")
+                        break
+                    }
+                    do { try await channel.seek(to: time) }
+                    catch { castPrint("CAST-CLI", "SEEK FAILED: \(error.localizedDescription)") }
+
+                case "STATUS":
+                    do { try await channel.getMediaStatus() }
+                    catch { castPrint("CAST-CLI", "STATUS FAILED: \(error.localizedDescription)") }
+
+                case "SEGS":
+                    var count = 0
+                    while FileManager.default.fileExists(atPath: (session.outputDir as NSString).appendingPathComponent("seg_\(String(format: "%03d", count)).ts")) {
+                        count += 1
+                    }
+                    castPrint("CAST-CLI", "\(count) segments on disk")
+
+                case "HELP", "?":
+                    print("Commands: LOAD [url] | PLAY | PAUSE | STOP | SEEK <s> | STATUS | SEGS | QUIT")
+
+                default:
+                    castPrint("CAST-CLI", "Unknown: \(trimmed). Type HELP.")
+                }
+
+                print("cast> ", terminator: "")
+                fflush(stdout)
+            }
+
+            // stdin closed
+            castPrint("CAST-CLI", "stdin closed — disconnecting...")
+            await channel.disconnect()
+            await TransmuxServer.shared.stop()
+
+        } catch {
+            castPrint("CAST-CLI", "ERROR: \(error.localizedDescription)")
+        }
+    }
+
+    /// Wait for Cast MPEG-TS segments to appear on disk.
+    static func waitForCastContent(session: CastTransmuxSession, minSegments: Int, timeout: Double) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            var count = 0
+            while FileManager.default.fileExists(atPath: (session.outputDir as NSString).appendingPathComponent("seg_\(String(format: "%03d", count)).ts")) {
+                count += 1
+            }
+            if count >= minSegments {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        return false
+    }
+
+    // MARK: - Cast Mode (Legacy fMP4 — kept for reference)
+
+    /// Legacy fMP4 Cast mode — kept for reference but no longer used.
+    /// The Default Media Receiver's MPL player only supports HLS with MPEG-TS segments.
+    static func runCast(session: ProgressiveTransmuxSession, castIP: String, verbose: Bool) async {
+        // Resolve the target IP — either use the provided one or discover
+        let resolvedIP: String
+        if castIP == "discover" {
+            castPrint("CAST-CLI", "Running SSDP discovery...")
+            let devices = discoverCastDevices(timeout: 5)
+
+            if devices.isEmpty {
+                castPrint("CAST-CLI", "ERROR: No Cast devices found on the network")
+                castPrint("CAST-CLI", "Make sure your Chromecast is on and connected to the same WiFi")
+                castPrint("CAST-CLI", "Tip: Use --cast <IP> to connect directly if you know the device IP")
+                return
+            }
+
+            if devices.count == 1 {
+                let device = devices[0]
+                castPrint("CAST-CLI", "Found 1 device: \(device.name) (\(device.model)) at \(device.ip)")
+                resolvedIP = device.ip
+            } else {
+                // Multiple devices — let user pick
+                print("")
+                print("Found \(devices.count) Cast devices:")
+                for (i, device) in devices.enumerated() {
+                    print("  [\(i + 1)] \(device.name) (\(device.model)) — \(device.ip)")
+                }
+                print("")
+                print("Select device [1-\(devices.count)]: ", terminator: "")
+                fflush(stdout)
+
+                guard let choice = readLine(),
+                      let idx = Int(choice.trimmingCharacters(in: .whitespaces)),
+                      idx >= 1, idx <= devices.count else {
+                    castPrint("CAST-CLI", "Invalid selection — exiting")
+                    return
+                }
+                resolvedIP = devices[idx - 1].ip
+                castPrint("CAST-CLI", "Selected: \(devices[idx - 1].name) at \(resolvedIP)")
+            }
+            print("")
+        } else {
+            resolvedIP = castIP
+        }
+
+        castPrint("CAST-CLI", "Starting Cast debug session to \(resolvedIP):8009")
+
+        // Step 1: Wait for initial content
+        castPrint("CAST-CLI", "Step 1: Waiting for initial content...")
+        let ready = await waitForContent(session: session, minSeconds: 12.0, timeout: 20.0)
+        if !ready {
+            castPrint("CAST-CLI", "WARNING: Timed out waiting for content, starting server anyway")
+        }
+
+        // Step 2: Start TransmuxServer
+        castPrint("CAST-CLI", "Step 2: Starting TransmuxServer...")
+        do {
+            let serverSession = try await TransmuxServer.shared.start(
+                filePath: session.outputPath,
+                playlistPath: session.playlistPath,
+                mediaPlaylistPath: session.mediaPlaylistPath,
+                expectedSize: session.expectedSize,
+                segmenter: session.segmenter,
+                initSegmentSize: session.initSegmentSize,
+                seekHandle: session.seekHandle
+            )
+
+            // Build LAN URL for the Chromecast
+            guard let lanIP = getLANIPAddress() else {
+                castPrint("CAST-CLI", "ERROR: Cannot determine LAN IP address")
+                return
+            }
+
+            let serverURL = serverSession.localURL
+
+            // For Cast: use master.m3u8 when available (multi-audio/subtitles).
+            // Shaka Player needs the #EXT-X-MEDIA rendition declarations to properly
+            // handle multi-track fMP4 content. Without the master playlist, Shaka sees
+            // multiple audio tracks in the moov but has no guidance on how to select them,
+            // which can cause it to get stuck in LOADING state.
+            // For single-audio content, serverURL already points to stream.m3u8.
+            let castURLString = serverURL.absoluteString
+                .replacingOccurrences(of: "localhost", with: lanIP)
+                .replacingOccurrences(of: "127.0.0.1", with: lanIP)
+            guard let castURL = URL(string: castURLString) else {
+                castPrint("CAST-CLI", "ERROR: Cannot build Cast URL")
+                return
+            }
+
+            let lanURLString = serverURL.absoluteString
+                .replacingOccurrences(of: "localhost", with: lanIP)
+                .replacingOccurrences(of: "127.0.0.1", with: lanIP)
+            guard let lanURL = URL(string: lanURLString) else {
+                castPrint("CAST-CLI", "ERROR: Cannot build LAN URL")
+                return
+            }
+
+            let castMIME = castContentType(for: castURL)
+
+            castPrint("CAST-CLI", "Server URL (local):  \(serverURL)")
+            castPrint("CAST-CLI", "Server URL (LAN):    \(lanURL)")
+            castPrint("CAST-CLI", "Cast URL (HLS):      \(castURL)")
+            castPrint("CAST-CLI", "Content type:        \(castMIME)")
+            castPrint("CAST-CLI", "LAN IP:              \(lanIP)")
+            print("")
+
+            // Step 3: Connect to Chromecast
+            castPrint("CAST-CLI", "Step 3: Connecting to Chromecast at \(resolvedIP):8009...")
+            let socket = CastDebugSocket(host: resolvedIP)
+            let channel = CastDebugChannel(socket: socket)
+
+            do {
+                try await socket.connect()
+                try await channel.connect()
+            } catch {
+                castPrint("CAST-CLI", "ERROR: Cast connection failed: \(error.localizedDescription)")
+                await socket.disconnect()
+                await TransmuxServer.shared.stop()
+                return
+            }
+
+            // Step 4: Send LOAD — HLS with fMP4 segment hints
+            castPrint("CAST-CLI", "Step 4: Sending LOAD (HLS + fMP4 hints)...")
+            do {
+                try await channel.loadMedia(
+                    url: castURL,
+                    contentType: castMIME,
+                    title: "TransmuxCLI Debug",
+                    startTime: 0
+                )
+                castPrint("CAST-CLI", "LOAD succeeded!")
+            } catch {
+                castPrint("CAST-CLI", "ERROR: LOAD failed: \(error.localizedDescription)")
+                castPrint("CAST-CLI", "Continuing in interactive mode to debug...")
+            }
+
+            // Step 5: Interactive command loop
+            print("")
+            print("=========================================")
+            print("  Cast Debug Session Active")
+            print("  Device: \(resolvedIP):8009")
+            print("  Server: \(lanURL)")
+            print("")
+            print("  Commands:")
+            print("    LOAD [url]     (Re)load media (default: server URL)")
+            print("    PLAY           Resume playback")
+            print("    PAUSE          Pause playback")
+            print("    STOP           Stop media")
+            print("    SEEK <seconds> Seek to position")
+            print("    STATUS         Get media status")
+            print("    RSTATUS        Get receiver status")
+            print("    QUIT           Disconnect and exit")
+            print("=========================================")
+            print("")
+
+            signal(SIGINT) { _ in
+                print("\n[CAST-CLI] Interrupted — exiting")
+                exit(0)
+            }
+
+            print("cast> ", terminator: "")
+            fflush(stdout)
+
+            while let line = readLine() {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    print("cast> ", terminator: "")
+                    fflush(stdout)
+                    continue
+                }
+
+                let parts = trimmed.split(separator: " ", maxSplits: 1)
+                let cmd = String(parts[0]).uppercased()
+
+                switch cmd {
+                case "QUIT", "EXIT", "Q":
+                    castPrint("CAST-CLI", "Disconnecting...")
+                    await channel.disconnect()
+                    await TransmuxServer.shared.stop()
+                    return
+
+                case "LOAD":
+                    let loadURL: URL
+                    if parts.count > 1, let customURL = URL(string: String(parts[1])) {
+                        loadURL = customURL
+                    } else {
+                        loadURL = lanURL
+                    }
+                    let ct = castContentType(for: loadURL)
+                    castPrint("CAST-CLI", "Loading \(loadURL) (\(ct))...")
+                    do {
+                        try await channel.loadMedia(url: loadURL, contentType: ct, title: "Debug")
+                        castPrint("CAST-CLI", "LOAD OK")
+                    } catch {
+                        castPrint("CAST-CLI", "LOAD FAILED: \(error.localizedDescription)")
+                    }
+
+                case "PLAY":
+                    do {
+                        try await channel.play()
+                    } catch {
+                        castPrint("CAST-CLI", "PLAY FAILED: \(error.localizedDescription)")
+                    }
+
+                case "PAUSE":
+                    do {
+                        try await channel.pause()
+                    } catch {
+                        castPrint("CAST-CLI", "PAUSE FAILED: \(error.localizedDescription)")
+                    }
+
+                case "STOP":
+                    do {
+                        try await channel.stop()
+                    } catch {
+                        castPrint("CAST-CLI", "STOP FAILED: \(error.localizedDescription)")
+                    }
+
+                case "SEEK":
+                    guard parts.count > 1, let time = Double(parts[1]) else {
+                        castPrint("CAST-CLI", "Usage: SEEK <seconds>")
+                        break
+                    }
+                    do {
+                        try await channel.seek(to: time)
+                    } catch {
+                        castPrint("CAST-CLI", "SEEK FAILED: \(error.localizedDescription)")
+                    }
+
+                case "STATUS":
+                    do {
+                        try await channel.getMediaStatus()
+                    } catch {
+                        castPrint("CAST-CLI", "STATUS FAILED: \(error.localizedDescription)")
+                    }
+
+                case "RSTATUS":
+                    castPrint("CAST-CLI", "Receiver status not available in debug channel (use STATUS)")
+
+                case "HELP", "?":
+                    print("Commands: LOAD [url] | PLAY | PAUSE | STOP | SEEK <s> | STATUS | QUIT")
+
+                default:
+                    castPrint("CAST-CLI", "Unknown: \(trimmed). Type HELP.")
+                }
+
+                print("cast> ", terminator: "")
+                fflush(stdout)
+            }
+
+            // stdin closed
+            castPrint("CAST-CLI", "stdin closed — disconnecting...")
+            await channel.disconnect()
+            await TransmuxServer.shared.stop()
+
+        } catch {
+            castPrint("CAST-CLI", "ERROR: \(error.localizedDescription)")
+        }
     }
 }

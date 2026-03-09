@@ -162,6 +162,24 @@ public actor TransmuxingService {
         shared = TransmuxingService(streamProxy: streamProxy)
     }
 
+    // MARK: - Probing
+
+    /// Probe media duration using FFmpeg without transmuxing.
+    /// - Parameter url: Local file URL to probe
+    /// - Returns: Duration in seconds, or nil if probing fails
+    public static func probeDuration(url: URL) -> Double? {
+        var formatCtx: UnsafeMutablePointer<AVFormatContext>?
+        let path = url.path
+        guard avformat_open_input(&formatCtx, path, nil, nil) == 0,
+              let ctx = formatCtx else { return nil }
+        defer { avformat_close_input(&formatCtx) }
+
+        guard avformat_find_stream_info(ctx, nil) >= 0 else { return nil }
+
+        let duration = Double(ctx.pointee.duration) / Double(AV_TIME_BASE)
+        return duration > 0 && duration.isFinite ? duration : nil
+    }
+
     // MARK: - Public API
 
     /// Start transmuxing and return immediately after the fMP4 header is written.
@@ -694,7 +712,7 @@ public actor TransmuxingService {
             )
         }
 
-        // --- Allocate output: single MPEG-TS file (no segments, no moov) ---
+        // --- Allocate output: MPEG-TS (streamable from byte 0, no moov needed) ---
         let tsPath = outputDir.appendingPathComponent("stream.ts").path
 
         ret = avformat_alloc_output_context2(&outputCtx, nil, "mpegts", tsPath)
@@ -815,6 +833,14 @@ public actor TransmuxingService {
             }
             packetCount += 1
 
+            // Flush FFmpeg's internal ~32KB buffer periodically so the HTTP server
+            // can serve fresh data. Flush aggressively at start, then every 500 packets.
+            if packetCount < 100 {
+                if packetCount % 10 == 0 { avio_flush(outCtx.pointee.pb) }
+            } else if packetCount % 500 == 0 {
+                avio_flush(outCtx.pointee.pb)
+            }
+
             if packetCount % 50000 == 0 {
                 TransmuxLog.service("DLNA: PROGRESS \(packetCount / 1000)K packets")
             }
@@ -825,6 +851,10 @@ public actor TransmuxingService {
         // --- Finalize ---
         av_write_trailer(outCtx)
         avio_closep(&outCtx.pointee.pb)
+
+        // Write sentinel so streamGrowingFile() knows EOF is real (matches fMP4 mode)
+        let sentinelPath = outputDir.appendingPathComponent(".transmux_complete").path
+        FileManager.default.createFile(atPath: sentinelPath, contents: nil)
 
         let fileSize: Int64
         if let attrs = try? FileManager.default.attributesOfItem(atPath: tsPath),

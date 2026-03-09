@@ -367,9 +367,12 @@ public actor TransmuxServer {
             TransmuxLog.log("WARNING: Could not determine LAN IP, DLNA may not work", tag: "Server", level: .warn)
         }
 
-        // Serve at /stream.ts — the fallback handler in dispatchRequest() will serve it
-        // with DLNA headers since dlnaMode=true
-        guard let url = URL(string: "http://\(host):\(port)/stream.ts") else {
+        // Serve using the actual file extension so MIME type resolves correctly.
+        // Add a timestamp parameter to bust TV HTTP cache between sessions.
+        let fileExt = (filePath as NSString).pathExtension
+        let serveName = fileExt.isEmpty ? "stream.ts" : "stream.\(fileExt)"
+        let cacheBust = Int(Date().timeIntervalSince1970)
+        guard let url = URL(string: "http://\(host):\(port)/\(serveName)?t=\(cacheBust)") else {
             throw ServerError.invalidFilePath
         }
 
@@ -552,7 +555,7 @@ public actor TransmuxServer {
             // DLNA TVs use this path to pull the fMP4 via HTTP range requests.
             switch request.method {
             case .head:
-                handleHead(connection: connection, filePath: filePath, expectedSize: expectedSize, dlnaMode: isDLNA)
+                handleHead(connection: connection, filePath: filePath, expectedSize: expectedSize, dlnaMode: isDLNA, isComplete: complete)
             case .get:
                 handleGet(connection: connection, filePath: filePath, expectedSize: expectedSize, isComplete: complete, rangeHeader: request.rangeHeader, dlnaMode: isDLNA)
             }
@@ -1339,24 +1342,30 @@ public actor TransmuxServer {
 
     // MARK: - HEAD Handler (MP4)
 
-    private nonisolated func handleHead(connection: NWConnection, filePath: String, expectedSize: Int64, dlnaMode: Bool = false) {
+    private nonisolated func handleHead(connection: NWConnection, filePath: String, expectedSize: Int64, dlnaMode: Bool = false, isComplete: Bool = true) {
+        let isStreaming = dlnaMode && !isComplete
         let fileSize: Int64 = expectedSize > 0 ? expectedSize : Self.currentFileSize(filePath)
         let contentType = Self.mimeType(for: filePath)
 
         var header = "HTTP/1.1 200 OK\r\n"
         header += "Content-Type: \(contentType)\r\n"
         header += "Content-Length: \(fileSize)\r\n"
-        header += "Accept-Ranges: bytes\r\n"
+        // Don't advertise byte-range seeking for progressive/streaming content
+        if !isStreaming {
+            header += "Accept-Ranges: bytes\r\n"
+        } else {
+            header += "Accept-Ranges: none\r\n"
+        }
         header += "Access-Control-Allow-Origin: *\r\n"
         if dlnaMode {
-            header += Self.dlnaHeaders()
+            header += Self.dlnaHeaders(contentType: contentType, streaming: isStreaming)
             header += "Connection: keep-alive\r\n"
         } else {
             header += "Connection: close\r\n"
         }
         header += "\r\n"
 
-        TransmuxLog.log("HEAD 200 CL=\(fileSize)\(dlnaMode ? " [DLNA]" : "")", tag: "Server")
+        TransmuxLog.log("HEAD 200 CL=\(fileSize)\(isStreaming ? " [DLNA-STREAM]" : dlnaMode ? " [DLNA]" : "")", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
@@ -1413,11 +1422,34 @@ public actor TransmuxServer {
         }
 
         let currentFileSize = Self.currentFileSize(filePath)
+
+        // Guard: if rangeStart >= totalSize, the range is invalid (can happen when
+        // expectedSize is updated to a smaller actual size after completion)
+        if rangeStart >= totalSize {
+            let resp = "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */\(totalSize)\r\nConnection: close\r\n\r\n"
+            TransmuxLog.log("GET 416 rangeStart=\(rangeStart) >= totalSize=\(totalSize)", tag: "Server", level: .warn)
+            connection.send(content: Data(resp.utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
         let contentLength = rangeEnd - rangeStart + 1
 
         // Case 3: Range starts beyond available data
         if rangeStart >= currentFileSize && !isComplete {
-            // Wait up to 5s for transmux to catch up
+            if dlnaMode {
+                // DLNA progressive: the TV may try to seek mid-file while we're still
+                // writing sequentially. Return 416 immediately (no wait) so the TV falls
+                // back to its sequential connection. Waiting would block SOAP responses.
+                let resp = "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */\(totalSize)\r\nAccept-Ranges: none\r\nConnection: close\r\n\r\n"
+                TransmuxLog.log("GET 416 rangeStart=\(rangeStart) fileSize=\(currentFileSize) [DLNA-STREAM skip]", tag: "Server", level: .warn)
+                connection.send(content: Data(resp.utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+                return
+            }
+            // Non-DLNA: Wait up to 5s for transmux to catch up
             var waitedFileSize = currentFileSize
             for _ in 0..<50 {
                 Thread.sleep(forTimeInterval: 0.1)
@@ -1439,21 +1471,26 @@ public actor TransmuxServer {
         // Cases 1 & 2: respond with 206 and the FULL requested Content-Range.
         // FigHTTP requires Content-Length to match the requested range exactly.
         let contentType = Self.mimeType(for: filePath)
+        let isStreaming = dlnaMode && !isComplete
         var header = "HTTP/1.1 206 Partial Content\r\n"
         header += "Content-Range: bytes \(rangeStart)-\(rangeEnd)/\(totalSize)\r\n"
         header += "Content-Length: \(contentLength)\r\n"
         header += "Content-Type: \(contentType)\r\n"
-        header += "Accept-Ranges: bytes\r\n"
+        if !isStreaming {
+            header += "Accept-Ranges: bytes\r\n"
+        } else {
+            header += "Accept-Ranges: none\r\n"
+        }
         header += "Access-Control-Allow-Origin: *\r\n"
         if dlnaMode {
-            header += Self.dlnaHeaders()
+            header += Self.dlnaHeaders(contentType: contentType, streaming: isStreaming)
             header += "Connection: keep-alive\r\n"
         } else {
             header += "Connection: close\r\n"
         }
         header += "\r\n"
 
-        TransmuxLog.log("GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength)\(dlnaMode ? " [DLNA]" : "")", tag: "Server")
+        TransmuxLog.log("GET 206 bytes=\(rangeStart)-\(rangeEnd)/\(totalSize) CL=\(contentLength)\(isStreaming ? " [DLNA-STREAM]" : dlnaMode ? " [DLNA]" : "")", tag: "Server")
 
         let headerData = Data(header.utf8)
         connection.send(content: headerData, completion: .contentProcessed { error in
@@ -1654,7 +1691,7 @@ public actor TransmuxServer {
         let ext = (filePath as NSString).pathExtension.lowercased()
         switch ext {
         case "mp4", "m4v": return "video/mp4"
-        case "ts", "m2ts": return "video/mp2t"
+        case "ts", "m2ts": return "video/mpeg"
         case "mkv": return "video/x-matroska"
         case "avi": return "video/x-msvideo"
         case "mov": return "video/quicktime"
@@ -1663,10 +1700,11 @@ public actor TransmuxServer {
         }
     }
 
-    private nonisolated static func dlnaHeaders() -> String {
+    private nonisolated static func dlnaHeaders(contentType: String = "video/mp2t", streaming: Bool = false) -> String {
+        let profileFlags = DLNAMetadataBuilder.dlnaProfileFlags(for: contentType, streaming: streaming)
         var h = ""
         h += "transferMode.dlna.org: Streaming\r\n"
-        h += "contentFeatures.dlna.org: DLNA.ORG_PN=*;DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\r\n"
+        h += "contentFeatures.dlna.org: \(profileFlags)\r\n"
         return h
     }
 

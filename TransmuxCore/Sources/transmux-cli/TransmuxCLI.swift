@@ -1188,74 +1188,122 @@ struct TransmuxCLI {
             device = d
         }
 
-        // Step 2: Transmux to regular MP4 (non-fragmented, with moov via faststart)
-        // Step 2: Start DLNA transmux (MKV/MP4/AVI → progressive MPEG-TS)
-        // MPEG-TS has no moov — streamable from byte 0. Resumes immediately.
-        dlnaPrint("DLNA-CLI", "Step 2: Transmuxing to MPEG-TS (progressive, no moov needed)...")
-        let session: DLNATransmuxSession
-        do {
-            session = try await service.startDLNATransmux(from: inputURL)
-        } catch {
-            dlnaPrint("DLNA-CLI", "ERROR: Transmux failed: \(error.localizedDescription)")
-            return
-        }
+        // Step 2: Determine serving strategy.
+        // - Local MP4/M4V/MOV: serve directly (no transmux)
+        // - Everything else (MKV, remote URLs): progressive MPEG-TS transmux,
+        //   start serving immediately while transmux runs in background
+        let sourceExt = inputURL.pathExtension.lowercased()
+        let isLocalFile = inputURL.isFileURL
+        let isDirectServe = isLocalFile && (sourceExt == "mp4" || sourceExt == "m4v" || sourceExt == "mov")
 
-        dlnaPrint("DLNA-CLI", "Transmux started: \(session.sessionID.prefix(8))")
-        dlnaPrint("DLNA-CLI", "  Output: \(session.outputPath)")
-        dlnaPrint("DLNA-CLI", "  Duration: \(String(format: "%.1f", session.duration))s")
-        dlnaPrint("DLNA-CLI", "  Estimated size: \(session.expectedSize / 1_048_576)MB")
+        if isDirectServe {
+            // --- LOCAL MP4: serve the file directly ---
+            dlnaPrint("DLNA-CLI", "Step 2: Source is local MP4 — serving directly (no transmux)")
+            let localPath = inputURL.path
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: localPath),
+                  let size = attrs[.size] as? Int64 else {
+                dlnaPrint("DLNA-CLI", "ERROR: Cannot read file: \(localPath)")
+                return
+            }
+            dlnaPrint("DLNA-CLI", "  File: \(localPath)")
+            dlnaPrint("DLNA-CLI", "  Size: \(size / 1_048_576)MB")
 
-        // Step 3: Wait a moment for initial content to be written
-        dlnaPrint("DLNA-CLI", "Step 3: Waiting for initial content...")
-        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s for initial buffering
-
-        // Step 4: Start TransmuxServer in DLNA mode (serves growing .ts with DLNA headers)
-        dlnaPrint("DLNA-CLI", "Step 4: Starting HTTP server (DLNA mode)...")
-        do {
-            let serverSession = try await TransmuxServer.shared.startDLNA(
-                filePath: session.outputPath,
-                expectedSize: session.expectedSize
-            )
-
-            dlnaPrint("DLNA-CLI", "Content URL: \(serverSession.localURL)")
-            print("")
-
-            // Background: monitor transmux completion and update server with actual file size
-            let outputPath = session.outputPath
-            Task {
-                var lastSize: Int64 = 0
-                while true {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                    let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath)
-                    let currentSize = (attrs?[.size] as? Int64) ?? 0
-                    if currentSize > 0 && currentSize == lastSize {
-                        // File stopped growing — transmux complete
-                        await TransmuxServer.shared.setExpectedSize(currentSize)
-                        await TransmuxServer.shared.setComplete()
-                        dlnaPrint("DLNA-CLI", "Transmux complete: \(currentSize / 1_048_576)MB final")
-                        break
-                    }
-                    lastSize = currentSize
-                }
+            let contentDuration = TransmuxingService.probeDuration(url: inputURL) ?? 0
+            if contentDuration > 0 {
+                dlnaPrint("DLNA-CLI", "  Duration: \(String(format: "%.1f", contentDuration))s")
             }
 
-            // Step 5: Run interactive DLNA session
-            let title = (inputURL.lastPathComponent as NSString).deletingPathExtension
-            await runDLNASession(
-                device: device,
-                contentURL: serverSession.localURL,
-                title: title,
-                duration: session.duration,
-                verbose: verbose
-            )
+            dlnaPrint("DLNA-CLI", "Step 3: Starting HTTP server (DLNA mode)...")
+            do {
+                let serverSession = try await TransmuxServer.shared.startDLNA(
+                    filePath: localPath,
+                    expectedSize: size
+                )
+                dlnaPrint("DLNA-CLI", "Content URL: \(serverSession.localURL)")
+                print("")
 
-            // Cleanup
-            await TransmuxServer.shared.stop()
-            await service.cleanup(sessionID: session.sessionID)
-            dlnaPrint("DLNA-CLI", "Cleanup complete")
+                await TransmuxServer.shared.setExpectedSize(size)
+                await TransmuxServer.shared.setComplete()
 
-        } catch {
-            dlnaPrint("DLNA-CLI", "ERROR: Server start failed: \(error.localizedDescription)")
+                let title = (inputURL.lastPathComponent as NSString).deletingPathExtension
+                await runDLNASession(
+                    device: device,
+                    contentURL: serverSession.localURL,
+                    title: title,
+                    duration: contentDuration,
+                    verbose: verbose
+                )
+
+                await TransmuxServer.shared.stop()
+                dlnaPrint("DLNA-CLI", "Cleanup complete")
+            } catch {
+                dlnaPrint("DLNA-CLI", "ERROR: Server start failed: \(error.localizedDescription)")
+            }
+        } else {
+            // --- REMOTE URL / MKV / NON-MP4: progressive MPEG-TS transmux ---
+            // Transmux runs in background, server starts after initial buffer,
+            // TV receives data in real-time as it's being transmuxed.
+            dlnaPrint("DLNA-CLI", "Step 2: Progressive MPEG-TS transmux (real-time streaming)...")
+            let session: DLNATransmuxSession
+            do {
+                session = try await service.startDLNATransmux(from: inputURL)
+            } catch {
+                dlnaPrint("DLNA-CLI", "ERROR: Transmux failed: \(error.localizedDescription)")
+                return
+            }
+
+            dlnaPrint("DLNA-CLI", "Transmux started: \(session.sessionID.prefix(8))")
+            dlnaPrint("DLNA-CLI", "  Output: \(session.outputPath)")
+            dlnaPrint("DLNA-CLI", "  Duration: \(String(format: "%.1f", session.duration))s")
+            dlnaPrint("DLNA-CLI", "  Estimated size: \(session.expectedSize / 1_048_576)MB")
+
+            // Step 3: Wait for initial buffer (2s) then start serving immediately
+            dlnaPrint("DLNA-CLI", "Step 3: Buffering initial content...")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+            dlnaPrint("DLNA-CLI", "Step 4: Starting HTTP server (DLNA streaming mode)...")
+            do {
+                let serverSession = try await TransmuxServer.shared.startDLNA(
+                    filePath: session.outputPath,
+                    expectedSize: session.expectedSize
+                )
+                dlnaPrint("DLNA-CLI", "Content URL: \(serverSession.localURL)")
+                print("")
+
+                // Background: monitor transmux completion via sentinel file.
+                // Don't use "file stopped growing" — network stalls cause false positives.
+                let outputPath = session.outputPath
+                let sentinelPath = (outputPath as NSString).deletingLastPathComponent + "/.transmux_complete"
+                Task {
+                    while true {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        if FileManager.default.fileExists(atPath: sentinelPath) {
+                            let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath)
+                            let finalSize = (attrs?[.size] as? Int64) ?? 0
+                            await TransmuxServer.shared.setExpectedSize(finalSize)
+                            await TransmuxServer.shared.setComplete()
+                            dlnaPrint("DLNA-CLI", "Transmux complete: \(finalSize / 1_048_576)MB final")
+                            break
+                        }
+                    }
+                }
+
+                let title = (inputURL.lastPathComponent as NSString).deletingPathExtension
+                await runDLNASession(
+                    device: device,
+                    contentURL: serverSession.localURL,
+                    title: title,
+                    duration: session.duration,
+                    verbose: verbose,
+                    streaming: true
+                )
+
+                await TransmuxServer.shared.stop()
+                await service.cleanup(sessionID: session.sessionID)
+                dlnaPrint("DLNA-CLI", "Cleanup complete")
+            } catch {
+                dlnaPrint("DLNA-CLI", "ERROR: Server start failed: \(error.localizedDescription)")
+            }
         }
     }
 

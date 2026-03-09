@@ -147,7 +147,8 @@ func runDLNASession(
     contentURL: URL,
     title: String,
     duration: Double,
-    verbose: Bool
+    verbose: Bool,
+    streaming: Bool = false
 ) async {
     dlnaPrint("DLNA", "Starting session with \(device.friendlyName) at \(device.ip):\(device.port)")
     dlnaPrint("DLNA", "Content URL: \(contentURL)")
@@ -158,7 +159,7 @@ func runDLNASession(
         title: title,
         contentURL: contentURL,
         duration: duration,
-        mimeType: "video/mpeg"
+        streaming: streaming
     )
 
     if verbose {
@@ -399,7 +400,7 @@ func runDLNASession(
                     title: title,
                     contentURL: loadURL,
                     duration: duration,
-                    mimeType: "video/mpeg"
+                    streaming: streaming
                 )
                 let setAction = DLNASOAPClient.AVTransportAction.setAVTransportURI(
                     instanceId: 0,

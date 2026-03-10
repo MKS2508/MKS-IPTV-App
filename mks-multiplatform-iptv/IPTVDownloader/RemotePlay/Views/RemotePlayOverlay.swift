@@ -77,9 +77,9 @@ struct RemotePlayOverlay: View {
 
                 // Device info header
                 HStack {
-                    Image(systemName: "tv.fill")
-                        .foregroundStyle(.green)
-                    Text("Casting to \(deviceName ?? "Device")")
+                    Image(systemName: remotePlayManager.connectedDevice?.type.icon ?? "tv.fill")
+                        .foregroundStyle(remotePlayManager.connectedDevice?.type.accentColor ?? .green)
+                    Text("Playing on \(deviceName ?? "Device")")
                         .font(.headline)
                     Spacer()
                     Button {

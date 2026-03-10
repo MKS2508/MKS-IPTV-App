@@ -381,16 +381,16 @@ struct MediaDetailSheet: View {
             }
             .buttonStyle(.appGlassProminent)
 
-            if remotePlayManager.connectedDevice != nil {
+            if let connectedDevice = remotePlayManager.connectedDevice {
                 Button { castContent() } label: {
-                    Label("Cast", systemImage: "tv.fill")
+                    Label("Play on \(connectedDevice.type.displayName)", systemImage: connectedDevice.type.icon)
                         .font(.caption.weight(.semibold))
                         .frame(maxWidth: isCompact ? .infinity : nil)
                 }
                 .buttonStyle(.appGlass)
 
                 Button { castDirectContent() } label: {
-                    Label("Cast Direct", systemImage: "dot.radiowaves.left.and.right")
+                    Label("Direct URL", systemImage: "link")
                         .font(.caption.weight(.semibold))
                         .frame(maxWidth: isCompact ? .infinity : nil)
                 }
@@ -897,7 +897,9 @@ struct MediaDetailSheet: View {
         #endif
     }
 
-    /// Cast content to connected remote device instead of playing locally.
+    /// Cast content to connected remote device with transmux pipeline.
+    /// Uses the appropriate transmux format (MPEG-TS for DLNA, segmented HLS for Cast)
+    /// and auto-enables audio transcoding based on device type.
     private func castContent() {
         if let movie = movieDetail {
             let urlString = IPTVConfiguration.buildMovieURL(
@@ -907,7 +909,7 @@ struct MediaDetailSheet: View {
             )
             guard let url = URL(string: urlString) else { return }
             Task {
-                try? await remotePlayManager.load(url: url, metadata: enrichedMetadata)
+                try? await remotePlayManager.loadWithTransmux(url: url, metadata: enrichedMetadata)
             }
         } else if let serie = serieDetail,
                   let firstSeason = serie.seasons.first,
@@ -965,7 +967,7 @@ struct MediaDetailSheet: View {
         }
     }
 
-    /// Cast a specific episode to connected remote device.
+    /// Cast a specific episode to connected remote device with transmux pipeline.
     private func castEpisode(_ episode: SerieDetail.Episode) {
         let urlString = IPTVConfiguration.buildSeriesURL(
             profile: profile,
@@ -990,7 +992,7 @@ struct MediaDetailSheet: View {
         )
 
         Task {
-            try? await remotePlayManager.load(url: url, metadata: episodeMetadata)
+            try? await remotePlayManager.loadWithTransmux(url: url, metadata: episodeMetadata)
         }
     }
 

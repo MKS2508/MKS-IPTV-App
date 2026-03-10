@@ -10,16 +10,12 @@ import SwiftUI
 /// Full modal picker for browsing and selecting remote playback devices.
 struct DevicePickerSheet: View {
 
+    // MARK: - Environment
+
+    /// Observe the manager directly so this sheet tracks device changes in its own body.
+    @Environment(RemotePlayManager.self) private var remotePlayManager
+
     // MARK: - Properties
-
-    /// Available devices from discovery.
-    let devices: [RemoteDevice]
-
-    /// Whether discovery is in progress.
-    let isDiscovering: Bool
-
-    /// Currently connected device (if any).
-    let selectedDevice: RemoteDevice?
 
     /// Callback when device is selected.
     let onDeviceSelected: (RemoteDevice) -> Void
@@ -29,6 +25,12 @@ struct DevicePickerSheet: View {
 
     /// Callback to dismiss sheet.
     let onDismiss: () -> Void
+
+    // MARK: - Computed
+
+    private var devices: [RemoteDevice] { remotePlayManager.discoveredDevices }
+    private var isDiscovering: Bool { remotePlayManager.isDiscovering }
+    private var selectedDevice: RemoteDevice? { remotePlayManager.connectedDevice }
 
     // MARK: - State
 
@@ -93,7 +95,7 @@ struct DevicePickerSheet: View {
                         }
                     }
                 } footer: {
-                    Text("Tap a device to connect and start casting")
+                    Text("Tap a device to connect and start playback")
                 }
 
                 // Connected device section
@@ -109,7 +111,7 @@ struct DevicePickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Cast to Device")
+            .navigationTitle("Remote Playback")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -203,24 +205,9 @@ private struct DeviceRow: View {
 
 #Preview {
     DevicePickerSheet(
-        devices: [
-            RemoteDevice.dlna(
-                id: "uuid:1234",
-                name: "Living Room TV",
-                capabilities: .full,
-                controlURL: "http://192.168.1.100:8080/control"
-            ),
-            RemoteDevice.dlna(
-                id: "uuid:5678",
-                name: "Bedroom TV",
-                capabilities: [.video, .audio],
-                controlURL: "http://192.168.1.101:8080/control"
-            )
-        ],
-        isDiscovering: false,
-        selectedDevice: nil,
         onDeviceSelected: { _ in },
         onRefresh: {},
         onDismiss: {}
     )
+    .environment(RemotePlayManager.shared)
 }

@@ -7,6 +7,7 @@
 
 import Foundation
 import Network
+import TransmuxCore
 
 /// Main coordinator for remote playback (DLNA and future Cast support).
 /// Manages device discovery, connection lifecycle, and content handoff.
@@ -55,6 +56,9 @@ final class RemotePlayManager: @unchecked Sendable {
 
     /// Active device controller (DLNA or Cast).
     private var activeController: RemoteDeviceController?
+
+    /// Active transmux session ID for cleanup on disconnect or new load.
+    private var activeTransmuxSessionID: String?
 
     /// Discovery state.
     private(set) var isDiscovering = false
@@ -132,6 +136,13 @@ final class RemotePlayManager: @unchecked Sendable {
 
         await controller.disconnect()
 
+        // Cleanup active transmux session
+        if let sessionID = activeTransmuxSessionID {
+            await TransmuxServer.shared.stop()
+            await TransmuxingService.shared.cleanup(sessionID: sessionID)
+            activeTransmuxSessionID = nil
+        }
+
         activeController = nil
         connectedDevice = nil
         playbackState = .idle
@@ -198,6 +209,107 @@ final class RemotePlayManager: @unchecked Sendable {
         do {
             try await controller.load(
                 url: url,
+                metadata: metadata,
+                startPosition: startPosition
+            )
+        } catch {
+            playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
+            throw error
+        }
+    }
+
+    /// Start the appropriate transmux pipeline for the connected device and load content.
+    /// - DLNA-family devices: `startDLNATransmux` → progressive MPEG-TS → `TransmuxServer.startDLNA`
+    /// - Cast-family devices: `startCastTransmux` → segmented MPEG-TS + HLS → `TransmuxServer.startCast`
+    /// Audio transcoding (AC3/EAC3/DTS → AAC) is auto-enabled based on `device.type.needsAudioTranscode`.
+    func loadWithTransmux(
+        url: URL,
+        metadata: MetadataResult?,
+        startPosition: Double = 0
+    ) async throws {
+        guard let device = connectedDevice,
+              let controller = activeController else {
+            throw RemotePlayError.noActiveSession
+        }
+
+        playbackState = .loading
+        currentMetadata = metadata
+
+        // Cleanup any previous transmux session
+        if let prevID = activeTransmuxSessionID {
+            await TransmuxServer.shared.stop()
+            await TransmuxingService.shared.cleanup(sessionID: prevID)
+            activeTransmuxSessionID = nil
+        }
+
+        let transcodeAudio = device.type.needsAudioTranscode
+        let service = TransmuxingService.shared
+
+        do {
+            let serverSession: TransmuxServer.Session
+
+            switch device.type.transportProtocol {
+            case .dlna:
+                // Progressive MPEG-TS → growing .ts file → HTTP range requests with DLNA headers
+                let session = try await service.startDLNATransmux(
+                    from: url,
+                    transcodeAudio: transcodeAudio
+                )
+                activeTransmuxSessionID = session.sessionID
+
+                // Buffer initial content before starting server
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+
+                await TransmuxServer.shared.setDLNAMode(true)
+                serverSession = try await TransmuxServer.shared.startDLNA(
+                    filePath: session.outputPath,
+                    expectedSize: session.expectedSize
+                )
+
+                // Monitor transmux completion in background
+                let outputPath = session.outputPath
+                Task.detached {
+                    let sentinelDir = (outputPath as NSString).deletingLastPathComponent
+                    let sentinelPath = sentinelDir + "/.transmux_complete"
+                    while true {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        if FileManager.default.fileExists(atPath: sentinelPath) {
+                            let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath)
+                            let finalSize = (attrs?[.size] as? Int64) ?? 0
+                            await TransmuxServer.shared.setExpectedSize(finalSize)
+                            await TransmuxServer.shared.setComplete()
+                            break
+                        }
+                    }
+                }
+
+            case .castV2:
+                // Segmented MPEG-TS → .ts segments + .m3u8 → file serving
+                let session = try await service.startCastTransmux(
+                    from: url,
+                    transcodeAudio: transcodeAudio
+                )
+                activeTransmuxSessionID = session.sessionID
+
+                // Wait for at least 1 segment to be written
+                while session.segmentCounter.count == 0 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                }
+
+                serverSession = try await TransmuxServer.shared.startCast(
+                    directory: session.outputDir
+                )
+            }
+
+            // Convert localhost URL to LAN URL for remote device access
+            guard let lanURL = convertToLANURL(serverSession.localURL) else {
+                throw RemotePlayError.networkUnavailable
+            }
+
+            streamingURL = lanURL
+
+            try await controller.load(
+                url: lanURL,
                 metadata: metadata,
                 startPosition: startPosition
             )
@@ -341,48 +453,32 @@ final class RemotePlayManager: @unchecked Sendable {
 
     /// Create appropriate controller for device type and wire state callbacks.
     private func createController(for device: RemoteDevice) throws -> RemoteDeviceController {
-        switch device.type {
-        case .dlna:
-            let controller = try DLNAController(device: device)
-            controller.onStateUpdate = { [weak self] state in
-                Task { @MainActor [weak self] in
-                    self?.deviceState = state
-                    // Sync playback state from transport state
-                    switch state.transportState {
-                    case .playing:
-                        self?.playbackState = .playing
-                    case .paused:
-                        self?.playbackState = .paused
-                    case .stopped:
-                        self?.playbackState = .stopped
-                    case .transitioning:
-                        self?.playbackState = .buffering
-                    case .noMedia, .unknown:
-                        break
-                    }
+        let stateHandler: @Sendable (RemoteDeviceState) -> Void = { [weak self] state in
+            Task { @MainActor [weak self] in
+                self?.deviceState = state
+                switch state.transportState {
+                case .playing:
+                    self?.playbackState = .playing
+                case .paused:
+                    self?.playbackState = .paused
+                case .stopped:
+                    self?.playbackState = .stopped
+                case .transitioning:
+                    self?.playbackState = .buffering
+                case .noMedia, .unknown:
+                    break
                 }
             }
+        }
+
+        switch device.type {
+        case .dlna, .smartTV, .fireTV, .androidTV:
+            let controller = try DLNAController(device: device)
+            controller.onStateUpdate = stateHandler
             return controller
         case .chromecast, .googleTV:
             let controller = try CastController(device: device)
-            controller.onStateUpdate = { [weak self] state in
-                Task { @MainActor [weak self] in
-                    self?.deviceState = state
-                    // Sync playback state from transport state
-                    switch state.transportState {
-                    case .playing:
-                        self?.playbackState = .playing
-                    case .paused:
-                        self?.playbackState = .paused
-                    case .stopped:
-                        self?.playbackState = .stopped
-                    case .transitioning:
-                        self?.playbackState = .buffering
-                    case .noMedia, .unknown:
-                        break
-                    }
-                }
-            }
+            controller.onStateUpdate = stateHandler
             return controller
         }
     }

@@ -32,6 +32,9 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     /// Stored metadata for Now Playing info (Control Center / Lock Screen / AirPlay)
     private var pendingMetadata: MetadataResult?
 
+    /// Whether the current stream is a live stream (affects reload/buffer behavior)
+    private var isLiveStream: Bool = false
+
     /// Glitch detection and monitoring.
     /// Internal access allows FFmpegPlayerImplementation to wire the feedback callback.
     private(set) var glitchDetector: GlitchDetector?
@@ -129,6 +132,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         stop()
 
         self.sourceURL = url
+        self.isLiveStream = url.path.lowercased().contains("/live/") || url.pathExtension.lowercased() == "m3u8" && url.path.lowercased().contains("/live/")
 
         // Start structured logging session
         PlayerLog.startSession(playerType: "AVPlayer", url: url.absoluteString)
@@ -137,9 +141,23 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         glitchDetector = GlitchDetector.forAVPlayer(sessionID: PlayerLog.sessionID)
         glitchDetector?.reset()
 
-        PlayerLog.log("LOAD", category: "lifecycle", fields: ["url": url.absoluteString])
+        PlayerLog.log("LOAD", category: "lifecycle", fields: [
+            "url": url.absoluteString,
+            "isLive": isLiveStream
+        ])
 
-        playerItem = AVPlayerItem(url: url)
+        // Use AVURLAsset with IPTV-compatible HTTP headers.
+        // Many Xtream Codes servers throttle or reject requests without a recognized User-Agent.
+        let headers = IPTVConfiguration.defaultRequestHeaders()
+        let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        playerItem = AVPlayerItem(asset: asset)
+
+        // For live HLS, set a moderate forward buffer to avoid the server
+        // thinking the client is inactive. Default (~10s+) can cause stalls
+        // when the server's segment window is small.
+        if isLiveStream {
+            playerItem?.preferredForwardBufferDuration = 6
+        }
 
         // Store metadata for Now Playing info (Control Center / Lock Screen / AirPlay)
         self.pendingMetadata = metadata
@@ -265,7 +283,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         currentTime = 0
         duration = 0
 
-        // Reset tracking state for external seek detection
+        // Reset tracking state
+        isLiveStream = false
         lastSampledTime = 0
         lastSampleDate = nil
         isProcessingExternalSeek = false
@@ -341,7 +360,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         PlayerLog.log("RELOAD", category: "lifecycle", fields: [
             "url": urlAsset.url.absoluteString,
             "position": String(format: "%.3f", position.seconds),
-            "wasPlaying": wasPlaying
+            "wasPlaying": wasPlaying,
+            "isLive": isLiveStream
         ])
 
         // Tear down old observers
@@ -352,9 +372,16 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         NotificationCenter.default.removeObserver(self)
         cancellables.removeAll()
 
-        // Create NEW AVPlayer and AVPlayerItem — forces fresh HLS playlist parse
-        // This is the key: replaceCurrentItem(with:) doesn't reset HLS state machine
-        playerItem = AVPlayerItem(url: urlAsset.url)
+        // Create NEW AVPlayer and AVPlayerItem — forces fresh HLS playlist parse.
+        // Use AVURLAsset with headers so the IPTV server recognizes the client.
+        let headers = IPTVConfiguration.defaultRequestHeaders()
+        let newAsset = AVURLAsset(url: urlAsset.url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        playerItem = AVPlayerItem(asset: newAsset)
+
+        // Reapply live buffer config on the new item
+        if isLiveStream {
+            playerItem?.preferredForwardBufferDuration = 6
+        }
 
         // Re-apply external metadata on the new item so NowPlaying survives reload
         #if os(iOS) || os(tvOS) || os(visionOS)
@@ -366,26 +393,43 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         player = AVPlayer(playerItem: playerItem)
         player?.volume = volume
-        player?.automaticallyWaitsToMinimizeStalling = false
+
+        // For VOD: disable auto-wait so playback resumes instantly after seek.
+        // For live: keep the default (true) to let AVPlayer buffer from the live edge.
+        if !isLiveStream {
+            player?.automaticallyWaitsToMinimizeStalling = false
+        }
 
         PlayerLog.log("RELOAD_PLAYER_CREATED", category: "lifecycle", fields: [:])
 
         // Re-attach observers to new player/item
         setupObservers()
 
-        // Restore position and playback state
-        if position.seconds > 0 {
-            player?.seek(to: position, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
-                PlayerLog.log("RELOAD_SEEK_COMPLETE", category: "lifecycle", fields: [
-                    "position": String(format: "%.3f", position.seconds),
-                    "resuming": wasPlaying
-                ])
-                if wasPlaying {
-                    self?.play()
-                }
+        if isLiveStream {
+            // Live streams: start from the live edge, don't seek to old position.
+            // The old position is likely outside the playlist's sliding window,
+            // which causes stream parse errors (-12312).
+            PlayerLog.log("RELOAD_LIVE_EDGE", category: "lifecycle", fields: [
+                "resuming": wasPlaying
+            ])
+            if wasPlaying {
+                play()
             }
-        } else if wasPlaying {
-            play()
+        } else {
+            // VOD: restore position and playback state
+            if position.seconds > 0 {
+                player?.seek(to: position, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+                    PlayerLog.log("RELOAD_SEEK_COMPLETE", category: "lifecycle", fields: [
+                        "position": String(format: "%.3f", position.seconds),
+                        "resuming": wasPlaying
+                    ])
+                    if wasPlaying {
+                        self?.play()
+                    }
+                }
+            } else if wasPlaying {
+                play()
+            }
         }
     }
 
@@ -454,12 +498,18 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 if absTimeDelta > 3.0 {
                     // Verificar que no sea un seek interno (nuestro seek(to:) setea seekTargetPosition)
                     if self.seekTargetPosition == nil {
-                        self.reportExternalSeek(
-                            from: self.lastSampledTime,
-                            to: seconds,
-                            source: "periodicObserver",
-                            delta: timeDelta
-                        )
+                        // For live streams, the initial jump from 0 to the live edge is normal —
+                        // AVPlayer buffers and then starts from the current live position.
+                        // Don't report this as an external seek.
+                        let isLiveEdgeJump = self.isLiveStream && self.lastSampledTime == 0
+                        if !isLiveEdgeJump {
+                            self.reportExternalSeek(
+                                from: self.lastSampledTime,
+                                to: seconds,
+                                source: "periodicObserver",
+                                delta: timeDelta
+                            )
+                        }
                     }
                 }
             }
@@ -575,6 +625,9 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             .removeDuplicates()
             .sink { [weak self] isEmpty in
                 guard let self = self, isEmpty else { return }
+                // At time 0 the buffer is always empty — player hasn't received data yet.
+                // Don't report this as a real starvation event.
+                guard self.currentTime > 0 else { return }
                 PlayerLog.log("BUFFER_EMPTY_KVO", category: "buffer", level: .critical, fields: [
                     "currentTime": String(format: "%.1f", self.currentTime)
                 ])

@@ -98,6 +98,7 @@ struct TransmuxCLI {
         let seekTime = (doSeek || testSeek) ? getArgValue(for: doSeek ? "--seek" : "--test-seek") ?? 300.0 : 0.0
         let duration = getArgValue(for: "--duration") ?? 10.0
         let verbose = args.contains("--verbose")
+        let transcodeAudio = args.contains("--transcode-audio")
 
         if verbose {
             print("TransmuxCore CLI v1.5.0")
@@ -123,6 +124,9 @@ struct TransmuxCLI {
             } else if doSeek {
                 print("Will seek to \(String(format: "%.1f", seekTime))s for \(String(format: "%.1f", duration))s")
             }
+            if transcodeAudio {
+                print("Audio transcoding: AC3/EAC3/DTS → AAC (192kbps, 48kHz, stereo)")
+            }
         }
 
         let service = TransmuxingService()
@@ -132,7 +136,7 @@ struct TransmuxCLI {
 
             // Cast mode: use MPEG-TS pipeline (Default Media Receiver's MPL only supports MPEG-TS)
             if isCastMode {
-                let castSession = try await service.startCastTransmux(from: inputURL)
+                let castSession = try await service.startCastTransmux(from: inputURL, transcodeAudio: transcodeAudio)
                 print("Cast transmux started: \(castSession.sessionID)")
                 print("  Output dir: \(castSession.outputDir)")
                 print("  Playlist: \(castSession.playlistPath)")
@@ -161,12 +165,13 @@ struct TransmuxCLI {
                     inputURL: inputURL,
                     dlnaTarget: dlnaTarget!,
                     service: service,
-                    verbose: verbose
+                    verbose: verbose,
+                    transcodeAudio: transcodeAudio
                 )
                 exit(0)
             }
 
-            let session = try await service.startTransmux(from: inputURL)
+            let session = try await service.startTransmux(from: inputURL, transcodeAudio: transcodeAudio)
             print("Transmux started: \(session.sessionID)")
             print("  Output: \(session.outputPath)")
             print("  Playlist: \(session.playlistPath)")
@@ -1027,6 +1032,8 @@ struct TransmuxCLI {
             --seek TIME             Seek to TIME seconds (one-shot seek during remux)
             --test-seek TIME        Run automated seek test with log validation
             --duration SECONDS      Duration to run transmux (default: 10 seconds)
+            --transcode-audio       Transcode AC3/EAC3/DTS audio to AAC (192kbps, 48kHz, stereo)
+                                    Use with --cast or --dlna for devices that don't support AC3/DTS
             --verbose               Enable verbose output
 
         EXAMPLES:
@@ -1047,6 +1054,12 @@ struct TransmuxCLI {
 
             # DLNA playback — direct IP (e.g. TELEFUNKEN at 192.168.1.142)
             transmux-cli movie.mkv --dlna 192.168.1.142 --verbose
+
+            # DLNA with audio transcoding (AC3/DTS → AAC for TV compatibility)
+            transmux-cli movie.mkv --dlna 192.168.1.142 --transcode-audio --verbose
+
+            # Cast with audio transcoding (AC3/DTS → AAC for Chromecast)
+            transmux-cli movie.mkv --cast --transcode-audio --verbose
 
             # Discover DLNA devices only (no playback)
             transmux-cli --discover-dlna
@@ -1139,7 +1152,8 @@ struct TransmuxCLI {
         inputURL: URL,
         dlnaTarget: String,
         service: TransmuxingService,
-        verbose: Bool
+        verbose: Bool,
+        transcodeAudio: Bool = false
     ) async {
         dlnaPrint("DLNA-CLI", "Starting DLNA mode...")
 
@@ -1246,7 +1260,7 @@ struct TransmuxCLI {
             dlnaPrint("DLNA-CLI", "Step 2: Progressive MPEG-TS transmux (real-time streaming)...")
             let session: DLNATransmuxSession
             do {
-                session = try await service.startDLNATransmux(from: inputURL)
+                session = try await service.startDLNATransmux(from: inputURL, transcodeAudio: transcodeAudio)
             } catch {
                 dlnaPrint("DLNA-CLI", "ERROR: Transmux failed: \(error.localizedDescription)")
                 return

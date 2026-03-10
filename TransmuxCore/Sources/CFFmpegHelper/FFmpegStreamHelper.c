@@ -975,6 +975,398 @@ void mks_subtitle_collector_finish(MKSSubtitleCollector *collector, int *cueCoun
 
 #undef MAX_SUB_STREAMS
 
+// --- Audio Transcoder Implementation (AC3/EAC3/DTS → AAC) ---
+
+#import <libswresample/swresample.h>
+
+struct MKSAudioTranscoder {
+    AVCodecContext *decoderCtx;
+    AVCodecContext *encoderCtx;
+    struct SwrContext *swrCtx;
+    AVFrame *decodedFrame;
+    AVFrame *resampledFrame;
+    int64_t nextPts;  // running PTS counter for encoder (in encoder time_base)
+};
+
+MKSAudioTranscoder *mks_audio_transcoder_create(
+    const void *inputFmtCtx,
+    int inputStreamIndex,
+    int targetBitrate,
+    int targetSampleRate,
+    int targetChannels)
+{
+    const AVFormatContext *inCtx = (const AVFormatContext *)inputFmtCtx;
+    if (!inCtx || inputStreamIndex < 0 || (unsigned)inputStreamIndex >= inCtx->nb_streams) {
+        log_to_file("Transcode", "ERR", "invalid input context or stream index %d", inputStreamIndex);
+        return NULL;
+    }
+
+    detect_field_shifts(inCtx);
+
+    AVCodecParameters *srcPar = get_codecpar(inCtx, inputStreamIndex);
+    if (!srcPar) {
+        log_to_file("Transcode", "ERR", "cannot get codecpar for stream %d", inputStreamIndex);
+        return NULL;
+    }
+
+    int srcCodecId = read_cp_int(srcPar, offsetof(AVCodecParameters, codec_id));
+
+    // Only transcode AC3 (86019), EAC3 (86056), DTS (86076)
+    if (srcCodecId != AV_CODEC_ID_AC3 &&
+        srcCodecId != AV_CODEC_ID_EAC3 &&
+        srcCodecId != AV_CODEC_ID_DTS) {
+        log_to_file("Transcode", "WRN", "codec_id %d is not AC3/EAC3/DTS, no transcoding needed", srcCodecId);
+        return NULL;
+    }
+
+    const char *codecName = srcCodecId == AV_CODEC_ID_AC3 ? "AC3" :
+                            srcCodecId == AV_CODEC_ID_EAC3 ? "EAC3" : "DTS";
+
+    // --- Set up decoder ---
+    const AVCodec *decoder = avcodec_find_decoder(srcCodecId);
+    if (!decoder) {
+        log_to_file("Transcode", "ERR", "no decoder found for %s (id=%d)", codecName, srcCodecId);
+        return NULL;
+    }
+
+    AVCodecContext *decCtx = avcodec_alloc_context3(decoder);
+    if (!decCtx) {
+        log_to_file("Transcode", "ERR", "failed to allocate decoder context");
+        return NULL;
+    }
+
+    int ret = avcodec_parameters_to_context(decCtx, srcPar);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "avcodec_parameters_to_context failed: %d", ret);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    // Set decoder time_base from input stream
+    AVStream *inStream = inCtx->streams[inputStreamIndex];
+    decCtx->pkt_timebase = read_stream_rational(inStream, offsetof(AVStream, time_base));
+
+    ret = avcodec_open2(decCtx, decoder, NULL);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "avcodec_open2 decoder failed: %d", ret);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    int srcSampleRate = decCtx->sample_rate;
+    int srcChannels = decCtx->ch_layout.nb_channels;
+    if (srcSampleRate <= 0) srcSampleRate = 48000;
+    if (srcChannels <= 0) srcChannels = 2;
+
+    int outSampleRate = targetSampleRate > 0 ? targetSampleRate : srcSampleRate;
+    int outChannels = targetChannels > 0 ? targetChannels : srcChannels;
+
+    log_to_file("Transcode", "INF", "decoder opened: %s %dch %dHz → target AAC %dch %dHz %dkbps",
+                codecName, srcChannels, srcSampleRate, outChannels, outSampleRate, targetBitrate / 1000);
+
+    // --- Set up AAC encoder ---
+    const AVCodec *encoder = avcodec_find_encoder(AV_CODEC_ID_AAC);
+    if (!encoder) {
+        log_to_file("Transcode", "ERR", "no AAC encoder found in FFmpeg build");
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    AVCodecContext *encCtx = avcodec_alloc_context3(encoder);
+    if (!encCtx) {
+        log_to_file("Transcode", "ERR", "failed to allocate encoder context");
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    encCtx->sample_fmt = AV_SAMPLE_FMT_FLTP;  // FFmpeg native AAC requires planar float
+    encCtx->sample_rate = outSampleRate;
+    encCtx->bit_rate = targetBitrate;
+    av_channel_layout_default(&encCtx->ch_layout, outChannels);
+    encCtx->time_base = (AVRational){1, outSampleRate};
+    encCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;  // extradata in codecpar, not in-band
+
+    ret = avcodec_open2(encCtx, encoder, NULL);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "avcodec_open2 encoder failed: %d", ret);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    log_to_file("Transcode", "INF", "AAC encoder opened: %dch %dHz %dkbps frame_size=%d",
+                outChannels, outSampleRate, targetBitrate / 1000, encCtx->frame_size);
+
+    // --- Set up resampler ---
+    struct SwrContext *swr = NULL;
+    ret = swr_alloc_set_opts2(&swr,
+                               &encCtx->ch_layout,      // output layout
+                               AV_SAMPLE_FMT_FLTP,      // output format
+                               outSampleRate,            // output rate
+                               &decCtx->ch_layout,       // input layout
+                               decCtx->sample_fmt,       // input format
+                               srcSampleRate,             // input rate
+                               0, NULL);
+    if (ret < 0 || !swr) {
+        log_to_file("Transcode", "ERR", "swr_alloc_set_opts2 failed: %d", ret);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    ret = swr_init(swr);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "swr_init failed: %d", ret);
+        swr_free(&swr);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    // --- Allocate frames ---
+    AVFrame *decodedFrame = av_frame_alloc();
+    AVFrame *resampledFrame = av_frame_alloc();
+    if (!decodedFrame || !resampledFrame) {
+        log_to_file("Transcode", "ERR", "failed to allocate frames");
+        if (decodedFrame) av_frame_free(&decodedFrame);
+        if (resampledFrame) av_frame_free(&resampledFrame);
+        swr_free(&swr);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    // Pre-configure resampled frame for the encoder
+    resampledFrame->format = AV_SAMPLE_FMT_FLTP;
+    resampledFrame->sample_rate = outSampleRate;
+    av_channel_layout_copy(&resampledFrame->ch_layout, &encCtx->ch_layout);
+    resampledFrame->nb_samples = encCtx->frame_size;
+
+    ret = av_frame_get_buffer(resampledFrame, 0);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "av_frame_get_buffer failed: %d", ret);
+        av_frame_free(&decodedFrame);
+        av_frame_free(&resampledFrame);
+        swr_free(&swr);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    // --- Create transcoder struct ---
+    MKSAudioTranscoder *tc = calloc(1, sizeof(MKSAudioTranscoder));
+    if (!tc) {
+        av_frame_free(&decodedFrame);
+        av_frame_free(&resampledFrame);
+        swr_free(&swr);
+        avcodec_free_context(&encCtx);
+        avcodec_free_context(&decCtx);
+        return NULL;
+    }
+
+    tc->decoderCtx = decCtx;
+    tc->encoderCtx = encCtx;
+    tc->swrCtx = swr;
+    tc->decodedFrame = decodedFrame;
+    tc->resampledFrame = resampledFrame;
+    tc->nextPts = 0;
+
+    log_to_file("Transcode", "INF", "audio transcoder created: %s → AAC (%dch %dHz %dkbps)",
+                codecName, outChannels, outSampleRate, targetBitrate / 1000);
+    return tc;
+}
+
+int mks_audio_transcoder_setup_output(MKSAudioTranscoder *ctx, void *outputStream) {
+    if (!ctx || !outputStream) return -1;
+
+    AVStream *outStream = (AVStream *)outputStream;
+    AVCodecParameters *outPar = get_stream_codecpar(outStream);
+    if (!outPar) {
+        log_to_file("Transcode", "ERR", "cannot get output stream codecpar");
+        return -1;
+    }
+
+    int ret = avcodec_parameters_from_context(outPar, ctx->encoderCtx);
+    if (ret < 0) {
+        log_to_file("Transcode", "ERR", "avcodec_parameters_from_context failed: %d", ret);
+        return ret;
+    }
+
+    // Clear codec_tag for container compatibility
+    write_cp_uint32(outPar, offsetof(AVCodecParameters, codec_tag), 0);
+
+    log_to_file("Transcode", "INF", "output stream configured: AAC %dch %dHz",
+                ctx->encoderCtx->ch_layout.nb_channels, ctx->encoderCtx->sample_rate);
+    return 0;
+}
+
+/// Internal: drain decoded frames through resampler + encoder.
+/// Called after avcodec_send_packet() to process all available decoded frames.
+static int transcode_drain_decoded(MKSAudioTranscoder *ctx) {
+    int ret;
+
+    while (1) {
+        ret = avcodec_receive_frame(ctx->decoderCtx, ctx->decodedFrame);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+            return 0;  // need more input or decoder fully drained
+        }
+        if (ret < 0) {
+            log_to_file("Transcode", "ERR", "avcodec_receive_frame failed: %d", ret);
+            return ret;
+        }
+
+        // Resample decoded frame → encoder-compatible frame
+        // swr_convert processes all samples from decodedFrame. If it produces
+        // enough for a full encoder frame (frame_size samples), we send it.
+        // Otherwise samples are buffered internally by SwrContext.
+        int samplesInSwr = swr_get_out_samples(ctx->swrCtx, ctx->decodedFrame->nb_samples);
+
+        // Convert into resampledFrame's buffer
+        const uint8_t **in_data = (const uint8_t **)ctx->decodedFrame->extended_data;
+
+        while (samplesInSwr >= ctx->encoderCtx->frame_size || ctx->decodedFrame->nb_samples > 0) {
+            // Make the resampled frame writable
+            av_frame_make_writable(ctx->resampledFrame);
+            ctx->resampledFrame->nb_samples = ctx->encoderCtx->frame_size;
+
+            int converted;
+            if (ctx->decodedFrame->nb_samples > 0) {
+                converted = swr_convert(ctx->swrCtx,
+                                       ctx->resampledFrame->extended_data,
+                                       ctx->resampledFrame->nb_samples,
+                                       in_data,
+                                       ctx->decodedFrame->nb_samples);
+                ctx->decodedFrame->nb_samples = 0;  // consumed
+                in_data = NULL;  // subsequent calls pull from swr internal buffer
+            } else {
+                converted = swr_convert(ctx->swrCtx,
+                                       ctx->resampledFrame->extended_data,
+                                       ctx->resampledFrame->nb_samples,
+                                       NULL, 0);
+            }
+
+            if (converted <= 0) break;
+
+            if (converted < ctx->encoderCtx->frame_size) {
+                // Not enough samples for a full frame — swr buffers them
+                break;
+            }
+
+            ctx->resampledFrame->nb_samples = converted;
+            ctx->resampledFrame->pts = ctx->nextPts;
+            ctx->nextPts += converted;
+
+            ret = avcodec_send_frame(ctx->encoderCtx, ctx->resampledFrame);
+            if (ret < 0 && ret != AVERROR(EAGAIN)) {
+                log_to_file("Transcode", "ERR", "avcodec_send_frame failed: %d", ret);
+                av_frame_unref(ctx->decodedFrame);
+                return ret;
+            }
+
+            // Check if there are still enough samples in swr
+            samplesInSwr = swr_get_out_samples(ctx->swrCtx, 0);
+            if (samplesInSwr < ctx->encoderCtx->frame_size) break;
+        }
+
+        av_frame_unref(ctx->decodedFrame);
+    }
+}
+
+int mks_audio_transcoder_send(MKSAudioTranscoder *ctx, const void *inputPacket) {
+    if (!ctx || !inputPacket) return -1;
+
+    const AVPacket *pkt = (const AVPacket *)inputPacket;
+
+    int ret = avcodec_send_packet(ctx->decoderCtx, pkt);
+    if (ret < 0 && ret != AVERROR(EAGAIN)) {
+        log_to_file("Transcode", "ERR", "avcodec_send_packet failed: %d", ret);
+        return ret;
+    }
+
+    return transcode_drain_decoded(ctx);
+}
+
+int mks_audio_transcoder_receive(MKSAudioTranscoder *ctx, void *outputPacket) {
+    if (!ctx || !outputPacket) return AVERROR(EINVAL);
+
+    AVPacket *pkt = (AVPacket *)outputPacket;
+    return avcodec_receive_packet(ctx->encoderCtx, pkt);
+}
+
+int mks_audio_transcoder_flush(MKSAudioTranscoder *ctx) {
+    if (!ctx) return -1;
+
+    // 1. Flush decoder (send NULL packet)
+    avcodec_send_packet(ctx->decoderCtx, NULL);
+    int ret = transcode_drain_decoded(ctx);
+    if (ret < 0) return ret;
+
+    // 2. Flush remaining samples from resampler
+    while (1) {
+        av_frame_make_writable(ctx->resampledFrame);
+        ctx->resampledFrame->nb_samples = ctx->encoderCtx->frame_size;
+
+        int converted = swr_convert(ctx->swrCtx,
+                                     ctx->resampledFrame->extended_data,
+                                     ctx->resampledFrame->nb_samples,
+                                     NULL, 0);
+        if (converted <= 0) break;
+
+        ctx->resampledFrame->nb_samples = converted;
+        ctx->resampledFrame->pts = ctx->nextPts;
+        ctx->nextPts += converted;
+
+        ret = avcodec_send_frame(ctx->encoderCtx, ctx->resampledFrame);
+        if (ret < 0 && ret != AVERROR(EAGAIN)) break;
+    }
+
+    // 3. Flush encoder (send NULL frame)
+    avcodec_send_frame(ctx->encoderCtx, NULL);
+
+    log_to_file("Transcode", "INF", "transcoder flushed (nextPts=%lld)", (long long)ctx->nextPts);
+    return 0;
+}
+
+void mks_audio_transcoder_reset(MKSAudioTranscoder *ctx) {
+    if (!ctx) return;
+
+    // Flush both codecs
+    avcodec_flush_buffers(ctx->decoderCtx);
+    avcodec_flush_buffers(ctx->encoderCtx);
+
+    // Reset resampler: close + reinit clears internal sample buffer
+    if (ctx->swrCtx) {
+        swr_close(ctx->swrCtx);
+        swr_init(ctx->swrCtx);
+    }
+
+    ctx->nextPts = 0;
+    log_to_file("Transcode", "INF", "transcoder reset after seek");
+}
+
+void mks_audio_transcoder_get_time_base(MKSAudioTranscoder *ctx, int *num, int *den) {
+    if (!ctx || !num || !den) {
+        if (num) *num = 0;
+        if (den) *den = 1;
+        return;
+    }
+    *num = ctx->encoderCtx->time_base.num;
+    *den = ctx->encoderCtx->time_base.den;
+}
+
+void mks_audio_transcoder_free(MKSAudioTranscoder *ctx) {
+    if (!ctx) return;
+
+    if (ctx->decodedFrame) av_frame_free(&ctx->decodedFrame);
+    if (ctx->resampledFrame) av_frame_free(&ctx->resampledFrame);
+    if (ctx->swrCtx) swr_free(&ctx->swrCtx);
+    if (ctx->encoderCtx) avcodec_free_context(&ctx->encoderCtx);
+    if (ctx->decoderCtx) avcodec_free_context(&ctx->decoderCtx);
+
+    log_to_file("Transcode", "INF", "audio transcoder freed");
+    free(ctx);
+}
+
 // --- Diagnostics (moved after collector) ---
 static int _removed_legacy_extract_fn = 0;  // was: _unused_mks_subtitle_extract_all_to_vtt
 // The standalone extraction function was removed — use the in-band collector instead.

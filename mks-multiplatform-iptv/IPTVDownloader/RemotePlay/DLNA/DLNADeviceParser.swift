@@ -80,10 +80,7 @@ enum DLNADeviceParser {
     /// - Parameter parsed: Parsed device information
     /// - Returns: RemoteDevice ready for use in RemotePlayManager
     static func toRemoteDevice(_ parsed: ParsedDevice) -> RemoteDevice {
-        // Determine device type based on available services:
-        // - AVTransport present → DLNA MediaRenderer (full playback control)
-        // - No AVTransport → DIAL/Cast device (not yet supported for playback)
-        let deviceType: DeviceType = parsed.avTransportControlURL != nil ? .dlna : .chromecast
+        let deviceType = inferDeviceType(parsed)
 
         var metadata: [String: String] = [
             "udn": parsed.udn,
@@ -117,6 +114,39 @@ enum DLNADeviceParser {
             isConnected: false,
             metadata: metadata
         )
+    }
+    // MARK: - Device Type Inference
+
+    /// Infer a more specific device type from manufacturer and model strings.
+    /// Falls back to `.dlna` for unrecognized DLNA devices or `.chromecast` for non-AVTransport devices.
+    private static func inferDeviceType(_ parsed: ParsedDevice) -> DeviceType {
+        // No AVTransport → likely a DIAL/Cast device
+        guard parsed.avTransportControlURL != nil else { return .chromecast }
+
+        let manufacturer = (parsed.manufacturer ?? "").lowercased()
+        let model = (parsed.modelName ?? "").lowercased()
+        let friendlyName = parsed.friendlyName.lowercased()
+
+        // Amazon Fire TV
+        if manufacturer.contains("amazon") || model.contains("fire") || friendlyName.contains("fire tv") {
+            return .fireTV
+        }
+
+        // Android TV (generic)
+        if manufacturer.contains("google") && (model.contains("android") || model.contains("chromecast")) {
+            return .androidTV
+        }
+
+        // Known Smart TV brands
+        let smartTVBrands = [
+            "samsung", "lg", "sony", "philips", "hisense", "tcl", "telefunken",
+            "panasonic", "toshiba", "sharp", "vizio", "grundig", "thomson"
+        ]
+        if smartTVBrands.contains(where: { manufacturer.contains($0) || friendlyName.contains($0) }) {
+            return .smartTV
+        }
+
+        return .dlna
     }
 }
 

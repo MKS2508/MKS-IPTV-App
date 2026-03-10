@@ -69,8 +69,7 @@ enum IPTVConfiguration {
     }
     
     static func buildLiveChannelURL(profile: IPTVProfile, channelID: Int) -> String {
-        let vodExtension = "ts"
-        return "\(profile.baseURL)/\(liveChannelsEndpoint)/\(profile.username)/\(profile.password)/\(channelID).\(vodExtension)"
+        return "\(profile.baseURL)/\(liveChannelsEndpoint)/\(profile.username)/\(profile.password)/\(channelID).m3u8"
     }
 
     static func defaultRequestHeaders() -> [String: String] {

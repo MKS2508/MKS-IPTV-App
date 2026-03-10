@@ -35,16 +35,14 @@ struct RemotePlayButton: View {
             }
         } label: {
             HStack(spacing: 6) {
-                if remotePlayManager.connectedDevice != nil {
-                    // Show connected device
-                    if let deviceName = remotePlayManager.connectedDevice?.name {
-                        Text(deviceName)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                if let device = remotePlayManager.connectedDevice {
+                    // Show connected device with type-specific icon
+                    Text(device.name)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
 
-                    Image(systemName: "tv.fill")
-                        .foregroundStyle(.primary)
+                    Image(systemName: device.type.icon)
+                        .foregroundStyle(device.type.accentColor)
                 } else {
                     // Show cast icon
                     if remotePlayManager.isDiscovering {
@@ -57,9 +55,6 @@ struct RemotePlayButton: View {
         }
         .sheet(isPresented: $showingDevicePicker) {
             DevicePickerSheet(
-                devices: remotePlayManager.discoveredDevices,
-                isDiscovering: remotePlayManager.isDiscovering,
-                selectedDevice: remotePlayManager.connectedDevice,
                 onDeviceSelected: { device in
                     showingDevicePicker = false
                     Task {

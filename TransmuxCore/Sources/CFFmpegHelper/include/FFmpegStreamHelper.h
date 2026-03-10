@@ -186,6 +186,64 @@ void mks_subtitle_collector_feed(MKSSubtitleCollector * _Nonnull collector,
 void mks_subtitle_collector_finish(MKSSubtitleCollector * _Nonnull collector,
                                     int * _Nullable cueCounts);
 
+// --- Audio transcoder (AC3/EAC3/DTS → AAC) ---
+
+typedef struct MKSAudioTranscoder MKSAudioTranscoder;
+
+/// Create audio transcoder: decoder + resampler + AAC encoder.
+/// Reads codec info from inputFmtCtx stream, configures AAC output.
+/// Returns NULL on failure (e.g., unsupported codec, missing decoder).
+/// @param inputFmtCtx   Source AVFormatContext (for codecpar + time_base)
+/// @param inputStreamIndex  Index of the audio stream to transcode
+/// @param targetBitrate     AAC bitrate in bits/s (e.g., 192000 for 192kbps)
+/// @param targetSampleRate  Output sample rate (e.g., 48000; 0 = same as source)
+/// @param targetChannels    Output channels (e.g., 2 for stereo; 0 = same as source)
+MKSAudioTranscoder * _Nullable mks_audio_transcoder_create(
+    const void * _Nonnull inputFmtCtx,
+    int inputStreamIndex,
+    int targetBitrate,
+    int targetSampleRate,
+    int targetChannels);
+
+/// Configure output stream's codecpar with AAC parameters from encoder.
+/// Call after avformat_new_stream() instead of mks_stream_copy_codecpar().
+/// @param ctx          Transcoder context
+/// @param outputStream Pointer to AVStream (from avformat_new_stream)
+/// @return 0 on success, negative on error.
+int mks_audio_transcoder_setup_output(MKSAudioTranscoder * _Nonnull ctx,
+                                       void * _Nonnull outputStream);
+
+/// Send one input packet to the transcoder (decoder side).
+/// Internally decodes → resamples → encodes. Output packets accumulate
+/// in the encoder and can be retrieved with mks_audio_transcoder_receive().
+/// @return 0 on success, negative on error.
+int mks_audio_transcoder_send(MKSAudioTranscoder * _Nonnull ctx,
+                               const void * _Nonnull inputPacket);
+
+/// Receive one transcoded AAC packet.
+/// @param outputPacket  Pre-allocated AVPacket to fill.
+/// @return 0 if packet available, AVERROR(EAGAIN) if need more input,
+///         AVERROR_EOF if done.
+int mks_audio_transcoder_receive(MKSAudioTranscoder * _Nonnull ctx,
+                                  void * _Nonnull outputPacket);
+
+/// Flush remaining buffered frames (call at EOF).
+/// After this, call mks_audio_transcoder_receive() in a loop until AVERROR_EOF.
+/// @return 0 on success, negative on error.
+int mks_audio_transcoder_flush(MKSAudioTranscoder * _Nonnull ctx);
+
+/// Reset after seek: flush decoder+encoder, reset resampler state.
+/// Clears internal PTS counter. Call alongside mks_bsf_flush().
+void mks_audio_transcoder_reset(MKSAudioTranscoder * _Nonnull ctx);
+
+/// Get encoder time_base for timestamp rescaling.
+/// Caller uses this to av_packet_rescale_ts from encoder TB to output TB.
+void mks_audio_transcoder_get_time_base(MKSAudioTranscoder * _Nonnull ctx,
+                                         int * _Nonnull num, int * _Nonnull den);
+
+/// Free transcoder and all internal contexts.
+void mks_audio_transcoder_free(MKSAudioTranscoder * _Nullable ctx);
+
 // --- Diagnostics ---
 
 /// Print struct layout info and pointer chain for a stream.

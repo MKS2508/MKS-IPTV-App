@@ -8,47 +8,77 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Transport Protocol
+
+/// Underlying streaming protocol used to send content to a device.
+enum TransportProtocol: String, Sendable {
+    /// UPnP AVTransport SOAP control.
+    case dlna
+    /// Google Cast V2 over TLS port 8009.
+    case castV2
+}
+
 // MARK: - Device Type
 
-/// Classification of remote playback device by protocol.
+/// Classification of remote playback device by protocol and manufacturer.
 enum DeviceType: String, Codable, Sendable, CaseIterable {
     case dlna = "dlna"
     case chromecast = "chromecast"
     case googleTV = "google_tv"
+    case androidTV = "android_tv"
+    case fireTV = "fire_tv"
+    case smartTV = "smart_tv"
 
     /// SF Symbol name for device icon.
     var icon: String {
         switch self {
-        case .dlna:
-            return "tv"
-        case .chromecast:
-            return "dot.radiowaves.left.and.right"
-        case .googleTV:
-            return "appletv"
+        case .dlna: "tv"
+        case .chromecast: "dot.radiowaves.left.and.right"
+        case .googleTV: "play.tv"
+        case .androidTV: "tv.and.mediabox"
+        case .fireTV: "flame"
+        case .smartTV: "tv.inset.filled"
         }
     }
 
-    /// Display name for the protocol.
+    /// Display name for the protocol/device family.
     var displayName: String {
         switch self {
-        case .dlna:
-            return "DLNA"
-        case .chromecast:
-            return "Chromecast"
-        case .googleTV:
-            return "Google TV"
+        case .dlna: "DLNA"
+        case .chromecast: "Chromecast"
+        case .googleTV: "Google TV"
+        case .androidTV: "Android TV"
+        case .fireTV: "Fire TV"
+        case .smartTV: "Smart TV"
         }
     }
 
     /// Color for UI highlighting.
     var accentColor: Color {
         switch self {
-        case .dlna:
-            return .cyan
-        case .chromecast:
-            return .blue
-        case .googleTV:
-            return .green
+        case .dlna: .cyan
+        case .chromecast: .blue
+        case .googleTV: .green
+        case .androidTV: .green
+        case .fireTV: .orange
+        case .smartTV: .purple
+        }
+    }
+
+    /// Underlying transport protocol for transmux pipeline decisions.
+    var transportProtocol: TransportProtocol {
+        switch self {
+        case .dlna, .smartTV, .fireTV, .androidTV: .dlna
+        case .chromecast, .googleTV: .castV2
+        }
+    }
+
+    /// Whether this device type typically needs audio transcoding (AC3/EAC3/DTS → AAC).
+    var needsAudioTranscode: Bool {
+        switch self {
+        case .chromecast: true
+        case .dlna, .smartTV, .fireTV: true
+        case .googleTV, .androidTV: false
         }
     }
 }
@@ -166,7 +196,8 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
 
     // MARK: - Factory Methods
 
-    /// Creates a DLNA device from parsed UPnP data.
+    /// Creates a DLNA-family device from parsed UPnP data.
+    /// - Parameter deviceType: Specific device classification (defaults to `.dlna`).
     static func dlna(
         id: String,
         name: String,
@@ -176,7 +207,8 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
         iconURL: String? = nil,
         manufacturer: String? = nil,
         modelName: String? = nil,
-        baseURL: String? = nil
+        baseURL: String? = nil,
+        deviceType: DeviceType = .dlna
     ) -> RemoteDevice {
         var meta: [String: String] = [
             "controlURL": controlURL,
@@ -191,7 +223,7 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
         return RemoteDevice(
             id: id,
             name: name,
-            type: .dlna,
+            type: deviceType,
             capabilities: capabilities,
             isConnected: false,
             metadata: meta

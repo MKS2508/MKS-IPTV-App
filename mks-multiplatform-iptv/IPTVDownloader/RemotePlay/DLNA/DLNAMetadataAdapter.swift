@@ -30,11 +30,14 @@ enum DLNAMetadataAdapter {
     ///   - metadata: Optional media metadata (title, poster, episode info, etc.)
     ///   - contentURL: The URL of the content being cast
     ///   - duration: Optional content duration in seconds
+    ///   - streaming: When true, marks content as progressive/live (OP=00, no seeking).
+    ///     Use for progressive transmux content that is still being written.
     /// - Returns: DIDL-Lite XML string
     static func buildDIDLLite(
         from metadata: MetadataResult?,
         contentURL: URL,
-        duration: Double?
+        duration: Double?,
+        streaming: Bool = false
     ) -> String {
         let title = formatTitle(from: metadata)
         let durationStr = duration.map { formatDuration($0) } ?? ""
@@ -45,7 +48,7 @@ enum DLNAMetadataAdapter {
           <item id="0" parentID="-1" restricted="1">
             <dc:title>\(xmlEscape(title))</dc:title>
             \(buildCreatorElements(from: metadata))
-            \(buildResElement(contentURL: contentURL, duration: durationStr, metadata: metadata))
+            \(buildResElement(contentURL: contentURL, duration: durationStr, metadata: metadata, streaming: streaming))
             \(buildAlbumArt(metadata: metadata))
           </item>
         </DIDL-Lite>
@@ -99,11 +102,13 @@ enum DLNAMetadataAdapter {
     private static func buildResElement(
         contentURL: URL,
         duration: String,
-        metadata: MetadataResult?
+        metadata: MetadataResult?,
+        streaming: Bool
     ) -> String {
         let durationAttr = duration.isEmpty ? "" : " duration=\"\(duration)\""
         let mimeType = mimeTypeForURL(contentURL)
-        let protocolInfo = "protocolInfo=\"http-get:*:\(mimeType):*\""
+        let dlnaFlags = dlnaProfileFlags(for: mimeType, streaming: streaming)
+        let protocolInfo = "protocolInfo=\"http-get:*:\(mimeType):\(dlnaFlags)\""
 
         return "<res\(durationAttr) \(protocolInfo)>\(xmlEscape(contentURL.absoluteString))</res>"
     }
@@ -118,7 +123,9 @@ enum DLNAMetadataAdapter {
         case "avi":
             return "video/x-msvideo"
         case "ts", "m2ts":
-            return "video/mp2t"
+            // DLNA renderers (e.g. TELEFUNKEN) expect "video/mpeg" for MPEG-TS,
+            // not the IANA-standard "video/mp2t" which triggers SOAP fault 714.
+            return "video/mpeg"
         case "mov":
             return "video/quicktime"
         case "wmv":
@@ -177,6 +184,30 @@ enum DLNAMetadataAdapter {
         let minutes = (totalSeconds % 3600) / 60
         let secs = totalSeconds % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, secs)
+    }
+
+    /// Returns DLNA.ORG profile flags string for the given MIME type.
+    /// Used in protocolInfo 4th field.
+    /// - Parameters:
+    ///   - mimeType: The content MIME type
+    ///   - streaming: When true, disables byte-range seeking (OP=00) and marks
+    ///     content as being converted (CI=1). Use for progressive/live streaming.
+    /// - Returns: DLNA.ORG flags string, or "*" for unknown types
+    static func dlnaProfileFlags(for mimeType: String, streaming: Bool = false) -> String {
+        let op = streaming ? "00" : "01"
+        let ci = streaming ? "1" : "0"
+        let flags = streaming
+            ? "21700000000000000000000000000000"  // streaming + sender-paced
+            : "01700000000000000000000000000000"  // background + interactive + streaming
+
+        switch mimeType {
+        case "video/mpeg", "video/mp2t":
+            return "DLNA.ORG_PN=MPEG_TS_HD_NA;DLNA.ORG_OP=\(op);DLNA.ORG_CI=\(ci);DLNA.ORG_FLAGS=\(flags)"
+        case "video/mp4":
+            return "DLNA.ORG_PN=AVC_MP4_HD_60_AC3;DLNA.ORG_OP=\(op);DLNA.ORG_CI=\(ci);DLNA.ORG_FLAGS=\(flags)"
+        default:
+            return "*"
+        }
     }
 
     /// XML-escape a string for safe embedding in XML.

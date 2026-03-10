@@ -1,0 +1,115 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-02-12T21:48:18.387Z",
+  "themes": [
+    {
+      "id": "default",
+      "name": "default",
+      "label": "Default",
+      "description": "Original project theme extracted from CSS variables",
+      "author": "Project",
+      "version": "1.0.0",
+      "source": "local",
+      "category": "built-in",
+      "default": true,
+      "modes": {
+        "light": "/themes/default-light.css",
+        "dark": "/themes/default-dark.css"
+      },
+      "fonts": {
+        "sans": "system-ui, sans-serif",
+        "serif": "Georgia, serif",
+        "mono": "monospace"
+      },
+      "preview": {
+        "primary": "oklch(0.577 0.245 27.325)",
+        "background": "oklch(1 0 0)",
+        "accent": "oklch(0.97 0 0)"
+      },
+      "config": {
+        "radius": "0.625rem"
+      }
+    },
+    {
+      "id": "synthwave84",
+      "name": "synthwave84",
+      "label": "Synthwave84",
+      "description": "Retro-futuristic neon theme with vibrant pink and purple accents",
+      "author": "System",
+      "version": "1.0.0",
+      "source": "local",
+      "category": "built-in",
+      "modes": {
+        "light": "/themes/synthwave84-light.css",
+        "dark": "/themes/synthwave84-dark.css"
+      },
+      "fonts": {
+        "sans": "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
+        "serif": "Georgia, Cambria, \"Times New Roman\", Times, serif",
+        "mono": "\"Fira Code\", Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace"
+      },
+      "preview": {
+        "primary": "oklch(0.5220 0.1732 16.5777)",
+        "background": "oklch(0.9640 0.0085 304.2185)",
+        "accent": "oklch(0.9253 0.0228 6.0819)"
+      },
+      "config": {
+        "radius": "0.5rem"
+      }
+    },
+    {
+      "id": "graphite",
+      "name": "graphite",
+      "label": "Graphite",
+      "description": "Elegant grayscale theme with subtle shadows",
+      "author": "System",
+      "version": "1.0.0",
+      "source": "local",
+      "category": "built-in",
+      "modes": {
+        "light": "/themes/graphite-light.css",
+        "dark": "/themes/graphite-dark.css"
+      },
+      "fonts": {
+        "sans": "Montserrat, sans-serif",
+        "serif": "Georgia, serif",
+        "mono": "Fira Code, monospace"
+      },
+      "preview": {
+        "primary": "oklch(0.4891 0 0)",
+        "background": "oklch(0.9551 0 0)",
+        "accent": "oklch(0.8078 0 0)"
+      },
+      "config": {
+        "radius": "0.35rem"
+      }
+    },
+    {
+      "id": "darkmatteviolet",
+      "name": "darkmatteviolet",
+      "label": "Dark Matte Violet",
+      "description": "Purple-accented theme with monospace aesthetics",
+      "author": "System",
+      "version": "1.0.0",
+      "source": "local",
+      "category": "built-in",
+      "modes": {
+        "light": "/themes/darkmatteviolet-light.css",
+        "dark": "/themes/darkmatteviolet-dark.css"
+      },
+      "fonts": {
+        "sans": "Geist Mono, ui-monospace, monospace",
+        "serif": "serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "preview": {
+        "primary": "oklch(0.5452 0.2088 308.6980)",
+        "background": "oklch(1.0000 0 0)",
+        "accent": "oklch(0.9491 0 0)"
+      },
+      "config": {
+        "radius": "0.75rem"
+      }
+    }
+  ]
+}

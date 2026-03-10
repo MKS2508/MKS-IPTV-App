@@ -1,0 +1,55 @@
+// FFmpeg Module Map for Swift Package Manager
+// Symlinks in this directory point to Frameworks/FFmpeg/include/<lib>/
+// This ensures transitive #includes between FFmpeg libraries resolve
+// without relying on -I flags during Xcode explicit module compilation.
+
+module CFFmpegHelper {
+    // Custom helper functions for field access workarounds
+    header "FFmpegStreamHelper.h"
+
+    // libavformat - container formats
+    header "libavformat/avformat.h"
+    header "libavformat/avio.h"
+
+    // libavcodec - codecs
+    header "libavcodec/avcodec.h"
+    header "libavcodec/bsf.h"
+    header "libavcodec/codec.h"
+    header "libavcodec/codec_desc.h"
+    header "libavcodec/codec_id.h"
+    header "libavcodec/codec_par.h"
+    header "libavcodec/packet.h"
+
+    // libavutil - utilities
+    header "libavutil/avutil.h"
+    header "libavutil/channel_layout.h"
+    header "libavutil/common.h"
+    header "libavutil/dict.h"
+    header "libavutil/error.h"
+    header "libavutil/frame.h"
+    header "libavutil/log.h"
+    header "libavutil/mathematics.h"
+    header "libavutil/mem.h"
+    header "libavutil/opt.h"
+    header "libavutil/pixfmt.h"
+    header "libavutil/rational.h"
+    header "libavutil/samplefmt.h"
+    header "libavutil/timestamp.h"
+
+    // libswresample - audio resampling
+    header "libswresample/swresample.h"
+
+    // libswscale - video scaling
+    header "libswscale/swscale.h"
+
+    // Link all FFmpeg libraries
+    link "avformat"
+    link "avcodec"
+    link "avutil"
+    link "swresample"
+    link "swscale"
+    link "avfilter"
+    link "avdevice"
+
+    export *
+}

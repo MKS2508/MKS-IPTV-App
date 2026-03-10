@@ -1,0 +1,90 @@
+---
+import Hero from './index.astro';
+import type { HeroProps } from './types';
+
+interface Props extends HeroProps {}
+
+const props = Astro.props;
+---
+
+<div class="tablet-viewport-wrapper">
+  <div class="viewport-label">Tablet View (768px)</div>
+  <div class="tablet-container">
+    <Hero {...props} />
+  </div>
+</div>
+
+<style>
+  .tablet-viewport-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: #1a1a1a;
+    border-radius: 12px;
+  }
+  
+  .viewport-label {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: #888;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: monospace;
+    border-radius: 4px;
+    border: 1px solid #333;
+    z-index: 10;
+  }
+  
+  .tablet-container {
+    width: 768px;
+    height: 1024px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 3px solid #333;
+    border-radius: 12px;
+    background: #000;
+    box-shadow: 
+      0 0 0 4px #1a1a1a,
+      0 0 0 7px #444,
+      0 10px 40px rgba(0, 0, 0, 0.5);
+    position: relative;
+  }
+  
+  /* Simular barra superior del iPad */
+  .tablet-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 5;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  /* Ajustar el Hero dentro del contenedor tablet */
+  .tablet-container :global(#hero-section) {
+    min-height: 100vh;
+    width: 768px;
+  }
+  
+  /* Scrollbar estilizado */
+  .tablet-container::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .tablet-container::-webkit-scrollbar-track {
+    background: #1a1a1a;
+  }
+  
+  .tablet-container::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+  }
+</style>

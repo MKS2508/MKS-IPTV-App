@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>mks-multiplatform-iptv.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>1</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>ABAEE1F3176B242E0EB264CED1EBF8E12458ECE9</string>
+				<key>dateExpires</key>
+				<string>1/7/26</string>
+				<key>type</key>
+				<string>Apple Development</string>
+			</dict>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>QL3NVUPD27.dev.mks2508.mks-multiplatform-iptv</string>
+				<key>com.apple.developer.team-identifier</key>
+				<string>QL3NVUPD27</string>
+				<key>com.apple.security.application-groups</key>
+				<array>
+					<string>group.mks</string>
+					<string>group.test.tv</string>
+				</array>
+				<key>get-task-allow</key>
+				<true/>
+			</dict>
+			<key>name</key>
+			<string>mks-multiplatform-iptv.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>2affd09f-d5a3-460c-8768-3794b801e6b5</string>
+				<key>dateExpires</key>
+				<string>8/7/25</string>
+				<key>name</key>
+				<string>iOS Team Provisioning Profile: dev.mks2508.mks-multiplatform-iptv</string>
+			</dict>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>QL3NVUPD27</string>
+				<key>name</key>
+				<string></string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>

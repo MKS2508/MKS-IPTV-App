@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{% if page.excerpt %}{{ page.excerpt | strip_html | strip_newlines | truncate: 160 }}{% else %}{{ site.description }}{% endif %}">
+    <title>{{ page.title }} | {{ site.title }}</title>
+    <link rel="icon" href="{{ '/assets/favicon/favicon.ico' | relative_url }}" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+  </head>
+  <body {% if page.url == '/' %} class="homepage"{% endif %}>
+    
+    <header class="sticky-header enhanced-nav">
+  <div class="container">
+    <div class="nav-brand">
+      <a href="{{ '/' | absolute_url }}" class="site-title">
+        <img src="{{ '/assets/imgs/applogo.webp' | relative_url }}" alt="{{ site.title }} Logo" class="site-logo">
+        <span class="site-title-text">{{ site.title }}</span>
+      </a>
+    </div>
+    
+    <nav class="nav-menu">
+      <a href="{{ '/' | absolute_url }}" class="nav-link{% if page.url == '/' %} active{% endif %}">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-text">Home</span>
+      </a>
+      {% for page_name in site.header_pages %}
+        {% assign page_url = page_name | replace: ".md", ".html" %}
+        <a href="{{ page_url | relative_url }}" class="nav-link{% if page.url contains page_name %} active{% endif %}">
+          <span class="nav-icon">
+            {% if page_name == 'download.md' %}📥
+            {% elsif page_name == 'installation.md' %}🛠️
+            {% elsif page_name == 'screenshots.md' %}📸
+            {% endif %}
+          </span>
+          <span class="nav-text">{{ page_name | replace: ".md", "" | capitalize }}</span>
+        </a>
+      {% endfor %}
+    </nav>
+    
+    <div class="nav-actions">
+      <button class="search-btn" aria-label="Search">
+        <span class="search-icon">🔍</span>
+      </button>
+      <a href="https://github.com/MKS2508/MKS-IPTV-App" class="github-btn" aria-label="GitHub Repository">
+        <span class="github-icon">⭐</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle navigation">
+        <span class="hamburger"></span>
+      </button>
+    </div>
+  </div>
+</header>
+    <main class="page-transition">
+      <div class="container">
+        {{ content }}
+      </div>
+    </main>
+    
+    <!-- Professional Footer -->
+    <footer class="site-footer">
+      <div class="footer-content">
+        <div class="container">
+          <div class="footer-grid">
+            <!-- Brand Section -->
+            <div class="footer-brand">
+              <div class="footer-logo">
+                <img src="{{ '/assets/imgs/applogo.webp' | relative_url }}" alt="{{ site.title }} Logo" class="footer-logo-img">
+                <span class="footer-brand-name">{{ site.title }}</span>
+              </div>
+              <p class="footer-description">The ultimate IPTV experience for Apple devices. Built with Swift 6 and SwiftUI for iOS, macOS, and tvOS.</p>
+              <div class="footer-version">
+                <span class="version-badge">v1.0-beta</span>
+                <span class="build-info">Built with ❤️ for Apple Ecosystem</span>
+              </div>
+            </div>
+            
+            <!-- Quick Links -->
+            <div class="footer-section">
+              <h4>Quick Links</h4>
+              <ul class="footer-links">
+                <li><a href="{{ '/' | relative_url }}">🏠 Home</a></li>
+                <li><a href="{{ '/download.html' | relative_url }}">📥 Downloads</a></li>
+                <li><a href="{{ '/installation.html' | relative_url }}">🛠️ Installation</a></li>
+                <li><a href="{{ '/screenshots.html' | relative_url }}">📸 Screenshots</a></li>
+              </ul>
+            </div>
+            
+            <!-- Resources -->
+            <div class="footer-section">
+              <h4>Resources</h4>
+              <ul class="footer-links">
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App" target="_blank">⭐ GitHub Repository</a></li>
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App/issues" target="_blank">🐛 Report Issues</a></li>
+                <li><a href="https://github.com/MKS2508/MKS-IPTV-App/discussions" target="_blank">💡 Discussions</a></li>
+                <li><a href="https://github.com/MKS2508" target="_blank">👨‍💻 Developer</a></li>
+              </ul>
+            </div>
+            
+            <!-- Technology Stack -->
+            <div class="footer-section">
+              <h4>Tech Stack</h4>
+              <div class="tech-badges">
+                <span class="tech-badge swift">Swift 6</span>
+                <span class="tech-badge swiftui">SwiftUI</span>
+                <span class="tech-badge avkit">AVKit</span>
+                <span class="tech-badge macos">macOS 26</span>
+                <span class="tech-badge ios">iOS 26</span>
+                <span class="tech-badge tvos">tvOS 26</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Footer Bottom -->
+          <div class="footer-bottom">
+            <div class="footer-bottom-content">
+              <p class="copyright">© 2024 MKS-IPTV-App. Open source project.</p>
+              <div class="footer-credits">
+                <span>🤖 Enhanced with <a href="https://claude.ai/code" target="_blank">Claude Code</a></span>
+                <span>🚀 Powered by <a href="https://pages.github.com/" target="_blank">GitHub Pages</a></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+    
+    <a href="#" class="back-to-top">↑</a>
+
+    <!-- External JavaScript Files -->
+    <script src="{{ '/assets/js/main.js' | relative_url }}" defer></script>
+
+    <!-- Enhanced Lightbox -->
+    <div id="lightbox" class="lightbox">
+      <span class="lightbox-close"></span>
+      <div class="lightbox-content">
+        <img src="" alt="">
+      </div>
+      <button class="lightbox-nav prev" aria-label="Previous image">‹</button>
+      <button class="lightbox-nav next" aria-label="Next image">›</button>
+    </div>
+
+    <script src="{{ '/assets/js/lightbox.js' | relative_url }}" defer></script>
+  </body>
+</html>

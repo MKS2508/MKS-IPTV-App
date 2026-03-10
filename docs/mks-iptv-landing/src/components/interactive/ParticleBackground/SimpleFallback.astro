@@ -1,0 +1,111 @@
+---
+/**
+ * Fallback de partículas simple usando CSS para casos donde tsParticles no funciona
+ */
+
+interface Props {
+  id?: string;
+  className?: string;
+}
+
+const {
+  id = 'particles-fallback',
+  className = ''
+} = Astro.props;
+---
+
+<div 
+  id={id} 
+  class={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${className}`}
+>
+  <!-- Las partículas se generarán via JavaScript -->
+</div>
+
+<script define:vars={{ id }}>
+  // Fallback simple con partículas CSS - INTEGRADO CON HERO VIRTUAL SCROLL
+  const initSimpleParticles = () => {
+    const container = document.getElementById(id);
+    if (!container) return;
+
+    // Limpiar contenedor
+    container.innerHTML = '';
+
+    // Crear partículas
+    const particleCount = window.innerWidth < 768 ? 15 : 30;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElement('div');
+      
+      // Estilos base
+      const size = Math.random() * 4 + 2;
+      const colors = ['#C62790', '#FFD700', '#463564', '#FF4757'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      
+      particle.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        background-color: ${color};
+        border-radius: 50%;
+        opacity: 0.6;
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 100}%;
+        animation: particleFloat ${Math.random() * 20 + 10}s infinite linear;
+        animation-delay: ${Math.random() * 5}s;
+      `;
+      
+      container.appendChild(particle);
+    }
+    
+    console.log(`✨ Hero particles loaded immediately: ${particleCount} particles`);
+  };
+
+  // ACTIVACIÓN INMEDIATA - Las partículas aparecen desde el inicio
+  document.addEventListener('DOMContentLoaded', () => {
+    // Activar partículas inmediatamente cuando el DOM está listo
+    setTimeout(() => {
+      initSimpleParticles();
+    }, 100); // Pequeño delay para asegurar que el container existe
+    
+    console.log('🎭 Hero particles system initialized - ready from start');
+  });
+</script>
+
+<style>
+  @keyframes particleFloat {
+    0% {
+      transform: translate(0, 0) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.6;
+    }
+    90% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translate(100px, -100vh) rotate(360deg);
+      opacity: 0;
+    }
+  }
+  
+  /* Partículas con movimiento suave */
+  #particles-fallback div {
+    will-change: transform, opacity;
+    pointer-events: none;
+  }
+  
+  /* Reducir en móviles */
+  @media (max-width: 767px) {
+    #particles-fallback div {
+      animation-duration: 15s !important;
+    }
+  }
+  
+  /* Respeto por preferencias de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    #particles-fallback {
+      display: none;
+    }
+  }
+</style>

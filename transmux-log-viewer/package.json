@@ -1,0 +1,32 @@
+{
+  "name": "transmux-log-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/backend",
+    "packages/frontend/mks-iptv-client"
+  ],
+  "scripts": {
+    "dev": "./dev.sh",
+    "dev:portless": "./dev.sh --portless",
+    "dev:clean": "./dev.sh --clean",
+    "dev:backend": "bun run --filter @transmux-viewer/backend dev",
+    "dev:frontend": "bun run --filter mks-iptv-client dev",
+    "dev:restart:backend": "./dev.sh restart backend",
+    "dev:restart:frontend": "./dev.sh restart frontend",
+    "dev:restart": "./dev.sh restart all",
+    "dev:stop": "./dev.sh stop",
+    "dev:status": "./dev.sh status",
+    "dev:output": "./dev.sh output",
+    "build": "bun run --filter '*' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "biome check packages/backend/src/ packages/frontend/mks-iptv-client/src/lib/ packages/frontend/mks-iptv-client/src/types/",
+    "format": "biome format --write packages/",
+    "check": "biome check --write packages/",
+    "clean": "rm -rf packages/backend/dist packages/frontend/mks-iptv-client/dist"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.5"
+  }
+}

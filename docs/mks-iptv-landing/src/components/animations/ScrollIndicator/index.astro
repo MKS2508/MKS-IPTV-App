@@ -1,0 +1,184 @@
+---
+/**
+ * ScrollIndicator - Indicador de scroll sutil y elegante
+ * Componente auto-contenido con animaciones GSAP integradas
+ * Diseño mejorado con colores sutiles que se integran mejor con la app
+ * 
+ * @component
+ * @param {string} text - Texto del indicador
+ * @param {boolean} showLine - Mostrar línea animada
+ * @param {boolean} showGlow - Mostrar efecto glow
+ * @param {string} className - Clases CSS adicionales
+ * @param {string} id - ID único
+ */
+
+import type { ScrollIndicatorProps } from './types';
+import { scrollIndicatorStyles } from './styles';
+import { strings } from '../../../i18n/strings/es-es';
+
+const {
+  text = strings.hero.scrollDown,
+  showLine = true,
+  showGlow = true,
+  className = '',
+  id = 'scroll-indicator'
+}: ScrollIndicatorProps = Astro.props;
+
+const containerClasses = [scrollIndicatorStyles.container, className].filter(Boolean).join(' ');
+---
+
+<div 
+  id={id} 
+  class={containerClasses}
+>
+  <!-- Icono con mejor integración visual -->
+  <div class={scrollIndicatorStyles.iconWrapper}>
+    {showGlow && (
+      <div class={`scroll-glow ${scrollIndicatorStyles.glow.base} ${scrollIndicatorStyles.glow.colors}`}></div>
+    )}
+    <div class={`scroll-border ${scrollIndicatorStyles.border.base} ${scrollIndicatorStyles.border.background} ${scrollIndicatorStyles.border.border} ${scrollIndicatorStyles.border.shadow}`}>
+      <svg 
+        class={`scroll-arrow ${scrollIndicatorStyles.arrow.base} ${scrollIndicatorStyles.arrow.color}`} 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24" 
+        stroke-width="2"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+      </svg>
+    </div>
+  </div>
+  
+  <!-- Texto sutil y bien integrado -->
+  <span class={`scroll-text ${scrollIndicatorStyles.text.base} ${scrollIndicatorStyles.text.color}`}>
+    {text}
+  </span>
+  
+  <!-- Línea animada opcional -->
+  {showLine && (
+    <div class={`scroll-line ${scrollIndicatorStyles.line.base} ${scrollIndicatorStyles.line.gradient}`}></div>
+  )}
+</div>
+
+<script>
+  import { gsap } from 'gsap';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const initScrollIndicator = () => {
+      const indicator = document.querySelector('#scroll-indicator');
+      if (!indicator) return;
+
+      console.log('🎯 Initializing subtle ScrollIndicator');
+
+      // Elementos para animación
+      const glow = indicator.querySelector('.scroll-glow');
+      const border = indicator.querySelector('.scroll-border');
+      const arrow = indicator.querySelector('.scroll-arrow');
+      const text = indicator.querySelector('.scroll-text');
+      const line = indicator.querySelector('.scroll-line');
+
+      // Animaciones sutiles y elegantes
+      if (glow) {
+        gsap.to(glow, {
+          opacity: 0.3,
+          scale: 1.1,
+          duration: 3,
+          repeat: -1,
+          yoyo: true,
+          ease: 'power2.inOut'
+        });
+      }
+
+      if (border) {
+        gsap.to(border, {
+          rotation: 360,
+          duration: 30,
+          repeat: -1,
+          ease: 'none'
+        });
+      }
+
+      if (arrow) {
+        gsap.to(arrow, {
+          y: 3,
+          duration: 2,
+          repeat: -1,
+          yoyo: true,
+          ease: 'power2.inOut'
+        });
+      }
+
+      if (text) {
+        gsap.to(text, {
+          opacity: 0.4,
+          duration: 4,
+          repeat: -1,
+          yoyo: true,
+          ease: 'power2.inOut'
+        });
+      }
+
+      if (line) {
+        gsap.to(line, {
+          opacity: 0.6,
+          scaleY: 1,
+          duration: 1.5,
+          ease: 'power3.out',
+          delay: 0.5
+        });
+      }
+
+      // Exponer función para ocultar (integración con Hero)
+      (window as any).hideSubtleScrollIndicator = (reason = 'interaction') => {
+        console.log(`🎯 Hiding subtle scroll indicator: ${reason}`);
+        gsap.to(indicator, {
+          opacity: 0,
+          y: 15,
+          duration: 0.6,
+          ease: 'power2.in'
+        });
+      };
+
+      // Auto-hide después de 12 segundos
+      setTimeout(() => {
+        if ((indicator as HTMLElement).style.opacity !== '0') {
+          (window as any).hideSubtleScrollIndicator('timeout');
+        }
+      }, 12000);
+    };
+
+    initScrollIndicator();
+  });
+</script>
+
+<style>
+  /* Estilos adicionales para mejor integración */
+  #scroll-indicator {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+  }
+  
+  .scroll-border {
+    backdrop-filter: blur(4px);
+  }
+  
+  .scroll-glow {
+    will-change: transform, opacity;
+  }
+  
+  .scroll-line {
+    transform-origin: top;
+    will-change: transform, opacity;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    #scroll-indicator * {
+      animation: none !important;
+      transition: none !important;
+    }
+    
+    #scroll-indicator {
+      opacity: 0.6;
+    }
+  }
+</style>

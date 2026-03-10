@@ -1,0 +1,222 @@
+---
+/**
+ * @file Indicador de configuración para ButtonShowcase
+ * @description Muestra la configuración de animación aplicada a un botón
+ * @author MKS
+ */
+
+import type { SerializableMotionConfig, AnimationEngine } from './types';
+
+export interface Props {
+  /** Configuración de motion aplicada */
+  motionConfig?: SerializableMotionConfig;
+  /** Contexto de animación si aplica */
+  animationContext?: 'button' | 'cta' | 'form' | 'hero';
+  /** Mostrar configuración expandida */
+  expanded?: boolean;
+  /** Modo compacto */
+  compact?: boolean;
+}
+
+const { 
+  motionConfig, 
+  animationContext,
+  expanded = false,
+  compact = false 
+} = Astro.props;
+
+// Determinar motor de animación
+const getEngine = (): AnimationEngine => {
+  if (motionConfig?.engine) return motionConfig.engine;
+  if (motionConfig?.gsap) return 'gsap';
+  if (motionConfig?.framer) return 'framer';
+  if (animationContext) {
+    // Auto-detect basado en contexto
+    const contextEngines = {
+      hero: 'gsap',
+      cta: 'gsap', 
+      form: 'css',
+      button: 'framer'
+    };
+    return contextEngines[animationContext] as AnimationEngine;
+  }
+  return 'css';
+};
+
+const engine = getEngine();
+
+// Obtener valores específicos
+const getValues = () => {
+  const preset = motionConfig?.preset;
+  
+  if (engine === 'framer') {
+    if (motionConfig?.framer) {
+      return {
+        hover: motionConfig.framer.whileHover,
+        tap: motionConfig.framer.whileTap,
+        layout: motionConfig.framer.layout
+      };
+    }
+    
+    // Presets de Framer Motion
+    const presets = {
+      gentle: { hover: 'scale(1.02), y(-1)', tap: 'scale(0.98)' },
+      bounce: { hover: 'scale(1.05), y(-2)', tap: 'scale(0.95)' },
+      scale: { hover: 'scale(1.03)', tap: 'scale(0.97)' },
+      rotate: { hover: 'scale(1.02), rotate(2deg)', tap: 'scale(0.98), rotate(-1deg)' },
+      none: { hover: 'none', tap: 'none' }
+    };
+    
+    return presets[preset as keyof typeof presets] || presets.gentle;
+  }
+  
+  if (engine === 'gsap') {
+    if (motionConfig?.gsap) {
+      const hover = motionConfig.gsap.hover;
+      const tap = motionConfig.gsap.tap;
+      return {
+        hover: hover ? `scale(${hover.scale || 1}), rotate(${hover.rotation || 0}deg)` : 'none',
+        tap: tap ? `scale(${tap.scale || 1})` : 'none',
+        duration: hover?.duration || 0.3,
+        ease: hover?.ease || 'power2.out'
+      };
+    }
+    
+    // Presets de GSAP
+    const presets = {
+      gentle: { hover: 'scale(1.02), y(-1px)', tap: 'scale(0.98)', duration: '0.3s' },
+      bounce: { hover: 'scale(1.05), y(-2px)', tap: 'scale(0.95)', duration: '0.4s', ease: 'back.out(1.7)' },
+      elastic: { hover: 'scale(1.03), rotate(2deg)', tap: 'scale(0.97)', duration: '0.5s', ease: 'elastic.out' },
+      scale: { hover: 'scale(1.03)', tap: 'scale(0.97)', duration: '0.25s' },
+      rotate: { hover: 'scale(1.02), rotate(5deg)', tap: 'scale(0.98)', duration: '0.3s' },
+      none: { hover: 'none', tap: 'none' }
+    };
+    
+    return presets[preset as keyof typeof presets] || presets.gentle;
+  }
+  
+  // CSS
+  return {
+    hover: 'CSS transitions',
+    tap: 'CSS active state',
+    duration: '200ms'
+  };
+};
+
+const values = getValues();
+
+// Estilos para badges
+const engineStyles = {
+  framer: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  gsap: 'bg-green-500/10 text-green-400 border-green-500/30',
+  css: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+  auto: 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+};
+
+const engineLabels = {
+  framer: 'Framer Motion',
+  gsap: 'GSAP',
+  css: 'CSS Transitions',
+  auto: 'Auto-detect'
+};
+---
+
+<div class:list={[
+  'config-indicator mt-3 p-3 rounded-lg border border-app-border/50 bg-app-surface/30',
+  compact && 'p-2 text-xs',
+  expanded && 'space-y-3'
+]}>
+  <!-- Header con motor y preset -->
+  <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      <!-- Engine Badge -->
+      <span class:list={[
+        'px-2 py-1 rounded text-xs font-medium border',
+        engineStyles[engine],
+        compact && 'px-1.5 py-0.5 text-[10px]'
+      ]}>
+        {engineLabels[engine]}
+      </span>
+      
+      <!-- Preset Badge -->
+      {(motionConfig?.preset || animationContext) && (
+        <span class:list={[
+          'px-2 py-1 rounded text-xs bg-app-highlight/10 text-app-highlight border border-app-highlight/30',
+          compact && 'px-1.5 py-0.5 text-[10px]'
+        ]}>
+          {motionConfig?.preset || `${animationContext}-optimized`}
+        </span>
+      )}
+    </div>
+    
+    <!-- Reduced Motion Indicator -->
+    {motionConfig?.respectReducedMotion && (
+      <span class="px-1.5 py-0.5 text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/30 rounded">
+        A11Y
+      </span>
+    )}
+  </div>
+  
+  <!-- Valores de animación -->
+  {!compact && (
+    <div class="space-y-1.5 text-xs text-app-text-muted">
+      <div class="flex items-center gap-2">
+        <span class="text-app-text-secondary font-medium min-w-[45px]">Hover:</span>
+        <code class="text-app-accent bg-app-accent/10 px-1.5 py-0.5 rounded text-[11px]">
+          {typeof values.hover === 'string' ? values.hover : JSON.stringify(values.hover)}
+        </code>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <span class="text-app-text-secondary font-medium min-w-[45px]">Tap:</span>
+        <code class="text-app-accent bg-app-accent/10 px-1.5 py-0.5 rounded text-[11px]">
+          {typeof values.tap === 'string' ? values.tap : JSON.stringify(values.tap)}
+        </code>
+      </div>
+      
+      {values.duration && (
+        <div class="flex items-center gap-2">
+          <span class="text-app-text-secondary font-medium min-w-[45px]">Time:</span>
+          <code class="text-app-text-muted text-[11px]">
+            {values.duration}
+          </code>
+        </div>
+      )}
+      
+      {values.ease && (
+        <div class="flex items-center gap-2">
+          <span class="text-app-text-secondary font-medium min-w-[45px]">Ease:</span>
+          <code class="text-app-text-muted text-[11px]">
+            {values.ease}
+          </code>
+        </div>
+      )}
+    </div>
+  )}
+  
+  <!-- Configuración expandida -->
+  {expanded && motionConfig && (
+    <details class="text-xs">
+      <summary class="cursor-pointer text-app-text-secondary hover:text-app-text-primary">
+        Raw Config
+      </summary>
+      <pre class="mt-2 p-2 bg-app-background rounded text-[10px] text-app-text-muted overflow-auto">
+{JSON.stringify(motionConfig, null, 2)}
+      </pre>
+    </details>
+  )}
+</div>
+
+<style>
+  .config-indicator {
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+  }
+  
+  code {
+    font-family: inherit;
+  }
+  
+  details[open] pre {
+    max-height: 120px;
+  }
+</style>

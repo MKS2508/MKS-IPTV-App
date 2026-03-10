@@ -1,0 +1,112 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/layout/Header/index.astro';
+import Footer from '../components/layout/Footer/index.astro';
+import Hero from '../components/sections/Hero/index.astro';
+import { strings } from '../i18n/strings/es-es';
+import { homeContent } from '../data/legacy-content';
+import { getImagePath } from '../utils/image-paths';
+import { banners } from '../data/assets';
+---
+
+<Layout 
+  title={strings.meta.titleHome}
+  description={strings.meta.description}
+>
+  <Header currentPath="/" transparent={true} />
+  
+  <main>
+    <Hero backgroundImage={getImagePath(banners.hero?.src || '/images/hero-bg.jpg')} />
+    
+    <!-- Contenedor para secciones que aparecen después del Hero -->
+    <div id="post-hero-sections" style="opacity: 0; transform: translateY(50vh); transition: all 2s cubic-bezier(0.23, 1, 0.32, 1);">
+      <!-- Features Preview -->
+      <section class="py-20 bg-app-surface/50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-3xl md:text-4xl font-bold text-center text-app-text mb-12">
+          {strings.sections.features}
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {homeContent.features.map((feature) => (
+            <div class="text-center p-6 bg-app-surface/30 rounded-xl hover:bg-app-surface/50 transition-colors duration-200">
+              <div class="text-4xl mb-4">{feature.icon}</div>
+              <h3 class="text-xl font-semibold text-app-text mb-3">{feature.title}</h3>
+              <p class="text-app-text-muted">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+    
+    <!-- Screenshots Carousel -->
+    <section class="py-20 bg-app-primary/10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl md:text-4xl font-bold text-app-text mb-4">
+            {homeContent.carousel.title}
+          </h2>
+          <p class="text-xl text-app-text-muted max-w-2xl mx-auto">
+            {homeContent.carousel.subtitle}
+          </p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {homeContent.carousel.slides.map((slide, _index) => (
+            <div class="bg-app-surface/30 rounded-xl p-6 hover:bg-app-surface/50 transition-colors duration-200">
+              <div class="aspect-video bg-app-primary/20 rounded-lg mb-4 overflow-hidden">
+                <img 
+                  src={getImagePath(`/${slide.image}`)}
+                  alt={slide.title}
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <h3 class="text-xl font-semibold text-app-text mb-2">{slide.title}</h3>
+              <p class="text-app-text-muted">{slide.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+    
+    <!-- Quick Stats -->
+    <section class="py-20 bg-gradient-to-r from-app-surface to-app-primary">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+          <div>
+            <div class="text-4xl font-bold text-app-highlight mb-2">3</div>
+            <div class="text-app-text-muted">{strings.stats.platforms}</div>
+          </div>
+          <div>
+            <div class="text-4xl font-bold text-app-accent mb-2">100%</div>
+            <div class="text-app-text-muted">{strings.stats.native}</div>
+          </div>
+          <div>
+            <div class="text-4xl font-bold text-app-highlight mb-2">GPL-3.0</div>
+            <div class="text-app-text-muted">{strings.stats.opensource}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    </div> <!-- Cierre de post-hero-sections -->
+  </main>
+  
+  <Footer />
+</Layout>
+
+<script>
+  // =============================================================================
+  // SIMPLIFIED HOME PAGE SCRIPT - VIRTUAL SCROLL NOW HANDLED BY HERO COMPONENT
+  // =============================================================================
+  
+  console.log('🏠 Home page script loaded - Hero handles virtual scroll');
+  
+  // No virtual scroll logic needed here anymore!
+  // Hero component is now fully self-contained with its own virtual scroll system
+  
+  // The only remaining responsibility is to wait for the Hero sequence to complete
+  // and then reveal post-hero sections (this will be triggered by Hero component)
+  
+  console.log('✅ Home page initialization complete - All scroll logic in Hero');
+</script>

@@ -11,7 +11,15 @@ struct mks_iptv_downloaderApp: App {
 
     var activeProfile: IPTVProfile? { profilesManager.activeProfile }
 
+    /// True when running inside Xcode Previews / Playgrounds.
+    private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PLAYGROUNDS"] == "1"
+
     init() {
+        // Skip heavy initialization in Xcode Previews — StderrFilter redirects
+        // stderr which breaks preview IPC, and TransmuxCore/FFmpeg init is slow
+        // on external drives.
+        guard !Self.isPreview else { return }
+
         StderrFilter.install()
         TransmuxingService.configure(streamProxy: StreamProxyAdapter())
         Self.configurePlayerEngines()

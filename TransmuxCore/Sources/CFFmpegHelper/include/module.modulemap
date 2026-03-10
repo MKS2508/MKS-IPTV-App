@@ -42,14 +42,10 @@ module CFFmpegHelper {
     // libswscale - video scaling
     header "libswscale/swscale.h"
 
-    // Link all FFmpeg libraries
-    link "avformat"
-    link "avcodec"
-    link "avutil"
-    link "swresample"
-    link "swscale"
-    link "avfilter"
-    link "avdevice"
+    // NOTE: FFmpeg library linking is handled by Package.swift linkerSettings,
+    // NOT by modulemap link directives. Having link directives here causes
+    // Xcode XOJIT preview linker to fail because it tries to resolve FFmpeg
+    // libraries during JIT injection and can't find them via unsafeFlags paths.
 
     export *
 }

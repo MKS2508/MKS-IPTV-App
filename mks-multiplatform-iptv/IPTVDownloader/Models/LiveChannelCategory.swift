@@ -7,7 +7,7 @@ import Foundation
 struct LiveChannelCategory: Identifiable, Codable, Equatable {
     let categoryId: String
     let categoryName: String
-    let parentId: Int
+    @CodableStringInt var parentId: Int
     
     var id: String { categoryId }
     

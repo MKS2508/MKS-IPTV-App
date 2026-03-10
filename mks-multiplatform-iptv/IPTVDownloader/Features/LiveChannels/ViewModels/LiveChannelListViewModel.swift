@@ -262,49 +262,99 @@ class LiveChannelListViewModel: ObservableObject {
     private func fetchAllData() async {
         loadingState = .loading
 
-        do {
-            // Fetch channels and categories in parallel
-            async let channelsTask = liveChannelService.fetchLiveChannels()
-            async let categoriesTask = liveChannelService.fetchLiveChannelsCategories()
+        // Fetch channels (required) and categories (best-effort) independently
+        // so a category API failure doesn't block channel loading.
+        async let channelsResult: Result<[LiveChannel], Error> = {
+            do { return .success(try await liveChannelService.fetchLiveChannels()) }
+            catch { return .failure(error) }
+        }()
 
-            let (fetchedChannels, fetchedCategories) = try await (channelsTask, categoriesTask)
+        async let categoriesResult: Result<[LiveChannelCategory], Error> = {
+            do { return .success(try await liveChannelService.fetchLiveChannelsCategories()) }
+            catch { return .failure(error) }
+        }()
 
-            self.logger.info("Fetched \(fetchedChannels.count) channels and \(fetchedCategories.count) categories")
+        let (chResult, catResult) = await (channelsResult, categoriesResult)
 
-            // Apply data
+        // Handle channels (critical path)
+        switch chResult {
+        case .success(let fetchedChannels):
             liveChannels = sortOption.sort(fetchedChannels)
-            categories = fetchedCategories.sorted {
-                $0.categoryName.localizedCaseInsensitiveCompare($1.categoryName) == .orderedAscending
-            }
-
-            // Build category lookup for O(1) access
-            categoryLookup = Dictionary(uniqueKeysWithValues: categories.map { ($0.categoryId, $0) })
-
-            // Cache for SWR
             cacheManager.cacheLiveChannels(fetchedChannels)
-
             didLoadChannels = true
             loadingState = .loaded(channelCount: fetchedChannels.count)
+            self.logger.info("Fetched \(fetchedChannels.count) channels")
 
-        } catch {
-            self.logger.error("Failed to load data: \(error.localizedDescription)")
+        case .failure(let error):
+            self.logger.error("Failed to load channels: \(error.localizedDescription)")
             loadingState = .failed(.unknown(error.localizedDescription))
+            return
+        }
+
+        // Handle categories (best-effort)
+        switch catResult {
+        case .success(let fetchedCategories):
+            applyCategories(fetchedCategories)
+            cacheManager.cacheLiveChannelCategories(fetchedCategories)
+            self.logger.info("Fetched \(fetchedCategories.count) categories")
+
+        case .failure(let error):
+            self.logger.warning("Categories API failed: \(error.localizedDescription)")
+            // Try SWR cache, then derive from channels
+            if let cached = cacheManager.getCachedLiveChannelCategoriesSWR() {
+                applyCategories(cached.value)
+                self.logger.info("Using \(cached.value.count) cached categories as fallback")
+            } else {
+                deriveCategoriresFromChannels()
+            }
         }
     }
 
-    /// Loads only categories from the API.
+    /// Loads categories using SWR cache strategy with fallback derivation from channels.
     private func loadCategories() async {
+        // SWR: try cache first
+        if let cached = cacheManager.getCachedLiveChannelCategoriesSWR() {
+            self.logger.info("Loaded \(cached.value.count) categories from cache (stale: \(cached.isStale))")
+            applyCategories(cached.value)
+
+            // If fresh, skip network fetch
+            if !cached.isStale { return }
+        }
+
+        // Fetch from API
         do {
             let fetchedCategories = try await liveChannelService.fetchLiveChannelsCategories()
-            categories = fetchedCategories.sorted {
-                $0.categoryName.localizedCaseInsensitiveCompare($1.categoryName) == .orderedAscending
-            }
-            categoryLookup = Dictionary(uniqueKeysWithValues: categories.map { ($0.categoryId, $0) })
-            self.logger.debug("Loaded \(self.categories.count) categories")
+            applyCategories(fetchedCategories)
+            cacheManager.cacheLiveChannelCategories(fetchedCategories)
+            self.logger.debug("Fetched and cached \(fetchedCategories.count) categories from API")
         } catch {
-            self.logger.warning("Failed to load categories: \(error.localizedDescription)")
-            // Not critical - continue without categories
+            self.logger.warning("Failed to fetch categories from API: \(error.localizedDescription)")
+
+            // Fallback: derive categories from loaded channels if we still have none
+            if categories.isEmpty {
+                deriveCategoriresFromChannels()
+            }
         }
+    }
+
+    /// Applies a list of categories to the published state and lookup dictionary.
+    private func applyCategories(_ fetchedCategories: [LiveChannelCategory]) {
+        categories = fetchedCategories.sorted {
+            $0.categoryName.localizedCaseInsensitiveCompare($1.categoryName) == .orderedAscending
+        }
+        categoryLookup = Dictionary(uniqueKeysWithValues: categories.map { ($0.categoryId, $0) })
+    }
+
+    /// Derives placeholder categories from the loaded channels when the API is unavailable.
+    private func deriveCategoriresFromChannels() {
+        let uniqueIds = Set(liveChannels.compactMap { $0.categoryId })
+        guard !uniqueIds.isEmpty else { return }
+
+        let derived = uniqueIds.map { id in
+            LiveChannelCategory(categoryId: id, categoryName: "Category \(id)", parentId: 0)
+        }
+        applyCategories(derived)
+        self.logger.info("Derived \(derived.count) placeholder categories from channel data")
     }
 
     private func refreshChannelsInBackground() async {

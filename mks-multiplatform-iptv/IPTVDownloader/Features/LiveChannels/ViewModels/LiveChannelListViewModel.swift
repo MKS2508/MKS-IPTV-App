@@ -116,7 +116,8 @@ enum ChannelSortOption: String, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Live Channel List View Model
 
-/// Manages live channel data with EPG integration, favorites support, and provides display models for UI rendering.
+/// Manages live channel data with EPG integration, favorites support, football events,
+/// and provides display models for UI rendering.
 /// Loads categories dynamically from the IPTV provider API.
 @MainActor
 class LiveChannelListViewModel: ObservableObject {
@@ -129,6 +130,11 @@ class LiveChannelListViewModel: ObservableObject {
     private let favoritesManager = LiveChannelFavoritesManager.shared
     private let epgService = LiveChannelEPGService()
     private let logger = Logger(subsystem: "LiveChannelListViewModel", category: "LiveTV")
+
+    // MARK: - Football Service
+
+    /// Football data service for matching fixtures to channels
+    private let footballService: FootballService
 
     // MARK: - Published State
 
@@ -161,17 +167,27 @@ class LiveChannelListViewModel: ObservableObject {
     @Published private(set) var isEPGAvailable = false
     @Published private(set) var epgError: ChannelError?
 
+    /// Football state
+    @Published private(set) var isFootballLoading = false
+    @Published private(set) var isFootballAvailable = false
+    @Published private(set) var footballError: ChannelError?
+
     // MARK: - Private State
 
     private var didLoadChannels = false
     private var didLoadEPG = false
+    private var didLoadFootball = false
     private var epgPreloadTask: Task<Void, Never>?
+
+    /// Cache of football events matched to channel stream IDs
+    private var footballEventsCache: [Int: FootballMatchedChannel] = [:]
 
     // MARK: - Initialization
 
-    init(profile: IPTVProfile, liveChannelService: MovieService? = nil) {
+    init(profile: IPTVProfile, liveChannelService: MovieService? = nil, footballService: FootballService? = nil) {
         self.profile = profile
         self.liveChannelService = liveChannelService ?? MovieService(profile: profile)
+        self.footballService = footballService ?? FootballService()
         self.logger.info("LiveChannelListViewModel initialized with profile: \(profile.name)")
     }
 
@@ -216,6 +232,38 @@ class LiveChannelListViewModel: ObservableObject {
     func categoryName(for categoryId: String?) -> String {
         guard let id = categoryId else { return "Sin categoría" }
         return categoryLookup[id]?.categoryName ?? "Categoría \(id)"
+    }
+
+    // MARK: - Computed Properties - Football
+
+    /// Channels that have live football matches
+    var liveFootballChannels: [LiveChannelDisplayModel] {
+        filteredDisplayModels.filter { $0.hasLiveFootball }
+    }
+
+    /// Channels that have upcoming football matches (not live yet)
+    var upcomingFootballChannels: [LiveChannelDisplayModel] {
+        filteredDisplayModels.filter { $0.hasFootballEvent && !$0.hasLiveFootball }
+    }
+
+    /// All channels with football events (live + upcoming)
+    var allFootballChannels: [LiveChannelDisplayModel] {
+        filteredDisplayModels.filter { $0.hasFootballEvent }
+    }
+
+    /// Number of live football matches
+    var liveFootballCount: Int {
+        liveFootballChannels.count
+    }
+
+    /// Whether there are any football events available
+    var hasFootballEvents: Bool {
+        !footballEventsCache.isEmpty
+    }
+
+    /// Gets football event for a specific channel
+    func footballEvent(for streamId: Int) -> FootballMatchedChannel? {
+        footballEventsCache[streamId]
     }
 
     // MARK: - Data Loading
@@ -427,12 +475,103 @@ class LiveChannelListViewModel: ObservableObject {
         }
     }
 
-    private func buildDisplayModels() async {
-        let favoriteIds = favoritesManager.favoriteIds
-        let modelsDict = await epgService.buildDisplayModels(for: liveChannels, favoriteIds: favoriteIds)
+    // MARK: - Football Integration
 
-        displayModels = Array(modelsDict.values)
-            .sorted { $0.channel.name.localizedCaseInsensitiveCompare($1.channel.name) == .orderedAscending }
+    /// Loads football fixtures and matches them to channels.
+    /// Should be called after channels are loaded.
+    func loadFootballFixtures() async {
+        guard !didLoadFootball else {
+            self.logger.debug("Football fixtures already loaded, skipping")
+            return
+        }
+
+        guard !self.liveChannels.isEmpty else {
+            self.logger.warning("No channels loaded, cannot match football fixtures")
+            return
+        }
+
+        self.logger.info("Loading football fixtures for \(self.liveChannels.count) channels")
+        self.isFootballLoading = true
+        self.footballError = nil
+
+        do {
+            // Fetch fixtures and match to channels
+            let matchedEvents = try await self.footballService.loadAndMatchFixtures(liveChannels: self.liveChannels)
+
+            // Store in cache
+            self.footballEventsCache = matchedEvents
+            self.didLoadFootball = true
+            self.isFootballAvailable = !matchedEvents.isEmpty
+
+            self.logger.info("Football fixtures loaded: \(matchedEvents.count) channels matched")
+
+            // Rebuild display models with football data
+            await self.buildDisplayModels()
+
+        } catch {
+            self.logger.error("Failed to load football fixtures: \(error.localizedDescription)")
+            self.footballError = .unknown(error.localizedDescription)
+        }
+
+        self.isFootballLoading = false
+    }
+
+    /// Forces a refresh of football fixtures.
+    func refreshFootballFixtures() async {
+        self.logger.info("Refreshing football fixtures")
+        self.didLoadFootball = false
+        await self.footballService.clearCache()
+        await self.loadFootballFixtures()
+    }
+
+    /// Gets all channels that have live football matches.
+    func channelsWithLiveFootball() -> [LiveChannelDisplayModel] {
+        self.displayModels.filter { $0.hasLiveFootball }
+    }
+
+    /// Gets all channels that have football events (live or upcoming).
+    func channelsWithFootballEvents() -> [LiveChannelDisplayModel] {
+        self.displayModels.filter { $0.hasFootballEvent }
+    }
+
+    /// Gets channels with football events for a specific competition.
+    func channelsWithFootball(competition: String) -> [LiveChannelDisplayModel] {
+        self.displayModels.filter { model in
+            guard let event = model.footballEvent else { return false }
+            return event.fixture.league.name.lowercased().contains(competition.lowercased())
+        }
+    }
+
+    /// Gets unique competitions from loaded football fixtures.
+    var availableCompetitions: [String] {
+        let competitions = Set(self.footballEventsCache.values.compactMap { $0.fixture.league.name })
+        return Array(competitions).sorted()
+    }
+
+    /// Gets the best channel for a football fixture.
+    func bestChannelForFixture(_ fixtureId: Int) -> LiveChannel? {
+        guard let event = self.footballEventsCache.values.first(where: { $0.fixture.id == fixtureId }),
+              let bestChannel = event.bestChannel else { return nil }
+        return bestChannel.channel
+    }
+
+    /// Gets all mirror channels for a football fixture.
+    func mirrorChannelsForFixture(_ fixtureId: Int) -> [LiveChannel] {
+        guard let event = self.footballEventsCache.values.first(where: { $0.fixture.id == fixtureId }) else {
+            return []
+        }
+        return event.channels.map { $0.channel }
+    }
+
+    private func buildDisplayModels() async {
+        let favoriteIds = self.favoritesManager.favoriteIds
+        let modelsDict = await self.epgService.buildDisplayModels(for: self.liveChannels, favoriteIds: favoriteIds)
+
+        // Enrich with football events
+        self.displayModels = modelsDict.values.map { model in
+            let footballEvent = self.footballEventsCache[model.id]
+            return model.withFootballEvent(footballEvent)
+        }.sorted { $0.channel.name.localizedCaseInsensitiveCompare($1.channel.name) == .orderedAscending }
     }
 
     // MARK: - Favorites

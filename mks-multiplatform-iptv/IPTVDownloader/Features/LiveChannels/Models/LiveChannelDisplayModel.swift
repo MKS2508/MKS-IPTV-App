@@ -2,16 +2,16 @@
 //  LiveChannelDisplayModel.swift
 //  mks-multiplatform-iptv
 //
-//  Display model combining LiveChannel with EPG data and favorites status.
-//  Used for rendering channel cards with program information.
+//  Display model combining LiveChannel with EPG data, favorites status,
+//  and football event matching. Used for rendering channel cards.
 //
 
 import Foundation
 
 // MARK: - Live Channel Display Model
 
-/// Combines LiveChannel data with EPG information and favorites status for UI display.
-/// Provides computed properties for progress tracking and EPG availability.
+/// Combines LiveChannel data with EPG information, favorites status, and football events for UI display.
+/// Provides computed properties for progress tracking, EPG availability, and live sports data.
 struct LiveChannelDisplayModel: Identifiable {
     // MARK: - Properties
 
@@ -30,7 +30,10 @@ struct LiveChannelDisplayModel: Identifiable {
     /// Whether this channel is marked as favorite
     var isFavorite: Bool
 
-    // MARK: - Computed Properties
+    /// Football event matched to this channel (if any)
+    let footballEvent: FootballMatchedChannel?
+
+    // MARK: - Computed Properties - EPG
 
     /// Whether EPG data is available for this channel
     var hasEPG: Bool {
@@ -66,39 +69,118 @@ struct LiveChannelDisplayModel: Identifiable {
         currentProgramme?.isNow ?? false
     }
 
+    // MARK: - Computed Properties - Football
+
+    /// Whether this channel has a matched football event
+    var hasFootballEvent: Bool {
+        footballEvent != nil
+    }
+
+    /// Whether the football match is currently live
+    var hasLiveFootball: Bool {
+        footballEvent?.isLive == true
+    }
+
+    /// Football match status display (e.g., "65'", "HT", "FT")
+    var footballStatusDisplay: String? {
+        footballEvent?.fixture.statusDisplay
+    }
+
+    /// Football score display (e.g., "2 - 1") or nil if not started
+    var footballScoreDisplay: String? {
+        footballEvent?.fixture.scoreDisplay
+    }
+
+    /// Compact badge for channel cards (e.g., "RMA 2 - 1 BAR")
+    var footballBadgeDisplay: String? {
+        footballEvent?.badgeDisplay
+    }
+
+    /// Full match display (e.g., "Real Madrid vs Barcelona")
+    var footballMatchDisplay: String? {
+        footballEvent?.fixture.matchDisplay
+    }
+
+    /// Short match display (e.g., "RMA vs BAR")
+    var footballShortDisplay: String? {
+        footballEvent?.fixture.shortDisplay
+    }
+
+    /// Match time display (e.g., "21:00")
+    var footballTimeDisplay: String? {
+        footballEvent?.fixture.formattedTime
+    }
+
+    /// Competition name (e.g., "Champions League")
+    var footballCompetition: String? {
+        footballEvent?.fixture.league.name
+    }
+
+    /// Best quality channel for this match
+    var bestFootballChannel: LiveChannel? {
+        footballEvent?.bestChannel?.channel
+    }
+
+    /// All mirror channels for this match
+    var footballMirrorChannels: [LiveChannel] {
+        footballEvent?.channels.map { $0.channel } ?? []
+    }
+
+    /// Match confidence level
+    var footballMatchConfidence: MatchConfidence? {
+        footballEvent?.matchConfidence
+    }
+
+    /// Whether this is the best channel for the match (highest quality)
+    var isBestFootballChannel: Bool {
+        guard let event = footballEvent,
+              let best = event.bestChannel else { return false }
+        return best.channel.streamId == channel.streamId
+    }
+
     // MARK: - Initialization
 
-    /// Creates a display model from a LiveChannel with optional EPG data
+    /// Creates a display model from a LiveChannel with optional EPG and football data
     /// - Parameters:
     ///   - channel: The live channel data
     ///   - currentProgramme: Currently airing programme (optional)
     ///   - upcomingProgrammes: List of upcoming programmes (optional)
     ///   - isFavorite: Whether marked as favorite
+    ///   - footballEvent: Matched football event (optional)
     init(
         channel: LiveChannel,
         currentProgramme: EPGProgramme? = nil,
         upcomingProgrammes: [EPGProgramme] = [],
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        footballEvent: FootballMatchedChannel? = nil
     ) {
         self.id = channel.streamId
         self.channel = channel
         self.currentProgramme = currentProgramme
         self.upcomingProgrammes = upcomingProgrammes
         self.isFavorite = isFavorite
+        self.footballEvent = footballEvent
     }
 
     // MARK: - Factory Methods
 
     /// Creates a display model without EPG data (EPG unavailable)
-    /// - Parameter channel: The live channel data
-    /// - Parameter isFavorite: Whether marked as favorite
+    /// - Parameters:
+    ///   - channel: The live channel data
+    ///   - isFavorite: Whether marked as favorite
+    ///   - footballEvent: Matched football event (optional)
     /// - Returns: A display model with no EPG information
-    static func withoutEPG(channel: LiveChannel, isFavorite: Bool = false) -> LiveChannelDisplayModel {
+    static func withoutEPG(
+        channel: LiveChannel,
+        isFavorite: Bool = false,
+        footballEvent: FootballMatchedChannel? = nil
+    ) -> LiveChannelDisplayModel {
         LiveChannelDisplayModel(
             channel: channel,
             currentProgramme: nil,
             upcomingProgrammes: [],
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            footballEvent: footballEvent
         )
     }
 
@@ -108,18 +190,45 @@ struct LiveChannelDisplayModel: Identifiable {
     ///   - currentProgramme: Currently airing programme
     ///   - upcomingProgrammes: List of upcoming programmes
     ///   - isFavorite: Whether marked as favorite
+    ///   - footballEvent: Matched football event (optional)
     /// - Returns: A display model with complete EPG information
     static func withEPG(
         channel: LiveChannel,
         currentProgramme: EPGProgramme,
         upcomingProgrammes: [EPGProgramme] = [],
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        footballEvent: FootballMatchedChannel? = nil
     ) -> LiveChannelDisplayModel {
         LiveChannelDisplayModel(
             channel: channel,
             currentProgramme: currentProgramme,
             upcomingProgrammes: upcomingProgrammes,
-            isFavorite: isFavorite
+            isFavorite: isFavorite,
+            footballEvent: footballEvent
+        )
+    }
+
+    // MARK: - Mutation Methods
+
+    /// Returns a copy of this model with updated favorite status
+    func withFavoriteStatus(_ isFavorite: Bool) -> LiveChannelDisplayModel {
+        LiveChannelDisplayModel(
+            channel: channel,
+            currentProgramme: currentProgramme,
+            upcomingProgrammes: upcomingProgrammes,
+            isFavorite: isFavorite,
+            footballEvent: footballEvent
+        )
+    }
+
+    /// Returns a copy of this model with updated football event
+    func withFootballEvent(_ footballEvent: FootballMatchedChannel?) -> LiveChannelDisplayModel {
+        LiveChannelDisplayModel(
+            channel: channel,
+            currentProgramme: currentProgramme,
+            upcomingProgrammes: upcomingProgrammes,
+            isFavorite: isFavorite,
+            footballEvent: footballEvent
         )
     }
 }

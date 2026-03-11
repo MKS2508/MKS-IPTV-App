@@ -83,6 +83,9 @@ public actor TransmuxServer {
     /// DLNA direct file serving: path to the original file (not transmuxed).
     /// DLNA TVs need standard MP4/MKV with full moov — not fMP4 fragments.
     private var dlnaFilePath: String?
+    /// Live HLS proxy: when set, serves rewritten m3u8 and cached .ts segments
+    /// from a single upstream connection. Enables AirPlay/Cast without duplicate connections.
+    private var liveProxy: LiveHLSProxy?
 
     private let networkQueue = DispatchQueue(label: "TransmuxServer.network", qos: .userInitiated)
     private let portRange: Range<UInt16> = 8100..<8200
@@ -380,6 +383,97 @@ public actor TransmuxServer {
         return Session(localURL: url, port: port)
     }
 
+    /// Start serving a proxied live HLS stream.
+    ///
+    /// The LiveHLSProxy fetches the upstream m3u8 and segments with a single connection,
+    /// rewrites URLs to point to this server, and caches segments in memory.
+    /// Both local AVPlayer and AirPlay/Cast devices consume from this server,
+    /// maintaining a single upstream connection to the IPTV server.
+    ///
+    /// - Parameter upstreamURL: The IPTV server m3u8 URL
+    /// - Returns: Session with the LAN-accessible URL
+    public func startLive(upstreamURL: URL) async throws -> Session {
+        if listener != nil {
+            stop()
+        }
+
+        self.stopped = false
+
+        // Initialize live proxy and fetch initial playlist
+        let proxy = LiveHLSProxy()
+        self.liveProxy = proxy
+        let liveSession = try await proxy.start(url: upstreamURL)
+
+        // Clear VOD/Cast/DLNA state
+        self.filePath = nil
+        self.mediaPlaylistPath = nil
+        self.masterPlaylistPath = nil
+        self.expectedSize = 0
+        self.segmenter = nil
+        self.initSegmentSize = 0
+        self.seekHandle = nil
+        self.isComplete = false
+        self.segmentCache = nil
+        self.castDirectory = nil
+        self.dlnaMode = false
+        self.dlnaFilePath = nil
+
+        let port = try findAvailablePort()
+        self.currentPort = port
+
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+        let nwListener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        self.listener = nwListener
+
+        nwListener.newConnectionHandler = { [weak self] connection in
+            Task { [weak self] in
+                await self?.handleConnection(connection)
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            nwListener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    TransmuxLog.log("LIVE LISTEN :\(port)", tag: "Server")
+                    if !resumed {
+                        resumed = true
+                        continuation.resume()
+                    }
+                case .failed(let error):
+                    TransmuxLog.log("Live listener failed: \(error)", tag: "Server", level: .error)
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: ServerError.portExhausted)
+                    }
+                default:
+                    break
+                }
+            }
+
+            nwListener.start(queue: self.networkQueue)
+        }
+
+        let host = Self.getLANIPAddress() ?? "localhost"
+        if host == "localhost" {
+            TransmuxLog.log("WARNING: Could not determine LAN IP, AirPlay may not work", tag: "Server", level: .warn)
+        }
+
+        guard let url = URL(string: "http://\(host):\(port)/\(liveSession.localPlaylistPath)") else {
+            throw ServerError.invalidFilePath
+        }
+
+        TransmuxLog.log("LIVE SERVING \(url) (upstream: \(upstreamURL.absoluteString))", tag: "Server")
+        return Session(localURL: url, port: port)
+    }
+
     /// Mark the transmux as complete. After this, empty reads mean real EOF.
     public func setComplete() {
         isComplete = true
@@ -396,6 +490,12 @@ public actor TransmuxServer {
     /// Stop serving and clean up all connections.
     public func stop() {
         stopped = true
+
+        // Stop live proxy if active (fire-and-forget since stop() is synchronous)
+        if let proxy = liveProxy {
+            liveProxy = nil
+            Task { await proxy.stop() }
+        }
 
         for connection in activeConnections {
             connection.cancel()
@@ -471,6 +571,12 @@ public actor TransmuxServer {
     }
 
     private func dispatchRequest(_ request: HTTPRequestParser.Request, connection: NWConnection) {
+        // Live proxy mode: serve from LiveHLSProxy cache
+        if let proxy = self.liveProxy {
+            dispatchLiveRequest(request, connection: connection, proxy: proxy)
+            return
+        }
+
         // Cast mode: serve files directly from the output directory
         if let castDir = self.castDirectory {
             dispatchCastRequest(request, connection: connection, directory: castDir)
@@ -1750,6 +1856,68 @@ public actor TransmuxServer {
         }
 
         return bestIP ?? fallbackIP
+    }
+
+    // MARK: - Live Proxy Mode Handlers
+
+    /// Dispatch requests in Live Proxy mode — serve rewritten m3u8 and cached .ts segments
+    /// from the LiveHLSProxy. Only .m3u8 and .ts files are served.
+    private func dispatchLiveRequest(_ request: HTTPRequestParser.Request, connection: NWConnection, proxy: LiveHLSProxy) {
+        let path = request.path
+
+        Task {
+            if path.hasSuffix(".m3u8") {
+                // Serve the rewritten live playlist
+                if let data = await proxy.getPlaylist() {
+                    var header = "HTTP/1.1 200 OK\r\n"
+                    header += "Content-Type: application/vnd.apple.mpegurl\r\n"
+                    header += "Content-Length: \(data.count)\r\n"
+                    header += "Cache-Control: no-cache, no-store\r\n"
+                    header += "Access-Control-Allow-Origin: *\r\n"
+                    header += "Connection: close\r\n\r\n"
+
+                    var response = Data(header.utf8)
+                    response.append(data)
+                    connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                        connection.cancel()
+                    })
+                } else {
+                    // Playlist not yet available — ask client to retry
+                    let resp = Data("HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nConnection: close\r\n\r\n".utf8)
+                    connection.send(content: resp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                        connection.cancel()
+                    })
+                }
+            } else if path.hasSuffix(".ts") {
+                // Serve a cached .ts segment (or fetch on-demand)
+                let segName = (path as NSString).lastPathComponent
+                if let data = await proxy.getOrFetchSegment(name: segName) {
+                    var header = "HTTP/1.1 200 OK\r\n"
+                    header += "Content-Type: video/mp2t\r\n"
+                    header += "Content-Length: \(data.count)\r\n"
+                    header += "Cache-Control: public, max-age=3600\r\n"
+                    header += "Access-Control-Allow-Origin: *\r\n"
+                    header += "Connection: close\r\n\r\n"
+
+                    var response = Data(header.utf8)
+                    response.append(data)
+                    connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                        connection.cancel()
+                    })
+                } else {
+                    TransmuxLog.log("LIVE 404 \(segName)", tag: "Server", level: .warn)
+                    let resp = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+                    connection.send(content: resp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                        connection.cancel()
+                    })
+                }
+            } else {
+                let resp = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+                connection.send(content: resp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
+        }
     }
 
     // MARK: - Cast Mode Handlers

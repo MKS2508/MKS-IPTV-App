@@ -13,6 +13,7 @@
 import SwiftUI
 import AVKit
 import os
+import TransmuxCore
 
 // MARK: - View Mode
 
@@ -567,17 +568,47 @@ struct LiveChannelsGridView: View {
             return
         }
 
-        let player = PlayerFactory.shared.createPlayer(for: url)
-        player.play()
+        // Route through LiveHLSProxy for single-connection AirPlay/Cast support.
+        // The proxy maintains one upstream connection and serves locally via HLS,
+        // so both local AVPlayer and AirPlay devices consume from the same server.
+        Task {
+            do {
+                let session = try await TransmuxServer.shared.startLive(upstreamURL: url)
+                let proxyURL = session.localURL
+                logger.debug("Live proxy started: \(proxyURL.absoluteString)")
 
-        #if os(macOS)
-        PlayerWindowManager.shared.present(player: player, title: channel.name)
-        openWindow(id: "player")
-        #else
-        activePlayer = player
-        playerTitle = channel.name
-        showFullscreenPlayer = true
-        #endif
+                await MainActor.run {
+                    let player = PlayerFactory.shared.createPlayer(for: proxyURL)
+                    player.play()
+
+                    #if os(macOS)
+                    PlayerWindowManager.shared.present(player: player, title: channel.name)
+                    openWindow(id: "player")
+                    #else
+                    activePlayer = player
+                    playerTitle = channel.name
+                    showFullscreenPlayer = true
+                    #endif
+                }
+            } catch {
+                logger.error("Live proxy failed: \(error.localizedDescription) — falling back to direct play")
+
+                // Fallback: direct play without proxy (may fail on AirPlay but works locally)
+                await MainActor.run {
+                    let player = PlayerFactory.shared.createPlayer(for: url)
+                    player.play()
+
+                    #if os(macOS)
+                    PlayerWindowManager.shared.present(player: player, title: channel.name)
+                    openWindow(id: "player")
+                    #else
+                    activePlayer = player
+                    playerTitle = channel.name
+                    showFullscreenPlayer = true
+                    #endif
+                }
+            }
+        }
     }
 
     private func copyStreamURL(for channel: LiveChannel) {

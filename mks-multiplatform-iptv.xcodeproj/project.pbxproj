@@ -515,6 +515,10 @@
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/macos/arm64",
 				);
+				"LIBRARY_SEARCH_PATHS[sdk=appletvos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/tvos/arm64",
+				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/ios/arm64",
@@ -522,10 +526,6 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/ios/x86_64",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=appletvos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/tvos/arm64",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -586,6 +586,10 @@
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/macos/arm64",
 				);
+				"LIBRARY_SEARCH_PATHS[sdk=appletvos*]" = (
+					"$(inherited)",
+					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/tvos/arm64",
+				);
 				"LIBRARY_SEARCH_PATHS[sdk=iphoneos*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/ios/arm64",
@@ -593,10 +597,6 @@
 				"LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]" = (
 					"$(inherited)",
 					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/ios/x86_64",
-				);
-				"LIBRARY_SEARCH_PATHS[sdk=appletvos*]" = (
-					"$(inherited)",
-					"$(SRCROOT)/TransmuxCore/Frameworks/FFmpeg/tvos/arm64",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;

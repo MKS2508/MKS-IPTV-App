@@ -99,6 +99,18 @@ struct TransmuxCLI {
         let duration = getArgValue(for: "--duration") ?? 10.0
         let verbose = args.contains("--verbose")
         let transcodeAudio = args.contains("--transcode-audio")
+        let benchmark = args.contains("--benchmark")
+        let benchmarkSeek = getArgValue(for: "--benchmark-seek")
+
+        if benchmark {
+            await runBenchmark(
+                inputURL: inputURL,
+                transcodeAudio: transcodeAudio,
+                seekTarget: benchmarkSeek,
+                verbose: verbose
+            )
+            exit(0)
+        }
 
         if verbose {
             print("TransmuxCore CLI v1.5.0")
@@ -1034,6 +1046,9 @@ struct TransmuxCLI {
             --duration SECONDS      Duration to run transmux (default: 10 seconds)
             --transcode-audio       Transcode AC3/EAC3/DTS audio to AAC (192kbps, 48kHz, stereo)
                                     Use with --cast or --dlna for devices that don't support AC3/DTS
+            --benchmark             Run performance benchmark: measures open time, first segment,
+                                    throughput (MB/s), total remux time, peak memory
+            --benchmark-seek TIME   Include seek latency measurement at TIME seconds in benchmark
             --verbose               Enable verbose output
 
         EXAMPLES:
@@ -1057,6 +1072,15 @@ struct TransmuxCLI {
 
             # DLNA with audio transcoding (AC3/DTS → AAC for TV compatibility)
             transmux-cli movie.mkv --dlna 192.168.1.142 --transcode-audio --verbose
+
+            # Benchmark: full file remux performance
+            transmux-cli movie.mkv --benchmark
+
+            # Benchmark with seek latency measurement
+            transmux-cli movie.mkv --benchmark --benchmark-seek 300
+
+            # Benchmark with audio transcoding to measure Tier 1 overhead
+            transmux-cli movie.mkv --benchmark --transcode-audio
 
             # Cast with audio transcoding (AC3/DTS → AAC for Chromecast)
             transmux-cli movie.mkv --cast --transcode-audio --verbose
@@ -1139,6 +1163,236 @@ struct TransmuxCLI {
         // Don't return the next flag as a value
         if val.hasPrefix("--") { return nil }
         return val
+    }
+
+    // MARK: - Benchmark Mode
+
+    /// Runs a comprehensive performance benchmark of the TransmuxCore pipeline.
+    /// Measures: open time, time to first segment, throughput, seek latency, peak memory.
+    /// Outputs structured results for v1 baseline comparison.
+    static func runBenchmark(
+        inputURL: URL,
+        transcodeAudio: Bool,
+        seekTarget: Double?,
+        verbose: Bool
+    ) async {
+        let service = TransmuxingService()
+        let isLocalFile = inputURL.isFileURL
+        var inputFileSize: Int64 = 0
+        if isLocalFile,
+           let attrs = try? FileManager.default.attributesOfItem(atPath: inputURL.path),
+           let size = attrs[.size] as? Int64 {
+            inputFileSize = size
+        }
+
+        print(String(repeating: "=", count: 60))
+        print("TransmuxCore v1 — Performance Benchmark")
+        print(String(repeating: "=", count: 60))
+        print("")
+        print("Input: \(inputURL.lastPathComponent)")
+        if inputFileSize > 0 {
+            print("Input size: \(formatBytes(inputFileSize))")
+        }
+        print("Audio transcode: \(transcodeAudio ? "ON (AC3/EAC3/DTS → AAC)" : "OFF (passthrough)")")
+        if let seek = seekTarget {
+            print("Seek test: \(String(format: "%.1f", seek))s")
+        }
+        print("")
+
+        // --- Phase 1: Open + Stream Analysis ---
+        print("--- Phase 1: Open + Stream Analysis ---")
+        let t0 = CFAbsoluteTimeGetCurrent()
+
+        let session: ProgressiveTransmuxSession
+        do {
+            session = try await service.startTransmux(from: inputURL, transcodeAudio: transcodeAudio)
+        } catch {
+            print("ERROR: Failed to start transmux: \(error.localizedDescription)")
+            return
+        }
+
+        let tStarted = CFAbsoluteTimeGetCurrent()
+        let openTime = tStarted - t0
+
+        print("  Open + start: \(String(format: "%.3f", openTime))s")
+        print("  Duration: \(String(format: "%.1f", session.duration))s")
+        print("  Init segment: \(formatBytes(session.initSegmentSize))")
+        print("  Audio tracks: \(session.audioTracks.count)")
+        for (i, a) in session.audioTracks.enumerated() {
+            print("    [\(i)] \(a.codecName) \(a.channels)ch \(a.sampleRate)Hz lang=\(a.language)")
+        }
+        print("  Subtitle tracks: \(session.subtitleTracks.count)")
+        print("")
+
+        // --- Phase 2: Time to First Segment ---
+        print("--- Phase 2: Time to First Segment ---")
+        let tFirstSegStart = CFAbsoluteTimeGetCurrent()
+        var firstSegTime: Double = 0
+        let firstSegDeadline = Date().addingTimeInterval(30.0)
+        while Date() < firstSegDeadline {
+            let buffered = session.segmenter.latestTransmuxedTime()
+            if buffered > 0 {
+                firstSegTime = CFAbsoluteTimeGetCurrent() - tFirstSegStart
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+        if firstSegTime > 0 {
+            print("  First segment: \(String(format: "%.3f", firstSegTime))s")
+        } else {
+            print("  First segment: TIMEOUT (30s)")
+        }
+        print("")
+
+        // --- Phase 3: Full Remux Throughput ---
+        print("--- Phase 3: Full Remux Throughput ---")
+        print("  Waiting for full remux to complete...")
+
+        // Sample progress every 500ms for throughput curve
+        var progressSamples: [(time: Double, buffered: Double)] = []
+        let tRemuxStart = CFAbsoluteTimeGetCurrent()
+        let remuxDeadline = Date().addingTimeInterval(max(session.duration * 3, 120.0)) // generous timeout
+
+        while Date() < remuxDeadline {
+            if session.seekHandle.isTransmuxComplete {
+                break
+            }
+            let elapsed = CFAbsoluteTimeGetCurrent() - tRemuxStart
+            let buffered = session.segmenter.latestTransmuxedTime()
+            progressSamples.append((time: elapsed, buffered: buffered))
+
+            if verbose && progressSamples.count % 10 == 0 {
+                let ratio = buffered / max(elapsed, 0.001)
+                print("    [\(String(format: "%5.1f", elapsed))s] buffered: \(String(format: "%.1f", buffered))s (\(String(format: "%.1f", ratio))x realtime)")
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+
+        let tRemuxEnd = CFAbsoluteTimeGetCurrent()
+        let totalRemuxTime = tRemuxEnd - tRemuxStart
+        let finalBuffered = session.segmenter.latestTransmuxedTime()
+        let remuxComplete = session.seekHandle.isTransmuxComplete
+
+        // Get output file size
+        var outputFileSize: Int64 = 0
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: session.outputPath),
+           let size = attrs[.size] as? Int64 {
+            outputFileSize = size
+        }
+
+        let realtimeRatio = finalBuffered / max(totalRemuxTime, 0.001)
+        let throughputMBps = Double(outputFileSize) / (1024 * 1024) / max(totalRemuxTime, 0.001)
+
+        print("  Completed: \(remuxComplete ? "YES" : "NO (timeout)")")
+        print("  Total remux time: \(String(format: "%.3f", totalRemuxTime))s")
+        print("  Content duration: \(String(format: "%.1f", finalBuffered))s")
+        print("  Realtime ratio: \(String(format: "%.1f", realtimeRatio))x")
+        print("  Output size: \(formatBytes(outputFileSize))")
+        print("  Throughput: \(String(format: "%.1f", throughputMBps)) MB/s")
+        if inputFileSize > 0 {
+            let ratio = Double(outputFileSize) / Double(inputFileSize) * 100
+            print("  Size ratio: \(String(format: "%.1f", ratio))% of input")
+        }
+        print("")
+
+        // --- Phase 4: Seek Latency (optional) ---
+        var seekLatency: Double? = nil
+        if let seekTo = seekTarget, seekTo < session.duration {
+            print("--- Phase 4: Seek Latency ---")
+            print("  Seeking to \(String(format: "%.1f", seekTo))s...")
+
+            let tSeekStart = CFAbsoluteTimeGetCurrent()
+            session.seekHandle.requestSeek(to: seekTo)
+
+            // Wait for post-seek content to appear
+            let preSeekBuffered = session.segmenter.latestTransmuxedTime()
+            let seekDeadline = Date().addingTimeInterval(15.0)
+            var seekDone = false
+            while Date() < seekDeadline {
+                let current = session.segmenter.latestTransmuxedTime()
+                // Seek is "done" when new content appears near the seek target
+                if current != preSeekBuffered {
+                    seekLatency = CFAbsoluteTimeGetCurrent() - tSeekStart
+                    seekDone = true
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+
+            if seekDone, let lat = seekLatency {
+                print("  Seek latency: \(String(format: "%.3f", lat))s")
+            } else {
+                print("  Seek latency: TIMEOUT (15s)")
+            }
+            print("")
+        }
+
+        // --- Phase 5: Memory ---
+        print("--- Phase 5: Memory Usage ---")
+        let memInfo = getMemoryUsage()
+        print("  Resident memory: \(formatBytes(Int64(memInfo.resident)))")
+        print("  Virtual memory: \(formatBytes(Int64(memInfo.virtual)))")
+        print("")
+
+        // --- Summary (JSON-like for easy parsing) ---
+        print(String(repeating: "=", count: 60))
+        print("BENCHMARK RESULTS (v1)")
+        print(String(repeating: "=", count: 60))
+        print("{")
+        print("  \"version\": \"v1.5.0\",")
+        print("  \"input\": \"\(inputURL.lastPathComponent)\",")
+        print("  \"input_size_bytes\": \(inputFileSize),")
+        print("  \"content_duration_s\": \(String(format: "%.1f", session.duration)),")
+        print("  \"audio_transcode\": \(transcodeAudio),")
+        print("  \"audio_tracks\": \(session.audioTracks.count),")
+        print("  \"subtitle_tracks\": \(session.subtitleTracks.count),")
+        print("  \"open_time_s\": \(String(format: "%.4f", openTime)),")
+        print("  \"first_segment_s\": \(String(format: "%.4f", firstSegTime)),")
+        print("  \"total_remux_time_s\": \(String(format: "%.3f", totalRemuxTime)),")
+        print("  \"remux_complete\": \(remuxComplete),")
+        print("  \"buffered_duration_s\": \(String(format: "%.1f", finalBuffered)),")
+        print("  \"realtime_ratio\": \(String(format: "%.2f", realtimeRatio)),")
+        print("  \"output_size_bytes\": \(outputFileSize),")
+        print("  \"throughput_mbps\": \(String(format: "%.2f", throughputMBps)),")
+        if inputFileSize > 0 {
+            print("  \"size_ratio_pct\": \(String(format: "%.1f", Double(outputFileSize) / Double(inputFileSize) * 100)),")
+        }
+        if let lat = seekLatency {
+            print("  \"seek_target_s\": \(String(format: "%.1f", seekTarget!)),")
+            print("  \"seek_latency_s\": \(String(format: "%.4f", lat)),")
+        }
+        print("  \"memory_resident_bytes\": \(memInfo.resident),")
+        print("  \"memory_virtual_bytes\": \(memInfo.virtual)")
+        print("}")
+        print("")
+
+        await service.cleanup(sessionID: session.sessionID)
+    }
+
+    /// Get current process memory usage via mach task_info
+    static func getMemoryUsage() -> (resident: UInt64, virtual: UInt64) {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        if result == KERN_SUCCESS {
+            return (resident: info.resident_size, virtual: info.virtual_size)
+        }
+        return (resident: 0, virtual: 0)
+    }
+
+    /// Format bytes as human-readable string
+    static func formatBytes(_ bytes: Int64) -> String {
+        if bytes < 1024 { return "\(bytes) B" }
+        let kb = Double(bytes) / 1024
+        if kb < 1024 { return "\(String(format: "%.1f", kb)) KB" }
+        let mb = kb / 1024
+        if mb < 1024 { return "\(String(format: "%.1f", mb)) MB" }
+        let gb = mb / 1024
+        return "\(String(format: "%.2f", gb)) GB"
     }
 
     // MARK: - DLNA Mode

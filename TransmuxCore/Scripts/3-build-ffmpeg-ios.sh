@@ -65,7 +65,7 @@ build_arch() {
     else
         PLATFORM="iPhoneOS"
         SDK="iphoneos"
-        CFLAGS="-arch arm64 -mios-version-min=${IOS_DEPLOYMENT_TARGET} -fembed-bitcode"
+        CFLAGS="-arch arm64 -mios-version-min=${IOS_DEPLOYMENT_TARGET}"
         LDFLAGS="-arch arm64 -mios-version-min=${IOS_DEPLOYMENT_TARGET}"
         OUTPUT_DIR="${BUILD_IOS_ARM64}"
     fi
@@ -94,8 +94,6 @@ build_arch() {
         --as="gas-preprocessor.pl -arch ${ARCH} -- xcrun -sdk ${SDK} clang" \
         --extra-cflags="${CFLAGS}" \
         --extra-ldflags="${LDFLAGS}" \
-        --disable-audiotoolbox \
-        --disable-videotoolbox \
         ${FFMPEG_CONFIGURE_FLAGS}
     
     # Build

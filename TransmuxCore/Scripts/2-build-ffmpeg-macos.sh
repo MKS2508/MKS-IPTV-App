@@ -57,8 +57,8 @@ make clean 2>/dev/null || true
     --target-os=darwin \
     --cc="xcrun -sdk macosx clang" \
     --ar="xcrun -sdk macosx ar" \
-    --extra-cflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET}" \
-    --extra-ldflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET}" \
+    --extra-cflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET} -O3 -flto=thin" \
+    --extra-ldflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET} -flto=thin" \
     ${FFMPEG_CONFIGURE_FLAGS}
 
 log_info "Building FFmpeg for macOS arm64..."

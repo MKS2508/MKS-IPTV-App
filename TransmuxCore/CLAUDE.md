@@ -1,5 +1,21 @@
 # TransmuxCore — CLAUDE.md
 
+## WORKING PHILOSOPHY — MANDATORY FOR ALL SESSIONS
+
+**These principles are non-negotiable and apply to ALL work in TransmuxCore.**
+
+1. **NEVER rush to compile or patch quickly.** Architecture quality is ALWAYS the priority. Take the time to do it right.
+2. **Always compare against reference documents periodically:**
+   - `docs/transmuxcore-phase0/REFERENCE-OVERVIEW.md`
+   - `docs/transmuxcore-phase0/architectural-decisions.md`
+   - The current implementation plan
+   - `docs/transmuxcore-phase0/SUBAGENT-FFMPEG-KSPLAYER_RESULT.MD`
+3. **We must surpass KSPlayer in EVERYTHING:** code quality, FFI support, algorithms. We have the advantage of having done the study, having the functional monolith, source code, analysis, and extensive documentation.
+4. **When fixing issues, fix them from the base with the BEST practices.** Not "at least use X". Cost does not matter — correctness and quality matter.
+5. **Do research before implementing.** Read documentation. Compare patterns. Find the BEST way, not the fastest way.
+
+---
+
 Swift Package que envuelve FFmpeg 8.0.1 (compilado desde source como static libraries) para hacer transmuxing de contenedores (MKV → fMP4/HLS) sin re-encoding. Se integra como dependencia local del proyecto principal MKS-IPTV-App (iOS, macOS, tvOS).
 
 ## Contexto en el proyecto
@@ -138,10 +154,22 @@ Definidos en: `transmux-log-viewer/packages/frontend/mks-iptv-client/src/lib/tes
 - **Métricas de rendimiento**: throughput (MB/s), latencia de seek, tiempo de primer segmento
 - **Integración AVPlayer**: probar en la app Swift real con el TransmuxServer sirviendo localmente
 
+## TransmuxCore Phase 0 Knowledge Base
+
+See `docs/transmuxcore-phase0/REFERENCE-OVERVIEW.md` for comprehensive analysis of:
+- KSPlayer architecture (patterns adopted, weaknesses exploited)
+- FFmpeg 6->8 competitive advantages (61% HEVC NEON speedup, new VT encoder options, zero-copy pipeline)
+- Stremio/IPTV codec distribution and tier coverage analysis (~98%+ with Tier 0-2)
+- Algorithmic improvements (A/V sync thresholds, buffering, decoder fallback from KSPlayer)
+- CTransmuxFFI modular C architecture design (10 modules from 1 monolithic file)
+- Architectural decisions with rationale (see `docs/transmuxcore-phase0/architectural-decisions.md`)
+
+Implementation plan: `/Users/mks/.claude/plans/resilient-sleeping-hummingbird.md`
+
 ## Convenciones
 
 - **No console.log** — este módulo es Swift/C puro, usa `fprintf(stderr, ...)` en C y `TransmuxLog` en Swift
-- **No re-encoding** — TransmuxCore SOLO remuxea, nunca transcodifica
+- **Tier system** — TransmuxCore uses a tier-based approach: Tier 0 (passthrough remux), Tier 1 (audio transcode AC3/EAC3/DTS->AAC), Tier 2 (video transcode VP9/AV1/MPEG-2->H.264/H.265 via VideoToolbox, planned), Tier 3 (full transcode, planned)
 - **Paths relativos en Package.swift** — los `-L` flags apuntan a `Frameworks/FFmpeg/lib/` relativo al package
 - **Module map paths** — relativos a `Sources/CFFmpegHelper/include/` (3 niveles hasta package root: `../../../`)
 - **IPTV servers block multiple concurrent connections** — NEVER open multiple HTTP connections to the same IPTV URL simultaneously. Servers enforce single-connection limits. For operations that need to re-read the file (e.g. subtitle extraction), either: (a) do it in a single pass over the same connection, (b) wait for the previous connection to close first, or (c) extract data during the main read loop. The `mks_subtitle_extract_all_to_vtt` function uses approach (a): one connection, one pass, multiple output files.

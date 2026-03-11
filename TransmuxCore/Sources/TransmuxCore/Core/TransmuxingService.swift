@@ -1,5 +1,5 @@
 import Foundation
-import CFFmpegHelper
+import CTransmuxFFI
 
 // MARK: - Transmux Error
 
@@ -383,8 +383,8 @@ public actor TransmuxingService {
         if bestAudio >= 0 {
             var langBuf = [CChar](repeating: 0, count: 64)
             var titleBuf = [CChar](repeating: 0, count: 256)
-            mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
-            mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
+            _ = mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
+            _ = mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
             let lang = String(cString: langBuf)
             let title = String(cString: titleBuf)
             let codecId = Int32(mks_stream_get_codec_id(inCtx, bestAudio))
@@ -428,6 +428,12 @@ public actor TransmuxingService {
         var streamMapping = [Int](repeating: -1, count: streamCount)
         var outputStreamIndex: Int32 = 0
 
+        // --- Video transcoder (VP9/AV1/MPEG-2 → H.264/H.265 via VideoToolbox) ---
+        var videoTranscoder: OpaquePointer? = nil
+        let videoCodecId = bestVideo >= 0 ? Int32(mks_stream_get_codec_id(inCtx, bestVideo)) : 0
+        // Tier 2 video codecs that need transcoding for AVPlayer compatibility
+        let videoTranscodableCodecs: Set<Int32> = [167, 225, 2, 1, 139, 62, 71, 87, 16, 54, 50, 51, 109]  // VP9, AV1, MPEG2, MPEG1, VP8, Theora, WMV3, VC1, FLV1, H263, H263P, MSMPEG4, RV40
+
         if bestVideo >= 0 {
             streamMapping[Int(bestVideo)] = Int(outputStreamIndex)
             guard let outStream = avformat_new_stream(outCtx, nil) else {
@@ -436,12 +442,64 @@ public actor TransmuxingService {
                 continuation.resume(throwing: TransmuxError.processFailure(status: -1))
                 return
             }
-            ret = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
-            guard ret >= 0 else {
-                avformat_close_input(&inputCtx)
-                avformat_free_context(outCtx)
-                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
-                return
+
+            let videoNeedsTranscode = videoTranscodableCodecs.contains(videoCodecId)
+
+            if videoNeedsTranscode {
+                let srcCodecName = videoCodecId == 167 ? "VP9" : videoCodecId == 225 ? "AV1" : videoCodecId == 2 ? "MPEG2" : "codec:\(videoCodecId)"
+                TransmuxLog.service("Cast: video transcode \(srcCodecName) → H.264/H.265 (VideoToolbox)")
+
+                // Create config (Swift can't use C macros, initialize manually)
+                // Defaults: auto codec/bitrate, power-efficient, spatial AQ, 1 B-frame, realtime mode
+                var config = MKSVideoConfig(
+                    targetCodecId: 0,      // auto: H.264 for <=1080p, H.265 for 4K+
+                    targetBitrate: 0,      // auto: based on resolution
+                    powerEfficient: 1,     // enabled
+                    spatialAQ: 1,          // enabled
+                    maxBFrames: 1,         // low latency for streaming
+                    realtime: 1,           // live mode
+                    profile: 0             // auto
+                )
+
+                if let tc = mks_video_transcoder_create(inCtx, bestVideo, config) {
+                    let setupRet = mks_video_transcoder_setup_output(tc, outStream)
+                    if setupRet == MKS_OK {
+                        videoTranscoder = tc
+                        let outCodecId = mks_video_transcoder_get_output_codec_id(tc)
+                        let outCodecName = outCodecId == 27 ? "H.264" : outCodecId == 173 ? "H.265" : "codec:\(outCodecId)"
+                        TransmuxLog.service("Cast: video transcoder created → \(outCodecName)")
+                    } else {
+                        TransmuxLog.service("Cast: video transcoder setup_output failed (\(setupRet.rawValue)), falling back to remux", level: .warn)
+                        mks_video_transcoder_free(tc)
+                        // Fallback: copy codec parameters
+                        let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                        guard videoCopyRet == MKS_OK else {
+                            avformat_close_input(&inputCtx)
+                            avformat_free_context(outCtx)
+                            continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                            return
+                        }
+                    }
+                } else {
+                    TransmuxLog.service("Cast: failed to create video transcoder, falling back to remux", level: .warn)
+                    // Fallback: copy codec parameters
+                    let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                    guard videoCopyRet == MKS_OK else {
+                        avformat_close_input(&inputCtx)
+                        avformat_free_context(outCtx)
+                        continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                        return
+                    }
+                }
+            } else {
+                // Passthrough: copy codec parameters
+                let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                guard videoCopyRet == MKS_OK else {
+                    avformat_close_input(&inputCtx)
+                    avformat_free_context(outCtx)
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                    return
+                }
             }
             outputStreamIndex += 1
         }
@@ -469,7 +527,7 @@ public actor TransmuxingService {
 
                 if let tc = mks_audio_transcoder_create(inCtx, bestAudio, 192000, 48000, 2) {
                     let setupRet = mks_audio_transcoder_setup_output(tc, outStream)
-                    if setupRet >= 0 {
+                    if setupRet == MKS_OK {
                         audioTranscoder = tc
                         useRemux = false
 
@@ -485,7 +543,7 @@ public actor TransmuxingService {
                             isDefault: true
                         )
                     } else {
-                        TransmuxLog.service("Cast: transcoder setup_output failed (\(setupRet)), falling back to remux", level: .warn)
+                        TransmuxLog.service("Cast: transcoder setup_output failed (\(setupRet.rawValue)), falling back to remux", level: .warn)
                         mks_audio_transcoder_free(tc)
                     }
                 } else {
@@ -494,11 +552,11 @@ public actor TransmuxingService {
             }
 
             if useRemux {
-                ret = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
-                guard ret >= 0 else {
+                let audioCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
+                guard audioCopyRet == MKS_OK else {
                     avformat_close_input(&inputCtx)
                     avformat_free_context(outCtx)
-                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(audioCopyRet.rawValue)))
                     return
                 }
             }
@@ -559,6 +617,7 @@ public actor TransmuxingService {
         var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
         var packetCount = 0
         var lastSegmentFile = ""
+        let castVideoInputIdx = bestVideo >= 0 ? Int(bestVideo) : -1
         let castAudioInputIdx = bestAudio >= 0 ? Int(bestAudio) : -1
 
         while true {
@@ -575,14 +634,45 @@ public actor TransmuxingService {
 
             let outStreamIdx = Int32(streamMapping[streamIndex])
 
-            // Audio transcoding path
-            if let tc = audioTranscoder, streamIndex == castAudioInputIdx {
-                mks_audio_transcoder_send(tc, pkt)
+            // Video transcoding path (VP9/AV1/MPEG-2 → H.264/H.265)
+            if let vtc = videoTranscoder, streamIndex == castVideoInputIdx {
+                let sendRet = mks_video_transcoder_send(vtc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.service("Cast: video transcoder send error (\(sendRet.rawValue))", level: .warn)
+                }
                 av_packet_unref(pkt)
 
                 var outPktPtr = av_packet_alloc()
                 if let outPkt = outPktPtr {
-                    while mks_audio_transcoder_receive(tc, outPkt) == 0 {
+                    while mks_video_transcoder_receive(vtc, outPkt) == MKS_OK {
+                        outPkt.pointee.stream_index = outStreamIdx
+                        var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                        mks_video_transcoder_get_time_base(vtc, &encTbNum, &encTbDen)
+                        let encTb = AVRational(num: encTbNum, den: encTbDen)
+                        var outTb = AVRational(num: 0, den: 0)
+                        mks_stream_get_time_base(outCtx, outStreamIdx, &outTb.num, &outTb.den)
+                        av_packet_rescale_ts(outPkt, encTb, outTb)
+
+                        ret = av_interleaved_write_frame(outCtx, outPkt)
+                        if ret < 0 {
+                            TransmuxLog.service("Cast: video transcode write error (\(ret)) at packet \(packetCount)", level: .error)
+                        }
+                        packetCount += 1
+                    }
+                }
+                av_packet_free(&outPktPtr)
+            }
+            // Audio transcoding path
+            else if let tc = audioTranscoder, streamIndex == castAudioInputIdx {
+                let sendRet = mks_audio_transcoder_send(tc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.service("Cast: audio transcoder send error (\(sendRet.rawValue))", level: .warn)
+                }
+                av_packet_unref(pkt)
+
+                var outPktPtr = av_packet_alloc()
+                if let outPkt = outPktPtr {
+                    while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
                         outPkt.pointee.stream_index = outStreamIdx
                         var encTbNum: Int32 = 0, encTbDen: Int32 = 0
                         mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)
@@ -632,12 +722,39 @@ public actor TransmuxingService {
         av_packet_free(&packet)
 
         // --- Flush transcoder at EOF ---
+        // Video transcoder flush
+        if let vtc = videoTranscoder {
+            let flushRet = mks_video_transcoder_flush(vtc)
+            if flushRet != MKS_OK {
+                TransmuxLog.service("Cast: video transcoder flush error (\(flushRet.rawValue))", level: .warn)
+            }
+            var outPktPtr = av_packet_alloc()
+            if let outPkt = outPktPtr {
+                let videoOutIdx = Int32(streamMapping[castVideoInputIdx])
+                while mks_video_transcoder_receive(vtc, outPkt) == MKS_OK {
+                    outPkt.pointee.stream_index = videoOutIdx
+                    var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                    mks_video_transcoder_get_time_base(vtc, &encTbNum, &encTbDen)
+                    let encTb = AVRational(num: encTbNum, den: encTbDen)
+                    var outTb = AVRational(num: 0, den: 0)
+                    mks_stream_get_time_base(outCtx, videoOutIdx, &outTb.num, &outTb.den)
+                    av_packet_rescale_ts(outPkt, encTb, outTb)
+                    av_interleaved_write_frame(outCtx, outPkt)
+                }
+            }
+            av_packet_free(&outPktPtr)
+        }
+
+        // Audio transcoder flush
         if let tc = audioTranscoder {
-            mks_audio_transcoder_flush(tc)
+            let flushRet = mks_audio_transcoder_flush(tc)
+            if flushRet != MKS_OK {
+                TransmuxLog.service("Cast: audio transcoder flush error (\(flushRet.rawValue))", level: .warn)
+            }
             var outPktPtr = av_packet_alloc()
             if let outPkt = outPktPtr {
                 let audioOutIdx = Int32(streamMapping[castAudioInputIdx])
-                while mks_audio_transcoder_receive(tc, outPkt) == 0 {
+                while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
                     outPkt.pointee.stream_index = audioOutIdx
                     var encTbNum: Int32 = 0, encTbDen: Int32 = 0
                     mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)
@@ -660,8 +777,13 @@ public actor TransmuxingService {
             finalSegCount += 1
         }
 
-        let castTranscInfo = audioTranscoder != nil ? " (audio transcoded to AAC)" : ""
+        let castTranscInfo = (videoTranscoder != nil ? " video transcoded" : "") + (audioTranscoder != nil ? " audio transcoded to AAC" : "")
         TransmuxLog.service("Cast: COMPLETE \(sessionID.prefix(8)) \(packetCount / 1000)K packets \(finalSegCount) segments\(castTranscInfo)")
+
+        // Cleanup video transcoder
+        if let vtc = videoTranscoder {
+            mks_video_transcoder_free(vtc)
+        }
 
         // Cleanup audio transcoder
         if let tc = audioTranscoder {
@@ -786,8 +908,8 @@ public actor TransmuxingService {
         if bestAudio >= 0 {
             var langBuf = [CChar](repeating: 0, count: 64)
             var titleBuf = [CChar](repeating: 0, count: 256)
-            mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
-            mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
+            _ = mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
+            _ = mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
             let lang = String(cString: langBuf)
             let title = String(cString: titleBuf)
             let codecId = Int32(mks_stream_get_codec_id(inCtx, bestAudio))
@@ -828,6 +950,11 @@ public actor TransmuxingService {
         var streamMapping = [Int](repeating: -1, count: streamCount)
         var outputStreamIndex: Int32 = 0
 
+        // --- Video transcoder (VP9/AV1/MPEG-2 → H.264/H.265 via VideoToolbox) ---
+        var videoTranscoder: OpaquePointer? = nil
+        let videoCodecId = bestVideo >= 0 ? Int32(mks_stream_get_codec_id(inCtx, bestVideo)) : 0
+        let videoTranscodableCodecs: Set<Int32> = [167, 225, 2, 1, 139, 62, 71, 87, 16, 54, 50, 51, 109]  // VP9, AV1, MPEG2, MPEG1, VP8, Theora, WMV3, VC1, FLV1, H263, H263P, MSMPEG4, RV40
+
         if bestVideo >= 0 {
             streamMapping[Int(bestVideo)] = Int(outputStreamIndex)
             guard let outStream = avformat_new_stream(outCtx, nil) else {
@@ -836,12 +963,59 @@ public actor TransmuxingService {
                 continuation.resume(throwing: TransmuxError.processFailure(status: -1))
                 return
             }
-            ret = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
-            guard ret >= 0 else {
-                avformat_close_input(&inputCtx)
-                avformat_free_context(outCtx)
-                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
-                return
+
+            let videoNeedsTranscode = videoTranscodableCodecs.contains(videoCodecId)
+
+            if videoNeedsTranscode {
+                let srcCodecName = videoCodecId == 167 ? "VP9" : videoCodecId == 225 ? "AV1" : videoCodecId == 2 ? "MPEG2" : "codec:\(videoCodecId)"
+                TransmuxLog.service("DLNA: video transcode \(srcCodecName) → H.264/H.265 (VideoToolbox)")
+
+                var config = MKSVideoConfig(
+                    targetCodecId: 0,      // auto
+                    targetBitrate: 0,      // auto
+                    powerEfficient: 1,
+                    spatialAQ: 1,
+                    maxBFrames: 2,         // VOD mode
+                    realtime: 0,
+                    profile: 0
+                )
+
+                if let tc = mks_video_transcoder_create(inCtx, bestVideo, config) {
+                    let setupRet = mks_video_transcoder_setup_output(tc, outStream)
+                    if setupRet == MKS_OK {
+                        videoTranscoder = tc
+                        let outCodecId = mks_video_transcoder_get_output_codec_id(tc)
+                        let outCodecName = outCodecId == 27 ? "H.264" : outCodecId == 173 ? "H.265" : "codec:\(outCodecId)"
+                        TransmuxLog.service("DLNA: video transcoder created → \(outCodecName)")
+                    } else {
+                        TransmuxLog.service("DLNA: video transcoder setup_output failed (\(setupRet.rawValue)), falling back to remux", level: .warn)
+                        mks_video_transcoder_free(tc)
+                        let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                        guard videoCopyRet == MKS_OK else {
+                            avformat_close_input(&inputCtx)
+                            avformat_free_context(outCtx)
+                            continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                            return
+                        }
+                    }
+                } else {
+                    TransmuxLog.service("DLNA: failed to create video transcoder, falling back to remux", level: .warn)
+                    let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                    guard videoCopyRet == MKS_OK else {
+                        avformat_close_input(&inputCtx)
+                        avformat_free_context(outCtx)
+                        continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                        return
+                    }
+                }
+            } else {
+                let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+                guard videoCopyRet == MKS_OK else {
+                    avformat_close_input(&inputCtx)
+                    avformat_free_context(outCtx)
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                    return
+                }
             }
             outputStreamIndex += 1
         }
@@ -869,7 +1043,7 @@ public actor TransmuxingService {
 
                 if let tc = mks_audio_transcoder_create(inCtx, bestAudio, 192000, 48000, 2) {
                     let setupRet = mks_audio_transcoder_setup_output(tc, outStream)
-                    if setupRet >= 0 {
+                    if setupRet == MKS_OK {
                         audioTranscoder = tc
                         useRemux = false
 
@@ -886,7 +1060,7 @@ public actor TransmuxingService {
                             isDefault: true
                         )
                     } else {
-                        TransmuxLog.service("DLNA: transcoder setup_output failed (\(setupRet)), falling back to remux", level: .warn)
+                        TransmuxLog.service("DLNA: transcoder setup_output failed (\(setupRet.rawValue)), falling back to remux", level: .warn)
                         mks_audio_transcoder_free(tc)
                     }
                 } else {
@@ -895,11 +1069,11 @@ public actor TransmuxingService {
             }
 
             if useRemux {
-                ret = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
-                guard ret >= 0 else {
+                let audioCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
+                guard audioCopyRet == MKS_OK else {
                     avformat_close_input(&inputCtx)
                     avformat_free_context(outCtx)
-                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(audioCopyRet.rawValue)))
                     return
                 }
             }
@@ -955,6 +1129,7 @@ public actor TransmuxingService {
         // --- Remux loop (background — file grows while server serves it) ---
         var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
         var packetCount = 0
+        let videoInputIdx = bestVideo >= 0 ? Int(bestVideo) : -1
         let audioInputIdx = bestAudio >= 0 ? Int(bestAudio) : -1
 
         while true {
@@ -971,14 +1146,46 @@ public actor TransmuxingService {
 
             let outStreamIdx = Int32(streamMapping[streamIndex])
 
-            // Audio transcoding path: decode → resample → encode → write AAC packets
-            if let tc = audioTranscoder, streamIndex == audioInputIdx {
-                mks_audio_transcoder_send(tc, pkt)
+            // Video transcoding path (VP9/AV1/MPEG-2 → H.264/H.265)
+            if let vtc = videoTranscoder, streamIndex == videoInputIdx {
+                let sendRet = mks_video_transcoder_send(vtc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.service("DLNA: video transcoder send error (\(sendRet.rawValue))", level: .warn)
+                }
                 av_packet_unref(pkt)
 
                 var outPktPtr = av_packet_alloc()
                 if let outPkt = outPktPtr {
-                    while mks_audio_transcoder_receive(tc, outPkt) == 0 {
+                    let videoOutIdx = Int32(streamMapping[videoInputIdx])
+                    while mks_video_transcoder_receive(vtc, outPkt) == MKS_OK {
+                        outPkt.pointee.stream_index = videoOutIdx
+                        var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                        mks_video_transcoder_get_time_base(vtc, &encTbNum, &encTbDen)
+                        let encTb = AVRational(num: encTbNum, den: encTbDen)
+                        var outTb = AVRational(num: 0, den: 0)
+                        mks_stream_get_time_base(outCtx, videoOutIdx, &outTb.num, &outTb.den)
+                        av_packet_rescale_ts(outPkt, encTb, outTb)
+
+                        ret = av_interleaved_write_frame(outCtx, outPkt)
+                        if ret < 0 {
+                            TransmuxLog.service("DLNA: video transcode write error (\(ret)) at packet \(packetCount)", level: .error)
+                        }
+                        packetCount += 1
+                    }
+                }
+                av_packet_free(&outPktPtr)
+            }
+            // Audio transcoding path: decode → resample → encode → write AAC packets
+            else if let tc = audioTranscoder, streamIndex == audioInputIdx {
+                let sendRet = mks_audio_transcoder_send(tc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.service("DLNA: audio transcoder send error (\(sendRet.rawValue))", level: .warn)
+                }
+                av_packet_unref(pkt)
+
+                var outPktPtr = av_packet_alloc()
+                if let outPkt = outPktPtr {
+                    while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
                         outPkt.pointee.stream_index = outStreamIdx
                         // Rescale from encoder time_base to output time_base
                         var encTbNum: Int32 = 0, encTbDen: Int32 = 0
@@ -1025,12 +1232,39 @@ public actor TransmuxingService {
         av_packet_free(&packet)
 
         // --- Flush transcoder at EOF ---
+        // Video transcoder flush
+        if let vtc = videoTranscoder {
+            let flushRet = mks_video_transcoder_flush(vtc)
+            if flushRet != MKS_OK {
+                TransmuxLog.service("DLNA: video transcoder flush error (\(flushRet.rawValue))", level: .warn)
+            }
+            var outPktPtr = av_packet_alloc()
+            if let outPkt = outPktPtr {
+                let videoOutIdx = Int32(streamMapping[videoInputIdx])
+                while mks_video_transcoder_receive(vtc, outPkt) == MKS_OK {
+                    outPkt.pointee.stream_index = videoOutIdx
+                    var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                    mks_video_transcoder_get_time_base(vtc, &encTbNum, &encTbDen)
+                    let encTb = AVRational(num: encTbNum, den: encTbDen)
+                    var outTb = AVRational(num: 0, den: 0)
+                    mks_stream_get_time_base(outCtx, videoOutIdx, &outTb.num, &outTb.den)
+                    av_packet_rescale_ts(outPkt, encTb, outTb)
+                    av_interleaved_write_frame(outCtx, outPkt)
+                }
+            }
+            av_packet_free(&outPktPtr)
+        }
+
+        // Audio transcoder flush
         if let tc = audioTranscoder {
-            mks_audio_transcoder_flush(tc)
+            let flushRet = mks_audio_transcoder_flush(tc)
+            if flushRet != MKS_OK {
+                TransmuxLog.service("DLNA: audio transcoder flush error (\(flushRet.rawValue))", level: .warn)
+            }
             var outPktPtr = av_packet_alloc()
             if let outPkt = outPktPtr {
                 let audioOutIdx = Int32(streamMapping[audioInputIdx])
-                while mks_audio_transcoder_receive(tc, outPkt) == 0 {
+                while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
                     outPkt.pointee.stream_index = audioOutIdx
                     var encTbNum: Int32 = 0, encTbDen: Int32 = 0
                     mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)
@@ -1060,8 +1294,13 @@ public actor TransmuxingService {
             fileSize = 0
         }
 
-        let transcodeInfo = audioTranscoder != nil ? " (audio transcoded to AAC)" : ""
+        let transcodeInfo = (videoTranscoder != nil ? " video transcoded" : "") + (audioTranscoder != nil ? " audio transcoded to AAC" : "")
         TransmuxLog.service("DLNA: COMPLETE \(sessionID.prefix(8)) \(packetCount / 1000)K packets \(fileSize / 1_048_576)MB\(transcodeInfo)")
+
+        // Cleanup video transcoder
+        if let vtc = videoTranscoder {
+            mks_video_transcoder_free(vtc)
+        }
 
         // Cleanup audio transcoder
         if let tc = audioTranscoder {
@@ -1173,8 +1412,8 @@ public actor TransmuxingService {
 
             var langBuf = [CChar](repeating: 0, count: 64)
             var titleBuf = [CChar](repeating: 0, count: 256)
-            mks_stream_get_language(inCtx, i, &langBuf, 64)
-            mks_stream_get_title(inCtx, i, &titleBuf, 256)
+            _ = mks_stream_get_language(inCtx, i, &langBuf, 64)
+            _ = mks_stream_get_title(inCtx, i, &titleBuf, 256)
 
             let lang = String(cString: langBuf)
             let title = String(cString: titleBuf)
@@ -1232,8 +1471,8 @@ public actor TransmuxingService {
 
             var langBuf = [CChar](repeating: 0, count: 64)
             var titleBuf = [CChar](repeating: 0, count: 256)
-            mks_stream_get_language(inCtx, i, &langBuf, 64)
-            mks_stream_get_title(inCtx, i, &titleBuf, 256)
+            _ = mks_stream_get_language(inCtx, i, &langBuf, 64)
+            _ = mks_stream_get_title(inCtx, i, &titleBuf, 256)
 
             let lang = String(cString: langBuf)
             let title = String(cString: titleBuf)
@@ -1324,11 +1563,11 @@ public actor TransmuxingService {
                 continuation.resume(throwing: TransmuxError.processFailure(status: -1))
                 return
             }
-            ret = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
-            guard ret >= 0 else {
+            let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+            guard videoCopyRet == MKS_OK else {
                 avformat_close_input(&inputCtx)
                 avformat_free_context(outCtx)
-                continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
                 return
             }
         }
@@ -1368,7 +1607,7 @@ public actor TransmuxingService {
                 let srcName = audio.codecId == 86019 ? "AC3" : audio.codecId == 86056 ? "EAC3" : "DTS"
                 if let tc = mks_audio_transcoder_create(inCtx, audio.inputIdx, 192000, 48000, 2) {
                     let setupRet = mks_audio_transcoder_setup_output(tc, outStream)
-                    if setupRet >= 0 {
+                    if setupRet == MKS_OK {
                         audioTranscoders[audio.inputIdx] = tc
                         usedTranscoder = true
                         streamCodecName = "AAC"
@@ -1377,7 +1616,7 @@ public actor TransmuxingService {
                         streamSampleRate = 48000
                         TransmuxLog.service("Audio transcode: stream \(audio.inputIdx) \(srcName) → AAC (192kbps, 48kHz, stereo)")
                     } else {
-                        TransmuxLog.service("Transcoder setup_output failed for stream \(audio.inputIdx) (\(setupRet)), falling back", level: .warn)
+                        TransmuxLog.service("Transcoder setup_output failed for stream \(audio.inputIdx) (\(setupRet.rawValue)), falling back", level: .warn)
                         mks_audio_transcoder_free(tc)
                     }
                 } else {
@@ -1386,13 +1625,13 @@ public actor TransmuxingService {
             }
 
             if !usedTranscoder {
-                ret = mks_stream_copy_codecpar(outStream, inCtx, audio.inputIdx)
-                guard ret >= 0 else {
+                let audioCopyRet = mks_stream_copy_codecpar(outStream, inCtx, audio.inputIdx)
+                guard audioCopyRet == MKS_OK else {
                     avformat_close_input(&inputCtx)
                     if outCtx.pointee.pb != nil { avio_close(outCtx.pointee.pb) }
                     avformat_free_context(outCtx)
                     for (_, tc) in audioTranscoders { mks_audio_transcoder_free(tc) }
-                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(audioCopyRet.rawValue)))
                     return
                 }
 
@@ -1841,9 +2080,9 @@ public actor TransmuxingService {
             // The BSF expects packets in the input stream's time_base.
             if let bsf = aacBsfContexts[Int32(streamIndex)] {
                 let bsfRet = mks_bsf_filter_packet(bsf, pkt)
-                if bsfRet < 0 {
+                if bsfRet != MKS_OK {
                     if seekPending {
-                        TransmuxLog.remux("BSF filter failed (ret=\(bsfRet)) during seek-pending, skipping", level: .warn)
+                        TransmuxLog.remux("BSF filter failed (ret=\(bsfRet.rawValue)) during seek-pending, skipping", level: .warn)
                     }
                     av_packet_unref(pkt)
                     packetCount += 1
@@ -1914,12 +2153,15 @@ public actor TransmuxingService {
             // the AAC output packets (with proper rescaling + rebase).
             // This bypasses the normal rescale→rebase→write path below.
             if let tc = audioTranscoders[Int32(streamIndex)] {
-                mks_audio_transcoder_send(tc, pkt)
+                let sendRet = mks_audio_transcoder_send(tc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.remux("audio transcoder send error for stream \(streamIndex) (\(sendRet.rawValue))", level: .warn)
+                }
                 av_packet_unref(pkt)
 
                 var outPktPtr = av_packet_alloc()
                 if let outPkt = outPktPtr {
-                    while mks_audio_transcoder_receive(tc, outPkt) == 0 {
+                    while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
                         outPkt.pointee.stream_index = outStreamIdx
                         // Rescale from encoder time_base to output time_base
                         var encTbNum: Int32 = 0, encTbDen: Int32 = 0
@@ -2301,10 +2543,13 @@ public actor TransmuxingService {
         if !audioTranscoders.isEmpty {
             var flushPktPtr = av_packet_alloc()
             for (inputIdx, tc) in audioTranscoders {
-                mks_audio_transcoder_flush(tc)
+                let flushRet = mks_audio_transcoder_flush(tc)
+                if flushRet != MKS_OK {
+                    TransmuxLog.remux("audio transcoder flush error for stream \(inputIdx) (\(flushRet.rawValue))", level: .warn)
+                }
                 if let flushPkt = flushPktPtr {
                     let outIdx = Int32(streamMapping[Int(inputIdx)])
-                    while mks_audio_transcoder_receive(tc, flushPkt) == 0 {
+                    while mks_audio_transcoder_receive(tc, flushPkt) == MKS_OK {
                         flushPkt.pointee.stream_index = outIdx
                         var encTbNum: Int32 = 0, encTbDen: Int32 = 0
                         mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)

@@ -53,12 +53,15 @@ export SCRATCH_DIR="${BUILD_ROOT}/scratch"
 #-------------------------------------------------------------------------------
 # Deployment Targets
 #-------------------------------------------------------------------------------
-export MACOS_DEPLOYMENT_TARGET="12.0"
-export IOS_DEPLOYMENT_TARGET="12.0"
+export MACOS_DEPLOYMENT_TARGET="14.0"
+export IOS_DEPLOYMENT_TARGET="17.0"
 
 #-------------------------------------------------------------------------------
 # FFmpeg Configure Flags (common for all platforms)
-# Minimal build: only what's needed for transmuxing
+# TransmuxCore tier system:
+#   Tier 0: Container remux (passthrough)
+#   Tier 1: Audio transcode (AC3/EAC3/DTS -> AAC)
+#   Tier 2: Video transcode (VP9/AV1/MPEG-2 -> H.264/H.265 via VideoToolbox)
 #-------------------------------------------------------------------------------
 export FFMPEG_CONFIGURE_FLAGS="
     --disable-debug
@@ -68,6 +71,12 @@ export FFMPEG_CONFIGURE_FLAGS="
     --disable-encoder=vvc
     --disable-decoder=vvc
     --enable-cross-compile
+    --enable-videotoolbox
+    --enable-audiotoolbox
+    --enable-encoder=h264_videotoolbox,hevc_videotoolbox
+    --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox
+    --enable-filter=scale_vt,transpose_vt
+    --enable-bsf=dts2pts
 "
 
 #-------------------------------------------------------------------------------

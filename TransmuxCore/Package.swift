@@ -69,7 +69,7 @@ let package = Package(
     products: [
         .library(
             name: "TransmuxCore",
-            targets: ["TransmuxCore", "CFFmpegHelper"]
+            targets: ["TransmuxCore", "CTransmuxFFI"]
         ),
         .executable(
             name: "transmux-cli",
@@ -77,10 +77,10 @@ let package = Package(
         )
     ],
     targets: [
-        // MARK: - CFFmpegHelper (C wrapper for FFmpeg)
+        // MARK: - CTransmuxFFI (Modular C FFI library wrapping FFmpeg 8.0.1)
         .target(
-            name: "CFFmpegHelper",
-            path: "Sources/CFFmpegHelper",
+            name: "CTransmuxFFI",
+            path: "Sources/CTransmuxFFI",
             publicHeadersPath: "include",
             cSettings: ffmpegHeaderSearchPaths,
             linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths
@@ -88,7 +88,7 @@ let package = Package(
         // MARK: - TransmuxCore (Swift library)
         .target(
             name: "TransmuxCore",
-            dependencies: ["CFFmpegHelper"],
+            dependencies: ["CTransmuxFFI"],
             path: "Sources/TransmuxCore",
             cSettings: ffmpegHeaderSearchPaths,
             linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths

@@ -197,7 +197,7 @@ extension NavigationDestination {
     /// Destinations that should be displayed in TabView (excludes debug)
     static var displayable: [NavigationDestination] {
         #if DEBUG
-        return [.home, .movies, .series, .liveChannels, .downloads, .debugStream]
+        return [.home, .movies, .series, .liveChannels, .myContent, .debugStream]
         #else
         return [.home, .movies, .series, .liveChannels, .downloads]
         #endif

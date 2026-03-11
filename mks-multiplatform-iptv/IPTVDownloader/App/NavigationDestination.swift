@@ -13,7 +13,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
     case movies = "Movies"
     case series = "Series"
     case liveChannels = "LiveChannels"
-    case downloads = "Downloads"
+    case myContent = "MyContent"
     #if DEBUG
     case debugStream = "DebugStream"
     case cacheDebug = "CacheDebug"
@@ -28,7 +28,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
         case .movies: return "Movies"
         case .series: return "Series"
         case .liveChannels: return "Live TV"
-        case .downloads: return "Downloads"
+        case .myContent: return "My Content"
         #if DEBUG
         case .debugStream: return "Debug Stream"
         case .cacheDebug: return "Cache Inspector"
@@ -43,7 +43,7 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
         case .movies: return "film"
         case .series: return "tv"
         case .liveChannels: return "antenna.radiowaves.left.and.right"
-        case .downloads: return "arrow.down.circle"
+        case .myContent: return "folder.fill"
         #if DEBUG
         case .debugStream: return "ant.circle"
         case .cacheDebug: return "internaldrive"
@@ -54,6 +54,11 @@ enum NavigationDestination: String, CaseIterable, Identifiable, Codable {
     /// Create from string (for backward compatibility)
     init?(from string: String?) {
         guard let string = string else { return nil }
+        // Handle legacy "Downloads" -> "MyContent" migration
+        if string == "Downloads" {
+            self = .myContent
+            return
+        }
         self.init(rawValue: string)
     }
 }

@@ -280,7 +280,7 @@ struct ContentView: View {
 
             // MY CONTENT section
             Section("My Content") {
-                navigationLink(for: .downloads)
+                navigationLink(for: .myContent)
             }
 
             #if DEBUG
@@ -385,13 +385,13 @@ struct ContentView: View {
                 loadingPlaceholder
             }
 
-        case .downloads:
-            DownloadsView()
+        case .myContent:
+            MyContentView()
                 .environmentObject(downloadManager)
                 #if os(macOS)
                 .environmentObject(touchBarManager)
                 #endif
-                .navigationTitle("Downloads")
+                .navigationTitle("My Content")
 
         #if DEBUG
         case .debugStream:
@@ -464,7 +464,7 @@ struct ContentView: View {
         case "LiveChannels":
             touchBarManager.switchToContext(.liveTV)
             updateTouchBarChannels()
-        case "Downloads":
+        case "My Content", "MyContent":
             touchBarManager.switchToContext(.downloads)
         default:
             break

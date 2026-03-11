@@ -1,0 +1,50 @@
+// CTransmuxFFI Module Map for Swift Package Manager
+//
+// Uses umbrella header pattern: CTransmuxFFI.h includes all per-module
+// public headers. FFmpeg headers are listed explicitly for Swift import.
+
+module CTransmuxFFI {
+    // CTransmuxFFI umbrella (includes mks_common.h, mks_log.h, mks_stream.h,
+    // mks_packet.h, mks_bsf.h, mks_audio.h, mks_subtitle.h)
+    umbrella header "CTransmuxFFI.h"
+
+    // libavformat - container formats
+    header "libavformat/avformat.h"
+    header "libavformat/avio.h"
+
+    // libavcodec - codecs
+    header "libavcodec/avcodec.h"
+    header "libavcodec/bsf.h"
+    header "libavcodec/codec.h"
+    header "libavcodec/codec_desc.h"
+    header "libavcodec/codec_id.h"
+    header "libavcodec/codec_par.h"
+    header "libavcodec/packet.h"
+
+    // libavutil - utilities
+    header "libavutil/avutil.h"
+    header "libavutil/channel_layout.h"
+    header "libavutil/common.h"
+    header "libavutil/dict.h"
+    header "libavutil/error.h"
+    header "libavutil/frame.h"
+    header "libavutil/log.h"
+    header "libavutil/mathematics.h"
+    header "libavutil/mem.h"
+    header "libavutil/opt.h"
+    header "libavutil/pixfmt.h"
+    header "libavutil/rational.h"
+    header "libavutil/samplefmt.h"
+    header "libavutil/timestamp.h"
+
+    // libswresample - audio resampling
+    header "libswresample/swresample.h"
+
+    // libswscale - video scaling
+    header "libswscale/swscale.h"
+
+    // NOTE: FFmpeg library linking is handled by Package.swift linkerSettings,
+    // NOT by modulemap link directives.
+
+    export *
+}

@@ -86,6 +86,13 @@ public actor TransmuxServer {
     /// Live HLS proxy: when set, serves rewritten m3u8 and cached .ts segments
     /// from a single upstream connection. Enables AirPlay/Cast without duplicate connections.
     private var liveProxy: LiveHLSProxy?
+    /// Live segmented mode: serves .ts segments and m3u8 from a local LiveSegmenter
+    /// that segments a raw continuous .ts stream via FFmpeg.
+    private var liveSegmenter: LiveSegmenter?
+    /// Directory containing .ts segment files for the live segmenter mode.
+    private var liveSegmentedDir: String?
+    /// Handle for the live transmux session (health monitoring, cancellation).
+    private var liveHandle: ActiveLiveTransmux?
 
     private let networkQueue = DispatchQueue(label: "TransmuxServer.network", qos: .userInitiated)
     private let portRange: Range<UInt16> = 8100..<8200
@@ -474,6 +481,103 @@ public actor TransmuxServer {
         return Session(localURL: url, port: port)
     }
 
+    /// Start serving live-segmented MPEG-TS content from a local directory.
+    /// The `LiveSegmenter` generates the playlist; segment files are served from disk.
+    /// Used when we segment a raw `.ts` stream locally via FFmpeg instead of
+    /// proxying an upstream m3u8 (lower latency, enables future timeshift).
+    ///
+    /// - Parameters:
+    ///   - directory: Directory containing `.ts` segment files.
+    ///   - segmenter: The `LiveSegmenter` managing playlist generation.
+    ///   - handle: The `ActiveLiveTransmux` session handle for health monitoring.
+    /// - Returns: Session with the LAN-accessible URL to `stream.m3u8`.
+    public func startLiveSegmented(
+        directory: String,
+        segmenter: LiveSegmenter,
+        handle: ActiveLiveTransmux
+    ) async throws -> Session {
+        if listener != nil {
+            stop()
+        }
+
+        self.stopped = false
+
+        // Clear all other mode state
+        self.filePath = nil
+        self.mediaPlaylistPath = nil
+        self.masterPlaylistPath = nil
+        self.expectedSize = 0
+        self.segmenter = nil
+        self.initSegmentSize = 0
+        self.seekHandle = nil
+        self.isComplete = false
+        self.segmentCache = nil
+        self.castDirectory = nil
+        self.dlnaMode = false
+        self.dlnaFilePath = nil
+        self.liveProxy = nil
+
+        // Set live segmented mode
+        self.liveSegmenter = segmenter
+        self.liveSegmentedDir = directory
+        self.liveHandle = handle
+
+        let port = try findAvailablePort()
+        self.currentPort = port
+
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+        let nwListener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+        self.listener = nwListener
+
+        nwListener.newConnectionHandler = { [weak self] connection in
+            Task { [weak self] in
+                await self?.handleConnection(connection)
+            }
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            nwListener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    TransmuxLog.log("LIVE-SEG LISTEN :\(port)", tag: "Server")
+                    if !resumed {
+                        resumed = true
+                        continuation.resume()
+                    }
+                case .failed(let error):
+                    TransmuxLog.log("Live-seg listener failed: \(error)", tag: "Server", level: .error)
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: error)
+                    }
+                case .cancelled:
+                    if !resumed {
+                        resumed = true
+                        continuation.resume(throwing: ServerError.portExhausted)
+                    }
+                default:
+                    break
+                }
+            }
+
+            nwListener.start(queue: self.networkQueue)
+        }
+
+        let host = Self.getLANIPAddress() ?? "localhost"
+        if host == "localhost" {
+            TransmuxLog.log("WARNING: Could not determine LAN IP, AirPlay may not work", tag: "Server", level: .warn)
+        }
+
+        guard let url = URL(string: "http://\(host):\(port)/stream.m3u8") else {
+            throw ServerError.invalidFilePath
+        }
+
+        TransmuxLog.log("LIVE-SEG SERVING \(url) (dir: \(directory))", tag: "Server")
+        return Session(localURL: url, port: port)
+    }
+
     /// Mark the transmux as complete. After this, empty reads mean real EOF.
     public func setComplete() {
         isComplete = true
@@ -518,6 +622,9 @@ public actor TransmuxServer {
         castDirectory = nil
         dlnaMode = false
         dlnaFilePath = nil
+        liveSegmenter = nil
+        liveSegmentedDir = nil
+        liveHandle = nil
 
         TransmuxLog.log("STOPPED", tag: "Server")
         TransmuxLog.flush()
@@ -571,6 +678,12 @@ public actor TransmuxServer {
     }
 
     private func dispatchRequest(_ request: HTTPRequestParser.Request, connection: NWConnection) {
+        // Live segmented mode: serve from local LiveSegmenter (raw .ts → segmented HLS)
+        if let seg = self.liveSegmenter, let dir = self.liveSegmentedDir {
+            dispatchLiveSegmentedRequest(request, connection: connection, segmenter: seg, directory: dir)
+            return
+        }
+
         // Live proxy mode: serve from LiveHLSProxy cache
         if let proxy = self.liveProxy {
             dispatchLiveRequest(request, connection: connection, proxy: proxy)
@@ -2010,6 +2123,114 @@ public actor TransmuxServer {
 
             // Timeout
             TransmuxLog.log("CAST 404 timeout \(fileName)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
+    }
+
+    // MARK: - Live Segmented Dispatch
+
+    /// Dispatch a request in live-segmented mode.
+    /// - `.m3u8` → serve from LiveSegmenter's in-memory playlist
+    /// - `.ts` → serve segment file from disk, poll if not yet written
+    private func dispatchLiveSegmentedRequest(
+        _ request: HTTPRequestParser.Request,
+        connection: NWConnection,
+        segmenter: LiveSegmenter,
+        directory: String
+    ) {
+        let path = request.path
+        let fileName = (path as NSString).lastPathComponent
+
+        // Security: only serve .m3u8 and .ts files
+        guard fileName.hasSuffix(".m3u8") || fileName.hasSuffix(".ts") else {
+            TransmuxLog.log("LIVE-SEG 404 unsupported: \(path)", tag: "Server", level: .warn)
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        // Playlist: serve from in-memory cache (always fresh, no disk read)
+        if fileName.hasSuffix(".m3u8") {
+            if let playlistData = segmenter.getPlaylist() {
+                var header = "HTTP/1.1 200 OK\r\n"
+                header += "Content-Type: application/vnd.apple.mpegurl\r\n"
+                header += "Content-Length: \(playlistData.count)\r\n"
+                header += "Cache-Control: no-cache, no-store\r\n"
+                header += "Access-Control-Allow-Origin: *\r\n"
+                header += "Connection: close\r\n"
+                header += "\r\n"
+
+                var responseData = Data(header.utf8)
+                responseData.append(playlistData)
+                connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            } else {
+                // No playlist yet — tell client to retry
+                let retryHeader = "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nConnection: close\r\n\r\n"
+                connection.send(content: Data(retryHeader.utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            }
+            return
+        }
+
+        // .ts segment: serve from disk
+        let filePath = (directory as NSString).appendingPathComponent(fileName)
+
+        if FileManager.default.fileExists(atPath: filePath) {
+            handleLiveSegServeFile(connection: connection, filePath: filePath, fileName: fileName)
+        } else {
+            // Segment not yet written — poll briefly
+            handleLiveSegWait(connection: connection, filePath: filePath, fileName: fileName)
+        }
+    }
+
+    /// Serve a .ts segment file from the live-segmented output directory.
+    private nonisolated func handleLiveSegServeFile(connection: NWConnection, filePath: String, fileName: String) {
+        guard let data = FileManager.default.contents(atPath: filePath) else {
+            let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
+            connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+
+        var header = "HTTP/1.1 200 OK\r\n"
+        header += "Content-Type: video/mp2t\r\n"
+        header += "Content-Length: \(data.count)\r\n"
+        header += "Cache-Control: public, max-age=60\r\n"
+        header += "Access-Control-Allow-Origin: *\r\n"
+        header += "Connection: close\r\n"
+        header += "\r\n"
+
+        var responseData = Data(header.utf8)
+        responseData.append(data)
+        connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
+    /// Wait for a live .ts segment to appear on disk.
+    /// Polls for up to 10 seconds (100 × 100ms), then returns 404.
+    private nonisolated func handleLiveSegWait(connection: NWConnection, filePath: String, fileName: String) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            for _ in 0..<100 {
+                if FileManager.default.fileExists(atPath: filePath) {
+                    // Wait briefly for the file to be fully written
+                    Thread.sleep(forTimeInterval: 0.05)
+                    self.handleLiveSegServeFile(connection: connection, filePath: filePath, fileName: fileName)
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+
+            // Timeout — segment not produced
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()

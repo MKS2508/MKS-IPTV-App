@@ -72,6 +72,12 @@ enum IPTVConfiguration {
         return "\(profile.baseURL)/\(liveChannelsEndpoint)/\(profile.username)/\(profile.password)/\(channelID).m3u8"
     }
 
+    /// Build a raw MPEG-TS stream URL for a live channel.
+    /// Used by the live segmenter pipeline (FFmpeg segments the continuous .ts stream locally).
+    static func buildLiveChannelTSURL(profile: IPTVProfile, channelID: Int) -> String {
+        return "\(profile.baseURL)/\(liveChannelsEndpoint)/\(profile.username)/\(profile.password)/\(channelID).ts"
+    }
+
     static func defaultRequestHeaders() -> [String: String] {
         return [
             "Accept-Encoding": "identity",

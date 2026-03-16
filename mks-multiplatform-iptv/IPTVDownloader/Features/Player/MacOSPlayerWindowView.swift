@@ -72,7 +72,7 @@ struct MacOSPlayerWindowView: View {
         VStack {
             HStack(spacing: 16) {
                 windowControlsSpacer
-                
+
                 if !manager.title.isEmpty {
                     Text(manager.title)
                         .font(.system(size: 13, weight: .medium))
@@ -80,9 +80,9 @@ struct MacOSPlayerWindowView: View {
                         .lineLimit(1)
                         .shadow(color: .black.opacity(0.5), radius: 2)
                 }
-                
+
                 Spacer()
-                
+
                 controlsModePicker
                 settingsButton
             }
@@ -99,9 +99,11 @@ struct MacOSPlayerWindowView: View {
                     endPoint: .bottom
                 )
             )
-            
+
             Spacer()
+                .allowsHitTesting(false)
         }
+        .allowsHitTesting(toolbarVisible || isHoveringToolbar)
         .opacity(toolbarVisible || isHoveringToolbar ? 1 : 0)
         .animation(.easeInOut(duration: 0.3), value: toolbarVisible)
         .animation(.easeInOut(duration: 0.2), value: isHoveringToolbar)

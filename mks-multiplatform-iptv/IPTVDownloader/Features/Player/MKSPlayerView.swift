@@ -27,6 +27,7 @@ struct MKSPlayerView: View {
     @State private var wasPlayingBeforeCast = false
     @State private var didLoadOnCastDevice = false
     @State private var videoGravity: PlayerVideoGravity = .resizeAspect
+    @State private var controlsVisible: Bool = true
 
     #if os(macOS)
     @State private var macOSOverlayVisible = true
@@ -39,16 +40,12 @@ struct MKSPlayerView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // MARK: - Layer 1: Player surface (video layer)
+            // MARK: - Layer 0: Player surface (video layer)
             playerSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
-                .onTapGesture(count: 3) {
-                    showDebugOverlay.toggle()
-                    UserDefaults.showPlayerDebugOverlay = showDebugOverlay
-                }
 
-            // MARK: - Layer 2: Debug overlay (top-left, non-blocking)
+            // MARK: - Layer 1: Debug overlay (top-left, non-blocking)
             if showDebugOverlay {
                 VStack {
                     HStack {
@@ -60,27 +57,23 @@ struct MKSPlayerView: View {
                 .allowsHitTesting(false)
             }
 
-            // MARK: - Layer 3: Controls/conditional overlays
+            // MARK: - Layer 2: Controls/conditional overlays
             if useNativeControls {
                 nativeControlsOverlays
             } else {
                 glassControlsOverlay
             }
 
-            // MARK: - Layer 4: Top trailing controls (always on top)
+            // MARK: - Layer 3: Top trailing buttons (individual, no full-screen wrapper)
             if showRemotePlayButton {
                 RemotePlayButton()
                     .buttonStyle(.plain)
                     .adaptiveGlass(in: Capsule())
+                    .opacity(useNativeControls ? 1 : (controlsVisible ? 1 : 0))
+                    .allowsHitTesting(useNativeControls || controlsVisible)
             }
 
-            if let onDismiss, presentationMode == .inline {
-                dismissButton(action: onDismiss)
-                    .buttonStyle(.plain)
-                    .adaptiveGlass(in: Circle())
-            }
-
-            // Casting overlay (replaces player surface when active)
+            // MARK: - Layer 4: Casting overlay (replaces player surface when active)
             if remotePlayManager.connectedDevice != nil {
                 castingOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -88,13 +81,15 @@ struct MKSPlayerView: View {
         }
         #if os(macOS)
         .onContinuousHover { phase in
-            if presentationMode == .fullscreen {
-                switch phase {
-                case .active:
+            switch phase {
+            case .active:
+                if presentationMode == .fullscreen {
                     showMacOSOverlayBriefly()
-                case .ended:
-                    break
+                } else if !useNativeControls {
+                    controlsVisible = true
                 }
+            case .ended:
+                break
             }
         }
         .onAppear {
@@ -174,18 +169,23 @@ struct MKSPlayerView: View {
     @ViewBuilder
     private var glassControlsOverlay: some View {
         if presentationMode == .inline {
+            // Metadata overlay — visible only when controls are visible
             if let metadata, showMetadata {
                 VStack {
                     GlassMetadataOverlay(metadata: metadata)
                         .padding(.horizontal)
                     Spacer()
                 }
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .opacity(controlsVisible ? 1 : 0)
+                .allowsHitTesting(controlsVisible)
+                .animation(.easeInOut(duration: 0.25), value: controlsVisible)
             }
 
-            GlassPlayerControlBar(
+            PlayerOverlayContainer(
                 player: player,
                 configuration: controlsConfiguration,
+                isVisible: $controlsVisible,
+                metadata: showMetadata ? metadata : nil,
                 onFullscreenRequest: onRequestFullscreen,
                 onDismiss: onDismiss,
                 onGravityChange: { newGravity in

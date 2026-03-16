@@ -294,4 +294,12 @@ public enum TransmuxLog {
     ) {
         log(message, tag: "Service", level: level)
     }
+
+    /// Log live segmenter events (segment tracking, playlist generation, eviction).
+    public static func liveSegmenter(
+        _ message: String,
+        level: Level = .info
+    ) {
+        log(message, tag: "LiveSeg", level: level)
+    }
 }

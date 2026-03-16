@@ -37,7 +37,9 @@ struct PlayerControlsConfiguration {
     var speedOptions: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
     var defaultSpeed: Float = 1.0
     var enableHapticFeedback: Bool = true
-    
+    var doubleTapSeekEnabled: Bool = false
+    var doubleTapSeekInterval: TimeInterval = 10
+
     static let `default` = PlayerControlsConfiguration()
     
     static let glass = PlayerControlsConfiguration(

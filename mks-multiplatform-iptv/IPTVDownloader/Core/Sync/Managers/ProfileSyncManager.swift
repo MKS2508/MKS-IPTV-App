@@ -24,7 +24,8 @@ final class ProfileSyncManager {
     private(set) var syncStatus: SyncStatus = .idle
 
     /// Whether sync is enabled by the user.
-    var isSyncEnabled: Bool = true
+    /// Defaults to false until explicitly enabled with valid CloudKit entitlements.
+    var isSyncEnabled: Bool = false
 
     /// The date of the last successful sync.
     var lastSyncDate: Date? {

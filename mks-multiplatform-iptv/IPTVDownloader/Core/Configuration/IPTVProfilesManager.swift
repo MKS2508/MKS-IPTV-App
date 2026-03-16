@@ -14,8 +14,9 @@ class IPTVProfilesManager: ObservableObject {
     /// Sync status for UI display
     @Published private(set) var syncStatus: SyncStatus = .idle
 
-    /// Whether iCloud sync is enabled
-    @Published var isSyncEnabled: Bool = true {
+    /// Whether iCloud sync is enabled.
+    /// Defaults to false — CloudKit entitlements must be active before enabling.
+    @Published var isSyncEnabled: Bool = false {
         didSet {
             syncManager.isSyncEnabled = isSyncEnabled
             if isSyncEnabled {

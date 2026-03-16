@@ -44,7 +44,15 @@ enum CloudKitContainer {
     /// - Throws: `SyncError.accountNotAvailable` if iCloud is not signed in,
     ///           `SyncError.permissionDenied` if restricted.
     static func ensureAvailable() async throws {
-        let status = try await container.accountStatus()
+        let status: CKAccountStatus
+        do {
+            status = try await container.accountStatus()
+        } catch {
+            // CKContainer can throw or crash when entitlements are missing.
+            // Treat any failure as iCloud unavailable.
+            throw SyncError.accountNotAvailable
+        }
+
         switch status {
         case .available:
             return

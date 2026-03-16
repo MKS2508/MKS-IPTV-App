@@ -7,7 +7,10 @@ struct GlassPlayerControlBar: View {
     var onFullscreenRequest: (() -> Void)?
     var onDismiss: (() -> Void)?
     var onGravityChange: ((PlayerVideoGravity) -> Void)?
-    
+    /// Called on every user interaction (play/pause, seek, volume, speed)
+    /// so the parent container can reset auto-hide timers.
+    var onUserInteraction: (() -> Void)?
+
     @State private var isPlaying: Bool = false
     @State private var currentTime: Double = 0
     @State private var duration: Double = 0
@@ -16,33 +19,20 @@ struct GlassPlayerControlBar: View {
     @State private var isMuted: Bool = false
     @State private var speed: Float = 1.0
     @State private var gravity: PlayerVideoGravity = .resizeAspect
-    @State private var isVisible: Bool = true
-    @State private var autoHideTask: Task<Void, Never>?
-    
+
     @Environment(\.scenePhase) private var scenePhase
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            if isVisible {
-                topBar
-                Spacer()
-                bottomControls
-            } else {
-                Spacer()
-                centerPlayButton
-                Spacer()
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            toggleControls()
+            topBar
+
+            Spacer()
+                .allowsHitTesting(false)
+
+            bottomControls
         }
         .onAppear {
             loadPlayerState()
-            startAutoHideTimer()
-        }
-        .onDisappear {
-            autoHideTask?.cancel()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
@@ -79,22 +69,6 @@ struct GlassPlayerControlBar: View {
                 endPoint: .bottom
             )
         )
-    }
-    
-    @ViewBuilder
-    private var centerPlayButton: some View {
-        Button {
-            togglePlayPause()
-        } label: {
-            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 36, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 80, height: 80)
-        }
-        .adaptiveGlassInteractive(in: Circle(), fallbackOpacity: 0.7)
-        .buttonStyle(.plain)
-        .scaleEffect(isPlaying ? 1.0 : 1.1)
-        .animation(.spring(response: 0.3), value: isPlaying)
     }
     
     @ViewBuilder
@@ -137,10 +111,10 @@ struct GlassPlayerControlBar: View {
                 triggerHaptic()
             },
             onSeekStart: {
-                autoHideTask?.cancel()
+                onUserInteraction?()
             },
             onSeekEnd: {
-                startAutoHideTimer()
+                onUserInteraction?()
             }
         )
         .adaptiveGlass(in: RoundedRectangle(cornerRadius: 10), fallbackOpacity: 0.5)
@@ -295,27 +269,6 @@ struct GlassPlayerControlBar: View {
         .buttonStyle(.plain)
     }
     
-    private func toggleControls() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            isVisible.toggle()
-        }
-        if isVisible {
-            startAutoHideTimer()
-        }
-    }
-    
-    private func startAutoHideTimer() {
-        guard configuration.autoHideControls else { return }
-        autoHideTask?.cancel()
-        autoHideTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(configuration.autoHideDelay))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.3)) {
-                isVisible = false
-            }
-        }
-    }
-    
     private func loadPlayerState() {
         isPlaying = player.isPlaying
         currentTime = player.currentTime
@@ -331,6 +284,7 @@ struct GlassPlayerControlBar: View {
         }
         isPlaying.toggle()
         triggerHaptic()
+        onUserInteraction?()
     }
     
     private func seekBackward() {
@@ -339,26 +293,30 @@ struct GlassPlayerControlBar: View {
         player.seek(to: newTime)
         currentTime = newTime
         triggerHaptic()
+        onUserInteraction?()
     }
-    
+
     private func seekForward() {
         let interval = configuration.seekIntervals.first ?? 15
         let newTime = min(duration, currentTime + interval)
         player.seek(to: newTime)
         currentTime = newTime
         triggerHaptic()
+        onUserInteraction?()
     }
-    
+
     private func toggleMute() {
         isMuted.toggle()
         player.setMuted(isMuted)
         triggerHaptic()
+        onUserInteraction?()
     }
-    
+
     private func changeSpeed(_ newSpeed: Float) {
         speed = newSpeed
         player.setRate(newSpeed)
         triggerHaptic()
+        onUserInteraction?()
     }
     
     private func togglePiP() {

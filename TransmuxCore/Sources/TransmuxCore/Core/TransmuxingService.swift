@@ -120,6 +120,29 @@ public struct DLNATransmuxSession: Sendable {
     public let audioTracks: [AudioTrackInfo]
 }
 
+// MARK: - Live Transmux Session
+
+/// Result returned after the first MPEG-TS segment is written for a live stream.
+/// The remux loop runs indefinitely until cancelled via the handle.
+///
+/// Opens a raw continuous `.ts` stream from an IPTV server, segments it locally
+/// into discrete `.ts` files using FFmpeg's segment muxer, and generates a live
+/// HLS playlist via `LiveSegmenter`. Enables lower latency than server-side HLS
+/// and future timeshift/DVR through segment retention.
+public struct LiveTransmuxSession: Sendable {
+    public let sessionID: String
+    /// Directory containing `.ts` segments and `stream.m3u8`.
+    public let outputDir: String
+    /// Path to the live EVENT m3u8 playlist (updated atomically on each segment).
+    public let playlistPath: String
+    /// Audio tracks detected in the stream.
+    public let audioTracks: [AudioTrackInfo]
+    /// Session handle for cancellation and health monitoring.
+    public let handle: ActiveLiveTransmux
+    /// Live segmenter for playlist generation and segment tracking.
+    public let segmenter: LiveSegmenter
+}
+
 // MARK: - Transmux Completion Notification
 
 public extension Notification.Name {
@@ -1305,6 +1328,476 @@ public actor TransmuxingService {
         // Cleanup audio transcoder
         if let tc = audioTranscoder {
             mks_audio_transcoder_free(tc)
+        }
+
+        // Cleanup FFmpeg contexts
+        avformat_free_context(outCtx)
+        avformat_close_input(&inputCtx)
+    }
+
+    // MARK: - Live MPEG-TS Transmux (Segmented from raw .ts stream)
+
+    /// Start a live MPEG-TS transmux that segments a raw continuous `.ts` stream
+    /// from an IPTV server into discrete HLS-compatible `.ts` segments with a
+    /// live EVENT playlist. Returns after the first segment is written.
+    ///
+    /// The remux loop runs indefinitely until cancelled via the returned handle.
+    /// FFmpeg's reconnect options handle transient connection drops automatically.
+    ///
+    /// - Parameters:
+    ///   - sourceURL: Raw `.ts` stream URL (e.g., `http://server/live/user/pass/channelID.ts`).
+    ///   - config: Segmenter configuration (segment duration, window size, retention).
+    ///   - transcodeAudio: Force AC3/EAC3/DTS → AAC transcoding.
+    /// - Returns: A `LiveTransmuxSession` with the output directory, segmenter, and handle.
+    public func startLiveTransmux(
+        from sourceURL: URL,
+        config: LiveSegmenter.Config = LiveSegmenter.Config(),
+        transcodeAudio: Bool = false
+    ) async throws -> LiveTransmuxSession {
+        let sessionID = UUID().uuidString
+        let outputDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mks-iptv-live-\(sessionID)")
+
+        try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
+        activeSessions[sessionID] = outputDir
+
+        // Resolve input path (same logic as startCastTransmux)
+        var proxySessionID: Int?
+        let inputPath: String
+        if sourceURL.scheme?.lowercased() == "https" {
+            if let proxy = streamProxy {
+                let proxySession = try await proxy.startProxy(for: sourceURL)
+                proxySessionID = proxySession.id
+                inputPath = proxySession.localURL.absoluteString
+                TransmuxLog.service("Live: Proxied HTTPS -> \(inputPath)")
+            } else {
+                inputPath = sourceURL.absoluteString
+                TransmuxLog.service("Live: WARNING: No StreamProxy for HTTPS URL", level: .warn)
+            }
+        } else if sourceURL.scheme == "file" {
+            inputPath = sourceURL.path(percentEncoded: false)
+        } else {
+            inputPath = sourceURL.absoluteString
+        }
+
+        let handle = ActiveLiveTransmux()
+        let segmenter = LiveSegmenter(outputDir: outputDir.path, config: config)
+        handle.segmenter = segmenter
+
+        do {
+            let session = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<LiveTransmuxSession, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    Self.performLiveTransmux(
+                        inputPath: inputPath,
+                        outputDir: outputDir,
+                        sessionID: sessionID,
+                        config: config,
+                        handle: handle,
+                        segmenter: segmenter,
+                        transcodeAudio: transcodeAudio,
+                        continuation: continuation
+                    )
+                }
+            }
+            return session
+        } catch {
+            if let pid = proxySessionID, let proxy = streamProxy {
+                await proxy.stop(sessionID: pid)
+            }
+            throw error
+        }
+    }
+
+    /// Live MPEG-TS transmux using FFmpeg's segment muxer.
+    /// Reads a continuous `.ts` stream, outputs discrete `.ts` segment files.
+    /// Runs indefinitely until `handle.isCancelled`. On stream errors, retries
+    /// with exponential backoff up to 10 consecutive failures.
+    private static func performLiveTransmux(
+        inputPath: String,
+        outputDir: URL,
+        sessionID: String,
+        config: LiveSegmenter.Config,
+        handle: ActiveLiveTransmux,
+        segmenter: LiveSegmenter,
+        transcodeAudio: Bool = false,
+        continuation: CheckedContinuation<LiveTransmuxSession, Error>
+    ) {
+        var inputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var outputCtx: UnsafeMutablePointer<AVFormatContext>?
+        var continuationResumed = false
+
+        mks_log_init(TransmuxLog.filePath)
+
+        // --- Helper: open the input stream ---
+        func openInput() -> Bool {
+            var inputOptions: OpaquePointer?
+            av_dict_set(&inputOptions, "user_agent", "VLC/3.0.18 LibVLC/3.0.18", 0)
+            av_dict_set(&inputOptions, "timeout", "30000000", 0)
+            av_dict_set(&inputOptions, "reconnect", "1", 0)
+            av_dict_set(&inputOptions, "reconnect_streamed", "1", 0)
+            av_dict_set(&inputOptions, "reconnect_delay_max", "5", 0)
+            av_dict_set(&inputOptions, "probesize", "33554432", 0)
+            av_dict_set(&inputOptions, "analyzeduration", "30000000", 0)
+
+            let ret = avformat_open_input(&inputCtx, inputPath, nil, &inputOptions)
+            av_dict_free(&inputOptions)
+            guard ret >= 0 else {
+                TransmuxLog.liveSegmenter("openInput failed (\(ret))", level: .error)
+                return false
+            }
+            guard avformat_find_stream_info(inputCtx, nil) >= 0 else {
+                avformat_close_input(&inputCtx)
+                TransmuxLog.liveSegmenter("find_stream_info failed", level: .error)
+                return false
+            }
+            return true
+        }
+
+        // --- Open input ---
+        guard openInput(), let inCtx = inputCtx else {
+            continuation.resume(throwing: TransmuxError.processStartFailure(
+                NSError(domain: "FFmpeg", code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to open live .ts stream"])
+            ))
+            return
+        }
+
+        let streamCount = Int(mks_format_get_nb_streams(inCtx))
+        let bestVideo = av_find_best_stream(inCtx, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0)
+        let bestAudio = av_find_best_stream(inCtx, AVMEDIA_TYPE_AUDIO, -1, -1, nil, 0)
+
+        TransmuxLog.liveSegmenter("SESSION \(sessionID.prefix(8)) | in=\(inputPath) v:\(bestVideo) a:\(bestAudio)")
+
+        // --- Find best audio stream ---
+        var audioInfo: AudioTrackInfo?
+        if bestAudio >= 0 {
+            var langBuf = [CChar](repeating: 0, count: 64)
+            var titleBuf = [CChar](repeating: 0, count: 256)
+            _ = mks_stream_get_language(inCtx, bestAudio, &langBuf, 64)
+            _ = mks_stream_get_title(inCtx, bestAudio, &titleBuf, 256)
+            let lang = String(cString: langBuf)
+            let title = String(cString: titleBuf)
+            let codecId = Int32(mks_stream_get_codec_id(inCtx, bestAudio))
+            let codecName: String
+            switch codecId {
+            case 86018: codecName = "AAC"
+            case 86019: codecName = "AC3"
+            case 86056: codecName = "EAC3"
+            case 86076: codecName = "OPUS"
+            case 86028: codecName = "FLAC"
+            case 86017: codecName = "MP3"
+            default: codecName = "audio(\(codecId))"
+            }
+            audioInfo = AudioTrackInfo(
+                inputStreamIndex: Int(bestAudio),
+                outputStreamIndex: bestVideo >= 0 ? 1 : 0,
+                language: lang.isEmpty ? "und" : lang,
+                title: title,
+                codecName: codecName,
+                codecId: codecId,
+                channels: Int(mks_stream_get_channels(inCtx, bestAudio)),
+                sampleRate: Int(mks_stream_get_sample_rate(inCtx, bestAudio)),
+                isDefault: true
+            )
+        }
+
+        // --- Allocate output: segment muxer with mpegts format ---
+        let segPattern = outputDir.appendingPathComponent(config.segmentPattern).path
+        // FFmpeg generates its own m3u8 — we discard it and use LiveSegmenter's playlist instead
+        let ffmpegPlaylistPath = outputDir.appendingPathComponent("_ffmpeg_internal.m3u8").path
+
+        var ret = avformat_alloc_output_context2(&outputCtx, nil, "segment", segPattern)
+        guard ret >= 0, let outCtx = outputCtx else {
+            TransmuxLog.liveSegmenter("segment muxer alloc failed (\(ret))", level: .error)
+            avformat_close_input(&inputCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        // --- Map streams: video + 1 audio ---
+        var streamMapping = [Int](repeating: -1, count: streamCount)
+        var outputStreamIndex: Int32 = 0
+
+        if bestVideo >= 0 {
+            streamMapping[Int(bestVideo)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+            let videoCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestVideo)
+            guard videoCopyRet == MKS_OK else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: Int(videoCopyRet.rawValue)))
+                return
+            }
+            outputStreamIndex += 1
+        }
+
+        // --- Audio (with optional transcoding) ---
+        var audioTranscoder: OpaquePointer? = nil
+        let audioCodecId = bestAudio >= 0 ? Int32(mks_stream_get_codec_id(inCtx, bestAudio)) : 0
+        let liveTranscodableCodecs: Set<Int32> = [86019, 86056, 86076]  // AC3, EAC3, DTS
+        let liveNeedsTranscode = transcodeAudio && liveTranscodableCodecs.contains(audioCodecId)
+
+        if bestAudio >= 0 {
+            streamMapping[Int(bestAudio)] = Int(outputStreamIndex)
+            guard let outStream = avformat_new_stream(outCtx, nil) else {
+                avformat_close_input(&inputCtx)
+                avformat_free_context(outCtx)
+                continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+                return
+            }
+
+            var useRemux = true
+
+            if liveNeedsTranscode {
+                let srcCodecName = audioCodecId == 86019 ? "AC3" : audioCodecId == 86056 ? "EAC3" : "DTS"
+                TransmuxLog.liveSegmenter("Audio transcode \(srcCodecName) → AAC (192kbps, 48kHz, stereo)")
+
+                if let tc = mks_audio_transcoder_create(inCtx, bestAudio, 192000, 48000, 2) {
+                    let setupRet = mks_audio_transcoder_setup_output(tc, outStream)
+                    if setupRet == MKS_OK {
+                        audioTranscoder = tc
+                        useRemux = false
+                        audioInfo = AudioTrackInfo(
+                            inputStreamIndex: Int(bestAudio),
+                            outputStreamIndex: bestVideo >= 0 ? 1 : 0,
+                            language: audioInfo?.language ?? "und",
+                            title: audioInfo?.title ?? "",
+                            codecName: "AAC",
+                            codecId: 86018,
+                            channels: 2,
+                            sampleRate: 48000,
+                            isDefault: true
+                        )
+                    } else {
+                        TransmuxLog.liveSegmenter("Audio transcoder setup failed (\(setupRet.rawValue)), falling back to remux", level: .warn)
+                        mks_audio_transcoder_free(tc)
+                    }
+                }
+            }
+
+            if useRemux {
+                let audioCopyRet = mks_stream_copy_codecpar(outStream, inCtx, bestAudio)
+                guard audioCopyRet == MKS_OK else {
+                    avformat_close_input(&inputCtx)
+                    avformat_free_context(outCtx)
+                    continuation.resume(throwing: TransmuxError.processFailure(status: Int(audioCopyRet.rawValue)))
+                    return
+                }
+            }
+            outputStreamIndex += 1
+        }
+
+        guard outputStreamIndex > 0 else {
+            TransmuxLog.liveSegmenter("No video or audio streams found", level: .error)
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: -1))
+            return
+        }
+
+        // --- Configure segment muxer options ---
+        var options: OpaquePointer?
+        av_dict_set(&options, "segment_format", "mpegts", 0)
+        av_dict_set(&options, "segment_time", String(Int(config.segmentDuration)), 0)
+        av_dict_set(&options, "segment_list", ffmpegPlaylistPath, 0)
+        av_dict_set(&options, "segment_list_type", "m3u8", 0)
+        av_dict_set(&options, "segment_list_flags", "live+cache", 0)
+        av_dict_set(&options, "reset_timestamps", "0", 0)
+        // Low-latency: flush immediately
+        av_dict_set(&options, "flush_packets", "1", 0)
+
+        let liveTranscodeLabel = audioTranscoder != nil ? " TRANSCODE→AAC" : ""
+        TransmuxLog.liveSegmenter("STREAMS v:\(bestVideo) a:\(bestAudio) | format=segment/mpegts segDur=\(config.segmentDuration)s\(liveTranscodeLabel)")
+
+        // --- Write header ---
+        ret = avformat_write_header(outCtx, &options)
+        av_dict_free(&options)
+        guard ret >= 0 else {
+            avformat_close_input(&inputCtx)
+            avformat_free_context(outCtx)
+            continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+            return
+        }
+
+        TransmuxLog.liveSegmenter("Header written, starting live remux loop")
+
+        // --- Remux loop (infinite until cancelled) ---
+        var packet: UnsafeMutablePointer<AVPacket>? = av_packet_alloc()
+        var packetCount: Int64 = 0
+        var lastKnownSegmentIndex = -1
+        let liveAudioInputIdx = bestAudio >= 0 ? Int(bestAudio) : -1
+        var cumulativeTime: Double = 0
+        let maxConsecutiveErrors = 10
+
+        while !handle.isCancelled {
+            ret = av_read_frame(inCtx, packet)
+
+            if ret < 0 {
+                // EOF or error — attempt reconnect for live streams
+                if handle.isCancelled { break }
+
+                handle.recordReconnect()
+                let attempt = handle.reconnectCount
+
+                if attempt > maxConsecutiveErrors {
+                    TransmuxLog.liveSegmenter("FATAL: \(maxConsecutiveErrors) consecutive errors, giving up", level: .error)
+                    if !continuationResumed {
+                        continuation.resume(throwing: TransmuxError.processFailure(status: Int(ret)))
+                        continuationResumed = true
+                    }
+                    break
+                }
+
+                let sleepSeconds = min(Double(attempt) * 1.0, 5.0)
+                TransmuxLog.liveSegmenter("Stream error (\(ret)), reconnect attempt \(attempt)/\(maxConsecutiveErrors), wait \(String(format: "%.1f", sleepSeconds))s", level: .warn)
+                Thread.sleep(forTimeInterval: sleepSeconds)
+
+                if handle.isCancelled { break }
+                continue
+            }
+
+            // Successful read — reset reconnect counter
+            if handle.reconnectCount > 0 {
+                handle.resetReconnectCount()
+            }
+
+            guard let pkt = packet else { break }
+            let streamIndex = Int(pkt.pointee.stream_index)
+
+            guard streamIndex < streamCount, streamMapping[streamIndex] >= 0 else {
+                av_packet_unref(pkt)
+                continue
+            }
+
+            let outStreamIdx = Int32(streamMapping[streamIndex])
+
+            // Audio transcoding path
+            if let tc = audioTranscoder, streamIndex == liveAudioInputIdx {
+                let sendRet = mks_audio_transcoder_send(tc, pkt)
+                if sendRet != MKS_OK {
+                    TransmuxLog.liveSegmenter("Audio transcoder send error (\(sendRet.rawValue))", level: .warn)
+                }
+                av_packet_unref(pkt)
+
+                var outPktPtr = av_packet_alloc()
+                if let outPkt = outPktPtr {
+                    while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
+                        outPkt.pointee.stream_index = outStreamIdx
+                        var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                        mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)
+                        let encTb = AVRational(num: encTbNum, den: encTbDen)
+                        var outTb = AVRational(num: 0, den: 0)
+                        mks_stream_get_time_base(outCtx, outStreamIdx, &outTb.num, &outTb.den)
+                        av_packet_rescale_ts(outPkt, encTb, outTb)
+                        _ = av_interleaved_write_frame(outCtx, outPkt)
+                        packetCount += 1
+                    }
+                }
+                av_packet_free(&outPktPtr)
+            } else {
+                // Normal remux path
+                pkt.pointee.stream_index = outStreamIdx
+                mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
+                mks_packet_clear_pos(pkt)
+                _ = av_interleaved_write_frame(outCtx, pkt)
+                packetCount += 1
+            }
+
+            // --- Detect new segment files ---
+            // Check every 50 packets to avoid excessive filesystem calls
+            if packetCount % 50 == 0 {
+                let nextSegIndex = lastKnownSegmentIndex + 1
+                let nextSegPath = segmenter.segmentFilePath(segmentIndex: nextSegIndex)
+
+                if FileManager.default.fileExists(atPath: nextSegPath) {
+                    // New segment file detected — notify segmenter
+                    let segDuration = config.segmentDuration
+                    let startTime = cumulativeTime
+                    cumulativeTime += segDuration
+
+                    segmenter.notifySegmentReady(
+                        segmentIndex: nextSegIndex,
+                        filePath: nextSegPath,
+                        duration: segDuration,
+                        startTime: startTime
+                    )
+                    handle.recordSegment()
+                    lastKnownSegmentIndex = nextSegIndex
+
+                    // Resume continuation after first segment is written
+                    if !continuationResumed {
+                        let audioTracks = audioInfo.map { [$0] } ?? []
+                        let session = LiveTransmuxSession(
+                            sessionID: sessionID,
+                            outputDir: outputDir.path,
+                            playlistPath: segmenter.playlistPath,
+                            audioTracks: audioTracks,
+                            handle: handle,
+                            segmenter: segmenter
+                        )
+                        continuation.resume(returning: session)
+                        continuationResumed = true
+                    }
+                }
+            }
+
+            if packetCount % 50000 == 0 {
+                TransmuxLog.liveSegmenter("PROGRESS \(packetCount / 1000)K pkts, \(lastKnownSegmentIndex + 1) segs, time=\(String(format: "%.1f", cumulativeTime))s, health=\(handle.isHealthy)")
+            }
+        }
+
+        av_packet_free(&packet)
+
+        // --- Flush audio transcoder ---
+        if let tc = audioTranscoder {
+            _ = mks_audio_transcoder_flush(tc)
+            var outPktPtr = av_packet_alloc()
+            if let outPkt = outPktPtr {
+                let audioOutIdx = Int32(streamMapping[liveAudioInputIdx])
+                while mks_audio_transcoder_receive(tc, outPkt) == MKS_OK {
+                    outPkt.pointee.stream_index = audioOutIdx
+                    var encTbNum: Int32 = 0, encTbDen: Int32 = 0
+                    mks_audio_transcoder_get_time_base(tc, &encTbNum, &encTbDen)
+                    let encTb = AVRational(num: encTbNum, den: encTbDen)
+                    var outTb = AVRational(num: 0, den: 0)
+                    mks_stream_get_time_base(outCtx, audioOutIdx, &outTb.num, &outTb.den)
+                    av_packet_rescale_ts(outPkt, encTb, outTb)
+                    _ = av_interleaved_write_frame(outCtx, outPkt)
+                }
+            }
+            av_packet_free(&outPktPtr)
+            mks_audio_transcoder_free(tc)
+        }
+
+        // --- Finalize ---
+        av_write_trailer(outCtx)
+
+        // Check for any final segment file
+        let finalSegIndex = lastKnownSegmentIndex + 1
+        let finalSegPath = segmenter.segmentFilePath(segmentIndex: finalSegIndex)
+        if FileManager.default.fileExists(atPath: finalSegPath) {
+            segmenter.notifySegmentReady(
+                segmentIndex: finalSegIndex,
+                filePath: finalSegPath,
+                duration: config.segmentDuration,
+                startTime: cumulativeTime
+            )
+            handle.recordSegment()
+        }
+
+        handle.markComplete()
+
+        let reason = handle.isCancelled ? "cancelled" : "stream ended"
+        TransmuxLog.liveSegmenter("COMPLETE \(sessionID.prefix(8)) \(reason) | \(packetCount / 1000)K pkts, \(segmenter.totalSegmentsProduced) segs, \(handle.totalReconnects) reconnects")
+
+        // Resume continuation if we never got a segment (error during startup)
+        if !continuationResumed {
+            continuation.resume(throwing: TransmuxError.processFailure(status: -1))
         }
 
         // Cleanup FFmpeg contexts

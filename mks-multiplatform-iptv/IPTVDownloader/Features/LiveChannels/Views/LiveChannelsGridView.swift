@@ -561,54 +561,84 @@ struct LiveChannelsGridView: View {
         logger.debug("Direct play for channel: \(channel.name)")
         hapticMedium()
 
+        Task {
+            // Primary: Live Segmenter pipeline (.ts → FFmpeg segment muxer → local HLS).
+            // Lower latency (~2-4s less), enables future timeshift/DVR, single upstream connection.
+            if let localURL = await startLiveSegmenterPipeline(channel: channel) {
+                await presentPlayer(url: localURL, title: channel.name)
+                return
+            }
+
+            // Fallback: LiveHLSProxy pipeline (.m3u8 → proxy upstream HLS → local serve).
+            // Works when the server doesn't support .ts or the segmenter fails.
+            logger.debug("Live segmenter unavailable, falling back to LiveHLSProxy")
+            if let localURL = await startLiveHLSProxyPipeline(channel: channel) {
+                await presentPlayer(url: localURL, title: channel.name)
+                return
+            }
+
+            // Last resort: direct play without any proxy (may fail on AirPlay).
+            logger.error("All live pipelines failed — falling back to direct URL")
+            guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
+                    .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: urlString) else {
+                logger.error("Failed to generate valid stream URL")
+                return
+            }
+            await presentPlayer(url: url, title: channel.name)
+        }
+    }
+
+    /// Start the live segmenter pipeline: FFmpeg segments the raw .ts stream into local HLS.
+    private func startLiveSegmenterPipeline(channel: LiveChannel) async -> URL? {
+        let tsURLString = IPTVConfiguration.buildLiveChannelTSURL(profile: profile, channelID: channel.streamId)
+        guard let tsURL = URL(string: tsURLString) else { return nil }
+
+        do {
+            let liveSession = try await TransmuxingService.shared.startLiveTransmux(from: tsURL)
+            let serverSession = try await TransmuxServer.shared.startLiveSegmented(
+                directory: liveSession.outputDir,
+                segmenter: liveSession.segmenter,
+                handle: liveSession.handle
+            )
+            logger.debug("Live segmenter started: \(serverSession.localURL.absoluteString)")
+            return serverSession.localURL
+        } catch {
+            logger.error("Live segmenter failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Start the LiveHLSProxy pipeline: proxy upstream .m3u8 through a local server.
+    private func startLiveHLSProxyPipeline(channel: LiveChannel) async -> URL? {
         guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
                 .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: urlString) else {
-            logger.error("Failed to generate valid stream URL")
-            return
+              let url = URL(string: urlString) else { return nil }
+
+        do {
+            let session = try await TransmuxServer.shared.startLive(upstreamURL: url)
+            logger.debug("Live proxy started: \(session.localURL.absoluteString)")
+            return session.localURL
+        } catch {
+            logger.error("Live proxy failed: \(error.localizedDescription)")
+            return nil
         }
+    }
 
-        // Route through LiveHLSProxy for single-connection AirPlay/Cast support.
-        // The proxy maintains one upstream connection and serves locally via HLS,
-        // so both local AVPlayer and AirPlay devices consume from the same server.
-        Task {
-            do {
-                let session = try await TransmuxServer.shared.startLive(upstreamURL: url)
-                let proxyURL = session.localURL
-                logger.debug("Live proxy started: \(proxyURL.absoluteString)")
+    /// Present the player on the appropriate platform.
+    @MainActor
+    private func presentPlayer(url: URL, title: String) {
+        let player = PlayerFactory.shared.createPlayer(for: url)
+        player.play()
 
-                await MainActor.run {
-                    let player = PlayerFactory.shared.createPlayer(for: proxyURL)
-                    player.play()
-
-                    #if os(macOS)
-                    PlayerWindowManager.shared.present(player: player, title: channel.name)
-                    openWindow(id: "player")
-                    #else
-                    activePlayer = player
-                    playerTitle = channel.name
-                    showFullscreenPlayer = true
-                    #endif
-                }
-            } catch {
-                logger.error("Live proxy failed: \(error.localizedDescription) — falling back to direct play")
-
-                // Fallback: direct play without proxy (may fail on AirPlay but works locally)
-                await MainActor.run {
-                    let player = PlayerFactory.shared.createPlayer(for: url)
-                    player.play()
-
-                    #if os(macOS)
-                    PlayerWindowManager.shared.present(player: player, title: channel.name)
-                    openWindow(id: "player")
-                    #else
-                    activePlayer = player
-                    playerTitle = channel.name
-                    showFullscreenPlayer = true
-                    #endif
-                }
-            }
-        }
+        #if os(macOS)
+        PlayerWindowManager.shared.present(player: player, title: title)
+        openWindow(id: "player")
+        #else
+        activePlayer = player
+        playerTitle = title
+        showFullscreenPlayer = true
+        #endif
     }
 
     private func copyStreamURL(for channel: LiveChannel) {

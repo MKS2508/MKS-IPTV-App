@@ -13,6 +13,11 @@ struct FullscreenPlayerModifier: ViewModifier {
     var metadata: MetadataResult? = nil
     var stopOnDismiss: Bool = true
 
+    // Auto-play next episode
+    var nextEpisodeInfo: NextEpisodeInfo?
+    var onPlayNextEpisode: ((SerieDetail.Episode) -> Void)?
+    var onCancelAutoPlay: (() -> Void)?
+
     func body(content: Content) -> some View {
         content
             .fullScreenCover(isPresented: $isPresented) {
@@ -37,7 +42,10 @@ struct FullscreenPlayerModifier: ViewModifier {
             title: title,
             metadata: metadata,
             onDismiss: dismiss,
-            presentationMode: .fullscreen
+            presentationMode: .fullscreen,
+            nextEpisodeInfo: nextEpisodeInfo,
+            onPlayNextEpisode: onPlayNextEpisode,
+            onCancelAutoPlay: onCancelAutoPlay
         )
         .background(Color.black)
         .ignoresSafeArea()
@@ -64,7 +72,10 @@ extension View {
         player: (any VideoPlayerProtocol)?,
         title: String = "",
         metadata: MetadataResult? = nil,
-        stopOnDismiss: Bool = true
+        stopOnDismiss: Bool = true,
+        nextEpisodeInfo: NextEpisodeInfo? = nil,
+        onPlayNextEpisode: ((SerieDetail.Episode) -> Void)? = nil,
+        onCancelAutoPlay: (() -> Void)? = nil
     ) -> some View {
         #if os(macOS)
         self
@@ -74,7 +85,10 @@ extension View {
             player: player,
             title: title,
             metadata: metadata,
-            stopOnDismiss: stopOnDismiss
+            stopOnDismiss: stopOnDismiss,
+            nextEpisodeInfo: nextEpisodeInfo,
+            onPlayNextEpisode: onPlayNextEpisode,
+            onCancelAutoPlay: onCancelAutoPlay
         ))
         #endif
     }

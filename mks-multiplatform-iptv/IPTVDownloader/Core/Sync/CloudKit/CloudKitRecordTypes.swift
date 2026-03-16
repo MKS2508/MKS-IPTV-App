@@ -16,6 +16,9 @@ enum CloudKitRecordTypes {
     /// Record type for IPTV profiles.
     static let profile = "IPTVProfile"
 
+    /// Record type for synced devices.
+    static let syncedDevice = "SyncedDevice"
+
     /// Field names for the IPTVProfile record type.
     enum ProfileFields {
         static let name = "name"
@@ -24,6 +27,18 @@ enum CloudKitRecordTypes {
         static let password = "password"
         static let fileExtension = "fileExtension"
         static let lastModified = "lastModified"
+    }
+
+    /// Field names for the SyncedDevice record type.
+    enum DeviceFields {
+        static let deviceName = "deviceName"
+        static let modelIdentifier = "modelIdentifier"
+        static let platform = "platform"
+        static let osVersion = "osVersion"
+        static let appVersion = "appVersion"
+        static let lastActiveDate = "lastActiveDate"
+        static let lastModified = "lastModified"
+        static let deviceSymbol = "deviceSymbol"
     }
 }
 

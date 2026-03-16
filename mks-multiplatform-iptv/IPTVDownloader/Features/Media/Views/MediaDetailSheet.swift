@@ -25,6 +25,7 @@ struct MediaDetailSheet: View {
     @EnvironmentObject private var downloadManager: DownloadManager
     @EnvironmentObject private var profile: IPTVProfile
     @Environment(RemotePlayManager.self) private var remotePlayManager
+    @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #endif
@@ -38,6 +39,12 @@ struct MediaDetailSheet: View {
     @State private var selectedTab: DetailTab = .overview
     @State private var selectedSeason: String = "1"
     @State private var episodeSearchText = ""
+
+    // Watch history
+    @State private var playbackTracker = PlaybackTracker()
+    @State private var showResumeDialog = false
+    @State private var resumeEntry: WatchHistoryEntry?
+    @State private var pendingPlayAction: (() -> Void)?
 
     // Download in-place
     @State private var showDownloadOptions = false
@@ -119,12 +126,54 @@ struct MediaDetailSheet: View {
             isPresented: $showingPlayer,
             player: activePlayer,
             title: detail.cleanTitle,
-            metadata: enrichedMetadata
+            metadata: enrichedMetadata,
+            nextEpisodeInfo: playbackTracker.nextEpisodeReady,
+            onPlayNextEpisode: { episode in
+                // Dismiss current player, then launch next episode
+                showingPlayer = false
+                playbackTracker.stopTracking()
+                activePlayer?.stop()
+                activePlayer = nil
+                // Small delay to allow fullscreen dismiss animation
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    launchEpisodePlayer(episode)
+                }
+            },
+            onCancelAutoPlay: {
+                playbackTracker.nextEpisodeReady = nil
+            }
         )
         .onChange(of: showingPlayer) { _, isShowing in
             if !isShowing {
+                playbackTracker.stopTracking()
                 activePlayer?.stop()
                 activePlayer = nil
+            }
+        }
+        .overlay {
+            if showResumeDialog, let entry = resumeEntry {
+                ResumeDialog(
+                    entry: entry,
+                    onResume: {
+                        showResumeDialog = false
+                        pendingPlayAction?()
+                        seekWhenReady(position: entry.lastPosition)
+                    },
+                    onStartOver: {
+                        showResumeDialog = false
+                        pendingPlayAction?()
+                    },
+                    onCancel: {
+                        showResumeDialog = false
+                        pendingPlayAction = nil
+                    }
+                )
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background {
+                playbackTracker.saveOnBackground()
             }
         }
         .task {
@@ -840,21 +889,27 @@ struct MediaDetailSheet: View {
 
     private func playContent() {
         if let movie = movieDetail {
-            let urlString = IPTVConfiguration.buildMovieURL(
-                profile: profile,
-                vodID: String(movie.movieData.streamId),
-                vodExtension: movie.movieData.containerExtension ?? "mkv"
-            )
-            guard let url = URL(string: urlString) else { return }
-            let player = PlayerFactory.shared.createPlayer(for: url, metadata: enrichedMetadata)
-            player.play()
-            #if os(macOS)
-            PlayerWindowManager.shared.present(player: player, title: detail.cleanTitle, metadata: enrichedMetadata)
-            openWindow(id: "player")
-            #else
-            activePlayer = player
-            showingPlayer = true
-            #endif
+            let contentId = String(movie.movieData.streamId)
+            let ext = movie.movieData.containerExtension ?? "mkv"
+
+            // Check for saved position — show resume dialog if applicable
+            Task {
+                if let entry = try? await WatchHistoryManager.shared?.entry(
+                    profileId: profile.id,
+                    contentType: "movie",
+                    contentId: contentId
+                ), entry.lastPosition > 30, !entry.isCompleted {
+                    print("[PlaybackTracker] Resume dialog: pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
+                    resumeEntry = entry
+                    pendingPlayAction = { [self] in
+                        launchMoviePlayer(movie: movie, ext: ext)
+                    }
+                    showResumeDialog = true
+                } else {
+                    print("[PlaybackTracker] No resume — launching directly")
+                    launchMoviePlayer(movie: movie, ext: ext)
+                }
+            }
         } else if let serie = serieDetail,
                   let firstSeason = serie.seasons.first,
                   let firstEpisode = serie.episodes[firstSeason.id]?.first {
@@ -862,7 +917,65 @@ struct MediaDetailSheet: View {
         }
     }
 
+    private func launchMoviePlayer(movie: MovieDetail, ext: String) {
+        let urlString = IPTVConfiguration.buildMovieURL(
+            profile: profile,
+            vodID: String(movie.movieData.streamId),
+            vodExtension: ext
+        )
+        guard let url = URL(string: urlString) else { return }
+        let player = PlayerFactory.shared.createPlayer(for: url, metadata: enrichedMetadata)
+        player.play()
+
+        let identity = ContentIdentity(
+            profileId: profile.id,
+            contentType: "movie",
+            contentId: String(movie.movieData.streamId),
+            displayTitle: detail.cleanTitle,
+            posterURL: enrichedMetadata?.posterURL ?? detail.detailPosterURL,
+            backdropURL: enrichedMetadata?.backdropURL ?? detail.detailBackdropPaths.first,
+            seriesId: nil,
+            showTitle: nil,
+            seasonNumber: nil,
+            episodeNumber: nil,
+            episodeTitle: nil,
+            containerExtension: ext
+        )
+        playbackTracker.startTracking(player: player, content: identity)
+
+        #if os(macOS)
+        PlayerWindowManager.shared.present(player: player, title: detail.cleanTitle, metadata: enrichedMetadata)
+        openWindow(id: "player")
+        #else
+        activePlayer = player
+        showingPlayer = true
+        #endif
+    }
+
     private func playEpisode(_ episode: SerieDetail.Episode) {
+        let contentId = episode.id
+
+        // Check for saved position — show resume dialog if applicable
+        Task {
+            if let entry = try? await WatchHistoryManager.shared?.entry(
+                profileId: profile.id,
+                contentType: "episode",
+                contentId: contentId
+            ), entry.lastPosition > 30, !entry.isCompleted {
+                print("[PlaybackTracker] Resume dialog (episode): pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
+                resumeEntry = entry
+                pendingPlayAction = { [self] in
+                    launchEpisodePlayer(episode)
+                }
+                showResumeDialog = true
+            } else {
+                print("[PlaybackTracker] No resume (episode) — launching directly")
+                launchEpisodePlayer(episode)
+            }
+        }
+    }
+
+    private func launchEpisodePlayer(_ episode: SerieDetail.Episode) {
         let urlString = IPTVConfiguration.buildSeriesURL(
             profile: profile,
             vodID: episode.id,
@@ -887,6 +1000,24 @@ struct MediaDetailSheet: View {
 
         let player = PlayerFactory.shared.createPlayer(for: url, metadata: episodeMetadata)
         player.play()
+
+        let identity = ContentIdentity(
+            profileId: profile.id,
+            contentType: "episode",
+            contentId: episode.id,
+            displayTitle: "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum))",
+            posterURL: episode.info.movieImage.isEmpty ? enrichedMetadata?.posterURL : episode.info.movieImage,
+            backdropURL: enrichedMetadata?.backdropURL ?? detail.detailBackdropPaths.first,
+            seriesId: serieDetail?.seriesId,
+            showTitle: detail.cleanTitle,
+            seasonNumber: episode.season,
+            episodeNumber: episode.episodeNum,
+            episodeTitle: episode.title,
+            containerExtension: episode.containerExtension
+        )
+        playbackTracker.seriesDetail = serieDetail
+        playbackTracker.startTracking(player: player, content: identity)
+
         #if os(macOS)
         let epTitle = "\(detail.cleanTitle) — S\(String(format: "%02d", episode.season))E\(String(format: "%02d", episode.episodeNum)) — \(episode.title)"
         PlayerWindowManager.shared.present(player: player, title: epTitle, metadata: episodeMetadata)
@@ -1001,7 +1132,29 @@ struct MediaDetailSheet: View {
             .getEnrichedMetadata(for: detail, tmdbId: detail.tmdbIdInt)
         enrichedMetadata = result
     }
-    
+
+    /// Waits for the player to be ready (isReady + duration > 0), then seeks.
+    /// Polls every 100ms for up to 15 seconds — handles transmux startup latency.
+    private func seekWhenReady(position: Double) {
+        Task { @MainActor in
+            for attempt in 0..<150 {
+                guard let player = activePlayer else {
+                    print("[Resume] Player is nil — aborting seek")
+                    return
+                }
+                if player.isReady && player.duration > 0 {
+                    player.seek(to: position)
+                    print("[Resume] Seeked to \(String(format: "%.1f", position))s (after \(attempt * 100)ms)")
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            // Timeout — try seeking anyway as a last resort
+            activePlayer?.seek(to: position)
+            print("[Resume] Timeout after 15s — attempted seek to \(String(format: "%.1f", position))s anyway")
+        }
+    }
+
     /// Icon for each output format
     private func formatIcon(for format: VideoDownloader.OutputFormat) -> String {
         switch format {

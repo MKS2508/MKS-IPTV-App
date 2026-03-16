@@ -235,6 +235,11 @@
 					};
 					058CC06E2D39C8CF006E00BF = {
 						CreatedOnToolsVersion = 16.2;
+						SystemCapabilities = {
+							com.apple.iCloud = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};

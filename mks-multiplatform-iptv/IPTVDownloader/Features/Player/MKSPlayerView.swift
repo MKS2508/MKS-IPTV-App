@@ -20,6 +20,11 @@ struct MKSPlayerView: View {
     var presentationMode: MKSPlayerPresentationMode = .inline
     var controlsConfiguration: PlayerControlsConfiguration = .glass
 
+    /// Auto-play next episode support — set from PlaybackTracker
+    var nextEpisodeInfo: NextEpisodeInfo?
+    var onPlayNextEpisode: ((SerieDetail.Episode) -> Void)?
+    var onCancelAutoPlay: (() -> Void)?
+
     @Environment(RemotePlayManager.self) private var remotePlayManager
 
     var showMetadata: Bool = true
@@ -29,13 +34,22 @@ struct MKSPlayerView: View {
     @State private var videoGravity: PlayerVideoGravity = .resizeAspect
     @State private var controlsVisible: Bool = true
 
-    #if os(macOS)
-    @State private var macOSOverlayVisible = true
-    @State private var overlayHideTask: Task<Void, Never>?
-    #endif
+    // macOS overlay state removed — native overlays use contentOverlayView,
+    // glass overlays use PlayerOverlayContainer's own visibility management.
 
     private var useNativeControls: Bool {
         controlsConfiguration.mode == .native
+    }
+
+    /// True when macOS fullscreen — NO SwiftUI overlays should exist above
+    /// the NSViewRepresentable (Apple bug FB9818366). DLNA/Cast is handled
+    /// entirely by `actionPopUpButtonMenu` in the native transport bar.
+    private var macOSFullscreen: Bool {
+        #if os(macOS)
+        return presentationMode == .fullscreen
+        #else
+        return false
+        #endif
     }
 
     var body: some View {
@@ -46,7 +60,8 @@ struct MKSPlayerView: View {
                 .background(Color.black)
 
             // MARK: - Layer 1: Debug overlay (top-left, non-blocking)
-            if showDebugOverlay {
+            // Hidden on macOS native fullscreen to avoid blocking NSView (FB9818366).
+            if showDebugOverlay, !macOSFullscreen {
                 VStack {
                     HStack {
                         PlayerDebugOverlay(player: player)
@@ -65,7 +80,10 @@ struct MKSPlayerView: View {
             }
 
             // MARK: - Layer 3: Top trailing buttons (individual, no full-screen wrapper)
-            if showRemotePlayButton {
+            // Hidden on macOS fullscreen — any SwiftUI view above the
+            // NSViewRepresentable blocks native AVPlayerView controls (FB9818366).
+            // DLNA/Cast is handled by actionPopUpButtonMenu gear icon on macOS fullscreen.
+            if showRemotePlayButton, !macOSFullscreen {
                 RemotePlayButton()
                     .buttonStyle(.plain)
                     .adaptiveGlass(in: Capsule())
@@ -78,23 +96,29 @@ struct MKSPlayerView: View {
                 castingOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            // MARK: - Layer 5: Auto-play next episode overlay (bottom-right)
+            if let nextInfo = nextEpisodeInfo, !macOSFullscreen {
+                AutoPlayNextOverlay(
+                    info: nextInfo,
+                    onPlayNow: { onPlayNextEpisode?(nextInfo.episode) },
+                    onCancel: { onCancelAutoPlay?() }
+                )
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: nextEpisodeInfo?.episode.id)
+            }
         }
         #if os(macOS)
         .onContinuousHover { phase in
             switch phase {
             case .active:
-                if presentationMode == .fullscreen {
-                    showMacOSOverlayBriefly()
-                } else if !useNativeControls {
+                // Only manage controlsVisible for inline glass controls.
+                // macOS fullscreen uses native controls exclusively.
+                if !macOSFullscreen, !useNativeControls {
                     controlsVisible = true
                 }
             case .ended:
                 break
-            }
-        }
-        .onAppear {
-            if presentationMode == .fullscreen {
-                scheduleMacOSOverlayAutoHide()
             }
         }
         #endif
@@ -119,7 +143,30 @@ struct MKSPlayerView: View {
                 title: title,
                 metadata: metadata,
                 onDismiss: onDismiss,
-                videoGravity: videoGravity.avGravity
+                videoGravity: videoGravity.avGravity,
+                remoteDevices: remotePlayManager.discoveredDevices,
+                connectedDevice: remotePlayManager.connectedDevice,
+                onDeviceSelected: { device in
+                    Task {
+                        try? await remotePlayManager.connect(to: device)
+                    }
+                },
+                onDisconnect: {
+                    Task {
+                        await remotePlayManager.disconnect()
+                    }
+                },
+                onCopyStreamURL: {
+                    #if os(macOS)
+                    if let url = player.sourceURL {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                    }
+                    #endif
+                },
+                onRefreshDevices: {
+                    remotePlayManager.refreshDiscovery()
+                }
             )
 
         case .inline:
@@ -131,54 +178,47 @@ struct MKSPlayerView: View {
 
     @ViewBuilder
     private var nativeControlsOverlays: some View {
+        // Native mode: inline overlays only.
+        // macOS fullscreen: title/metadata injected into AVPlayerView.contentOverlayView
+        // (does NOT block native transport controls — Apple bug FB9818366 workaround).
         if presentationMode == .inline {
             if let metadata, showMetadata {
-                VStack {
-                    Spacer()
-                    GlassMetadataOverlay(metadata: metadata)
-                        .padding()
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                GlassMetadataOverlay(metadata: metadata)
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .allowsHitTesting(false)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
             if metadata == nil, !title.isEmpty {
-                VStack {
-                    titleBar
-                    Spacer()
-                }
+                titleBar
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .allowsHitTesting(false)
             }
 
             if onRequestFullscreen != nil {
                 fullscreenButton
             }
         }
-
-        #if os(macOS)
-        if presentationMode == .fullscreen, (!title.isEmpty || metadata != nil) {
-            macOSFullscreenTitleOverlay
-        }
-
-        if let onDismiss, presentationMode == .fullscreen {
-            macOSDismissButton(onDismiss: onDismiss)
-        }
-        #endif
     }
 
     // MARK: - Glass Controls Overlay
 
     @ViewBuilder
     private var glassControlsOverlay: some View {
-        if presentationMode == .inline {
-            // Metadata overlay — visible only when controls are visible
+        // Glass controls only for inline mode on all platforms.
+        // macOS fullscreen uses native controls + actionPopUpButtonMenu for DLNA/Cast.
+        // iOS fullscreen uses AVPlayerViewController native controls.
+        let showGlassControls = presentationMode == .inline
+
+        if showGlassControls {
             if let metadata, showMetadata {
-                VStack {
-                    GlassMetadataOverlay(metadata: metadata)
-                        .padding(.horizontal)
-                    Spacer()
-                }
-                .opacity(controlsVisible ? 1 : 0)
-                .allowsHitTesting(controlsVisible)
-                .animation(.easeInOut(duration: 0.25), value: controlsVisible)
+                GlassMetadataOverlay(metadata: metadata)
+                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .opacity(controlsVisible ? 1 : 0)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.25), value: controlsVisible)
             }
 
             PlayerOverlayContainer(
@@ -193,16 +233,6 @@ struct MKSPlayerView: View {
                 }
             )
         }
-
-        #if os(macOS)
-        if presentationMode == .fullscreen, (!title.isEmpty || metadata != nil) {
-            macOSFullscreenTitleOverlay
-        }
-
-        if let onDismiss, presentationMode == .fullscreen {
-            macOSDismissButton(onDismiss: onDismiss)
-        }
-        #endif
     }
 
     // MARK: - Show Remote Play Button
@@ -248,21 +278,16 @@ struct MKSPlayerView: View {
 
     @ViewBuilder
     private var fullscreenButton: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Button(action: { onRequestFullscreen?() }) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(10)
-                }
-                .adaptiveGlass(in: Circle())
-                .padding(.trailing, 12)
-                .padding(.bottom, 12)
-            }
+        Button(action: { onRequestFullscreen?() }) {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(10)
         }
+        .adaptiveGlass(in: Circle())
+        .padding(.trailing, 12)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
     }
 
     // MARK: - Casting Overlay
@@ -307,26 +332,45 @@ struct MKSPlayerView: View {
 
     private func handleCastConnected() {
         guard let sourceURL = player.sourceURL else {
-            print("[Cast] No sourceURL on player — cannot auto-load on Cast device")
+            print("[DLNACast] No sourceURL on player — cannot auto-load on Cast device")
             return
         }
+
+        print("[DLNACast] handleCastConnected — sourceURL=\(sourceURL.absoluteString)")
+        print("[DLNACast] handleCastConnected — player.isPlaying=\(player.isPlaying), player.currentTime=\(player.currentTime)")
+        print("[DLNACast] handleCastConnected — device transport=\(remotePlayManager.connectedDevice?.effectiveTransport.rawValue ?? "nil")")
 
         wasPlayingBeforeCast = player.isPlaying
         didLoadOnCastDevice = true
 
         let startPosition = player.currentTime
 
+        // Pause local playback — audio should come from the TV, not the Mac
+        if player.isPlaying {
+            player.pause()
+            print("[DLNACast] Local player paused before cast handoff")
+        }
+
         Task {
             do {
-                try await remotePlayManager.load(
+                // Use transmux pipeline: FFmpeg remuxes the source to MPEG-TS/HLS,
+                // TransmuxServer serves it over HTTP, TV gets a LAN URL with
+                // compatible content instead of raw MKV from the IPTV server.
+                print("[DLNACast] Starting loadWithTransmux...")
+                try await remotePlayManager.loadWithTransmux(
                     url: sourceURL,
                     metadata: metadata,
                     startPosition: startPosition
                 )
-                print("[Cast] Content loaded on device at position \(String(format: "%.1f", startPosition))s — local player continues")
+                print("[DLNACast] Content transmuxed and loaded on device at position \(String(format: "%.1f", startPosition))s")
             } catch {
-                print("[Cast] Failed to load on device: \(error.localizedDescription)")
+                print("[DLNACast] Failed to load on device: \(error)")
                 didLoadOnCastDevice = false
+                // Resume local playback on failure
+                if wasPlayingBeforeCast {
+                    player.play()
+                    print("[DLNACast] Resumed local playback after cast failure")
+                }
             }
         }
     }
@@ -346,100 +390,6 @@ struct MKSPlayerView: View {
         }
     }
 
-    // MARK: - macOS Fullscreen Overlays
-
-    #if os(macOS)
-    @ViewBuilder
-    private var macOSFullscreenTitleOverlay: some View {
-        VStack {
-            VStack(alignment: .leading, spacing: 6) {
-                if !title.isEmpty {
-                    Text(title)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                }
-
-                if let metadata {
-                    HStack(spacing: 12) {
-                        if let year = metadata.year {
-                            Text(String(year))
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                        if !metadata.genre.isEmpty {
-                            Text(metadata.genre.prefix(2).joined(separator: ", "))
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                        if let runtime = metadata.runtimeMinutes, runtime > 0 {
-                            let h = runtime / 60
-                            let m = runtime % 60
-                            Text(h > 0 ? "\(h)h \(m)m" : "\(m)m")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.7))
-                        }
-                        if let rating = metadata.rating, rating > 0 {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill")
-                                    .foregroundStyle(.yellow)
-                                    .font(.caption)
-                                Text(String(format: "%.1f", rating))
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                LinearGradient(
-                    colors: [.black.opacity(0.75), .black.opacity(0.4), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-
-            Spacer()
-        }
-        .opacity(macOSOverlayVisible ? 1 : 0)
-        .animation(.easeInOut(duration: 0.4), value: macOSOverlayVisible)
-        .allowsHitTesting(false)
-    }
-
-    @ViewBuilder
-    private func macOSDismissButton(onDismiss: @escaping () -> Void) -> some View {
-        VStack {
-            HStack {
-                dismissButton(action: onDismiss)
-                    .opacity(macOSOverlayVisible ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.3), value: macOSOverlayVisible)
-                Spacer()
-            }
-            Spacer()
-        }
-    }
-
-    private func showMacOSOverlayBriefly() {
-        macOSOverlayVisible = true
-        scheduleMacOSOverlayAutoHide()
-    }
-
-    private func scheduleMacOSOverlayAutoHide() {
-        overlayHideTask?.cancel()
-        overlayHideTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(4))
-            guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.5)) {
-                macOSOverlayVisible = false
-            }
-        }
-    }
-    #endif
 }
 
 // MARK: - GlassMetadataOverlay
@@ -763,6 +713,15 @@ private struct ReactiveFullscreenSurface: View {
     var onDismiss: (() -> Void)?
     var videoGravity: AVLayerVideoGravity = .resizeAspect
 
+    // MARK: - Remote Play (macOS actionPopUpButtonMenu)
+
+    var remoteDevices: [RemoteDevice] = []
+    var connectedDevice: RemoteDevice? = nil
+    var onDeviceSelected: ((RemoteDevice) -> Void)? = nil
+    var onDisconnect: (() -> Void)? = nil
+    var onCopyStreamURL: (() -> Void)? = nil
+    var onRefreshDevices: (() -> Void)? = nil
+
     @State private var avPlayer: AVPlayer?
     @State private var didSetupMetadata = false
     @State private var didSetDuration = false
@@ -777,7 +736,17 @@ private struct ReactiveFullscreenSurface: View {
                     videoGravity: videoGravity
                 )
                 #elseif os(macOS)
-                NativeAVPlayerView(player: avPlayer, videoGravity: videoGravity)
+                NativeAVPlayerView(
+                    player: avPlayer,
+                    videoGravity: videoGravity,
+                    controlsStyle: .floating,
+                    remoteDevices: remoteDevices,
+                    connectedDevice: connectedDevice,
+                    onDeviceSelected: onDeviceSelected,
+                    onDisconnect: onDisconnect,
+                    onCopyStreamURL: onCopyStreamURL,
+                    onRefreshDevices: onRefreshDevices
+                )
                 #endif
             } else {
                 player.playerView()

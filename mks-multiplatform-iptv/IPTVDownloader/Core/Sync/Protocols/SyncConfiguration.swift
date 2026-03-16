@@ -32,9 +32,7 @@ struct SyncConfiguration: Codable {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let config = try? JSONDecoder().decode(SyncConfiguration.self, from: data)
         else {
-            // Default to disabled — CloudKit entitlements must be active before enabling sync.
-            // Enable via Settings once iCloud container is provisioned.
-            return SyncConfiguration(isEnabled: false, lastSyncDate: nil, serverChangeTokenData: nil)
+            return SyncConfiguration(isEnabled: true, lastSyncDate: nil, serverChangeTokenData: nil)
         }
         return config
     }

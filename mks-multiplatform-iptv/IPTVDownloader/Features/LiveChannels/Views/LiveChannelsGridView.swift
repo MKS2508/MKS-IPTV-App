@@ -561,6 +561,17 @@ struct LiveChannelsGridView: View {
         logger.debug("Direct play for channel: \(channel.name)")
         hapticMedium()
 
+        // Record channel watch for "Recently Watched" on Home
+        Task {
+            try? await WatchHistoryManager.shared?.recordChannelWatch(
+                profileId: profile.id,
+                channelStreamId: channel.streamId,
+                channelName: channel.name,
+                channelIcon: channel.streamIcon,
+                categoryId: channel.categoryId
+            )
+        }
+
         Task {
             // Primary: Live Segmenter pipeline (.ts → FFmpeg segment muxer → local HLS).
             // Lower latency (~2-4s less), enables future timeshift/DVR, single upstream connection.

@@ -2,5 +2,9 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/references/FileProvider-Swift" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/references/KSPlayer" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/references/Stremio-iOS" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/references/stremio-addon-sdk" vcs="Git" />
   </component>
 </project>

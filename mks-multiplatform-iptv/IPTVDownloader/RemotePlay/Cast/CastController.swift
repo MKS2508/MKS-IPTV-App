@@ -150,7 +150,7 @@ final class CastController: RemoteDeviceController, @unchecked Sendable {
 
     // MARK: - Content Loading
 
-    func load(url: URL, metadata: MetadataResult?, startPosition: Double) async throws {
+    func load(url: URL, metadata: MetadataResult?, startPosition: Double, streaming: Bool = false) async throws {
         guard let channel else {
             throw RemotePlayError.transportError("Cast: not connected")
         }

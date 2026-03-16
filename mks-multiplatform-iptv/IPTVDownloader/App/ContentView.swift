@@ -139,6 +139,9 @@ struct ContentView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .automatic) {
+                    SyncToolbarItem(manager: profilesManager)
+                }
+                ToolbarItem(placement: .automatic) {
                     Button(action: { showingSettings = true }) {
                         Label("Settings", systemImage: "gearshape")
                     }
@@ -287,6 +290,7 @@ struct ContentView: View {
             // DEVELOPMENT section
             Section("Development") {
                 navigationLink(for: .debugStream)
+                navigationLink(for: .logsDebug)
             }
             #endif
         }
@@ -405,6 +409,10 @@ struct ContentView: View {
         case .cacheDebug:
             CacheDebugView()
                 .navigationTitle("Cache Inspector")
+
+        case .logsDebug:
+            LogsDebugView()
+                .navigationTitle("Logs Inspector")
         #endif
         }
     }

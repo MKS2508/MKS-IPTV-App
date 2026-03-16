@@ -212,25 +212,19 @@ struct ProfileRow: View {
 }
 
 struct GeneralSettingsView: View {
+    @EnvironmentObject private var profilesManager: IPTVProfilesManager
+
     var body: some View {
-        VStack {
-            Image(systemName: "gearshape.2")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-                .padding()
-            
-            Text("General Settings")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            Text("Additional settings will be available here in future updates.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding()
-            
-            Spacer()
+        Form {
+            Section {
+                SyncStatusDetailView(manager: profilesManager)
+            } header: {
+                Label("iCloud Sync", systemImage: "icloud")
+            }
+
+            SyncedDevicesView()
         }
+        .formStyle(.grouped)
         .navigationTitle("General")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

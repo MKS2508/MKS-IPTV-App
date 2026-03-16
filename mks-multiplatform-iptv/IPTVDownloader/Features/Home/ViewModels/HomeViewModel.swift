@@ -21,6 +21,8 @@ struct HomeSection: Identifiable {
 /// Types of sections displayed on the Home screen
 enum HomeSectionType {
     case heroBanner(item: any LibraryItem)
+    case continueWatching(items: [WatchHistoryEntry])
+    case recentChannels(channels: [RecentChannelEntry])
     case nowOnTV(channels: [(liveChannel: LiveChannel, epgChannel: EPGChannel?, programme: EPGProgramme)])
     case comingUpNext(programmes: [(programme: EPGProgramme, channelName: String)])
     case mediaCarousel(items: [any LibraryItem])
@@ -166,6 +168,80 @@ final class HomeViewModel {
         }
 
         print("[HomeViewModel] Inserted \(epgSections.count) EPG sections")
+    }
+
+    // MARK: - Continue Watching Section (deferred)
+
+    /// Insert "Continue Watching" section after hero banner.
+    /// Call after initial section assembly or when returning to Home.
+    func insertContinueWatchingSection(profileId: UUID) async {
+        guard let manager = WatchHistoryManager.shared else { return }
+
+        do {
+            let items = try await manager.continueWatchingItems(profileId: profileId, limit: 20)
+            guard !items.isEmpty else {
+                // Remove existing section if no items
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    sections.removeAll { $0.id == "continue_watching" }
+                }
+                return
+            }
+
+            // Remove existing section before reinserting (refresh)
+            sections.removeAll { $0.id == "continue_watching" }
+
+            let section = HomeSection(
+                id: "continue_watching",
+                type: .continueWatching(items: items),
+                title: "Continue Watching",
+                iconName: "play.circle"
+            )
+
+            // Insert after hero banner (index 1)
+            let insertionIndex = sections.isEmpty ? 0 : min(1, sections.count)
+            withAnimation(.easeInOut(duration: 0.4)) {
+                sections.insert(section, at: insertionIndex)
+            }
+
+            print("[HomeViewModel] Inserted Continue Watching section with \(items.count) items")
+        } catch {
+            print("[HomeViewModel] Failed to load continue watching: \(error)")
+        }
+    }
+
+    /// Insert "Recently Watched Channels" section after Continue Watching.
+    func insertRecentChannelsSection(profileId: UUID) async {
+        guard let manager = WatchHistoryManager.shared else { return }
+
+        do {
+            let channels = try await manager.recentChannels(profileId: profileId, limit: 20)
+            guard !channels.isEmpty else {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    sections.removeAll { $0.id == "recent_channels" }
+                }
+                return
+            }
+
+            sections.removeAll { $0.id == "recent_channels" }
+
+            let section = HomeSection(
+                id: "recent_channels",
+                type: .recentChannels(channels: channels),
+                title: "Recently Watched",
+                iconName: "clock.arrow.circlepath"
+            )
+
+            // Insert after continue watching (or after hero banner)
+            let afterCW = sections.firstIndex(where: { $0.id == "continue_watching" })
+            let insertionIndex = (afterCW.map { $0 + 1 }) ?? min(1, sections.count)
+            withAnimation(.easeInOut(duration: 0.4)) {
+                sections.insert(section, at: insertionIndex)
+            }
+
+            print("[HomeViewModel] Inserted Recent Channels section with \(channels.count) items")
+        } catch {
+            print("[HomeViewModel] Failed to load recent channels: \(error)")
+        }
     }
 
     // MARK: - Hero Banner

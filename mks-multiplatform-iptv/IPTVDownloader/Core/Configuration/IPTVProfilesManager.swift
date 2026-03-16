@@ -112,6 +112,11 @@ class IPTVProfilesManager: ObservableObject {
                 await deleteProfileFromCloud(profile)
             }
         }
+
+        // Cascade delete watch history for this profile
+        Task {
+            try? await WatchHistoryManager.shared?.deleteAllEntries(profileId: id)
+        }
     }
 
     func selectProfile(_ id: ProfileID) {

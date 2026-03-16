@@ -43,8 +43,10 @@ protocol RemoteDeviceController: AnyObject, Sendable {
     ///   - url: Content URL (LAN-accessible, not localhost)
     ///   - metadata: Optional media metadata for device display
     ///   - startPosition: Optional start position in seconds (default: 0)
+    ///   - streaming: When true, content is progressive/live (transmuxed MPEG-TS).
+    ///     Affects DLNA DIDL-Lite flags (OP=00 no seeking, CI=1 converted).
     /// - Throws: RemotePlayError if loading fails
-    func load(url: URL, metadata: MetadataResult?, startPosition: Double) async throws
+    func load(url: URL, metadata: MetadataResult?, startPosition: Double, streaming: Bool) async throws
 
     // MARK: - Transport Control
 

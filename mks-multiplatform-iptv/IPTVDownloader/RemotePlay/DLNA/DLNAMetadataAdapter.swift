@@ -47,6 +47,7 @@ enum DLNAMetadataAdapter {
         <DIDL-Lite xmlns="\(didlNamespace)" xmlns:dc="\(dcNamespace)" xmlns:upnp="\(upnpNamespace)">
           <item id="0" parentID="-1" restricted="1">
             <dc:title>\(xmlEscape(title))</dc:title>
+            <upnp:class>object.item.videoItem.movie</upnp:class>
             \(buildCreatorElements(from: metadata))
             \(buildResElement(contentURL: contentURL, duration: durationStr, metadata: metadata, streaming: streaming))
             \(buildAlbumArt(metadata: metadata))

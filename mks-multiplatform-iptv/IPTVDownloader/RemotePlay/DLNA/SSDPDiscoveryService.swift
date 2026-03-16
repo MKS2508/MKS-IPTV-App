@@ -335,6 +335,17 @@ final class SSDPDiscoveryService: @unchecked Sendable {
                 }
             }
 
+            // Skip devices with no usable transport (no AVTransport AND no DIAL).
+            // These are typically AirPlay-only devices (e.g. Apple TV) that advertise
+            // via SSDP but can't receive DLNA or Cast content.
+            if parsed.avTransportControlURL == nil && !parsed.hasDIALService {
+                print("[SSDP] Skipping \(parsed.friendlyName) — no AVTransport and no DIAL (likely AirPlay-only)")
+                await MainActor.run { [weak self] in
+                    self?.fetchTasks.removeValue(forKey: udn)
+                }
+                return
+            }
+
             let device = DLNADeviceParser.toRemoteDevice(parsed)
 
             await MainActor.run { [weak self] in

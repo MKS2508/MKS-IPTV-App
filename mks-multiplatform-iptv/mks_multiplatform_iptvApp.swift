@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import TransmuxCore
 #if os(iOS)
 import AVFoundation
@@ -12,12 +13,43 @@ struct mks_iptv_downloaderApp: App {
     @StateObject var profilesManager = IPTVProfilesManager.shared
     @State private var showingSettings = false
 
+    /// SwiftData container for watch history persistence
+    let watchHistoryContainer: ModelContainer
+
     var activeProfile: IPTVProfile? { profilesManager.activeProfile }
 
     private static let isPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PLAYGROUNDS"] == "1"
 
     init() {
+        // Initialize SwiftData container (must happen before guard)
+        do {
+            watchHistoryContainer = try WatchHistoryConfiguration.createContainer()
+            WatchHistoryManager.shared = WatchHistoryManager(modelContainer: watchHistoryContainer)
+            print("[WatchHistory] SwiftData container initialized")
+            // Repair entries corrupted by the duration=0 bug (progress=1.0 with low position)
+            Task {
+                try? await WatchHistoryManager.shared.repairCorruptedEntries()
+            }
+            // Remove duplicate entries created by CloudKit sync across devices
+            Task {
+                try? await WatchHistoryManager.shared.deduplicateEntries()
+            }
+            // Register this device in CloudKit for cross-device tracking
+            Task {
+                await DeviceSyncManager.shared.registerCurrentDevice()
+            }
+        } catch {
+            fatalError("[WatchHistory] Failed to create ModelContainer: \(error)")
+        }
+
         guard !Self.isPreview else { return }
+
+        #if os(macOS)
+        // Prevent macOS from restoring previous windows on launch.
+        // This must be set before the first window is created.
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+        NSWindow.allowsAutomaticWindowTabbing = false
+        #endif
 
         StderrFilter.install()
         TransmuxingService.configure(streamProxy: StreamProxyAdapter())
@@ -35,8 +67,11 @@ struct mks_iptv_downloaderApp: App {
         WindowGroup {
             MainWindowContent(showingSettings: $showingSettings)
                 .environmentObject(profilesManager)
+                .modelContainer(watchHistoryContainer)
         }
         #if os(macOS)
+        .defaultLaunchBehavior(.presented)
+        .restorationBehavior(.disabled)
         .commands {
             CommandGroup(replacing: .newItem) {
                 OpenFileButton()
@@ -63,6 +98,7 @@ struct mks_iptv_downloaderApp: App {
             MacOSPlayerWindowView()
                 .preferredColorScheme(.dark)
                 .environment(RemotePlayManager.shared)
+                .modelContainer(watchHistoryContainer)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 720)

@@ -69,17 +69,20 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     // MARK: - RemoteDeviceController
 
     func connect() async throws {
+        print("[DLNACast] DLNAController.connect — controlURL=\(controlURL.absoluteString)")
         // DLNA is connectionless - verify device is reachable by querying state
         playbackState = .connected(deviceId: device.id)
 
         // Query initial state
         do {
-            _ = try await queryPosition()
-            // Device is responsive
+            let pos = try await queryPosition()
+            print("[DLNACast] DLNAController.connect — device responsive, state=\(pos)")
         } catch let error as RemotePlayError {
+            print("[DLNACast] DLNAController.connect — FAILED: \(error)")
             playbackState = .error(error)
             throw error
         } catch {
+            print("[DLNACast] DLNAController.connect — FAILED: \(error)")
             let remoteError = RemotePlayError.transportError(error.localizedDescription)
             playbackState = .error(remoteError)
             throw remoteError
@@ -97,7 +100,10 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     // MARK: - Content Loading
 
-    func load(url: URL, metadata: MetadataResult?, startPosition: Double) async throws {
+    func load(url: URL, metadata: MetadataResult?, startPosition: Double, streaming: Bool = false) async throws {
+        print("[DLNACast] DLNAController.load — url=\(url.absoluteString)")
+        print("[DLNACast] DLNAController.load — controlURL=\(controlURL.absoluteString)")
+        print("[DLNACast] DLNAController.load — streaming=\(streaming)")
         playbackState = .loading
 
         // Build DIDL-Lite metadata - convert runtimeMinutes to seconds
@@ -105,38 +111,77 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         let didlMetadata = DLNAMetadataAdapter.buildDIDLLite(
             from: metadata,
             contentURL: url,
-            duration: durationSeconds
+            duration: durationSeconds,
+            streaming: streaming
         )
+        print("[DLNACast] DLNAController.load — DIDL metadata length=\(didlMetadata.count)")
 
         do {
-            // SetAVTransportURI
+            // 0. Stop any current playback — many TVs reject SetAVTransportURI
+            //    with error 705 "Access denied" if the transport is busy/locked.
+            print("[DLNACast] DLNAController.load — sending Stop (clear transport)...")
+            let stopAction = DLNASOAPClient.AVTransportAction.stop(instanceId: instanceId)
+            do {
+                _ = try await DLNASOAPClient.send(
+                    action: stopAction.actionName,
+                    serviceType: .avTransport,
+                    controlURL: controlURL,
+                    arguments: stopAction.arguments
+                )
+                print("[DLNACast] DLNAController.load — Stop OK")
+                // Give the TV time to release the transport lock
+                try? await Task.sleep(for: .seconds(1))
+            } catch {
+                // Stop failing is non-fatal — TV might already be stopped
+                print("[DLNACast] DLNAController.load — Stop failed (non-fatal): \(error)")
+            }
+
+            // 1. SetAVTransportURI — tell the TV what to play
+            print("[DLNACast] DLNAController.load — sending SetAVTransportURI...")
             let setURIAction = DLNASOAPClient.AVTransportAction.setAVTransportURI(
                 instanceId: instanceId,
                 uri: url.absoluteString,
                 metadata: didlMetadata
             )
-            _ = try await DLNASOAPClient.send(
+            let setURIResponse = try await DLNASOAPClient.send(
                 action: setURIAction.actionName,
                 serviceType: .avTransport,
                 controlURL: controlURL,
                 arguments: setURIAction.arguments
             )
+            print("[DLNACast] DLNAController.load — SetAVTransportURI response=\(setURIResponse)")
 
-            // Seek to start position if > 0
+            // 2. Play FIRST — most TVs reject Seek until content is playing/buffered
+            print("[DLNACast] DLNAController.load — sending Play...")
+            try await play()
+            print("[DLNACast] DLNAController.load — Play sent")
+
+            // 3. Seek AFTER Play (non-fatal) — TV needs time to buffer before accepting seeks.
+            //    If seek fails, playback continues from the beginning which is acceptable.
             if startPosition > 0 {
-                try await seek(to: startPosition)
+                // Give the TV time to start buffering before attempting seek
+                try? await Task.sleep(for: .seconds(2))
+                print("[DLNACast] DLNAController.load — seeking to \(startPosition)s...")
+                do {
+                    try await seek(to: startPosition)
+                    print("[DLNACast] DLNAController.load — Seek succeeded")
+                } catch {
+                    print("[DLNACast] DLNAController.load — Seek failed (non-fatal, playing from start): \(error)")
+                    // Restore playing state since seek may have changed it
+                    playbackState = .playing
+                }
             }
 
-            // Start playback
-            try await play()
-
             // Start polling for state updates
+            print("[DLNACast] DLNAController.load — starting polling")
             startPolling()
 
         } catch let error as RemotePlayError {
+            print("[DLNACast] DLNAController.load — FAILED (RemotePlayError): \(error)")
             playbackState = .error(error)
             throw error
         } catch {
+            print("[DLNACast] DLNAController.load — FAILED: \(error)")
             let remoteError = RemotePlayError.transportError(error.localizedDescription)
             playbackState = .error(remoteError)
             throw remoteError
@@ -313,8 +358,14 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             arguments: posAction.arguments
         )
 
-        let currentTime = parseTime(response["RelTime"] ?? "00:00:00")
-        let duration = parseTime(response["TrackDuration"] ?? "00:00:00")
+        let relTimeStr = response["RelTime"] ?? "00:00:00"
+        let durationStr = response["TrackDuration"] ?? "00:00:00"
+        let trackURI = response["TrackURI"] ?? "nil"
+        let currentTime = parseTime(relTimeStr)
+        let duration = parseTime(durationStr)
+
+        // Log raw GetPositionInfo response for first few polls
+        print("[DLNACast] GetPositionInfo raw — RelTime=\(relTimeStr), TrackDuration=\(durationStr), TrackURI=\(trackURI.prefix(80))")
 
         // Query transport state for isPlaying
         let transportState = try await queryTransportInfo()
@@ -413,14 +464,20 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         pollingTask?.cancel()
 
         pollingTask = Task { [weak self] in
+            var pollCount = 0
             while !Task.isCancelled {
                 do {
-                    let _ = try await self?.queryPosition()
+                    let pos = try await self?.queryPosition()
                     if let state = self?.deviceState {
+                        pollCount += 1
+                        // Log first 5 polls and then every 10th for ongoing monitoring
+                        if pollCount <= 5 || pollCount % 10 == 0 {
+                            print("[DLNACast] Poll #\(pollCount) — transport=\(state.transportState.rawValue), time=\(String(format: "%.1f", state.currentTime))/\(String(format: "%.1f", state.duration)), isPlaying=\(pos?.isPlaying ?? false)")
+                        }
                         self?.onStateUpdate?(state)
                     }
                 } catch {
-                    // Polling error - device may have disconnected
+                    print("[DLNACast] Poll error: \(error)")
                 }
 
                 try? await Task.sleep(for: .seconds(self?.pollingInterval ?? 2.0))

@@ -67,6 +67,9 @@ final class RemotePlayManager: @unchecked Sendable {
 
     private init() {
         setupDiscoveryCallbacks()
+        // Auto-start SSDP discovery at launch so devices are ready
+        // before the user opens the player or gear menu.
+        startDiscovery()
     }
 
     // MARK: - Public API - Discovery
@@ -102,14 +105,18 @@ final class RemotePlayManager: @unchecked Sendable {
     func connect(to device: RemoteDevice) async throws {
         // If same device is already connected, just return
         if connectedDevice?.id == device.id {
+            print("[DLNACast] connect — already connected to \(device.name)")
             return
         }
 
         // Disconnect existing device if any
         if connectedDevice != nil {
+            print("[DLNACast] connect — disconnecting previous device before connecting to \(device.name)")
             await disconnect()
         }
 
+        print("[DLNACast] connect — connecting to \(device.name) (type=\(device.type.displayName), transport=\(device.effectiveTransport))")
+        print("[DLNACast] connect — controlURL=\(device.metadata["controlURL"] ?? "MISSING")")
         playbackState = .connecting(deviceId: device.id)
 
         do {
@@ -123,8 +130,10 @@ final class RemotePlayManager: @unchecked Sendable {
             connectedDevice = device
             playbackState = .connected(deviceId: device.id)
             deviceState = .idle
+            print("[DLNACast] connect — SUCCESS, connected to \(device.name)")
 
         } catch {
+            print("[DLNACast] connect — FAILED: \(error)")
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
             throw error
         }
@@ -164,13 +173,20 @@ final class RemotePlayManager: @unchecked Sendable {
         startPosition: Double = 0
     ) async throws {
         guard let controller = activeController else {
+            print("[DLNACast] load — ERROR: no active controller")
             throw RemotePlayError.noActiveSession
         }
 
+        print("[DLNACast] load — input URL=\(url.absoluteString)")
+
         // Convert localhost URL to LAN URL for remote access
         guard let lanURL = convertToLANURL(url) else {
+            print("[DLNACast] load — ERROR: convertToLANURL failed (no LAN IP?)")
             throw RemotePlayError.networkUnavailable
         }
+
+        print("[DLNACast] load — LAN URL=\(lanURL.absoluteString)")
+        print("[DLNACast] load — startPosition=\(startPosition), metadata.title=\(metadata?.title ?? "nil")")
 
         streamingURL = lanURL
         currentMetadata = metadata
@@ -179,9 +195,12 @@ final class RemotePlayManager: @unchecked Sendable {
             try await controller.load(
                 url: lanURL,
                 metadata: metadata,
-                startPosition: startPosition
+                startPosition: startPosition,
+                streaming: false
             )
+            print("[DLNACast] load — SUCCESS")
         } catch {
+            print("[DLNACast] load — FAILED: \(error)")
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
             throw error
         }
@@ -210,7 +229,8 @@ final class RemotePlayManager: @unchecked Sendable {
             try await controller.load(
                 url: url,
                 metadata: metadata,
-                startPosition: startPosition
+                startPosition: startPosition,
+                streaming: false
             )
         } catch {
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
@@ -229,14 +249,19 @@ final class RemotePlayManager: @unchecked Sendable {
     ) async throws {
         guard let device = connectedDevice,
               let controller = activeController else {
+            print("[DLNACast] loadWithTransmux — ERROR: no active session")
             throw RemotePlayError.noActiveSession
         }
+
+        print("[DLNACast] loadWithTransmux — source=\(url.absoluteString)")
+        print("[DLNACast] loadWithTransmux — device=\(device.name), transport=\(device.effectiveTransport), transcodeAudio=\(device.type.needsAudioTranscode)")
 
         playbackState = .loading
         currentMetadata = metadata
 
         // Cleanup any previous transmux session
         if let prevID = activeTransmuxSessionID {
+            print("[DLNACast] loadWithTransmux — cleaning up previous session \(prevID)")
             await TransmuxServer.shared.stop()
             await TransmuxingService.shared.cleanup(sessionID: prevID)
             activeTransmuxSessionID = nil
@@ -251,13 +276,16 @@ final class RemotePlayManager: @unchecked Sendable {
             switch device.effectiveTransport {
             case .dlna:
                 // Progressive MPEG-TS → growing .ts file → HTTP range requests with DLNA headers
+                print("[DLNACast] loadWithTransmux — starting DLNA transmux pipeline...")
                 let session = try await service.startDLNATransmux(
                     from: url,
                     transcodeAudio: transcodeAudio
                 )
                 activeTransmuxSessionID = session.sessionID
+                print("[DLNACast] loadWithTransmux — DLNA transmux started, sessionID=\(session.sessionID), outputPath=\(session.outputPath)")
 
                 // Buffer initial content before starting server
+                print("[DLNACast] loadWithTransmux — buffering 2s before starting HTTP server...")
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
 
                 await TransmuxServer.shared.setDLNAMode(true)
@@ -265,6 +293,7 @@ final class RemotePlayManager: @unchecked Sendable {
                     filePath: session.outputPath,
                     expectedSize: session.expectedSize
                 )
+                print("[DLNACast] loadWithTransmux — TransmuxServer started, localURL=\(serverSession.localURL.absoluteString)")
 
                 // Monitor transmux completion in background
                 let outputPath = session.outputPath
@@ -278,6 +307,7 @@ final class RemotePlayManager: @unchecked Sendable {
                             let finalSize = (attrs?[.size] as? Int64) ?? 0
                             await TransmuxServer.shared.setExpectedSize(finalSize)
                             await TransmuxServer.shared.setComplete()
+                            print("[DLNACast] loadWithTransmux — transmux complete, finalSize=\(finalSize)")
                             break
                         }
                     }
@@ -285,13 +315,16 @@ final class RemotePlayManager: @unchecked Sendable {
 
             case .castV2:
                 // Segmented MPEG-TS → .ts segments + .m3u8 → file serving
+                print("[DLNACast] loadWithTransmux — starting Cast transmux pipeline...")
                 let session = try await service.startCastTransmux(
                     from: url,
                     transcodeAudio: transcodeAudio
                 )
                 activeTransmuxSessionID = session.sessionID
+                print("[DLNACast] loadWithTransmux — Cast transmux started, sessionID=\(session.sessionID)")
 
                 // Wait for at least 1 segment to be written
+                print("[DLNACast] loadWithTransmux — waiting for first segment...")
                 while session.segmentCounter.count == 0 {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                 }
@@ -299,21 +332,31 @@ final class RemotePlayManager: @unchecked Sendable {
                 serverSession = try await TransmuxServer.shared.startCast(
                     directory: session.outputDir
                 )
+                print("[DLNACast] loadWithTransmux — Cast server started, localURL=\(serverSession.localURL.absoluteString)")
             }
 
             // Convert localhost URL to LAN URL for remote device access
             guard let lanURL = convertToLANURL(serverSession.localURL) else {
+                print("[DLNACast] loadWithTransmux — ERROR: convertToLANURL failed")
                 throw RemotePlayError.networkUnavailable
             }
 
+            print("[DLNACast] loadWithTransmux — LAN URL for TV=\(lanURL.absoluteString)")
             streamingURL = lanURL
 
+            // Always use streaming: false — the TransmuxServer supports range requests
+            // on growing files, so DIDL-Lite protocolInfo should use OP=01 (byte-range
+            // supported), CI=0 (not converted). DLNA TVs refuse content with OP=00/CI=1.
+            print("[DLNACast] loadWithTransmux — sending to controller.load(url: \(lanURL.absoluteString), streaming: false)...")
             try await controller.load(
                 url: lanURL,
                 metadata: metadata,
-                startPosition: startPosition
+                startPosition: startPosition,
+                streaming: false
             )
+            print("[DLNACast] loadWithTransmux — SUCCESS, content playing on \(device.name)")
         } catch {
+            print("[DLNACast] loadWithTransmux — FAILED: \(error)")
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
             throw error
         }

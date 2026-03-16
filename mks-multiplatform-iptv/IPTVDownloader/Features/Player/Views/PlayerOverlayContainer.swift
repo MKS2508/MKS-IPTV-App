@@ -40,6 +40,13 @@ struct PlayerOverlayContainer: View {
         .onDisappear {
             autoHideTask?.cancel()
         }
+        .onChange(of: isVisible) { _, newValue in
+            if newValue {
+                startAutoHideTimer()
+            } else {
+                autoHideTask?.cancel()
+            }
+        }
     }
 
     // MARK: - Gesture Layer

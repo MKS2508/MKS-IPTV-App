@@ -320,6 +320,10 @@ final class AppDataLoader {
             seriesCategories: seriesCategories,
             liveChannelCategories: liveChannelCategories
         )
+
+        // Insert watch history sections (Continue Watching + Recent Channels)
+        await homeVM.insertContinueWatchingSection(profileId: profile.id)
+        await homeVM.insertRecentChannelsSection(profileId: profile.id)
     }
 }
 

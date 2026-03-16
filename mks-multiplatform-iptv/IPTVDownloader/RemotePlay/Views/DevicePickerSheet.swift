@@ -83,6 +83,9 @@ struct DevicePickerSheet: View {
                                 hoveredDeviceId = isHovered ? device.id : nil
                             }
                             .opacity(isSupportedType ? 1.0 : 0.6)
+                            .contextMenu {
+                                DeviceProtocolMenu(device: device, manager: remotePlayManager)
+                            }
                         }
                     }
                 } header: {
@@ -147,6 +150,14 @@ private struct DeviceRow: View {
     let isHovered: Bool
     var isUnsupported: Bool = false
 
+    /// Display label for the effective transport protocol.
+    private var protocolLabel: String {
+        let proto = device.effectiveTransport
+        let isOverridden = device.transportOverride != nil
+        let label = proto == .dlna ? "DLNA" : "Cast"
+        return isOverridden ? "\(label) (forced)" : label
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Device icon
@@ -160,7 +171,8 @@ private struct DeviceRow: View {
                 Text(device.name)
                     .font(.headline)
 
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    // Device type badge
                     Text(device.type.displayName)
                         .font(.caption)
                         .padding(.horizontal, 8)
@@ -169,16 +181,32 @@ private struct DeviceRow: View {
                         .foregroundColor(device.type.accentColor)
                         .cornerRadius(4)
 
-                    if isUnsupported {
-                        Text("Coming soon")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .italic()
-                    } else if let manufacturer = device.manufacturer {
-                        Text(manufacturer)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    // Protocol badge
+                    Text(protocolLabel)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.gray.opacity(0.15))
+                        .foregroundColor(.secondary)
+                        .cornerRadius(4)
+
+                    // Capability indicators
+                    CapabilityIndicators(capabilities: device.capabilities)
+                }
+
+                if isUnsupported {
+                    Text("Coming soon")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                } else if device.hasLimitedCapabilities {
+                    Label("Limited (no transport control)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                } else if let manufacturer = device.manufacturer {
+                    Text(manufacturer)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -198,6 +226,77 @@ private struct DeviceRow: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Capability Indicators
+
+/// Small SF Symbol indicators showing device capabilities at a glance.
+private struct CapabilityIndicators: View {
+    let capabilities: DeviceCapabilities
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if capabilities.contains(.seeking) {
+                Image(systemName: "forward.fill")
+                    .help("Seeking supported")
+            }
+            if capabilities.contains(.volumeControl) {
+                Image(systemName: "speaker.wave.2.fill")
+                    .help("Volume control")
+            }
+            if capabilities.contains(.pause) {
+                Image(systemName: "pause.fill")
+                    .help("Pause supported")
+            }
+        }
+        .font(.system(size: 9))
+        .foregroundStyle(.tertiary)
+    }
+}
+
+// MARK: - Protocol Override Menu
+
+/// Context menu allowing the user to force a specific transport protocol on a device.
+private struct DeviceProtocolMenu: View {
+    let device: RemoteDevice
+    let manager: RemotePlayManager
+
+    var body: some View {
+        Section("Transport Protocol") {
+            Button {
+                setOverride(nil)
+            } label: {
+                Label(
+                    "Auto (detected: \(device.type.transportProtocol == .dlna ? "DLNA" : "Cast"))",
+                    systemImage: device.transportOverride == nil ? "checkmark" : ""
+                )
+            }
+
+            Button {
+                setOverride(.dlna)
+            } label: {
+                Label(
+                    "Force DLNA",
+                    systemImage: device.transportOverride == .dlna ? "checkmark" : ""
+                )
+            }
+
+            Button {
+                setOverride(.castV2)
+            } label: {
+                Label(
+                    "Force Cast V2",
+                    systemImage: device.transportOverride == .castV2 ? "checkmark" : ""
+                )
+            }
+        }
+    }
+
+    private func setOverride(_ proto: TransportProtocol?) {
+        if let idx = manager.discoveredDevices.firstIndex(where: { $0.id == device.id }) {
+            manager.discoveredDevices[idx].transportOverride = proto
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 import Foundation
 import SwiftUI
 
-class IPTVProfile: ObservableObject, Codable, Equatable, Identifiable {
+final class IPTVProfile: ObservableObject, Codable, Equatable, Identifiable {
     let id: UUID
     @Published var name: String
     @Published var baseURL: String

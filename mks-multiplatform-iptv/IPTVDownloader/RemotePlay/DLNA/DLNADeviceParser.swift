@@ -48,6 +48,9 @@ enum DLNADeviceParser {
         /// Preferred icon URL (largest PNG icon).
         let iconURL: URL?
 
+        /// Whether the device exposes a DIAL service (Google Cast SSDP discovery).
+        let hasDIALService: Bool
+
         /// Device capabilities inferred from available services.
         let capabilities: DeviceCapabilities
     }
@@ -74,6 +77,63 @@ enum DLNADeviceParser {
         }
 
         return device
+    }
+
+    // MARK: - MediaRenderer Probe
+
+    /// Common device description paths where TVs expose their MediaRenderer service.
+    /// Many TVs (e.g. TELEFUNKEN) advertise a basic `tvdevice` via SSDP but expose
+    /// their full MediaRenderer with AVTransport at a different path/port.
+    private static let probePaths = ["/dmr.xml", "/DeviceDescription.xml", "/description.xml", "/rootDesc.xml"]
+    private static let probePorts: [Int] = [2870, 8008, 49152, 1400, 8080]
+
+    /// Probe common alternative device description paths on the same IP to find
+    /// a MediaRenderer with AVTransport. Called when the SSDP LOCATION description
+    /// has no AVTransport service.
+    /// - Parameter initialDevice: The parsed device from SSDP (no AVTransport)
+    /// - Returns: An upgraded `ParsedDevice` with AVTransport, or `nil` if none found
+    static func probeForMediaRenderer(ip: String, ssdpPort: Int) async -> ParsedDevice? {
+        // Probe known paths on known ports, skipping the port+path already tried via SSDP
+        for port in probePorts where port != ssdpPort {
+            for path in probePaths {
+                guard let url = URL(string: "http://\(ip):\(port)\(path)") else { continue }
+                do {
+                    let (data, response) = try await URLSession.shared.data(from: url)
+                    guard let httpResponse = response as? HTTPURLResponse,
+                          httpResponse.statusCode == 200 else { continue }
+
+                    let parser = UPnPDeviceXMLParser(baseURL: url)
+                    guard let device = parser.parse(data),
+                          device.avTransportControlURL != nil else { continue }
+
+                    print("[DLNAParser] Probe HIT: found MediaRenderer at \(url) with AVTransport")
+                    return device
+                } catch {
+                    continue
+                }
+            }
+        }
+        // Also try probePaths on the SSDP port (different path, same port)
+        for path in probePaths {
+            guard let url = URL(string: "http://\(ip):\(ssdpPort)\(path)") else { continue }
+            do {
+                let (data, response) = try await URLSession.shared.data(from: url)
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else { continue }
+
+                let parser = UPnPDeviceXMLParser(baseURL: url)
+                guard let device = parser.parse(data),
+                      device.avTransportControlURL != nil else { continue }
+
+                print("[DLNAParser] Probe HIT: found MediaRenderer at \(url) with AVTransport")
+                return device
+            } catch {
+                continue
+            }
+        }
+
+        print("[DLNAParser] Probe: no MediaRenderer found on \(ip)")
+        return nil
     }
 
     /// Convert parsed device to RemoteDevice struct.
@@ -118,10 +178,14 @@ enum DLNADeviceParser {
     // MARK: - Device Type Inference
 
     /// Infer a more specific device type from manufacturer and model strings.
-    /// Falls back to `.dlna` for unrecognized DLNA devices or `.chromecast` for non-AVTransport devices.
+    /// - Has AVTransport → DLNA family (check manufacturer for specific type)
+    /// - No AVTransport + has DIAL service → Chromecast (Cast V2 over TLS port 8009)
+    /// - No AVTransport + no DIAL → basic DLNA with limited capabilities
     private static func inferDeviceType(_ parsed: ParsedDevice) -> DeviceType {
-        // No AVTransport → likely a DIAL/Cast device
-        guard parsed.avTransportControlURL != nil else { return .chromecast }
+        // No AVTransport: check for DIAL service (Google Cast SSDP discovery component)
+        guard parsed.avTransportControlURL != nil else {
+            return parsed.hasDIALService ? .chromecast : .dlna
+        }
 
         let manufacturer = (parsed.manufacturer ?? "").lowercased()
         let model = (parsed.modelName ?? "").lowercased()
@@ -220,10 +284,11 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
             resolvedBaseURL = baseURL
         }
 
-        // Find AVTransport service
+        // Find known services
         let avTransport = services.first { $0.type.contains("AVTransport") }
         let renderingControl = services.first { $0.type.contains("RenderingControl") }
         let connectionManager = services.first { $0.type.contains("ConnectionManager") }
+        let hasDIAL = services.contains { $0.type.contains("dial-multiscreen") || $0.type.contains("dial:") }
 
         print("[DLNAParser] Device: \(friendlyName ?? "?")")
         print("[DLNAParser] Base URL: \(resolvedBaseURL.absoluteString)")
@@ -267,6 +332,7 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
             renderingControlURL: resolveURL(renderingControl?.controlURL, base: resolvedBaseURL),
             connectionManagerURL: resolveURL(connectionManager?.controlURL, base: resolvedBaseURL),
             iconURL: bestIconURL,
+            hasDIALService: hasDIAL,
             capabilities: caps
         )
     }

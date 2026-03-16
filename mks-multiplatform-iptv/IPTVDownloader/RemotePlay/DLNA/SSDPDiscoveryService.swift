@@ -322,7 +322,19 @@ final class SSDPDiscoveryService: @unchecked Sendable {
 
     private func fetchAndParseDeviceDescription(locationURL: URL, udn: String) async {
         do {
-            let parsed = try await DLNADeviceParser.parse(from: locationURL)
+            var parsed = try await DLNADeviceParser.parse(from: locationURL)
+
+            // If device has no AVTransport and no DIAL, probe common alternative
+            // description paths for a MediaRenderer endpoint (e.g. /dmr.xml on port 2870).
+            if parsed.avTransportControlURL == nil && !parsed.hasDIALService,
+               let ip = locationURL.host {
+                let ssdpPort = locationURL.port ?? 80
+                print("[SSDP] Device \(parsed.friendlyName) has no AVTransport, probing for MediaRenderer on \(ip)...")
+                if let upgraded = await DLNADeviceParser.probeForMediaRenderer(ip: ip, ssdpPort: ssdpPort) {
+                    parsed = upgraded
+                }
+            }
+
             let device = DLNADeviceParser.toRemoteDevice(parsed)
 
             await MainActor.run { [weak self] in

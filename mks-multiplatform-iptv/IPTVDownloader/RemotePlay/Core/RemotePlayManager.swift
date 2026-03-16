@@ -248,7 +248,7 @@ final class RemotePlayManager: @unchecked Sendable {
         do {
             let serverSession: TransmuxServer.Session
 
-            switch device.type.transportProtocol {
+            switch device.effectiveTransport {
             case .dlna:
                 // Progressive MPEG-TS → growing .ts file → HTTP range requests with DLNA headers
                 let session = try await service.startDLNATransmux(
@@ -471,12 +471,12 @@ final class RemotePlayManager: @unchecked Sendable {
             }
         }
 
-        switch device.type {
-        case .dlna, .smartTV, .fireTV, .androidTV:
+        switch device.effectiveTransport {
+        case .dlna:
             let controller = try DLNAController(device: device)
             controller.onStateUpdate = stateHandler
             return controller
-        case .chromecast, .googleTV:
+        case .castV2:
             let controller = try CastController(device: device)
             controller.onStateUpdate = stateHandler
             return controller

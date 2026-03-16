@@ -64,6 +64,21 @@ protocol VideoPlayerProtocol: ObservableObject {
     /// The original source URL that was passed to `load(url:)`.
     /// Used by RemotePlay to send the content URL to Cast/DLNA devices.
     var sourceURL: URL? { get }
+    
+    /// Buffered time in seconds (how much content is buffered ahead)
+    var bufferedTime: Double { get }
+    
+    /// Whether audio is muted
+    var isMuted: Bool { get }
+    
+    /// Set muted state
+    func setMuted(_ muted: Bool)
+    
+    /// Set playback rate (speed)
+    func setRate(_ rate: Float)
+    
+    /// Toggle Picture-in-Picture mode (if supported)
+    func togglePictureInPicture()
 }
 
 // MARK: - Buffering Detail
@@ -95,6 +110,12 @@ extension VideoPlayerProtocol {
     var isBuffering: Bool { false }
     var bufferingDetail: PlayerBufferingDetail { .idle }
     var sourceURL: URL? { nil }
+    var bufferedTime: Double { 0 }
+    var isMuted: Bool { false }
+    
+    func setMuted(_ muted: Bool) {}
+    func setRate(_ rate: Float) {}
+    func togglePictureInPicture() {}
 
     /// Default implementation that ignores metadata (for players that don't support it)
     func load(url: URL, metadata: MetadataResult?) {

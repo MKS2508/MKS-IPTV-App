@@ -64,6 +64,7 @@ struct mks_iptv_downloaderApp: App {
                 .preferredColorScheme(.dark)
                 .environment(RemotePlayManager.shared)
         }
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 720)
         .defaultPosition(.center)
         .defaultLaunchBehavior(.suppressed)

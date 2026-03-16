@@ -161,6 +161,10 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
     /// Whether the device is currently connected.
     var isConnected: Bool
 
+    /// User override for the transport protocol. When set, takes precedence
+    /// over the device type's default `transportProtocol`.
+    var transportOverride: TransportProtocol?
+
     /// Protocol-specific payload.
     /// Keys vary by device type:
     /// - DLNA: controlURL, eventSubURL, iconURL, manufacturer, modelName, udn, baseURL
@@ -182,6 +186,16 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
     /// Icon URL for the device, if available.
     var iconURL: URL? {
         metadata["iconURL"].flatMap { URL(string: $0) }
+    }
+
+    /// Effective transport protocol, respecting user override.
+    var effectiveTransport: TransportProtocol {
+        transportOverride ?? type.transportProtocol
+    }
+
+    /// Whether the device has limited DLNA capabilities (no AVTransport control URL).
+    var hasLimitedCapabilities: Bool {
+        type.transportProtocol == .dlna && !capabilities.contains(.seeking) && !capabilities.contains(.pause)
     }
 
     // MARK: - Hashable

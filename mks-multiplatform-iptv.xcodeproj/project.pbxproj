@@ -12,6 +12,7 @@
 		0534111E2F5C65B900A6C87F /* MKSDownloadActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05548F942F5626330060E2DD /* TransmuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F932F5626330060E2DD /* TransmuxCore */; };
 		05548F962F5626330060E2DD /* transmux-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F952F5626330060E2DD /* transmux-cli */; };
+		05A1B2C3D4E5F60718293A4C /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05A1B2C3D4E5F60718293A4B /* CloudKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +45,7 @@
 		053411102F5C65B800A6C87F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
 		057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplataforma-tvos-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "mks-multiplatform-iptv.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		05A1B2C3D4E5F60718293A4B /* CloudKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CloudKit.framework; path = /System/Library/Frameworks/CloudKit.framework; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -108,6 +110,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				05A1B2C3D4E5F60718293A4C /* CloudKit.framework in Frameworks */,
 				05548F942F5626330060E2DD /* TransmuxCore in Frameworks */,
 				05548F962F5626330060E2DD /* transmux-cli in Frameworks */,
 			);
@@ -119,6 +122,7 @@
 		0534110D2F5C65B800A6C87F /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				05A1B2C3D4E5F60718293A4B /* CloudKit.framework */,
 				0534110E2F5C65B800A6C87F /* WidgetKit.framework */,
 				053411102F5C65B800A6C87F /* SwiftUI.framework */,
 			);
@@ -343,7 +347,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv22.MKSDownloadActivityWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv.MKSDownloadActivityWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SKIP_INSTALL = YES;
@@ -386,7 +390,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv22.MKSDownloadActivityWidget;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.mks2508.iptv.MKSDownloadActivityWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SKIP_INSTALL = YES;
@@ -661,7 +665,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "mks-multiplatform-iptv/mks_multiplatform_iptv.entitlements";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplatform-iptv/Preview Content\"";
@@ -693,6 +697,7 @@
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=iphoneos*]" = dev.mks2508.iptv;
 				"PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" = dev.mks2508.iptv22;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;

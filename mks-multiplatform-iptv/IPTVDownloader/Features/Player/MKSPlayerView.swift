@@ -4,72 +4,42 @@ import MediaPlayer
 
 // MARK: - Presentation Mode
 
-/// How MKSPlayerView renders the player surface.
 enum MKSPlayerPresentationMode {
-    /// Inline preview within another view (e.g. 250pt in download views).
-    /// Uses `VideoPlayer(player:)` with basic controls. Shows a fullscreen expand button.
     case inline
-
-    /// Fullscreen native player presentation.
-    /// Uses `AVPlayerViewController` (iOS) / `AVPlayerView` (macOS) for all system controls:
-    /// scrub bar, play/pause/skip, volume, AirPlay, PiP, fullscreen, subtitle picker.
-    /// Falls back to `playerView()` for non-AVPlayer backends (VLC).
     case fullscreen
 }
 
 // MARK: - MKSPlayerView
 
-/// Unified player component used across the entire app.
-///
-/// Two modes:
-/// - **inline**: `VideoPlayer(player:)` with optional metadata overlay + fullscreen button
-/// - **fullscreen**: Native `AVPlayerViewController`/`AVPlayerView` with complete system controls
-///
-/// On iOS 26+, `AVPlayerViewController` automatically uses Liquid Glass transport controls.
-/// AirPlay, PiP, seeking, and all native controls are provided by the system.
-///
-/// ## Usage
-/// ```swift
-/// // Inline preview with fullscreen button
-/// MKSPlayerView(
-///     player: player,
-///     metadata: enrichedMetadata,
-///     onRequestFullscreen: { showFullscreen = true }
-/// )
-/// .frame(height: 250)
-///
-/// // Fullscreen (via FullscreenPlayerPresenter)
-/// MKSPlayerView(
-///     player: player,
-///     title: "Movie Title",
-///     onDismiss: { player.stop() },
-///     presentationMode: .fullscreen
-/// )
-/// ```
 struct MKSPlayerView: View {
     let player: any VideoPlayerProtocol
     var title: String = ""
     var metadata: MetadataResult? = nil
-    var onDismiss: (() -> Void)? = nil
-    var onRequestFullscreen: (() -> Void)? = nil
+    var onDismiss: (() -> Void)?
+    var onRequestFullscreen: (() -> Void)?
     var presentationMode: MKSPlayerPresentationMode = .inline
+    var controlsConfiguration: PlayerControlsConfiguration = .glass
 
     @Environment(RemotePlayManager.self) private var remotePlayManager
 
-    @State private var showMetadata = true
+    var showMetadata: Bool = true
     @State private var showDebugOverlay = UserDefaults.showPlayerDebugOverlay
-    /// Whether local player was playing before casting started (to resume on disconnect).
     @State private var wasPlayingBeforeCast = false
-    /// Whether we already loaded content on the current Cast connection.
     @State private var didLoadOnCastDevice = false
+    @State private var videoGravity: PlayerVideoGravity = .resizeAspect
+
     #if os(macOS)
     @State private var macOSOverlayVisible = true
     @State private var overlayHideTask: Task<Void, Never>?
     #endif
 
+    private var useNativeControls: Bool {
+        controlsConfiguration.mode == .native
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // Video surface — mode-dependent rendering
+            // MARK: - Layer 1: Player surface (video layer)
             playerSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black)
@@ -78,82 +48,39 @@ struct MKSPlayerView: View {
                     UserDefaults.showPlayerDebugOverlay = showDebugOverlay
                 }
 
-            // Debug overlay (top-leading corner, any mode)
+            // MARK: - Layer 2: Debug overlay (top-left, non-blocking)
             if showDebugOverlay {
                 VStack {
                     HStack {
                         PlayerDebugOverlay(player: player)
                         Spacer()
                     }
-                    Spacer()
                 }
                 .padding(8)
                 .allowsHitTesting(false)
             }
 
-            // Overlays only for inline mode (fullscreen has native controls)
-            if presentationMode == .inline {
-                // Metadata overlay (Liquid Glass on iOS 26+)
-                if let metadata, showMetadata {
-                    VStack {
-                        Spacer()
-                        metadataOverlay(metadata)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // Title bar (when no metadata but title provided)
-                if metadata == nil, !title.isEmpty {
-                    VStack {
-                        titleBar
-                        Spacer()
-                    }
-                }
-
-                // Fullscreen expand button (bottom-trailing)
-                if onRequestFullscreen != nil {
-                    fullscreenButton
-                }
+            // MARK: - Layer 3: Controls/conditional overlays
+            if useNativeControls {
+                nativeControlsOverlays
+            } else {
+                glassControlsOverlay
             }
 
-            // macOS fullscreen: title + metadata overlay at top, auto-hides with mouse
-            #if os(macOS)
-            if presentationMode == .fullscreen, (!title.isEmpty || metadata != nil) {
-                macOSFullscreenTitleOverlay
-            }
-
-            if let onDismiss, presentationMode == .fullscreen {
-                VStack {
-                    HStack {
-                        dismissButton(action: onDismiss)
-                            .opacity(macOSOverlayVisible ? 1 : 0)
-                            .animation(.easeInOut(duration: 0.3), value: macOSOverlayVisible)
-                        Spacer()
-                    }
-                    Spacer()
-                }
-            }
-            #endif
-
-            // Top-trailing player controls (cast + dismiss)
-            VStack(alignment: .trailing, spacing: 8) {
+            // MARK: - Layer 4: Top trailing controls (always on top)
+            if showRemotePlayButton {
                 RemotePlayButton()
                     .buttonStyle(.plain)
                     .adaptiveGlass(in: Capsule())
-
-                if let onDismiss, presentationMode == .inline {
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.white)
-                    }
-                    .adaptiveGlass(in: Circle())
-                }
             }
-            .padding()
 
-            // RemotePlay casting overlay (replaces player surface when active)
+            if let onDismiss, presentationMode == .inline {
+                dismissButton(action: onDismiss)
+                    .buttonStyle(.plain)
+                    .adaptiveGlass(in: Circle())
+            }
+
+            // Casting overlay (replaces player surface when active)
             if remotePlayManager.connectedDevice != nil {
                 castingOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -178,10 +105,8 @@ struct MKSPlayerView: View {
         #endif
         .onChange(of: remotePlayManager.connectedDevice?.id) { oldId, newId in
             if newId != nil, oldId == nil {
-                // Device just connected — auto-load content and pause local player
                 handleCastConnected()
             } else if newId == nil, oldId != nil {
-                // Device disconnected — resume local player
                 handleCastDisconnected()
             }
         }
@@ -194,19 +119,96 @@ struct MKSPlayerView: View {
     private var playerSurface: some View {
         switch presentationMode {
         case .fullscreen:
-            // Reactive surface that polls for underlyingAVPlayer becoming available.
-            // Critical for FFmpeg transmux where AVPlayer is nil during transmux,
-            // then becomes available once the HLS pipeline is ready.
             ReactiveFullscreenSurface(
                 player: player,
                 title: title,
                 metadata: metadata,
-                onDismiss: onDismiss
+                onDismiss: onDismiss,
+                videoGravity: videoGravity.avGravity
             )
 
         case .inline:
             player.playerView()
         }
+    }
+
+    // MARK: - Native Controls Overlays
+
+    @ViewBuilder
+    private var nativeControlsOverlays: some View {
+        if presentationMode == .inline {
+            if let metadata, showMetadata {
+                VStack {
+                    Spacer()
+                    GlassMetadataOverlay(metadata: metadata)
+                        .padding()
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if metadata == nil, !title.isEmpty {
+                VStack {
+                    titleBar
+                    Spacer()
+                }
+            }
+
+            if onRequestFullscreen != nil {
+                fullscreenButton
+            }
+        }
+
+        #if os(macOS)
+        if presentationMode == .fullscreen, (!title.isEmpty || metadata != nil) {
+            macOSFullscreenTitleOverlay
+        }
+
+        if let onDismiss, presentationMode == .fullscreen {
+            macOSDismissButton(onDismiss: onDismiss)
+        }
+        #endif
+    }
+
+    // MARK: - Glass Controls Overlay
+
+    @ViewBuilder
+    private var glassControlsOverlay: some View {
+        if presentationMode == .inline {
+            if let metadata, showMetadata {
+                VStack {
+                    GlassMetadataOverlay(metadata: metadata)
+                        .padding(.horizontal)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            GlassPlayerControlBar(
+                player: player,
+                configuration: controlsConfiguration,
+                onFullscreenRequest: onRequestFullscreen,
+                onDismiss: onDismiss,
+                onGravityChange: { newGravity in
+                    videoGravity = newGravity
+                }
+            )
+        }
+
+        #if os(macOS)
+        if presentationMode == .fullscreen, (!title.isEmpty || metadata != nil) {
+            macOSFullscreenTitleOverlay
+        }
+
+        if let onDismiss, presentationMode == .fullscreen {
+            macOSDismissButton(onDismiss: onDismiss)
+        }
+        #endif
+    }
+
+    // MARK: - Show Remote Play Button
+
+    private var showRemotePlayButton: Bool {
+        true
     }
 
     // MARK: - Title Bar
@@ -230,20 +232,6 @@ struct MKSPlayerView: View {
         .background(Color.black.opacity(0.85))
     }
 
-    // MARK: - Metadata Overlay
-
-    @ViewBuilder
-    private func metadataOverlay(_ metadata: MetadataResult) -> some View {
-        MetadataOverlayView(metadata: metadata)
-            .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadius))
-            .padding()
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showMetadata.toggle()
-                }
-            }
-    }
-
     // MARK: - Dismiss Button
 
     @ViewBuilder
@@ -254,8 +242,6 @@ struct MKSPlayerView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.white)
         }
-        .adaptiveGlass(in: Circle())
-        .padding()
     }
 
     // MARK: - Fullscreen Button
@@ -281,19 +267,14 @@ struct MKSPlayerView: View {
 
     // MARK: - Casting Overlay
 
-    /// Full-screen overlay that replaces the player surface when casting.
-    /// Shows device name, content title, and playback controls.
-    @ViewBuilder
     private var castingOverlay: some View {
         ZStack {
-            // Dark background covering the player
             Color.black
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
                 Spacer()
 
-                // Casting indicator
                 Image(systemName: "tv.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(.green)
@@ -315,36 +296,26 @@ struct MKSPlayerView: View {
 
                 Spacer()
 
-                // Playback controls from RemotePlayOverlay
-                RemotePlayOverlay()
+                GlassRemotePlayOverlay()
 
                 Spacer()
             }
         }
     }
 
-    // MARK: - Cast Connection Handling
+    // MARK: - Event Handlers
 
-    /// Called when a Cast device connects — auto-load content on Cast device.
-    /// Local player keeps playing (AirPlay-like simultaneous mode).
-    /// Both consumers (AVPlayer + Cast device) read from the same TransmuxServer.
     private func handleCastConnected() {
         guard let sourceURL = player.sourceURL else {
             print("[Cast] No sourceURL on player — cannot auto-load on Cast device")
             return
         }
 
-        // Remember if local player was playing (for disconnect resume logic)
         wasPlayingBeforeCast = player.isPlaying
         didLoadOnCastDevice = true
 
-        // DON'T pause local playback — keep transmux pipeline running.
-        // Both local AVPlayer and Cast device consume the same TransmuxServer stream.
-
-        // Get current position to start Cast device from the same point
         let startPosition = player.currentTime
 
-        // Load content on Cast device
         Task {
             do {
                 try await remotePlayManager.load(
@@ -360,26 +331,22 @@ struct MKSPlayerView: View {
         }
     }
 
-    /// Called when Cast device disconnects — resume local playback.
     private func handleCastDisconnected() {
         guard didLoadOnCastDevice else { return }
         didLoadOnCastDevice = false
 
-        // Get the last known position from the Cast device to sync local player
         let castPosition = remotePlayManager.deviceState?.currentTime ?? player.currentTime
 
-        // Seek local player to the Cast device's last position
         if castPosition > 0 {
             player.seek(to: castPosition)
         }
 
-        // Resume local playback if it was playing before cast
         if wasPlayingBeforeCast {
             player.play()
         }
     }
 
-    // MARK: - macOS Fullscreen Title Overlay
+    // MARK: - macOS Fullscreen Overlays
 
     #if os(macOS)
     @ViewBuilder
@@ -444,6 +411,19 @@ struct MKSPlayerView: View {
         .allowsHitTesting(false)
     }
 
+    @ViewBuilder
+    private func macOSDismissButton(onDismiss: @escaping () -> Void) -> some View {
+        VStack {
+            HStack {
+                dismissButton(action: onDismiss)
+                    .opacity(macOSOverlayVisible ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.3), value: macOSOverlayVisible)
+                Spacer()
+            }
+            Spacer()
+        }
+    }
+
     private func showMacOSOverlayBriefly() {
         macOSOverlayVisible = true
         scheduleMacOSOverlayAutoHide()
@@ -462,37 +442,344 @@ struct MKSPlayerView: View {
     #endif
 }
 
-// MARK: - Reactive Fullscreen Surface
+// MARK: - GlassMetadataOverlay
 
-/// Polls for `underlyingAVPlayer` becoming available, then transitions from the
-/// player's own view to native system controls (`NativeAVPlayerView` / `NativeAVPlayerViewController`).
-///
-/// - **AVPlayer**: `underlyingAVPlayer` is available immediately → native controls from the start.
-/// - **FFmpeg**: `underlyingAVPlayer` is nil during transmux → shows the player's own view
-///   (spinner), then transitions to native controls once the HLS pipeline produces an AVPlayer.
-/// - **VLC**: `underlyingAVPlayer` is always nil → permanently uses its own player view.
+struct GlassMetadataOverlay: View {
+    let metadata: MetadataResult
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(metadata.title)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    if let year = metadata.year {
+                        Text(String(year))
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+
+                Spacer()
+
+                if let rating = metadata.rating {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                        Text(String(format: "%.1f", rating))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .adaptiveGlass(in: Capsule(), fallbackOpacity: 0.5)
+                }
+            }
+
+            HStack(spacing: 12) {
+                if let director = metadata.director, !director.isEmpty {
+                    Label(director, systemImage: "person.fill")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                        .lineLimit(1)
+                }
+
+                if !metadata.genre.isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(metadata.genre.prefix(3), id: \.self) { genre in
+                            Text(genre)
+                                .font(.caption2)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .adaptiveGlass(in: Capsule(), fallbackOpacity: 0.3)
+                        }
+                    }
+                }
+            }
+
+            if let plot = metadata.plot, !plot.isEmpty {
+                Text(plot)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(2)
+            }
+        }
+        .padding(14)
+        .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadius), fallbackOpacity: 0.75)
+    }
+}
+
+// MARK: - GlassRemotePlayOverlay
+
+struct GlassRemotePlayOverlay: View {
+    @Environment(RemotePlayManager.self) private var remotePlayManager
+
+    @State private var isDragging = false
+    @State private var dragProgress: Double = 0
+    @State private var pendingVolume: Float?
+    @State private var volumeDebounceTask: Task<Void, Never>?
+
+    private var isConnected: Bool {
+        remotePlayManager.connectedDevice != nil
+    }
+
+    private var deviceName: String? {
+        remotePlayManager.connectedDevice?.name
+    }
+
+    private var isPlaying: Bool {
+        remotePlayManager.deviceState?.isPlaying ?? false
+    }
+
+    private var currentTime: Double {
+        remotePlayManager.deviceState?.currentTime ?? 0
+    }
+
+    private var duration: Double {
+        remotePlayManager.deviceState?.duration ?? 0
+    }
+
+    private var progress: Double {
+        guard duration > 0 else { return 0 }
+        return isDragging ? dragProgress : (currentTime / duration)
+    }
+
+    private var volume: Float {
+        remotePlayManager.deviceState?.volume ?? 1.0
+    }
+
+    private var isMuted: Bool {
+        remotePlayManager.deviceState?.isMuted ?? false
+    }
+
+    var body: some View {
+        if isConnected {
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                    .frame(width: 36, height: 5)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
+
+                HStack {
+                    Image(systemName: remotePlayManager.connectedDevice?.type.icon ?? "tv.fill")
+                        .foregroundStyle(remotePlayManager.connectedDevice?.type.accentColor ?? .green)
+                    Text("Playing on \(deviceName ?? "Device")")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button {
+                        Task {
+                            await remotePlayManager.disconnect()
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 14)
+
+                Divider()
+                    .background(.white.opacity(0.2))
+
+                VStack(spacing: 16) {
+                    castSeekBar
+
+                    HStack(spacing: 40) {
+                        castSkipButton(direction: .backward)
+                        castPlayPauseButton
+                        castSkipButton(direction: .forward)
+                    }
+                    .padding(.vertical, 8)
+
+                    HStack(spacing: 12) {
+                        Button {
+                            Task {
+                                try? await remotePlayManager.setMuted(!isMuted)
+                            }
+                        } label: {
+                            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .font(.body)
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                        .buttonStyle(.plain)
+
+                        Slider(value: Binding(
+                            get: { volume },
+                            set: { newVolume in
+                                debouncedSetVolume(newVolume)
+                            }
+                        ))
+                        .frame(maxWidth: 150)
+                        .tint(AppColors.accent)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 16)
+            }
+            #if os(iOS)
+            .frame(maxWidth: .infinity)
+            #else
+            .frame(width: 340)
+            #endif
+            .adaptiveGlass(in: RoundedRectangle(cornerRadius: 16), fallbackOpacity: 0.85)
+            .shadow(color: .black.opacity(0.3), radius: 20)
+            .padding()
+        }
+    }
+
+    // MARK: - Cast Seek Bar
+
+    @ViewBuilder
+    private var castSeekBar: some View {
+        VStack(spacing: 4) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(height: 4)
+
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(AppColors.accent)
+                        .frame(width: geometry.size.width * progress, height: 4)
+
+                    if isDragging {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 12, height: 12)
+                            .overlay(Circle().fill(AppColors.accent).frame(width: 8, height: 8))
+                            .offset(x: geometry.size.width * progress - 6)
+                    }
+                }
+                .contentShape(Rectangle().size(width: geometry.size.width, height: 24))
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            isDragging = true
+                            let fraction = max(0, min(1, value.location.x / geometry.size.width))
+                            dragProgress = fraction
+                        }
+                        .onEnded { value in
+                            let fraction = max(0, min(1, value.location.x / geometry.size.width))
+                            let seekTime = fraction * duration
+                            isDragging = false
+                            Task {
+                                try? await remotePlayManager.seek(to: seekTime)
+                            }
+                        }
+                )
+            }
+            .frame(height: 12)
+
+            HStack {
+                Text(PlayerTimeInfo.formatTime(currentTime))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.8))
+                Spacer()
+                Text(PlayerTimeInfo.formatTime(duration))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Cast Skip Buttons
+
+    @ViewBuilder
+    private func castSkipButton(direction: SkipDirection) -> some View {
+        Button {
+            Task {
+                let interval: Double = 15
+                let newTime = direction == .forward
+                    ? min(duration, currentTime + interval)
+                    : max(0, currentTime - interval)
+                try? await remotePlayManager.seek(to: newTime)
+            }
+        } label: {
+            Image(systemName: direction == .forward ? "goforward.15" : "gobackward.15")
+                .font(.title2)
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Cast Play/Pause Button
+
+    @ViewBuilder
+    private var castPlayPauseButton: some View {
+        Button {
+            Task {
+                if isPlaying {
+                    try? await remotePlayManager.pause()
+                } else {
+                    try? await remotePlayManager.play()
+                }
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(AppColors.accent)
+                    .frame(width: 64, height: 64)
+                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    .font(.title)
+                    .foregroundStyle(.white)
+                    .offset(x: isPlaying ? 0 : 2)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func debouncedSetVolume(_ newVolume: Float) {
+        pendingVolume = newVolume
+        volumeDebounceTask?.cancel()
+        volumeDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let volume = pendingVolume else { return }
+            try? await remotePlayManager.setVolume(volume)
+            pendingVolume = nil
+        }
+    }
+
+    private enum SkipDirection {
+        case forward, backward
+    }
+}
+
+// MARK: - ReactiveFullscreenSurface
+
 private struct ReactiveFullscreenSurface: View {
     let player: any VideoPlayerProtocol
     var title: String = ""
     var metadata: MetadataResult? = nil
     var onDismiss: (() -> Void)?
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
 
     @State private var avPlayer: AVPlayer?
-    /// Tracks whether one-time metadata setup (externalMetadata, remote controls) has been done.
     @State private var didSetupMetadata = false
-    /// Tracks whether NowPlaying duration has been set (may need retry when duration loads late).
     @State private var didSetDuration = false
 
     var body: some View {
         Group {
             if let avPlayer {
                 #if os(iOS) || os(tvOS)
-                NativeAVPlayerViewController(player: avPlayer, onDismiss: onDismiss)
+                NativeAVPlayerViewController(
+                    player: avPlayer,
+                    onDismiss: onDismiss,
+                    videoGravity: videoGravity
+                )
                 #elseif os(macOS)
-                NativeAVPlayerView(player: avPlayer)
+                NativeAVPlayerView(player: avPlayer, videoGravity: videoGravity)
                 #endif
             } else {
-                // Fallback: player's own view (spinner for FFmpeg, native view for VLC)
                 player.playerView()
             }
         }
@@ -513,9 +800,6 @@ private struct ReactiveFullscreenSurface: View {
         }
     }
 
-    /// Apply metadata to the AVPlayer once it's available. Sets externalMetadata
-    /// (iOS/tvOS for AVPlayerViewController display) and MPNowPlayingInfoCenter
-    /// (all platforms for Control Center / Lock Screen / AirPlay).
     private func applyMetadataIfNeeded() {
         guard !didSetupMetadata, let avPlayer else { return }
         didSetupMetadata = true
@@ -523,7 +807,6 @@ private struct ReactiveFullscreenSurface: View {
         let playerRef = player
         let displayTitle = metadata?.title ?? title
 
-        // Setup remote transport controls (required for NowPlaying widget to appear on macOS)
         PlayerMetadataHelper.setupRemoteTransportControls(
             onPlay: { playerRef.play() },
             onPause: { playerRef.pause() },
@@ -534,7 +817,6 @@ private struct ReactiveFullscreenSurface: View {
         )
 
         if let metadata {
-            // Full metadata available
             let dur = avPlayer.currentItem?.duration.seconds ?? 0
             PlayerMetadataHelper.setNowPlayingInfo(
                 from: metadata,
@@ -550,7 +832,6 @@ private struct ReactiveFullscreenSurface: View {
             }
             #endif
         } else if !displayTitle.isEmpty {
-            // Title-only: set minimal NowPlaying and externalMetadata
             var info: [String: Any] = [
                 MPMediaItemPropertyTitle: displayTitle,
                 MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
@@ -563,7 +844,6 @@ private struct ReactiveFullscreenSurface: View {
             }
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
             MPNowPlayingInfoCenter.default().playbackState = .playing
-            print("[ReactiveFullscreenSurface] Set NowPlaying title: \(displayTitle)")
 
             #if os(iOS) || os(tvOS) || os(visionOS)
             if let item = avPlayer.currentItem {
@@ -573,8 +853,6 @@ private struct ReactiveFullscreenSurface: View {
         }
     }
 
-    /// Once the AVPlayer reports a valid duration, update NowPlaying info so the
-    /// progress bar shows the correct length.
     private func updateDurationIfNeeded() {
         guard !didSetDuration, let avPlayer else { return }
         let dur = avPlayer.currentItem?.duration.seconds ?? 0
@@ -585,5 +863,39 @@ private struct ReactiveFullscreenSurface: View {
         info[MPMediaItemPropertyPlaybackDuration] = dur
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = avPlayer.currentTime().seconds
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+// MARK: - Extensions
+
+extension MKSPlayerView {
+    func controlsMode(_ mode: PlayerControlsMode) -> Self {
+        var copy = self
+        copy.controlsConfiguration = PlayerControlsConfiguration(mode: mode)
+        return copy
+    }
+
+    func controlsConfiguration(_ config: PlayerControlsConfiguration) -> Self {
+        var copy = self
+        copy.controlsConfiguration = config
+        return copy
+    }
+}
+
+// MARK: - Previews
+
+#Preview("Native Controls") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        Text("Native Controls Preview")
+            .foregroundStyle(.white)
+    }
+}
+
+#Preview("Glass Controls") {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        Text("Glass Controls Preview")
+            .foregroundStyle(.white)
     }
 }

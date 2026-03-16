@@ -76,7 +76,6 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     var bufferingDetail: PlayerBufferingDetail {
         guard let player = player, let item = playerItem else { return .idle }
 
-        // Compute seconds of buffered data ahead of playhead
         let currentSec = player.currentTime().seconds
         var loadedAhead: Double? = nil
         if let range = item.loadedTimeRanges.first?.timeRangeValue {
@@ -87,7 +86,6 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             }
         }
 
-        // Access log metrics
         var bitrate: Double? = nil
         var stallCount = 0
         if let log = item.accessLog(), let event = log.events.last {
@@ -97,7 +95,6 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             stallCount = event.numberOfStalls
         }
 
-        // Buffering reason (AVPlayer.WaitingReason is a struct, not enum)
         let reason: String?
         let waitingReason = player.reasonForWaitingToPlay
         if waitingReason == .toMinimizeStalls {
@@ -119,6 +116,53 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
             playerRate: player.rate
         )
     }
+
+    var bufferedTime: Double {
+        guard let item = playerItem,
+              let range = item.loadedTimeRanges.first?.timeRangeValue else {
+            return 0
+        }
+        let bufferedEnd = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration)
+        return bufferedEnd.isFinite ? bufferedEnd : 0
+    }
+
+    var isMuted: Bool {
+        player?.isMuted ?? false
+    }
+
+    func setMuted(_ muted: Bool) {
+        player?.isMuted = muted
+    }
+
+    func setRate(_ newRate: Float) {
+        rate = newRate
+        if isPlaying {
+            player?.rate = newRate
+        }
+    }
+
+    func togglePictureInPicture() {
+        #if os(iOS) || os(macOS)
+        if let pipController = pictureInPictureController {
+            if pipController.isPictureInPictureActive {
+                pipController.stopPictureInPicture()
+            } else {
+                pipController.startPictureInPicture()
+            }
+        }
+        #endif
+    }
+
+    #if os(iOS) || os(macOS)
+    private var pictureInPictureController: AVPictureInPictureController? {
+        guard let player = player else { return nil }
+        let playerLayer = AVPlayerLayer(player: player)
+        if AVPictureInPictureController.isPictureInPictureSupported() {
+            return try? AVPictureInPictureController(playerLayer: playerLayer)
+        }
+        return nil
+    }
+    #endif
 
     deinit {
         stop()

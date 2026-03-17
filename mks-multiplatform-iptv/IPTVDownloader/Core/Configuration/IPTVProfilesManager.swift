@@ -131,14 +131,28 @@ class IPTVProfilesManager: ObservableObject {
     // MARK: - CloudKit Sync
 
     /// Loads sync configuration from persisted storage.
+    ///
+    /// Note: `didSet` observers don't fire during a designated initializer,
+    /// so we must set `syncManager.isSyncEnabled` directly here AND
+    /// kick off the initial sync explicitly.
     private func loadSyncConfiguration() {
         let config = SyncConfiguration.load()
         self.isSyncEnabled = config.isEnabled
+        syncManager.isSyncEnabled = config.isEnabled
+
+        // didSet won't fire during init(), so trigger initial sync manually
+        if config.isEnabled {
+            Task { [weak self] in
+                await self?.syncProfiles()
+            }
+        }
     }
 
     /// Performs a full sync with CloudKit.
     ///
     /// This pulls remote profiles, merges with local, and pushes changes.
+    /// If no profile is currently selected (e.g. fresh install on a new device),
+    /// auto-selects the first synced profile so the user skips the onboarding screen.
     func syncProfiles() async {
         guard isSyncEnabled else { return }
 
@@ -146,6 +160,12 @@ class IPTVProfilesManager: ObservableObject {
             let syncedProfiles = try await syncManager.syncProfiles(local: profiles)
             self.profiles = syncedProfiles
             self.syncStatus = syncManager.syncStatus
+
+            // Auto-select first profile on new devices where no profile is active yet
+            if activeProfileID == nil, let first = syncedProfiles.first {
+                activeProfileID = first.id
+            }
+
             saveProfiles()
         } catch {
             self.syncStatus = syncManager.syncStatus

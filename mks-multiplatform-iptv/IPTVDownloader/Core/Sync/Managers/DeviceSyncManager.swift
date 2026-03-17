@@ -45,13 +45,15 @@ final class DeviceSyncManager: ObservableObject {
     /// Registers or updates the current device's CKRecord in CloudKit.
     ///
     /// Called on every app launch to keep the `lastActiveDate` fresh.
-    /// Silently fails if iCloud is unavailable.
+    /// Uses `saveRecords` (which applies `.changedKeys` save policy) instead of
+    /// `saveRecord` so that re-registering an already-known device updates the
+    /// existing record rather than failing with "record already exists".
     func registerCurrentDevice() async {
         let device = SyncedDevice.current()
         let record = device.toRecord(in: CloudKitContainer.zoneID)
 
         do {
-            try await engine.saveRecord(record)
+            _ = try await engine.saveRecords([record])
             print("[DeviceSync] Registered device: \(device.deviceName) (\(device.platform))")
         } catch {
             print("[DeviceSync] Failed to register device: \(error)")
@@ -67,7 +69,7 @@ final class DeviceSyncManager: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let records = try await engine.fetchRecords(ofType: CloudKitRecordTypes.syncedDevice)
+            let records = try await engine.fetchRecordsViaZoneChanges(ofType: CloudKitRecordTypes.syncedDevice)
             let devices = records.compactMap { SyncedDevice.fromRecord($0) }
                 .sorted { $0.lastActiveDate > $1.lastActiveDate }
             syncedDevices = devices

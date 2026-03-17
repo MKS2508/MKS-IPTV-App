@@ -171,17 +171,21 @@ struct ContentView: View {
                 #if DEBUG
                 if destination == .debugStream {
                     Section {
-                        navigationLink(for: destination)
+                        navigationLink(for: .debugStream)
+                        navigationLink(for: .cacheDebug)
+                        navigationLink(for: .logsDebug)
                     } header: {
                         Text("Development")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                } else if destination == .cacheDebug || destination == .logsDebug {
+                    EmptyView()
                 } else {
                     navigationLink(for: destination)
                 }
                 #else
-                if destination != .debugStream {
+                if destination != .debugStream && destination != .cacheDebug && destination != .logsDebug {
                     navigationLink(for: destination)
                 }
                 #endif
@@ -290,6 +294,7 @@ struct ContentView: View {
             // DEVELOPMENT section
             Section("Development") {
                 navigationLink(for: .debugStream)
+                navigationLink(for: .cacheDebug)
                 navigationLink(for: .logsDebug)
             }
             #endif
@@ -309,7 +314,9 @@ struct ContentView: View {
         NavigationLink(value: destination.rawValue) {
             Label(destination.displayName, systemImage: destination.iconName)
                 #if DEBUG
-                .foregroundColor(destination == .debugStream ? .orange : .primary)
+                .foregroundColor(
+                    (destination == .debugStream || destination == .cacheDebug || destination == .logsDebug) ? .orange : .primary
+                )
                 #endif
         }
     }

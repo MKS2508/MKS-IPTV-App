@@ -80,7 +80,7 @@ final class ProfileSyncManager {
 
             // Pull remote profiles
             syncStatus = .syncing("Downloading profiles...")
-            let remoteRecords = try await engine.fetchRecords(ofType: CloudKitRecordTypes.profile)
+            let remoteRecords = try await engine.fetchRecordsViaZoneChanges(ofType: CloudKitRecordTypes.profile)
             let remoteProfiles = remoteRecords.compactMap { IPTVProfile.fromRecord($0) }
 
             // Merge local and remote
@@ -197,7 +197,7 @@ final class ProfileSyncManager {
         syncStatus = .syncing("Fetching remote profiles...")
 
         do {
-            let records = try await engine.fetchRecords(ofType: CloudKitRecordTypes.profile)
+            let records = try await engine.fetchRecordsViaZoneChanges(ofType: CloudKitRecordTypes.profile)
             let profiles = records.compactMap { IPTVProfile.fromRecord($0) }
             await engine.recordSuccessfulSync()
             syncStatus = .synced(Date())

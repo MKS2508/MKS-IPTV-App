@@ -158,6 +158,7 @@
 	<array>
 		<string>audio</string>
 		<string>processing</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>

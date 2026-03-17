@@ -143,6 +143,55 @@ actor CloudKitSyncEngine {
         }
     }
 
+    /// Fetches all records of a given type using zone-level change tracking.
+    ///
+    /// Unlike `fetchRecords(ofType:)` which uses `CKQuery` and requires the record
+    /// type to have queryable indexes in CloudKit Dashboard, this method fetches
+    /// all records in the zone via `CKFetchRecordZoneChangesOperation` and filters
+    /// by record type client-side. Use this for record types that don't have
+    /// indexes configured (e.g. newly created types like `SyncedDevice`).
+    ///
+    /// - Parameter recordType: The CloudKit record type to filter for.
+    /// - Returns: An array of matching `CKRecord` objects.
+    /// - Throws: `SyncError` on failure.
+    func fetchRecordsViaZoneChanges(ofType recordType: String) async throws -> [CKRecord] {
+        try await ensureZone()
+
+        let config = CKFetchRecordZoneChangesOperation.ZoneConfiguration()
+        config.previousServerChangeToken = nil // nil = fetch current state from scratch
+
+        return try await withCheckedThrowingContinuation { continuation in
+            var records: [CKRecord] = []
+
+            let operation = CKFetchRecordZoneChangesOperation(
+                recordZoneIDs: [CloudKitContainer.zoneID],
+                configurationsByRecordZoneID: [CloudKitContainer.zoneID: config]
+            )
+
+            operation.recordWasChangedBlock = { _, result in
+                if case .success(let record) = result,
+                   record.recordType == recordType {
+                    records.append(record)
+                }
+            }
+
+            operation.fetchRecordZoneChangesResultBlock = { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: records)
+                case .failure(let error):
+                    if let ckError = error as? CKError {
+                        continuation.resume(throwing: self.mapCKError(ckError))
+                    } else {
+                        continuation.resume(throwing: SyncError.networkError(error.localizedDescription))
+                    }
+                }
+            }
+
+            CloudKitContainer.privateDatabase.add(operation)
+        }
+    }
+
     // MARK: - Sync Metadata
 
     /// Records a successful sync and persists the timestamp.

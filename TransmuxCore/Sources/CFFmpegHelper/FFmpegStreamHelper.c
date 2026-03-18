@@ -23,42 +23,33 @@
 #import <libavcodec/avcodec.h>
 #import <libavcodec/bsf.h>
 #import <libavutil/avutil.h>
-#import <libavutil/log.h>
-#import <libavutil/time.h>
 
 #include "FFmpegStreamHelper.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include <pthread.h>
 
-// --- File logging (writes to /tmp/mks-iptv-transmux.log) ---
+// --- Logging shim (delegates to CTransmuxFFI's mks_log_impl) ---
 //
-// All log output goes to BOTH stderr (Xcode console) and the log file
-// so the web-based log viewer sees everything in real time.
-// Format matches TransmuxLog.swift: [HH:mm:ss.SSS] [LEVEL] [TAG] message
+// CTransmuxFFI owns the log file handle, FFmpeg av_log callback, and
+// thread-safe formatting. This module just forward-declares the symbol
+// (resolved at link time) and maps level strings to MKSLogLevel ints.
+//
+// MKSLogLevel values (from mks_log.h):
+//   MKS_LOG_ERROR=16, MKS_LOG_WARNING=24, MKS_LOG_INFO=32, MKS_LOG_DEBUG=48
 
-static FILE *s_log_file = NULL;
-static pthread_mutex_t s_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+extern void mks_log_impl(const char *tag, int level, const char *fmt, ...);
 
-/// Format a timestamp matching TransmuxLog.swift: HH:mm:ss.SSS
-/// Uses av_gettime() (microseconds since epoch) to avoid system <time.h>
-/// which is unavailable inside the CFFmpegHelper Swift module.
-/// NOTE: This produces UTC time. TransmuxLog.swift produces local time.
-/// For timezone-correct timestamps, the log viewer can normalize.
-static void format_timestamp(char *buf, size_t bufsize) {
-    int64_t us = av_gettime();
-    int64_t total_secs = us / 1000000;
-    int ms = (int)((us % 1000000) / 1000);
-    int64_t day_secs = total_secs % 86400;
-    int h = (int)(day_secs / 3600);
-    int m = (int)((day_secs % 3600) / 60);
-    int s = (int)(day_secs % 60);
-    snprintf(buf, bufsize, "%02d:%02d:%02d.%03d", h, m, s, ms);
+/// Map level abbreviation string to MKSLogLevel numeric value.
+static int level_from_str(const char *level) {
+    if (strcmp(level, "ERR") == 0) return 16;  // MKS_LOG_ERROR
+    if (strcmp(level, "WRN") == 0) return 24;  // MKS_LOG_WARNING
+    if (strcmp(level, "DBG") == 0) return 48;  // MKS_LOG_DEBUG
+    return 32;                                  // MKS_LOG_INFO
 }
 
-/// Write a log entry to both stderr and the log file.
+/// Write a log entry via the centralized CTransmuxFFI logging system.
 static void log_to_file(const char *tag, const char *level, const char *fmt, ...) {
     char msg[2048];
     va_list ap;
@@ -66,62 +57,7 @@ static void log_to_file(const char *tag, const char *level, const char *fmt, ...
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
-    char ts[16];
-    format_timestamp(ts, sizeof(ts));
-
-    // stderr (Xcode console)
-    fprintf(stderr, "[%s] [%s] [%s] %s\n", ts, level, tag, msg);
-
-    // Log file (thread-safe, append mode)
-    pthread_mutex_lock(&s_log_mutex);
-    if (s_log_file) {
-        fprintf(s_log_file, "[%s] [%s] [%s] %s\n", ts, level, tag, msg);
-        fflush(s_log_file);
-    }
-    pthread_mutex_unlock(&s_log_mutex);
-}
-
-/// FFmpeg av_log callback — routes FFmpeg internal messages to the log file.
-/// Captures critical messages like "non monotonically increasing dts" from the mp4 muxer.
-static void ffmpeg_log_callback(void *avcl, int level, const char *fmt, va_list vl) {
-    if (level > av_log_get_level()) return;
-
-    char buf[1024];
-    vsnprintf(buf, sizeof(buf), fmt, vl);
-
-    // Strip trailing whitespace/newlines (FFmpeg appends them)
-    size_t len = strlen(buf);
-    while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r' || buf[len-1] == ' ')) {
-        buf[--len] = '\0';
-    }
-    if (len == 0) return;
-
-    const char *lvl;
-    if (level <= AV_LOG_ERROR)        lvl = "ERR";
-    else if (level <= AV_LOG_WARNING) lvl = "WRN";
-    else if (level <= AV_LOG_INFO)    lvl = "INF";
-    else                              lvl = "DBG";
-
-    log_to_file("FFmpeg", lvl, "%s", buf);
-}
-
-void mks_log_init(const char *logFilePath) {
-    pthread_mutex_lock(&s_log_mutex);
-    if (s_log_file) {
-        fclose(s_log_file);
-        s_log_file = NULL;
-    }
-    if (logFilePath) {
-        s_log_file = fopen(logFilePath, "a");
-        if (!s_log_file) {
-            fprintf(stderr, "[FFmpegHelper] WARNING: failed to open log file: %s\n", logFilePath);
-        }
-    }
-    pthread_mutex_unlock(&s_log_mutex);
-
-    // Route FFmpeg internal logging through our callback
-    av_log_set_level(AV_LOG_INFO);
-    av_log_set_callback(ffmpeg_log_callback);
+    mks_log_impl(tag, level_from_str(level), "%s", msg);
 }
 
 // --- Runtime layout detection ---

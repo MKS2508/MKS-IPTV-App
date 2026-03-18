@@ -51,6 +51,14 @@ struct mks_iptv_downloaderApp: App {
         NSWindow.allowsAutomaticWindowTabbing = false
         #endif
 
+        // Centralized log configuration — must run before any logger fires.
+        let logConfig = MKSLogConfig.shared
+        logConfig.ensureLogDirectoryExists()
+        TransmuxLog.configure(
+            directory: logConfig.logDirectory,
+            level: logConfig.level(for: .transmux).toTransmuxLevel()
+        )
+
         StderrFilter.install()
         TransmuxingService.configure(streamProxy: StreamProxyAdapter())
         Self.configurePlayerEngines()

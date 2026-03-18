@@ -32,14 +32,16 @@ enum DLNAMetadataAdapter {
     ///   - duration: Optional content duration in seconds
     ///   - streaming: When true, marks content as progressive/live (OP=00, no seeking).
     ///     Use for progressive transmux content that is still being written.
+    ///   - fallbackTitle: Title to use when metadata is nil (e.g. derived from source URL).
     /// - Returns: DIDL-Lite XML string
     static func buildDIDLLite(
         from metadata: MetadataResult?,
         contentURL: URL,
         duration: Double?,
-        streaming: Bool = false
+        streaming: Bool = false,
+        fallbackTitle: String? = nil
     ) -> String {
-        let title = formatTitle(from: metadata)
+        let title = formatTitle(from: metadata, fallbackTitle: fallbackTitle)
         let durationStr = duration.map { formatDuration($0) } ?? ""
 
         // Build DIDL-Lite XML
@@ -62,9 +64,10 @@ enum DLNAMetadataAdapter {
     /// - Episode: "ShowTitle - S01E03 - EpisodeTitle"
     /// - Series: showTitle
     /// - Movie: title
-    static func formatTitle(from metadata: MetadataResult?) -> String {
+    /// - Nil metadata: fallbackTitle or "Video"
+    static func formatTitle(from metadata: MetadataResult?, fallbackTitle: String? = nil) -> String {
         guard let metadata else {
-            return "Unknown"
+            return fallbackTitle ?? "Video"
         }
 
         // Episode with all info

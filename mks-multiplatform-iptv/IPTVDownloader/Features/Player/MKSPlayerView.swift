@@ -130,6 +130,15 @@ struct MKSPlayerView: View {
             }
         }
         .ignoresSafeArea(.all, edges: .bottom)
+        .onDisappear {
+            // Stop RemotePlay when player view is dismissed to prevent
+            // leaked polling tasks, transmux monitors, and SOAP calls.
+            if didLoadOnCastDevice || remotePlayManager.connectedDevice != nil {
+                Task {
+                    await remotePlayManager.disconnect()
+                }
+            }
+        }
     }
 
     // MARK: - Player Surface

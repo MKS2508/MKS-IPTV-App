@@ -172,11 +172,12 @@ enum CastMetadataAdapter {
     static func buildCastLoadPayload(
         from metadata: MetadataResult?,
         contentURL: URL,
-        duration: Double?
+        duration: Double?,
+        fallbackTitle: String? = nil
     ) -> [String: Any] {
         var result: [String: Any] = [:]
 
-        let title = formatTitle(from: metadata)
+        let title = formatTitle(from: metadata, fallbackTitle: fallbackTitle)
         result["title"] = title
         result["metadataType"] = metadataTypeCode(from: metadata)
 
@@ -241,7 +242,7 @@ enum CastMetadataAdapter {
 
     /// Format display title for Cast metadata.
     /// Delegates to DLNAMetadataAdapter.formatTitle for consistent formatting across protocols.
-    static func formatTitle(from metadata: MetadataResult?) -> String {
-        DLNAMetadataAdapter.formatTitle(from: metadata)
+    static func formatTitle(from metadata: MetadataResult?, fallbackTitle: String? = nil) -> String {
+        DLNAMetadataAdapter.formatTitle(from: metadata, fallbackTitle: fallbackTitle)
     }
 }

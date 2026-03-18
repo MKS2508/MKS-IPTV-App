@@ -48,6 +48,10 @@ final class CastController: RemoteDeviceController, @unchecked Sendable {
     /// Callback for state updates (connected by RemotePlayManager).
     var onStateUpdate: ((RemoteDeviceState) -> Void)?
 
+    /// Original source URL (pre-transmux) for metadata title fallback.
+    /// Set by RemotePlayManager before calling load().
+    var sourceContentURL: URL?
+
     // MARK: - Initialization
 
     init(device: RemoteDevice) throws {
@@ -79,58 +83,88 @@ final class CastController: RemoteDeviceController, @unchecked Sendable {
 
     // MARK: - RemoteDeviceController
 
+    /// Maximum number of connection attempts before failing.
+    private static let maxConnectAttempts = 2
+
     func connect() async throws {
         CastLog.startSession(host: hostIP, port: castPort)
         CastLog.controllerAction("CONNECT_START", fields: ["device": device.name, "host": hostIP])
         playbackState = .connecting(deviceId: device.id)
 
-        do {
-            // Create TLS socket
-            let sock = CastSocket(host: hostIP, port: castPort)
-            self.socket = sock
+        var lastError: Error?
+        for attempt in 1...Self.maxConnectAttempts {
+            do {
+                try await performConnect(attempt: attempt)
+                return
+            } catch {
+                lastError = error
+                CastLog.error("CONNECT_ATTEMPT_\(attempt)_FAILED", error: error.localizedDescription)
 
-            // Connect TLS
-            try await sock.connect()
+                // Clean up failed socket before retry
+                await socket?.disconnect()
+                socket = nil
+                channel = nil
 
-            // Create protocol channel
-            let chan = CastChannel(socket: sock)
-            self.channel = chan
-
-            // Setup state change callback
-            await chan.set(onStateChanged: { [weak self] state in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    if case .error(let msg) = state {
-                        CastLog.error("STATE_ERROR", error: msg)
-                        self.playbackState = .error(RemotePlayError.transportError(msg))
-                    } else if case .disconnected = state {
-                        CastLog.controllerAction("DEVICE_DISCONNECTED")
-                        self.playbackState = .idle
-                        self.deviceState = .idle
-                    }
+                if attempt < Self.maxConnectAttempts {
+                    CastLog.controllerAction("CONNECT_RETRY", fields: [
+                        "attempt": "\(attempt + 1)/\(Self.maxConnectAttempts)",
+                        "delay": "3s"
+                    ])
+                    try? await Task.sleep(for: .seconds(3))
                 }
-            })
-
-            // Setup media status callback
-            await chan.set(onMediaStatusUpdate: { [weak self] status in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    self.updateFromMediaStatus(status)
-                }
-            })
-
-            // Run Cast V2 handshake
-            try await chan.connect()
-
-            playbackState = .connected(deviceId: device.id)
-            deviceState = .idle
-            CastLog.controllerAction("CONNECT_SUCCESS", fields: ["device": device.name])
-
-        } catch {
-            CastLog.error("CONNECT_FAILED", error: error.localizedDescription)
-            playbackState = .error((error as? RemotePlayError) ?? .connectionFailed(error.localizedDescription))
-            throw error
+            }
         }
+
+        let finalError = lastError ?? RemotePlayError.connectionTimeout
+        CastLog.error("CONNECT_FAILED", error: "All \(Self.maxConnectAttempts) attempts failed: \(finalError.localizedDescription)")
+        playbackState = .error((finalError as? RemotePlayError) ?? .connectionFailed(finalError.localizedDescription))
+        throw finalError
+    }
+
+    /// Perform a single connection attempt (TLS + Cast V2 handshake).
+    private func performConnect(attempt: Int) async throws {
+        CastLog.controllerAction("CONNECT_ATTEMPT", fields: ["attempt": "\(attempt)", "host": hostIP])
+
+        // Create TLS socket
+        let sock = CastSocket(host: hostIP, port: castPort)
+        self.socket = sock
+
+        // Connect TLS
+        try await sock.connect()
+
+        // Create protocol channel
+        let chan = CastChannel(socket: sock)
+        self.channel = chan
+
+        // Setup state change callback
+        await chan.set(onStateChanged: { [weak self] state in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if case .error(let msg) = state {
+                    CastLog.error("STATE_ERROR", error: msg)
+                    self.playbackState = .error(RemotePlayError.transportError(msg))
+                } else if case .disconnected = state {
+                    CastLog.controllerAction("DEVICE_DISCONNECTED")
+                    self.playbackState = .idle
+                    self.deviceState = .idle
+                }
+            }
+        })
+
+        // Setup media status callback
+        await chan.set(onMediaStatusUpdate: { [weak self] status in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.updateFromMediaStatus(status)
+            }
+        })
+
+        // Run Cast V2 handshake
+        try await chan.connect()
+
+        playbackState = .connected(deviceId: device.id)
+        deviceState = .idle
+        CastLog.controllerAction("CONNECT_SUCCESS", fields: ["device": device.name, "attempt": "\(attempt)"])
     }
 
     func disconnect() async {
@@ -172,10 +206,12 @@ final class CastController: RemoteDeviceController, @unchecked Sendable {
         }
 
         let durationSeconds: Double? = metadata?.runtimeMinutes.map { Double($0) * 60.0 }
+        let fallbackTitle = deriveFallbackTitle()
         let castMetadata = CastMetadataAdapter.buildCastLoadPayload(
             from: metadata,
             contentURL: url,
-            duration: durationSeconds
+            duration: durationSeconds,
+            fallbackTitle: fallbackTitle
         )
 
         CastLog.controllerAction("LOAD_METADATA", fields: [
@@ -314,6 +350,16 @@ final class CastController: RemoteDeviceController, @unchecked Sendable {
     }
 
     // MARK: - Private Helpers
+
+    /// Derive a fallback title from sourceContentURL when metadata is nil.
+    private func deriveFallbackTitle() -> String? {
+        guard let url = sourceContentURL else { return nil }
+        let filename = url.deletingPathExtension().lastPathComponent
+        guard !filename.isEmpty else { return nil }
+        return filename
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+    }
 
     /// Map Cast playerState to RemoteDeviceState.TransportState and update local state.
     private func updateFromMediaStatus(_ status: CastMediaStatus) {

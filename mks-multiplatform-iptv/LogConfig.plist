@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logDirectory</key>
+	<string></string>
+	<key>maxFileSize</key>
+	<integer>10485760</integer>
+	<key>levels</key>
+	<dict>
+		<key>transmux</key>
+		<integer>1</integer>
+		<key>player</key>
+		<integer>1</integer>
+		<key>cast</key>
+		<integer>1</integer>
+		<key>live</key>
+		<integer>1</integer>
+		<key>ffmpeg</key>
+		<integer>1</integer>
+	</dict>
+</dict>
+</plist>

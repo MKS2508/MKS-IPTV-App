@@ -45,6 +45,37 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     /// Callback for state updates (connected by RemotePlayManager).
     var onStateUpdate: ((RemoteDeviceState) -> Void)?
 
+    /// Callback to notify RemotePlayManager when a capability should be removed.
+    var onCapabilityDowngrade: ((DeviceCapabilities) -> Void)?
+
+    /// Known content duration from transmux probe (overrides TV-reported duration).
+    /// Set by RemotePlayManager after DLNATransmuxSession is created.
+    /// Many TVs report garbage TrackDuration for progressive MPEG-TS.
+    var knownDuration: Double?
+
+    /// Short-circuit flags to avoid repeated SOAP round-trips after a capability
+    /// is confirmed unsupported by the device.
+    private var pauseUnsupported = false
+    private var seekUnsupported = false
+
+    /// When true, skip Pause and Play(Speed=0) and go directly to Stop-as-pause.
+    /// Set after the first successful Stop-as-pause cycle.
+    private var useStopAsPause = false
+
+    /// Fake-pause state: content was stopped to simulate pause.
+    /// On next play(), re-load content at savedPositionForResume.
+    private var isFakePaused = false
+    private var savedPositionForResume: Double?
+
+    /// Saved load() parameters for fake-pause resume.
+    private var loadedContentURL: URL?
+    private var loadedMetadata: MetadataResult?
+    private var loadedStreaming: Bool = false
+
+    /// Original source URL (pre-transmux) for metadata title fallback.
+    /// Set by RemotePlayManager before calling load().
+    var sourceContentURL: URL?
+
     // MARK: - Initialization
 
     init(device: RemoteDevice) throws {
@@ -104,7 +135,15 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         print("[DLNACast] DLNAController.load — url=\(url.absoluteString)")
         print("[DLNACast] DLNAController.load — controlURL=\(controlURL.absoluteString)")
         print("[DLNACast] DLNAController.load — streaming=\(streaming)")
+        print("[DLNACast] DLNAController.load — metadata.title=\(metadata?.title ?? "nil"), sourceContentURL=\(sourceContentURL?.lastPathComponent ?? "nil")")
         playbackState = .loading
+
+        // Save load parameters for fake-pause resume
+        loadedContentURL = url
+        loadedMetadata = metadata
+        loadedStreaming = streaming
+        isFakePaused = false
+        savedPositionForResume = nil
 
         // Build DIDL-Lite metadata - convert runtimeMinutes to seconds
         let durationSeconds: Double? = metadata?.runtimeMinutes.map { Double($0) * 60.0 }
@@ -112,7 +151,8 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             from: metadata,
             contentURL: url,
             duration: durationSeconds,
-            streaming: streaming
+            streaming: streaming,
+            fallbackTitle: deriveFallbackTitle()
         )
         print("[DLNACast] DLNAController.load — DIDL metadata length=\(didlMetadata.count)")
 
@@ -189,6 +229,15 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     }
 
     func play() async throws {
+        // Resume from fake pause (Stop was used as pause substitute)
+        if isFakePaused, let resumePos = savedPositionForResume, let url = loadedContentURL {
+            print("[DLNACast] Resuming from fake pause at \(String(format: "%.1f", resumePos))s")
+            isFakePaused = false
+            savedPositionForResume = nil
+            try await load(url: url, metadata: loadedMetadata, startPosition: resumePos, streaming: loadedStreaming)
+            return
+        }
+
         do {
             let action = DLNASOAPClient.AVTransportAction.play(
                 instanceId: instanceId,
@@ -215,6 +264,18 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     }
 
     func pause() async throws {
+        if pauseUnsupported {
+            print("[DLNACast] Pause skipped — already confirmed unsupported by this device")
+            throw RemotePlayError.soapError(501, "Pause not supported by this device")
+        }
+
+        // Fast path: if Stop-as-pause already proven to work, skip SOAP Pause/Play(Speed=0)
+        if useStopAsPause {
+            try await performStopAsPause()
+            return
+        }
+
+        // Tier 1: Standard Pause
         do {
             let action = DLNASOAPClient.AVTransportAction.pause(
                 instanceId: instanceId
@@ -225,21 +286,86 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
                 controlURL: controlURL,
                 arguments: action.arguments
             )
-
             playbackState = .paused
             deviceState.transportState = .paused
-
+            return
         } catch let error as RemotePlayError {
-            playbackState = .error(error)
-            throw error
+            if case .soapError(let code, _) = error, code == 501 || code == 701 {
+                print("[DLNACast] Pause failed (UPnP \(code)), trying Play(Speed=0)...")
+            } else {
+                playbackState = .error(error)
+                throw error
+            }
         } catch {
             let remoteError = RemotePlayError.transportError(error.localizedDescription)
             playbackState = .error(remoteError)
             throw remoteError
         }
+
+        // Tier 2: Play(Speed=0) — some TVs accept this as pause
+        do {
+            let fallbackAction = DLNASOAPClient.AVTransportAction.play(
+                instanceId: instanceId,
+                speed: "0"
+            )
+            _ = try await DLNASOAPClient.send(
+                action: fallbackAction.actionName,
+                serviceType: .avTransport,
+                controlURL: controlURL,
+                arguments: fallbackAction.arguments
+            )
+            playbackState = .paused
+            deviceState.transportState = .paused
+            print("[DLNACast] Play(Speed=0) fallback succeeded")
+            return
+        } catch {
+            print("[DLNACast] Play(Speed=0) also failed: \(error), trying Stop-as-pause...")
+        }
+
+        // Tier 3: Stop + save position (fake pause) — re-loads on play()
+        do {
+            try await performStopAsPause()
+            useStopAsPause = true  // Next time, skip tiers 1 & 2
+            return
+        } catch {
+            print("[DLNACast] Stop-as-pause also failed: \(error)")
+        }
+
+        // All three tiers failed — downgrade capability permanently
+        pauseUnsupported = true
+        downgradeCapability(.pause)
+        playbackState = .playing
+        throw RemotePlayError.soapError(501, "Pause not supported by this device (all fallbacks failed)")
+    }
+
+    /// Stop playback and save current position for resume.
+    /// Used as a last-resort pause fallback when Pause and Play(Speed=0) fail.
+    private func performStopAsPause() async throws {
+        let currentPos = deviceState.currentTime
+        print("[DLNACast] Stop-as-pause — saving position \(String(format: "%.1f", currentPos))s before stopping")
+
+        let stopAction = DLNASOAPClient.AVTransportAction.stop(instanceId: instanceId)
+        _ = try await DLNASOAPClient.send(
+            action: stopAction.actionName,
+            serviceType: .avTransport,
+            controlURL: controlURL,
+            arguments: stopAction.arguments
+        )
+
+        savedPositionForResume = currentPos
+        isFakePaused = true
+        playbackState = .paused
+        deviceState.transportState = .paused
+        stopPolling()
+        print("[DLNACast] Stop-as-pause succeeded — will resume at \(String(format: "%.1f", currentPos))s on play()")
     }
 
     func seek(to time: Double) async throws {
+        if seekUnsupported {
+            print("[DLNACast] Seek skipped — already confirmed unsupported by this device")
+            throw RemotePlayError.soapError(710, "Seek not supported by this device")
+        }
+
         let target = formatSeekTarget(time)
 
         playbackState = .seeking(to: time)
@@ -267,6 +393,19 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             }
 
         } catch let error as RemotePlayError {
+            // Downgrade seeking capability on known unsupported errors
+            if case .soapError(let code, _) = error, code == 710 || code == 501 || code == 711 {
+                print("[DLNACast] Seek failed (UPnP \(code)), disabling seek capability")
+                seekUnsupported = true
+                downgradeCapability(.seeking)
+                // Restore playback state — seek failure is non-fatal for content
+                if deviceState.transportState == .playing {
+                    playbackState = .playing
+                } else {
+                    playbackState = .paused
+                }
+                throw error
+            }
             playbackState = .error(error)
             throw error
         } catch {
@@ -362,10 +501,18 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         let durationStr = response["TrackDuration"] ?? "00:00:00"
         let trackURI = response["TrackURI"] ?? "nil"
         let currentTime = parseTime(relTimeStr)
-        let duration = parseTime(durationStr)
+        let tvDuration = parseTime(durationStr)
+
+        // Use known duration from transmux probe if available;
+        // many TVs report garbage TrackDuration for progressive MPEG-TS
+        // (e.g. computing from Content-Length / assumed bitrate).
+        let duration = knownDuration ?? tvDuration
 
         // Log raw GetPositionInfo response for first few polls
         print("[DLNACast] GetPositionInfo raw — RelTime=\(relTimeStr), TrackDuration=\(durationStr), TrackURI=\(trackURI.prefix(80))")
+        if let known = knownDuration, abs(tvDuration - known) > 60 {
+            print("[DLNACast] Duration override — TV reported \(durationStr) (\(String(format: "%.0f", tvDuration))s), using known \(String(format: "%.1f", known))s")
+        }
 
         // Query transport state for isPlaying
         let transportState = try await queryTransportInfo()
@@ -434,6 +581,24 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
         let stateString = response["CurrentTransportState"] ?? "STOPPED"
         return RemoteDeviceState.TransportState(rawValue: stateString) ?? .stopped
+    }
+
+    /// Remove a capability and notify the manager to update the UI.
+    private func downgradeCapability(_ capability: DeviceCapabilities) {
+        print("[DLNACast] Downgrading capability: removing \(capability) from device")
+        onCapabilityDowngrade?(capability)
+    }
+
+    /// Derive a fallback title from sourceContentURL when metadata is nil.
+    /// Uses the URL's last path component (without extension) as a human-readable title.
+    private func deriveFallbackTitle() -> String? {
+        guard let url = sourceContentURL else { return nil }
+        let filename = url.deletingPathExtension().lastPathComponent
+        guard !filename.isEmpty else { return nil }
+        // Clean up common URL artifacts: replace underscores/dots with spaces
+        return filename
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
     }
 
     /// Format seek target as HH:MM:SS.

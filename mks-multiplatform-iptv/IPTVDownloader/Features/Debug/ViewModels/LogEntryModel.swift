@@ -15,6 +15,7 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
     case transmux = "Transmux"
     case player = "Player"
     case cast = "Cast"
+    case live = "Live"
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
         case .transmux: return "gearshape.2"
         case .player: return "play.circle"
         case .cast: return "airplayvideo"
+        case .live: return "antenna.radiowaves.left.and.right"
         }
     }
 
@@ -33,17 +35,23 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
         case .transmux: return .purple
         case .player: return .blue
         case .cast: return .green
+        case .live: return .orange
         }
     }
 
-    /// File path for this log source.
-    var filePath: String {
-        let dir = FileManager.default.temporaryDirectory.path
+    /// Corresponding MKSLogConfig subsystem.
+    var configSubsystem: MKSLogConfig.Subsystem {
         switch self {
-        case .transmux: return (dir as NSString).appendingPathComponent("mks-iptv-transmux.log")
-        case .player: return (dir as NSString).appendingPathComponent("mks-iptv-player.log")
-        case .cast: return (dir as NSString).appendingPathComponent("mks-iptv-cast.log")
+        case .transmux: return .transmux
+        case .player: return .player
+        case .cast: return .cast
+        case .live: return .live
         }
+    }
+
+    /// File path for this log source, resolved from MKSLogConfig.
+    var filePath: String {
+        MKSLogConfig.shared.filePath(for: configSubsystem)
     }
 }
 

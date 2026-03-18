@@ -7,6 +7,10 @@
 
 import Foundation
 
+/// App-level UserDefaults keys for download and debug preferences.
+///
+/// > Note: Log-related keys (`MKSLog.level.*`, `MKSLog.directory`) are managed
+/// > exclusively by ``MKSLogConfig`` and should not be accessed directly here.
 extension UserDefaults {
     private static let downloadPathKey = "DownloadPath"
     private static let showPlayerDebugOverlayKey = "showPlayerDebugOverlay"

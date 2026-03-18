@@ -12,15 +12,9 @@
 // All FFmpeg struct pointers are passed as void* to avoid type conflicts
 // between the bridging header and Swift's "import Libavformat" module.
 
-// --- Logging setup ---
-
-/// Initialize C-level file logging and FFmpeg av_log callback.
-/// Routes all CHelper diagnostics and FFmpeg internal messages
-/// (e.g. "non monotonically increasing dts") to the same log file
-/// that TransmuxLog.swift writes to, so the web log viewer sees everything.
-/// Must be called before any other mks_* function.
-/// @param logFilePath  Path to append logs to (e.g. "/tmp/mks-iptv-transmux.log")
-void mks_log_init(const char * _Nullable logFilePath);
+// --- Logging ---
+// CFFmpegHelper logging is delegated to CTransmuxFFI's mks_log_impl.
+// Call mks_log_init() (from CTransmuxFFI/mks_log.h) before using any mks_* function.
 
 // --- Stream inspection ---
 

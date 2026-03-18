@@ -155,8 +155,8 @@ struct RemoteDevice: Identifiable, Hashable, Sendable {
     /// Protocol/device type classification.
     let type: DeviceType
 
-    /// Capabilities advertised by the device.
-    let capabilities: DeviceCapabilities
+    /// Capabilities advertised by the device (may be downgraded at runtime).
+    var capabilities: DeviceCapabilities
 
     /// Whether the device is currently connected.
     var isConnected: Bool

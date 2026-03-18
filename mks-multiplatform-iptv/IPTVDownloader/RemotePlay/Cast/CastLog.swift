@@ -15,10 +15,9 @@ enum CastLog {
 
     // MARK: - Configuration
 
-    public static let filePath: String = {
-        let dir = FileManager.default.temporaryDirectory.path
-        return (dir as NSString).appendingPathComponent("mks-iptv-cast.log")
-    }()
+    public static var filePath: String {
+        MKSLogConfig.shared.filePath(for: .cast)
+    }
 
     private static let queue = DispatchQueue(label: "CastLog.write", qos: .utility)
     private static let dateFormatter: ISO8601DateFormatter = {
@@ -55,6 +54,15 @@ enum CastLog {
         level: String = "INF",
         fields: [String: Any] = [:]
     ) {
+        // Map level string to MKSLogConfig.Level for filtering
+        let configLevel: MKSLogConfig.Level = switch level {
+        case "ERR": .error
+        case "WRN": .warning
+        case "DBG": .debug
+        default: .info
+        }
+        guard configLevel >= MKSLogConfig.shared.level(for: .cast) else { return }
+
         let entry = formatEntry(action: action, category: category, level: level, fields: fields)
         queue.async {
             writeEntry(entry)

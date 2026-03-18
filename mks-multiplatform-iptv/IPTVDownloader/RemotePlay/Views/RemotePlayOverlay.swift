@@ -40,6 +40,14 @@ struct RemotePlayOverlay: View {
     private var isMuted: Bool {
         remotePlayManager.deviceState?.isMuted ?? false
     }
+
+    private var canSeek: Bool {
+        remotePlayManager.connectedDevice?.capabilities.contains(.seeking) ?? false
+    }
+
+    private var canPause: Bool {
+        remotePlayManager.connectedDevice?.capabilities.contains(.pause) ?? false
+    }
     
     var body: some View {
         if isConnected {
@@ -101,11 +109,17 @@ struct RemotePlayOverlay: View {
     @ViewBuilder
     private var playbackControls: some View {
         VStack(spacing: 16) {
-            seekBar
+            if canSeek {
+                seekBar
+            } else {
+                timeLabels
+                    .padding(.horizontal)
+            }
             mainControls
             volumeControl
         }
         .padding(.vertical, 16)
+        .animation(.easeInOut(duration: 0.3), value: canSeek)
     }
     
     @ViewBuilder
@@ -190,11 +204,16 @@ struct RemotePlayOverlay: View {
     @ViewBuilder
     private var mainControls: some View {
         HStack(spacing: 40) {
-            skipButton(direction: .backward)
+            if canSeek {
+                skipButton(direction: .backward)
+            }
             playPauseButton
-            skipButton(direction: .forward)
+            if canSeek {
+                skipButton(direction: .forward)
+            }
         }
         .padding(.vertical, 8)
+        .animation(.easeInOut(duration: 0.3), value: canSeek)
     }
     
     @ViewBuilder
@@ -220,6 +239,7 @@ struct RemotePlayOverlay: View {
         Button {
             Task {
                 if isPlaying {
+                    guard canPause else { return }
                     try? await remotePlayManager.pause()
                 } else {
                     try? await remotePlayManager.play()
@@ -228,7 +248,7 @@ struct RemotePlayOverlay: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(AppColors.accent)
+                    .fill(isPlaying && !canPause ? AppColors.accent.opacity(0.4) : AppColors.accent)
                     .frame(width: 64, height: 64)
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .font(.title)
@@ -237,6 +257,7 @@ struct RemotePlayOverlay: View {
             }
         }
         .buttonStyle(.plain)
+        .disabled(isPlaying && !canPause)
         .scaleEffect(isPlaying ? 1.0 : 1.05)
         .animation(.spring(response: 0.25), value: isPlaying)
     }

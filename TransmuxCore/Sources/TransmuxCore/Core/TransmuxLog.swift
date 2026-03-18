@@ -53,11 +53,35 @@ public enum TransmuxLog {
 
     // MARK: - Configuration
 
-    /// Log file path — uses the system temporary directory (sandbox-safe on iOS).
-    public static let filePath: String = {
-        let dir = FileManager.default.temporaryDirectory.path
+    /// Configured log directory. Set via `configure(directory:level:)` from the main app.
+    /// Falls back to the system temporary directory if not configured.
+    private static var _configuredDirectory: String?
+
+    /// Minimum log level. Messages below this level are silently dropped.
+    private static var _minimumLevel: Level = .debug
+
+    /// Configure the log directory and minimum level.
+    /// Must be called from the app's `init()` **before** any log call fires
+    /// (i.e. before `sessionID` is lazily initialized).
+    ///
+    /// - Parameters:
+    ///   - directory: Absolute path to the log directory (created externally).
+    ///   - level: Minimum severity to record. Default is `.info`.
+    public static func configure(directory: String, level: Level = .info) {
+        // Close any stale handle so the next write opens at the new path.
+        queue.sync {
+            try? persistentHandle?.close()
+            persistentHandle = nil
+        }
+        _configuredDirectory = directory
+        _minimumLevel = level
+    }
+
+    /// Log file path — uses the configured directory, falling back to $TMPDIR.
+    public static var filePath: String {
+        let dir = _configuredDirectory ?? FileManager.default.temporaryDirectory.path
         return (dir as NSString).appendingPathComponent("mks-iptv-transmux.log")
-    }()
+    }
 
     private static let queue = DispatchQueue(label: "TransmuxLog.write", qos: .utility)
     private static let dateFormatter: DateFormatter = {
@@ -111,6 +135,8 @@ public enum TransmuxLog {
         file: String = #fileID,
         line: Int = #line
     ) {
+        guard level >= _minimumLevel else { return }
+
         let entry = formatEntry(tag: tag, level: level, message: message)
 
         queue.async {

@@ -10,12 +10,14 @@ struct SettingsView: View {
         case profiles = "Profiles"
         case cache = "Cache"
         case general = "General"
+        case logging = "Logging"
 
         var systemImage: String {
             switch self {
             case .profiles: return "person.2.badge.key"
             case .cache: return "internaldrive"
             case .general: return "gearshape"
+            case .logging: return "doc.text.magnifyingglass"
             }
         }
     }
@@ -39,6 +41,8 @@ struct SettingsView: View {
                     CacheDebugView()
                 case .general:
                     GeneralSettingsView()
+                case .logging:
+                    LoggingSettingsView()
                 }
             }
             .frame(minWidth: 500, minHeight: 400)

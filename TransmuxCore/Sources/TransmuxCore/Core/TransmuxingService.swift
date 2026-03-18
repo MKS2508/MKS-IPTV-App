@@ -1607,7 +1607,12 @@ public actor TransmuxingService {
         av_dict_set(&options, "segment_list", ffmpegPlaylistPath, 0)
         av_dict_set(&options, "segment_list_type", "m3u8", 0)
         av_dict_set(&options, "segment_list_flags", "live+cache", 0)
-        av_dict_set(&options, "reset_timestamps", "0", 0)
+        // reset_timestamps=1: Each segment starts at PTS≈0, making segments
+        // self-contained. Prevents PCR/PTS discontinuities at segment boundaries
+        // that cause AVPlayer timebase errors (-12753) on live IPTV input.
+        av_dict_set(&options, "reset_timestamps", "1", 0)
+        // Tolerance for splitting near keyframes (avoids very short segments)
+        av_dict_set(&options, "segment_time_delta", "0.5", 0)
         // Low-latency: flush immediately
         av_dict_set(&options, "flush_packets", "1", 0)
 
@@ -1633,6 +1638,16 @@ public actor TransmuxingService {
         let liveAudioInputIdx = bestAudio >= 0 ? Int(bestAudio) : -1
         var cumulativeTime: Double = 0
         let maxConsecutiveErrors = 10
+
+        // --- Timestamp normalization for IPTV streams ---
+        // IPTV broadcasts carry the original program clock (e.g., PTS starting at
+        // 66093s into the broadcast day). FFmpeg's segment muxer computes EXTINF
+        // durations from these raw timestamps, producing bogus values (e.g., 66093s
+        // for a 2s segment). Fix: capture the DTS of the first packet (after
+        // timebase rescaling) and subtract it from ALL packets, so the segment
+        // muxer sees timestamps starting at ~0.
+        var liveTsOffset: Int64 = 0
+        var liveTsOffsetCaptured = false
 
         while !handle.isCancelled {
             ret = av_read_frame(inCtx, packet)
@@ -1694,6 +1709,22 @@ public actor TransmuxingService {
                         var outTb = AVRational(num: 0, den: 0)
                         mks_stream_get_time_base(outCtx, outStreamIdx, &outTb.num, &outTb.den)
                         av_packet_rescale_ts(outPkt, encTb, outTb)
+
+                        // Apply same timestamp normalization as video path
+                        if !liveTsOffsetCaptured {
+                            let dts = mks_packet_get_dts(outPkt)
+                            if dts != Int64.min {
+                                liveTsOffset = dts
+                                liveTsOffsetCaptured = true
+                                if dts != 0 {
+                                    TransmuxLog.liveSegmenter("TS_NORMALIZE offset=\(dts) ticks (from audio) → all packets shifted to start at ~0")
+                                }
+                            }
+                        }
+                        if liveTsOffset != 0 {
+                            mks_packet_adjust_ts(outPkt, -liveTsOffset)
+                        }
+
                         _ = av_interleaved_write_frame(outCtx, outPkt)
                         packetCount += 1
                     }
@@ -1703,34 +1734,74 @@ public actor TransmuxingService {
                 // Normal remux path
                 pkt.pointee.stream_index = outStreamIdx
                 mks_packet_rescale_ts(pkt, inCtx, Int32(streamIndex), outCtx, outStreamIdx)
+
+                // Capture initial DTS for timestamp normalization (first valid packet wins)
+                if !liveTsOffsetCaptured {
+                    let dts = mks_packet_get_dts(pkt)
+                    if dts != Int64.min { // AV_NOPTS_VALUE
+                        liveTsOffset = dts
+                        liveTsOffsetCaptured = true
+                        if dts != 0 {
+                            TransmuxLog.liveSegmenter("TS_NORMALIZE offset=\(dts) ticks → all packets shifted to start at ~0")
+                        }
+                    }
+                }
+                if liveTsOffset != 0 {
+                    mks_packet_adjust_ts(pkt, -liveTsOffset)
+                }
+
                 mks_packet_clear_pos(pkt)
                 _ = av_interleaved_write_frame(outCtx, pkt)
                 packetCount += 1
             }
 
-            // --- Detect new segment files ---
-            // Check every 50 packets to avoid excessive filesystem calls
+            // --- Detect new segment files (look-ahead strategy) ---
+            // Segment N is COMPLETE when segment N+1 appears on disk.
+            // FFmpeg's segment muxer creates (opens) a file BEFORE writing data,
+            // so checking for seg_N existence detects it prematurely (0 bytes).
+            // Instead, when seg_N+1 is opened, seg_N has been finalized and flushed.
+            // Check every 50 packets to avoid excessive filesystem calls.
             if packetCount % 50 == 0 {
-                let nextSegIndex = lastKnownSegmentIndex + 1
-                let nextSegPath = segmenter.segmentFilePath(segmentIndex: nextSegIndex)
+                let completedIndex = lastKnownSegmentIndex + 1
+                let lookAheadIndex = completedIndex + 1
+                let lookAheadPath = segmenter.segmentFilePath(segmentIndex: lookAheadIndex)
 
-                if FileManager.default.fileExists(atPath: nextSegPath) {
-                    // New segment file detected — notify segmenter
-                    let segDuration = config.segmentDuration
+                // Diagnostic: log first few detection attempts to trace look-ahead behavior
+                if packetCount <= 200 || packetCount % 5000 == 0 {
+                    let exists = FileManager.default.fileExists(atPath: lookAheadPath)
+                    TransmuxLog.liveSegmenter("DETECT pkt=\(packetCount) lastSeg=\(lastKnownSegmentIndex) lookAhead=\(lookAheadIndex) exists=\(exists) path=\(lookAheadPath)")
+                }
+
+                if FileManager.default.fileExists(atPath: lookAheadPath) {
+                    let completedPath = segmenter.segmentFilePath(segmentIndex: completedIndex)
+
+                    // Parse the EXTINF at the specific segment index from FFmpeg's
+                    // internal m3u8. Using the indexed lookup (not "last") ensures
+                    // correct duration even during initial burst when multiple
+                    // segments are detected in rapid succession.
+                    // Validation handles bogus values from IPTV streams with bad timestamps.
+                    let segDuration = Self.getValidatedSegmentDuration(
+                        at: completedIndex,
+                        from: ffmpegPlaylistPath,
+                        targetDuration: config.segmentDuration
+                    )
                     let startTime = cumulativeTime
                     cumulativeTime += segDuration
 
                     segmenter.notifySegmentReady(
-                        segmentIndex: nextSegIndex,
-                        filePath: nextSegPath,
+                        segmentIndex: completedIndex,
+                        filePath: completedPath,
                         duration: segDuration,
                         startTime: startTime
                     )
                     handle.recordSegment()
-                    lastKnownSegmentIndex = nextSegIndex
+                    lastKnownSegmentIndex = completedIndex
 
-                    // Resume continuation after first segment is written
+                    // Resume continuation after first COMPLETE segment is available.
+                    // The segment is guaranteed to have data (not 0 bytes) because
+                    // look-ahead detection only fires after FFmpeg finalized it.
                     if !continuationResumed {
+                        TransmuxLog.liveSegmenter("FIRST_COMPLETE seg[\(completedIndex)] → resuming continuation")
                         let audioTracks = audioInfo.map { [$0] } ?? []
                         let session = LiveTransmuxSession(
                             sessionID: sessionID,
@@ -1777,17 +1848,41 @@ public actor TransmuxingService {
         // --- Finalize ---
         av_write_trailer(outCtx)
 
-        // Check for any final segment file
-        let finalSegIndex = lastKnownSegmentIndex + 1
-        let finalSegPath = segmenter.segmentFilePath(segmentIndex: finalSegIndex)
-        if FileManager.default.fileExists(atPath: finalSegPath) {
+        // After av_write_trailer, all segments are finalized on disk.
+        // Catch up with any segments not yet detected by the look-ahead loop.
+        // This includes: (1) segments whose N+1 appeared but weren't polled yet,
+        // and (2) the LAST segment (no N+1 exists, but trailer finalized it).
+        var catchUpIndex = lastKnownSegmentIndex + 1
+        while true {
+            let segPath = segmenter.segmentFilePath(segmentIndex: catchUpIndex)
+            guard FileManager.default.fileExists(atPath: segPath) else { break }
+
+            // After trailer, all files are complete — safe to check size
+            let fileSize: Int64
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: segPath),
+               let size = attrs[.size] as? Int64 {
+                fileSize = size
+            } else {
+                fileSize = 0
+            }
+
+            // Skip truly empty files (e.g., opened but never written)
+            guard fileSize > 0 else { break }
+
+            let segDuration = Self.getValidatedSegmentDuration(
+                at: catchUpIndex,
+                from: ffmpegPlaylistPath,
+                targetDuration: config.segmentDuration
+            )
             segmenter.notifySegmentReady(
-                segmentIndex: finalSegIndex,
-                filePath: finalSegPath,
-                duration: config.segmentDuration,
+                segmentIndex: catchUpIndex,
+                filePath: segPath,
+                duration: segDuration,
                 startTime: cumulativeTime
             )
+            cumulativeTime += segDuration
             handle.recordSegment()
+            catchUpIndex += 1
         }
 
         handle.markComplete()
@@ -1803,6 +1898,76 @@ public actor TransmuxingService {
         // Cleanup FFmpeg contexts
         avformat_free_context(outCtx)
         avformat_close_input(&inputCtx)
+    }
+
+    // MARK: - Live Helpers
+
+    /// Parse the `#EXTINF:` duration at a specific segment index from FFmpeg's
+    /// internal m3u8 file. FFmpeg writes EXTINF entries sequentially (seg 0 first,
+    /// then seg 1, etc.), so the Nth `#EXTINF:` corresponds to segment N.
+    ///
+    /// Using index-specific lookup instead of "last EXTINF" prevents duration
+    /// misattribution during initial burst when multiple segments are detected
+    /// in rapid succession.
+    ///
+    /// Returns nil if the file can't be read or the index is out of range.
+    private static func parseEXTINF(at segmentIndex: Int, from path: String) -> Double? {
+        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else { return nil }
+        var extinfCount = 0
+        for line in content.components(separatedBy: "\n") {
+            if line.hasPrefix("#EXTINF:") {
+                if extinfCount == segmentIndex {
+                    // Format: "#EXTINF:2.003," or "#EXTINF:2.003"
+                    let value = line.dropFirst(8)  // Remove "#EXTINF:"
+                    let numStr: Substring
+                    if let commaIdx = value.firstIndex(of: ",") {
+                        numStr = value[value.startIndex..<commaIdx]
+                    } else {
+                        numStr = value
+                    }
+                    return Double(numStr)
+                }
+                extinfCount += 1
+            }
+        }
+        return nil
+    }
+
+    /// Get a validated segment duration from FFmpeg's internal m3u8.
+    ///
+    /// IPTV live streams often have incorrect timestamps (e.g., start_time=66530s
+    /// instead of 0). This causes FFmpeg's segment muxer to write bogus EXTINF
+    /// values (e.g., 66093s for a 2s segment).
+    ///
+    /// This function parses the EXTINF and clamps it to a reasonable maximum
+    /// (4x the target duration) as a safeguard, falling back to the configured
+    /// segment duration if the parsed value is absurd.
+    ///
+    /// - Parameters:
+    ///   - segmentIndex: The segment index to look up in the m3u8.
+    ///   - playlistPath: Path to FFmpeg's internal m3u8 file.
+    ///   - targetDuration: The configured target segment duration.
+    /// - Returns: A validated segment duration in seconds.
+    private static func getValidatedSegmentDuration(
+        at segmentIndex: Int,
+        from playlistPath: String,
+        targetDuration: Double
+    ) -> Double {
+        let parsedDuration = parseEXTINF(at: segmentIndex, from: playlistPath) ?? targetDuration
+
+        // Allow up to 4x the target duration (accounts for keyframe alignment variance)
+        // Anything larger is clearly bogus (e.g., 66093s from bad timestamps)
+        let maxReasonableDuration = targetDuration * 4.0
+
+        guard parsedDuration > maxReasonableDuration else {
+            return parsedDuration
+        }
+
+        TransmuxLog.liveSegmenter(
+            "SEGMENT DURATION CLAMPED: seg[\(segmentIndex)] parsed=\(String(format: "%.1f", parsedDuration))s → using target=\(targetDuration)s",
+            level: .warn
+        )
+        return targetDuration
     }
 
     // MARK: - FFmpeg C API Core (Progressive)
@@ -2074,7 +2239,7 @@ public actor TransmuxingService {
 
         // Audio transcoders: keyed by INPUT stream index. Only created for AC3/EAC3/DTS
         // streams when transcodeAudio=true. Other audio streams are remuxed as-is.
-        let fmpTranscodableCodecs: Set<Int32> = [86019, 86056, 86076]  // AC3, EAC3, DTS
+        let fmpTranscodableCodecs: Set<Int32> = [86019, 86020, 86056, 86076]  // AC3, DTS, EAC3, OPUS
         var audioTranscoders: [Int32: OpaquePointer] = [:]  // inputIdx → MKSAudioTranscoder*
 
         var audioTrackInfos: [AudioTrackInfo] = []
@@ -2097,7 +2262,7 @@ public actor TransmuxingService {
 
             // Try to create transcoder for AC3/EAC3/DTS streams
             if transcodeAudio && fmpTranscodableCodecs.contains(audio.codecId) {
-                let srcName = audio.codecId == 86019 ? "AC3" : audio.codecId == 86056 ? "EAC3" : "DTS"
+                let srcName = audio.codecId == 86019 ? "AC3" : audio.codecId == 86020 ? "DTS" : audio.codecId == 86056 ? "EAC3" : "OPUS"
                 if let tc = mks_audio_transcoder_create(inCtx, audio.inputIdx, 192000, 48000, 2) {
                     let setupRet = mks_audio_transcoder_setup_output(tc, outStream)
                     if setupRet == MKS_OK {
@@ -2129,12 +2294,13 @@ public actor TransmuxingService {
                 }
 
                 switch audio.codecId {
+                case 86017: streamCodecName = "MP3"
                 case 86018: streamCodecName = "AAC"
                 case 86019: streamCodecName = "AC3"
+                case 86020: streamCodecName = "DTS"
+                case 86028: streamCodecName = "FLAC"
                 case 86056: streamCodecName = "EAC3"
                 case 86076: streamCodecName = "OPUS"
-                case 86028: streamCodecName = "FLAC"
-                case 86017: streamCodecName = "MP3"
                 default: streamCodecName = "audio(\(audio.codecId))"
                 }
             }
@@ -2185,7 +2351,7 @@ public actor TransmuxingService {
                 } else {
                     TransmuxLog.service("WARNING: Failed to create aac_adtstoasc BSF for stream \(audio.inputIdx)", level: .warn)
                 }
-            } else if audio.codecId == 86019 || audio.codecId == 86056 {
+            } else if audio.codecId == 86019 || audio.codecId == 86020 || audio.codecId == 86056 {
                 hasAC3Audio = true
             }
         }
@@ -2194,23 +2360,28 @@ public actor TransmuxingService {
         // AC3 frames are always 1536 samples. For pure AC3, this eliminates delay_moov.
         // For EAC3, delay_moov is still required but frame_size ensures trex gets
         // default_sample_duration=1536 (AVPlayer needs this for CMTimebase).
-        var hasEAC3 = false
+        // For DTS, frame sizes vary (512-8192) so we cannot pre-set frame_size reliably;
+        // delay_moov lets the muxer peek at actual packets to determine sample duration.
+        var needsDelayMoov = false
         for audio in audioStreams {
-            // Skip transcoded streams — their output is AAC, not AC3/EAC3
+            // Skip transcoded streams — their output is AAC, not AC3/EAC3/DTS
             if audioTranscoders[audio.inputIdx] != nil { continue }
 
             let outIdx = Int32(streamMapping[Int(audio.inputIdx)])
             if audio.codecId == 86019 {
-                // Pure AC3
+                // Pure AC3 — frame_size=1536 eliminates need for delay_moov
                 mks_stream_set_frame_size(outCtx, outIdx, 1536)
             } else if audio.codecId == 86056 {
-                // EAC3
+                // EAC3 — frame_size=1536 for trex, but still needs delay_moov
                 mks_stream_set_frame_size(outCtx, outIdx, 1536)
-                hasEAC3 = true
+                needsDelayMoov = true
+            } else if audio.codecId == 86020 {
+                // DTS — variable frame sizes, must use delay_moov
+                needsDelayMoov = true
             }
         }
-        // Only need delay_moov if there's EAC3 (pure AC3 with frame_size doesn't need it)
-        hasAC3Audio = hasEAC3
+        // delay_moov needed when EAC3 or DTS is remuxed (not transcoded)
+        hasAC3Audio = needsDelayMoov
 
         // --- Set fragmented MP4 muxer options ---
         var options: OpaquePointer?

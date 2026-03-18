@@ -60,6 +60,10 @@ final class RemotePlayManager: @unchecked Sendable {
     /// Active transmux session ID for cleanup on disconnect or new load.
     private var activeTransmuxSessionID: String?
 
+    /// Background task monitoring transmux completion (sentinel file).
+    /// Must be cancelled on disconnect to prevent leaked tasks.
+    private var transmuxMonitorTask: Task<Void, Never>?
+
     /// Discovery state.
     private(set) var isDiscovering = false
 
@@ -143,7 +147,13 @@ final class RemotePlayManager: @unchecked Sendable {
     func disconnect() async {
         guard let controller = activeController else { return }
 
+        print("[DLNACast] disconnect — stopping controller, transmux monitor, and transmux session")
+
         await controller.disconnect()
+
+        // Cancel transmux monitor task
+        transmuxMonitorTask?.cancel()
+        transmuxMonitorTask = nil
 
         // Cleanup active transmux session
         if let sessionID = activeTransmuxSessionID {
@@ -178,6 +188,13 @@ final class RemotePlayManager: @unchecked Sendable {
         }
 
         print("[DLNACast] load — input URL=\(url.absoluteString)")
+
+        // Reset known duration — non-transmux loads use TV-reported duration
+        if let dlnaController = activeController as? DLNAController {
+            dlnaController.knownDuration = nil
+            dlnaController.sourceContentURL = url
+        }
+        (activeController as? CastController)?.sourceContentURL = url
 
         // Convert localhost URL to LAN URL for remote access
         guard let lanURL = convertToLANURL(url) else {
@@ -221,6 +238,13 @@ final class RemotePlayManager: @unchecked Sendable {
         guard let controller = activeController else {
             throw RemotePlayError.noActiveSession
         }
+
+        // Reset known duration — direct loads use TV-reported duration
+        if let dlnaController = activeController as? DLNAController {
+            dlnaController.knownDuration = nil
+            dlnaController.sourceContentURL = url
+        }
+        (activeController as? CastController)?.sourceContentURL = url
 
         streamingURL = url
         currentMetadata = metadata
@@ -284,6 +308,12 @@ final class RemotePlayManager: @unchecked Sendable {
                 activeTransmuxSessionID = session.sessionID
                 print("[DLNACast] loadWithTransmux — DLNA transmux started, sessionID=\(session.sessionID), outputPath=\(session.outputPath)")
 
+                // Inject known duration into DLNAController to override TV-reported garbage
+                if let dlnaController = activeController as? DLNAController {
+                    dlnaController.knownDuration = session.duration
+                    print("[DLNACast] loadWithTransmux — injected knownDuration=\(String(format: "%.1f", session.duration))s into DLNAController")
+                }
+
                 // Buffer initial content before starting server
                 print("[DLNACast] loadWithTransmux — buffering 2s before starting HTTP server...")
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
@@ -295,13 +325,15 @@ final class RemotePlayManager: @unchecked Sendable {
                 )
                 print("[DLNACast] loadWithTransmux — TransmuxServer started, localURL=\(serverSession.localURL.absoluteString)")
 
-                // Monitor transmux completion in background
+                // Monitor transmux completion in background (tracked for cancellation on disconnect)
                 let outputPath = session.outputPath
-                Task.detached {
+                transmuxMonitorTask?.cancel()
+                transmuxMonitorTask = Task.detached {
                     let sentinelDir = (outputPath as NSString).deletingLastPathComponent
                     let sentinelPath = sentinelDir + "/.transmux_complete"
-                    while true {
+                    while !Task.isCancelled {
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        guard !Task.isCancelled else { break }
                         if FileManager.default.fileExists(atPath: sentinelPath) {
                             let attrs = try? FileManager.default.attributesOfItem(atPath: outputPath)
                             let finalSize = (attrs?[.size] as? Int64) ?? 0
@@ -344,6 +376,12 @@ final class RemotePlayManager: @unchecked Sendable {
             print("[DLNACast] loadWithTransmux — LAN URL for TV=\(lanURL.absoluteString)")
             streamingURL = lanURL
 
+            // Inject original source URL into controller for metadata title fallback
+            if let dlnaController = activeController as? DLNAController {
+                dlnaController.sourceContentURL = url
+            }
+            (activeController as? CastController)?.sourceContentURL = url
+
             // Always use streaming: false — the TransmuxServer supports range requests
             // on growing files, so DIDL-Lite protocolInfo should use OP=01 (byte-range
             // supported), CI=0 (not converted). DLNA TVs refuse content with OP=00/CI=1.
@@ -385,6 +423,11 @@ final class RemotePlayManager: @unchecked Sendable {
         do {
             try await controller.pause()
         } catch {
+            // Don't set error state for unsupported capabilities — the controller
+            // already downgraded the capability and kept playback state intact.
+            if let rpe = error as? RemotePlayError, case .soapError = rpe {
+                throw error
+            }
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
             throw error
         }
@@ -399,6 +442,11 @@ final class RemotePlayManager: @unchecked Sendable {
         do {
             try await controller.seek(to: time)
         } catch {
+            // Don't set error state for unsupported capabilities — the controller
+            // already downgraded the capability and kept playback state intact.
+            if let rpe = error as? RemotePlayError, case .soapError = rpe {
+                throw error
+            }
             playbackState = .error((error as? RemotePlayError) ?? .unknown(error.localizedDescription))
             throw error
         }
@@ -518,6 +566,12 @@ final class RemotePlayManager: @unchecked Sendable {
         case .dlna:
             let controller = try DLNAController(device: device)
             controller.onStateUpdate = stateHandler
+            controller.onCapabilityDowngrade = { [weak self] capability in
+                Task { @MainActor [weak self] in
+                    self?.connectedDevice?.capabilities.remove(capability)
+                    print("[DLNACast] Capability downgraded — remaining: \(self?.connectedDevice?.capabilities ?? [])")
+                }
+            }
             return controller
         case .castV2:
             let controller = try CastController(device: device)

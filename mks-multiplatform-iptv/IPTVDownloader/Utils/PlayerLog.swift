@@ -9,10 +9,9 @@ enum PlayerLog {
 
     // MARK: - Configuration
 
-    public static let filePath: String = {
-        let dir = FileManager.default.temporaryDirectory.path
-        return (dir as NSString).appendingPathComponent("mks-iptv-player.log")
-    }()
+    public static var filePath: String {
+        MKSLogConfig.shared.filePath(for: .player)
+    }
     private static let queue = DispatchQueue(label: "PlayerLog.write", qos: .utility)
     private static let dateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -55,6 +54,14 @@ enum PlayerLog {
         file: String = #fileID,
         line: Int = #line
     ) {
+        // Map GlitchSeverity to MKSLogConfig.Level for filtering
+        let configLevel: MKSLogConfig.Level = switch level {
+        case .info: .info
+        case .warning: .warning
+        case .critical: .error
+        }
+        guard configLevel >= MKSLogConfig.shared.level(for: .player) else { return }
+
         let entry = formatEntry(action: action, category: category, level: level, fields: fields)
         queue.async {
             writeEntry(entry)

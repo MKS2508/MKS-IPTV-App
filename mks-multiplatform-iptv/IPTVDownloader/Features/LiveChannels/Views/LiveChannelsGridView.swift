@@ -2,12 +2,11 @@
 //  LiveChannelsGridView.swift
 //  mks-multiplatform-iptv
 //
-//  Modern Live TV grid UI with native iOS patterns:
-//  - Haptic feedback on interactions
-//  - Context menus for quick actions
-//  - Pull-to-refresh
-//  - Adaptive grid/list toggle
-//  - Native search and sort
+//  Modern Live TV grid UI with native iOS 26+ Liquid Glass design:
+//  - GlassEffectContainer for grouped glass elements
+//  - Adaptive glass with fallbacks for older OS
+//  - Efficient rendering for 571+ channels
+//  - Platform-specific adaptations (iOS/macOS/tvOS)
 //
 
 import SwiftUI
@@ -33,9 +32,17 @@ enum ChannelViewMode: String, CaseIterable, Identifiable {
 
 // MARK: - Live Channels Grid View
 
-/// Modern Live TV UI with native iOS patterns.
+/// Modern Live TV UI with native Liquid Glass styling.
+///
+/// **Architecture Notes:**
+/// - Components are extracted for better diffing performance with 571+ channels
+/// - Uses `LiveChannelCard` with modes instead of separate card views
+/// - Category filter uses `GlassCategoryFilterBar` with `GlassEffectContainer`
+/// - Detail sheet is extracted to `LiveChannelDetailSheet`
+///
 struct LiveChannelsGridView: View {
     // MARK: - Environment
+
     @EnvironmentObject var profile: IPTVProfile
     @EnvironmentObject var viewModel: LiveChannelListViewModel
     @StateObject private var favoritesManager = LiveChannelFavoritesManager.shared
@@ -45,24 +52,24 @@ struct LiveChannelsGridView: View {
     #endif
 
     // MARK: - State
+
     @State private var viewMode: ChannelViewMode = .grid
     @State private var selectedChannel: LiveChannel?
     @State private var showDetailSheet = false
     @State private var activePlayer: (any VideoPlayerProtocol)?
     @State private var showFullscreenPlayer = false
     @State private var playerTitle = ""
-    @State private var showSortSheet = false
-    @State private var showCategoryPicker = false
 
     // MARK: - Platform-Specific Configuration
+
     #if os(iOS)
     private let cardMinWidth: CGFloat = 160
     private let cardMaxWidth: CGFloat = 200
     private let gridSpacing: CGFloat = 12
     private let horizontalPadding: CGFloat = 16
     #else
-    private let cardMinWidth: CGFloat = 200
-    private let cardMaxWidth: CGFloat = 260
+    private let cardMinWidth: CGFloat = 180
+    private let cardMaxWidth: CGFloat = 240
     private let gridSpacing: CGFloat = 14
     private let horizontalPadding: CGFloat = 20
     #endif
@@ -72,9 +79,11 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Logger
+
     private let logger = Logger(subsystem: "LiveChannelsGridView", category: "UI")
 
     // MARK: - Body
+
     var body: some View {
         contentView
             .navigationTitle("Live TV")
@@ -118,17 +127,20 @@ struct LiveChannelsGridView: View {
             .task {
                 await loadInitialData()
             }
-            .onChange(of: viewModel.searchText) { _, newValue in
-                // Debounce is handled in ViewModel
-            }
     }
 
     // MARK: - Main Content
+
     private var contentView: some View {
         VStack(spacing: 0) {
-            // Category Filter Bar (iOS only)
+            // Category Filter Bar
             #if os(iOS)
-            categoryFilterBar
+            GlassCategoryFilterBar(
+                categories: viewModel.categories,
+                selectedCategory: $viewModel.selectedCategoryId,
+                favoritesCount: favoritesManager.favoriteIds.count,
+                onCategorySelected: { _ in hapticLight() }
+            )
             #endif
 
             // Main content
@@ -136,60 +148,8 @@ struct LiveChannelsGridView: View {
         }
     }
 
-    // MARK: - Category Filter Bar
-    private var categoryFilterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // All categories
-                CategoryChip(
-                    title: "All",
-                    icon: "tv",
-                    count: viewModel.liveChannels.count,
-                    isSelected: viewModel.selectedCategoryId == nil
-                ) {
-                    hapticLight()
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        viewModel.selectedCategoryId = nil
-                    }
-                }
-
-                // Favorites
-                if favoritesManager.favoriteIds.count > 0 {
-                    CategoryChip(
-                        title: "Favorites",
-                        icon: "star.fill",
-                        count: favoritesManager.favoriteIds.count,
-                        isSelected: viewModel.selectedCategoryId == "favorites"
-                    ) {
-                        hapticLight()
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.selectedCategoryId = "favorites"
-                        }
-                    }
-                }
-
-                // Categories from API
-                ForEach(viewModel.categories) { category in
-                    CategoryChip(
-                        title: category.categoryName,
-                        icon: nil,
-                        count: channelCount(for: category.categoryId),
-                        isSelected: viewModel.selectedCategoryId == category.categoryId
-                    ) {
-                        hapticLight()
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewModel.selectedCategoryId = category.categoryId
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, 8)
-        }
-        .adaptiveGlass(in: Rectangle(), fallbackOpacity: 0.8)
-    }
-
     // MARK: - Main Content Area
+
     @ViewBuilder
     private var mainContent: some View {
         switch viewModel.loadingState {
@@ -212,6 +172,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Loading View
+
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
@@ -224,6 +185,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Error View
+
     private func errorView(_ error: ChannelError) -> some View {
         ContentUnavailableView {
             Label("Unable to Load", systemImage: "exclamationmark.triangle")
@@ -241,6 +203,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Empty View
+
     private var emptyView: some View {
         ContentUnavailableView {
             Label("No Channels Found", systemImage: "tv.slash")
@@ -262,6 +225,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Channels List
+
     private var channelsList: some View {
         ScrollView {
             switch viewMode {
@@ -274,22 +238,26 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Grid View
+
     private var gridView: some View {
         LazyVGrid(columns: columns, spacing: gridSpacing) {
             ForEach(viewModel.filteredDisplayModels, id: \.id) { displayModel in
-                LiveChannelCardView(displayModel: displayModel)
-                    .contextMenu {
-                        channelContextMenu(for: displayModel)
-                    }
-                    .onTapGesture {
+                LiveChannelCard(
+                    displayModel: displayModel,
+                    mode: .compact,
+                    onTap: {
                         hapticLight()
                         handleDirectPlay(channel: displayModel.channel)
-                    }
-                    .onLongPressGesture {
+                    },
+                    onLongPress: {
                         hapticMedium()
                         selectedChannel = displayModel.channel
                         showDetailSheet = true
                     }
+                )
+                .contextMenu {
+                    channelContextMenu(for: displayModel)
+                }
             }
         }
         .padding(.horizontal, horizontalPadding)
@@ -297,12 +265,26 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - List View
+
     private var listView: some View {
         LazyVStack(spacing: 0) {
             ForEach(viewModel.filteredDisplayModels, id: \.id) { displayModel in
-                ChannelListRow(
+                LiveChannelCard(
                     displayModel: displayModel,
-                    categoryName: viewModel.categoryName(for: displayModel.channel.categoryId)
+                    mode: .regular,
+                    onTap: {
+                        hapticLight()
+                        handleDirectPlay(channel: displayModel.channel)
+                    },
+                    onLongPress: {
+                        hapticMedium()
+                        selectedChannel = displayModel.channel
+                        showDetailSheet = true
+                    },
+                    onFavoriteToggle: {
+                        viewModel.toggleFavorite(displayModel.id)
+                        hapticSuccess()
+                    }
                 )
                 .contextMenu {
                     channelContextMenu(for: displayModel)
@@ -313,19 +295,17 @@ struct LiveChannelsGridView: View {
                 .swipeActions(edge: .leading) {
                     playSwipeAction(for: displayModel)
                 }
-                .onTapGesture {
-                    hapticLight()
-                    handleDirectPlay(channel: displayModel.channel)
-                }
 
                 Divider()
-                    .padding(.leading, 72)
+                    .padding(.leading, 80)
             }
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, horizontalPadding)
     }
 
     // MARK: - Context Menu
+
     @ViewBuilder
     private func channelContextMenu(for displayModel: LiveChannelDisplayModel) -> some View {
         Button {
@@ -363,6 +343,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Swipe Actions
+
     @ViewBuilder
     private func favoriteSwipeAction(for displayModel: LiveChannelDisplayModel) -> some View {
         Button {
@@ -388,6 +369,7 @@ struct LiveChannelsGridView: View {
     }
 
     // MARK: - Toolbar Content
+
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         #if os(iOS)
@@ -535,6 +517,15 @@ struct LiveChannelsGridView: View {
                 Image(systemName: "line.3.horizontal.decrease.circle")
             }
         }
+
+        // macOS view mode toggle
+        ToolbarItem(placement: .automatic) {
+            Picker("View Mode", selection: $viewMode) {
+                Image(systemName: "square.grid.2x2").tag(ChannelViewMode.grid)
+                Image(systemName: "list.bullet").tag(ChannelViewMode.list)
+            }
+            .pickerStyle(.segmented)
+        }
         #endif
     }
 
@@ -646,8 +637,6 @@ struct LiveChannelsGridView: View {
     }
 
     /// Present the player on the appropriate platform.
-    /// - Parameter isLive: Pass `true` for live streams so AVPlayer uses
-    ///   live-optimized buffer settings even when the URL is a local proxy.
     @MainActor
     private func presentPlayer(url: URL, title: String, isLive: Bool = true) {
         logger.info("[LivePlay] presentPlayer: url=\(url.absoluteString), isLive=\(isLive)")
@@ -683,11 +672,8 @@ struct LiveChannelsGridView: View {
         hapticSuccess()
     }
 
-    private func channelCount(for categoryId: String?) -> Int {
-        viewModel.liveChannels.filter { $0.categoryId == categoryId }.count
-    }
-
     // MARK: - Haptic Feedback
+
     private func hapticLight() {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -707,108 +693,15 @@ struct LiveChannelsGridView: View {
     }
 }
 
-// MARK: - Category Chip
-
-/// A styled chip button for category selection with adaptive glass.
-struct CategoryChip: View {
-    let title: String
-    let icon: String?
-    let count: Int
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.caption.weight(.medium))
-                }
-
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-
-                if count > 0 {
-                    Text("\(count)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .foregroundStyle(isSelected ? .white : .primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.plain)
-        .if(isSelected) { view in
-            view.background(Capsule().fill(Color.accentColor))
-        }
-        .if(!isSelected) { view in
-            view.adaptiveGlass(in: Capsule(), fallbackOpacity: 0.6)
-        }
-    }
-}
-
-// MARK: - Channel List Row
-
-/// A list row for displaying a channel with semantic fonts.
-struct ChannelListRow: View {
-    let displayModel: LiveChannelDisplayModel
-    let categoryName: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // Channel Icon
-            ChannelIconView(
-                url: URL(string: displayModel.channel.streamIcon ?? ""),
-                size: CGSize(width: 48, height: 48)
-            )
-            .frame(width: 48, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            // Channel Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayModel.channel.name)
-                    .font(.body.weight(.medium))
-                    .lineLimit(1)
-
-                HStack(spacing: 8) {
-                    Text(categoryName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    LiveBadge(size: .compact)
-
-                    if displayModel.hasEPG, let programme = displayModel.programmeTitle {
-                        Text(programme)
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
-            }
-
-            Spacer()
-
-            if displayModel.isFavorite {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(.yellow)
-                    .font(.caption)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .contentShape(Rectangle())
-    }
-}
-
 // MARK: - Live Channel Detail Sheet
 
-/// Detail sheet for live channel with adaptive glass styling.
+/// Detail sheet for live channel with native Liquid Glass styling.
+///
+/// **iOS 26+ Features:**
+/// - Uses `.buttonStyle(.glassProminent)` for primary action
+/// - Uses `.buttonStyle(.glass)` for secondary action
+/// - Info section wrapped in `GlassEffectContainer` for proper glass blending
+///
 struct LiveChannelDetailSheet: View {
     let channel: LiveChannel
     let categoryName: String
@@ -842,21 +735,37 @@ struct LiveChannelDetailSheet: View {
     }
 
     // MARK: - Header Section
+
     private var headerSection: some View {
         VStack(spacing: 16) {
-            ChannelIconView(
-                url: URL(string: channel.streamIcon ?? ""),
-                size: CGSize(width: 100, height: 70),
-                cornerRadius: 12
-            )
+            // Channel icon with glass background
+            if #available(iOS 26, macOS 26, tvOS 26, *) {
+                GlassEffectContainer {
+                    ChannelIconView(
+                        url: URL(string: channel.streamIcon ?? ""),
+                        size: CGSize(width: 100, height: 70),
+                        cornerRadius: 12
+                    )
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                }
+            } else {
+                ChannelIconView(
+                    url: URL(string: channel.streamIcon ?? ""),
+                    size: CGSize(width: 100, height: 70),
+                    cornerRadius: 12
+                )
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
 
             LiveBadge(size: .regular)
         }
     }
 
     // MARK: - Quick Actions
+
     private var quickActionsSection: some View {
         HStack(spacing: 12) {
+            // Primary action: Play button with prominent glass
             Button {
                 onPlay()
                 onClose()
@@ -866,8 +775,9 @@ struct LiveChannelDetailSheet: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
             }
-            .buttonStyle(.borderedProminent)
+            .glassButtonStyle(isProminent: true)
 
+            // Secondary action: Favorite button
             Button {
                 onFavorite()
             } label: {
@@ -879,12 +789,12 @@ struct LiveChannelDetailSheet: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
             }
-            .buttonStyle(.bordered)
-            .tint(isFavorite ? .yellow : nil)
+            .glassButtonStyle(isProminent: false, tintColor: isFavorite ? .yellow : nil)
         }
     }
 
     // MARK: - Info Section
+
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             LabeledContent("Category", value: categoryName)
@@ -898,5 +808,35 @@ struct LiveChannelDetailSheet: View {
         }
         .padding()
         .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall), fallbackOpacity: 0.5)
+    }
+}
+
+// MARK: - Glass Button Style Extension
+
+private extension Button {
+    /// Applies glass button style with fallback for older OS versions
+    @ViewBuilder
+    func glassButtonStyle(isProminent: Bool = false, tintColor: Color? = nil) -> some View {
+        if #available(iOS 26, macOS 26, tvOS 26, *) {
+            if isProminent {
+                self.buttonStyle(.glassProminent)
+            } else {
+                if let tint = tintColor {
+                    self.buttonStyle(.glass)
+                        .tint(tint)
+                } else {
+                    self.buttonStyle(.glass)
+                }
+            }
+        } else {
+            if isProminent {
+                self.buttonStyle(.borderedProminent)
+            } else {
+                self.buttonStyle(.bordered)
+                if let tint = tintColor {
+                    self.tint(tint)
+                }
+            }
+        }
     }
 }

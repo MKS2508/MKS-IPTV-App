@@ -66,11 +66,9 @@ struct mks_iptv_downloaderApp: App {
         Self.configureAudioSession()
         #endif
 
-        #if os(macOS)
         Task {
             _ = await DownloadNotificationService.shared.requestPermission()
         }
-        #endif
     }
 
     var body: some Scene {

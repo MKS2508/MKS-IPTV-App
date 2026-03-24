@@ -904,7 +904,7 @@ class DownloadManager: ObservableObject {
             totalBytes: progress.totalBytes,
             status: "Downloading"
         )
-        #else
+        #elseif os(macOS)
         notificationService.updateProgress(
             downloadId: id,
             title: updatedDownload.title,
@@ -945,7 +945,7 @@ class DownloadManager: ObservableObject {
         guard let item = downloads.first(where: { $0.id == id }) else { return }
         #if os(iOS)
         liveActivityManager.endActivity(for: id.uuidString, status: "Completed")
-        #else
+        #elseif os(macOS)
         notificationService.notifyDownloadComplete(
             downloadId: id,
             title: item.title,
@@ -973,14 +973,14 @@ class DownloadManager: ObservableObject {
                         totalBytes: downloads[index].totalBytes,
                         status: "Paused"
                     )
-                    #else
+                    #elseif os(macOS)
                     notificationService.removeNotification(downloadId: id)
                     #endif
                 case .downloadCancelled:
                     downloads[index].status = .cancelled
                     #if os(iOS)
                     liveActivityManager.endActivity(for: id.uuidString, status: "Cancelled")
-                    #else
+                    #elseif os(macOS)
                     notificationService.removeNotification(downloadId: id)
                     #endif
                 default:
@@ -988,7 +988,7 @@ class DownloadManager: ObservableObject {
                     downloads[index].errorMessage = error.localizedDescription
                     #if os(iOS)
                     liveActivityManager.endActivity(for: id.uuidString, status: "Failed")
-                    #else
+                    #elseif os(macOS)
                     notificationService.notifyDownloadFailed(
                         downloadId: id,
                         title: title,

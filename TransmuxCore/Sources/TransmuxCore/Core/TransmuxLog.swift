@@ -1,4 +1,5 @@
 import Foundation
+import CTransmuxFFI
 
 /// Thread-safe buffered file logger for the transmux pipeline.
 /// Writes timestamped entries to `<temporaryDirectory>/mks-iptv-transmux.log`.
@@ -60,6 +61,11 @@ public enum TransmuxLog {
     /// Minimum log level. Messages below this level are silently dropped.
     private static var _minimumLevel: Level = .debug
 
+    /// External log observer — called for every log entry after formatting.
+    /// Set from the main app to bridge TransmuxLog → MKSLog → WebSocket.
+    /// Signature: (message: String, tag: String, level: Level)
+    public static var externalObserver: ((String, String, Level) -> Void)?
+
     /// Configure the log directory and minimum level.
     /// Must be called from the app's `init()` **before** any log call fires
     /// (i.e. before `sessionID` is lazily initialized).
@@ -75,6 +81,41 @@ public enum TransmuxLog {
         }
         _configuredDirectory = directory
         _minimumLevel = level
+    }
+
+    /// Install a C-level log callback that bridges CTransmuxFFI/CFFmpegHelper logs
+    /// through the same `externalObserver` as Swift TransmuxLog entries.
+    /// Call this once after `configure()` to capture ALL log output from C code.
+    public static func installCLogBridge() {
+        mks_log_set_callback { tag, level, fmt, vl in
+            // Format the C message
+            var buf = [CChar](repeating: 0, count: 2048)
+            vsnprintf(&buf, 2048, fmt, vl)
+            let message = String(cString: buf)
+
+            // Map C level to Swift Level
+            let swiftLevel: Level
+            if level <= 16 { swiftLevel = .error }      // MKS_LOG_ERROR
+            else if level <= 24 { swiftLevel = .warn }   // MKS_LOG_WARNING
+            else if level <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
+            else { swiftLevel = .debug }                  // MKS_LOG_DEBUG+
+
+            let swiftTag = tag.map { String(cString: $0) } ?? "C"
+
+            // Forward to the same external observer as Swift logs
+            externalObserver?(message, swiftTag, swiftLevel)
+
+            // Also write to the TransmuxLog file buffer (normal path)
+            let entry = formatEntry(tag: swiftTag, level: swiftLevel, message: message)
+            queue.async {
+                _ = sessionID
+                _ = flushTimer
+                buffer.append(entry)
+                if swiftLevel >= .warn || buffer.count >= bufferCapacity {
+                    flushBuffer()
+                }
+            }
+        }
     }
 
     /// Log file path — uses the configured directory, falling back to $TMPDIR.
@@ -136,6 +177,10 @@ public enum TransmuxLog {
         line: Int = #line
     ) {
         guard level >= _minimumLevel else { return }
+
+        // Forward to external observer (MKSLog bridge) synchronously before buffering.
+        // The observer is responsible for its own thread safety.
+        externalObserver?(message, tag, level)
 
         let entry = formatEntry(tag: tag, level: level, message: message)
 
@@ -211,6 +256,7 @@ public enum TransmuxLog {
         }
         let avgKB = b.count > 0 ? b.totalBytes / b.count / 1024 : 0
         let msg = "SERVE \(range) \(b.count)/\(b.count) immediate avg=\(avgKB)KB buf=\(String(format: "%.1f", b.latestBuf))s"
+        externalObserver?(msg, "Server", .info)
         buffer.append(formatEntry(tag: "Server", level: .info, message: msg))
     }
 

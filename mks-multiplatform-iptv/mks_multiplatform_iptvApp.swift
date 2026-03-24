@@ -59,6 +59,20 @@ struct mks_iptv_downloaderApp: App {
             level: logConfig.level(for: .transmux).toTransmuxLevel()
         )
 
+        // Bridge TransmuxCore logs (Swift + C/FFmpeg) → MKSLog → WebSocket.
+        // TransmuxLog writes to its own file (mks-iptv-transmux.log).
+        // This observer additionally sends each entry through MKSLog.transmux
+        // so it reaches os.Logger + WebSocket remote viewer.
+        TransmuxLog.externalObserver = { message, tag, level in
+            switch level {
+            case .error: MKSLog.transmux.error("[\(tag)] \(message)")
+            case .warn:  MKSLog.transmux.warning("[\(tag)] \(message)")
+            case .info:  MKSLog.transmux.info("[\(tag)] \(message)")
+            case .debug: MKSLog.transmux.debug("[\(tag)] \(message)")
+            }
+        }
+        TransmuxLog.installCLogBridge()
+
         StderrFilter.install()
         TransmuxingService.configure(streamProxy: StreamProxyAdapter())
         Self.configurePlayerEngines()

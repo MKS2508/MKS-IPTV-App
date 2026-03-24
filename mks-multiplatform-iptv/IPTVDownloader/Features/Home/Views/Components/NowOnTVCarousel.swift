@@ -22,7 +22,8 @@ struct NowOnTVCarousel: View {
                             HomeChannelCard(
                                 liveChannel: entry.liveChannel,
                                 epgChannel: entry.epgChannel,
-                                programme: entry.programme
+                                programme: entry.programme,
+                                onTap: nil
                             )
                         }
                         .buttonStyle(.plain)

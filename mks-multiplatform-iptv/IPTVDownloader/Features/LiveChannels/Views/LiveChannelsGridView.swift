@@ -554,7 +554,7 @@ struct LiveChannelsGridView: View {
     }
 
     private func handleDirectPlay(channel: LiveChannel) {
-        logger.debug("Direct play for channel: \(channel.name)")
+        logger.info("[LivePlay] ▶ Starting playback for: \(channel.name) (id=\(channel.streamId))")
         hapticMedium()
 
         // Record channel watch for "Recently Watched" on Home
@@ -569,29 +569,33 @@ struct LiveChannelsGridView: View {
         }
 
         Task {
-            // Primary: Live Segmenter pipeline (.ts → FFmpeg segment muxer → local HLS).
-            // Lower latency (~2-4s less), enables future timeshift/DVR, single upstream connection.
+            // Step 1: Live Segmenter pipeline (.ts → FFmpeg segment muxer → local HLS).
+            logger.info("[LivePlay] Step 1: Trying live segmenter pipeline...")
             if let localURL = await startLiveSegmenterPipeline(channel: channel) {
+                logger.info("[LivePlay] ✓ Segmenter pipeline OK → \(localURL.absoluteString)")
                 await presentPlayer(url: localURL, title: channel.name)
                 return
             }
+            logger.warning("[LivePlay] ✗ Segmenter pipeline failed")
 
-            // Fallback: LiveHLSProxy pipeline (.m3u8 → proxy upstream HLS → local serve).
-            // Works when the server doesn't support .ts or the segmenter fails.
-            logger.debug("Live segmenter unavailable, falling back to LiveHLSProxy")
+            // Step 2: LiveHLSProxy pipeline (.m3u8 → proxy upstream HLS → local serve).
+            logger.info("[LivePlay] Step 2: Trying HLS proxy pipeline...")
             if let localURL = await startLiveHLSProxyPipeline(channel: channel) {
+                logger.info("[LivePlay] ✓ HLS proxy pipeline OK → \(localURL.absoluteString)")
                 await presentPlayer(url: localURL, title: channel.name)
                 return
             }
+            logger.warning("[LivePlay] ✗ HLS proxy pipeline failed")
 
-            // Last resort: direct play without any proxy (may fail on AirPlay).
-            logger.error("All live pipelines failed — falling back to direct URL")
+            // Step 3: Direct URL play (last resort — may fail on AirPlay).
+            logger.info("[LivePlay] Step 3: Falling back to direct URL...")
             guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
                     .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                   let url = URL(string: urlString) else {
-                logger.error("Failed to generate valid stream URL")
+                logger.error("[LivePlay] ✗ Failed to build direct stream URL")
                 return
             }
+            logger.info("[LivePlay] ✓ Direct URL → \(url.absoluteString)")
             await presentPlayer(url: url, title: channel.name)
         }
     }
@@ -599,19 +603,24 @@ struct LiveChannelsGridView: View {
     /// Start the live segmenter pipeline: FFmpeg segments the raw .ts stream into local HLS.
     private func startLiveSegmenterPipeline(channel: LiveChannel) async -> URL? {
         let tsURLString = IPTVConfiguration.buildLiveChannelTSURL(profile: profile, channelID: channel.streamId)
-        guard let tsURL = URL(string: tsURLString) else { return nil }
+        guard let tsURL = URL(string: tsURLString) else {
+            logger.error("[LivePlay] Segmenter: failed to build TS URL for channel \(channel.streamId)")
+            return nil
+        }
+        logger.info("[LivePlay] Segmenter: TS URL = \(tsURL.absoluteString)")
 
         do {
             let liveSession = try await TransmuxingService.shared.startLiveTransmux(from: tsURL)
+            logger.info("[LivePlay] Segmenter: FFmpeg session started, output dir = \(liveSession.outputDir.path)")
             let serverSession = try await TransmuxServer.shared.startLiveSegmented(
                 directory: liveSession.outputDir,
                 segmenter: liveSession.segmenter,
                 handle: liveSession.handle
             )
-            logger.debug("Live segmenter started: \(serverSession.localURL.absoluteString)")
+            logger.info("[LivePlay] Segmenter: serving at \(serverSession.localURL.absoluteString)")
             return serverSession.localURL
         } catch {
-            logger.error("Live segmenter failed: \(error.localizedDescription)")
+            logger.error("[LivePlay] Segmenter error: \(error)")
             return nil
         }
     }
@@ -620,14 +629,18 @@ struct LiveChannelsGridView: View {
     private func startLiveHLSProxyPipeline(channel: LiveChannel) async -> URL? {
         guard let urlString = IPTVConfiguration.buildLiveChannelURL(profile: profile, channelID: channel.streamId)
                 .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: urlString) else { return nil }
+              let url = URL(string: urlString) else {
+            logger.error("[LivePlay] HLS Proxy: failed to build channel URL for \(channel.streamId)")
+            return nil
+        }
+        logger.info("[LivePlay] HLS Proxy: upstream URL = \(url.absoluteString)")
 
         do {
             let session = try await TransmuxServer.shared.startLive(upstreamURL: url)
-            logger.debug("Live proxy started: \(session.localURL.absoluteString)")
+            logger.info("[LivePlay] HLS Proxy: serving at \(session.localURL.absoluteString)")
             return session.localURL
         } catch {
-            logger.error("Live proxy failed: \(error.localizedDescription)")
+            logger.error("[LivePlay] HLS Proxy error: \(error)")
             return nil
         }
     }
@@ -637,16 +650,20 @@ struct LiveChannelsGridView: View {
     ///   live-optimized buffer settings even when the URL is a local proxy.
     @MainActor
     private func presentPlayer(url: URL, title: String, isLive: Bool = true) {
+        logger.info("[LivePlay] presentPlayer: url=\(url.absoluteString), isLive=\(isLive)")
         let player = PlayerFactory.shared.createPlayer(for: url, metadata: nil, isLive: isLive)
         player.play()
+        logger.info("[LivePlay] Player created (type=\(type(of: player))), play() called")
 
         #if os(macOS)
         PlayerWindowManager.shared.present(player: player, title: title)
         openWindow(id: "player")
+        logger.info("[LivePlay] macOS: opened player window")
         #else
         activePlayer = player
         playerTitle = title
         showFullscreenPlayer = true
+        logger.info("[LivePlay] iOS: showFullscreenPlayer=true")
         #endif
     }
 

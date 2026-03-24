@@ -98,11 +98,12 @@ public enum TransmuxLog {
             let message = String(cString: buf)
 
             // Map C level to Swift Level
+            let lvl = level.rawValue
             let swiftLevel: Level
-            if level <= 16 { swiftLevel = .error }      // MKS_LOG_ERROR
-            else if level <= 24 { swiftLevel = .warn }   // MKS_LOG_WARNING
-            else if level <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
-            else { swiftLevel = .debug }                  // MKS_LOG_DEBUG+
+            if lvl <= 16 { swiftLevel = .error }      // MKS_LOG_ERROR
+            else if lvl <= 24 { swiftLevel = .warn }   // MKS_LOG_WARNING
+            else if lvl <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
+            else { swiftLevel = .debug }                // MKS_LOG_DEBUG+
 
             let swiftTag = tag.map { String(cString: $0) } ?? "C"
 

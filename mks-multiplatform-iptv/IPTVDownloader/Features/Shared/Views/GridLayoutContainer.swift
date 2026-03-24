@@ -5,20 +5,36 @@ import SwiftUI
 struct GridLayoutContainer<Content: View>: View {
     let content: () -> Content
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     // Platform-optimized configuration
     #if os(iOS)
-    private let cardMinWidth: CGFloat = 140
+    private let baseMinWidth: CGFloat = 140
     private let cardMaxWidth: CGFloat = 200
     private let gridSpacing: CGFloat = 14
     private let horizontalPadding: CGFloat = 16
     private let verticalPadding: CGFloat = 16
     #else
-    private let cardMinWidth: CGFloat = 150
+    private let baseMinWidth: CGFloat = 150
     private let cardMaxWidth: CGFloat = 220
     private let gridSpacing: CGFloat = 16
     private let horizontalPadding: CGFloat = 20
     private let verticalPadding: CGFloat = 20
     #endif
+
+    /// Scale minimum card width for larger Dynamic Type sizes
+    private var cardMinWidth: CGFloat {
+        switch dynamicTypeSize {
+        case .xSmall, .small, .medium, .large:
+            return baseMinWidth
+        case .xLarge, .xxLarge, .xxxLarge:
+            return baseMinWidth + 20
+        case .accessibility1, .accessibility2:
+            return baseMinWidth + 40
+        default:
+            return baseMinWidth + 60
+        }
+    }
 
     var body: some View {
         ScrollView {

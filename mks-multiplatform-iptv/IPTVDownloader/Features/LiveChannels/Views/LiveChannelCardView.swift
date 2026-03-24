@@ -3,214 +3,155 @@
 //  mks-multiplatform-iptv
 //
 //  Card component for Live TV channels with Liquid Glass styling.
-//  Features: EPG integration, favorites toggle, and Direct Play tap action.
+//  Matches VOD card design: flexible layout, adaptive glass, semantic fonts.
 //
 
 import SwiftUI
-import AVKit
 
 // MARK: - Live Channel Card View
 
 /// Modern card for Live TV channels with Liquid Glass styling.
-/// Shows EPG progress, programme info, and allows direct play on channel.
+/// Uses flexible layout (no fixed frame) — fills the grid cell width,
+/// matching the VOD MediaCardViewiOS design pattern.
 struct LiveChannelCardView: View {
     // MARK: - Properties
 
-    /// The display model containing channel and EPG data
     let displayModel: LiveChannelDisplayModel
 
-    /// Callback triggered when card is tapped for direct play
-    let onTap: (() -> Void)?
-
-    /// Callback triggered when card is long-pressed for details
-    let onLongPress: (() -> Void)?
-
-    // MARK: - Environment
-
-    @EnvironmentObject var profile: IPTVProfile
-    @Environment(\.openWindow) private var openWindow
-
     // MARK: - State
-    @State private var isHovered = false
     @State private var isPressed = false
-    @State private var activePlayer: (any VideoPlayerProtocol)?
-    @State private var showFullscreenPlayer = false
-    @State private var isLoading = false
-    @State private var showError: Error?
 
-    // MARK: - Initialization
-
-    init(displayModel: LiveChannelDisplayModel, onTap: (() -> Void)? = nil, onLongPress: (() -> Void)? = nil) {
-        self.displayModel = displayModel
-        self.onTap = onTap
-        self.onLongPress = onLongPress
-    }
-
-    // MARK: - Platform-Specific Computed Properties
-
-    private var cardSize: CGSize {
-        #if os(iOS)
-        CGSize(width: 160, height: 200)
-        #elseif os(macOS)
-        CGSize(width: 200, height: 250)
-        #elseif os(tvOS)
-        CGSize(width: 300, height: 380)
-        #else
-        CGSize(width: 160, height: 200)
-        #endif
-    }
-
-    private var iconSize: CGFloat {
-        #if os(iOS)
-        50
-        #elseif os(macOS)
-        60
-        #elseif os(tvOS)
-        80
-        #else
-        50
-        #endif
-    }
-
-    private var titleFont: Font {
-        #if os(iOS)
-        .system(size: 13, weight: .semibold)
-        #elseif os(macOS)
-        .system(size: 14, weight: .semibold)
-        #elseif os(tvOS)
-        .system(size: 18, weight: .semibold)
-        #else
-        .system(size: 13, weight: .semibold)
-        #endif
-    }
-
-    private var programmeFont: Font {
-        #if os(iOS)
-        .system(size: 11, weight: .medium)
-        #elseif os(macOS)
-        .system(size: 12, weight: .medium)
-        #elseif os(tvOS)
-        .system(size: 14, weight: .medium)
-        #else
-        .system(size: 11, weight: .medium)
-        #endif
-    }
-
-    private var badgeSize: LiveBadgeSize {
-        #if os(iOS)
-        .compact
-        #elseif os(macOS)
-        .regular
-        #elseif os(tvOS)
-        .large
-        #else
-        .compact
-        #endif
-    }
-
-    private var hoverScale: CGFloat {
-        isHovered ? 1.03 : 1.0
-    }
+    // MARK: - Layout Constants
+    private let posterAspectRatio: CGFloat = 4 / 3
+    private let cornerRadius: CGFloat = AppGlass.cornerRadiusSmall
 
     // MARK: - Body
     var body: some View {
-        ZStack(alignment: .top) {
-            // Favorite button (top-right)
-            HStack {
-                Spacer()
-                Button(action: toggleFavorite) {
-                    Image(systemName: displayModel.isFavorite ? "star.fill" : "star")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(displayModel.isFavorite ? .yellow : .white)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 28, height: 28)
-                .contentShape(Circle())
-                .background(.ultraThinMaterial)
-                .clipShape(Circle())
-                .accessibilityLabel("Toggle favorite")
-                .accessibilityHint("Tap to toggle favorite")
-            }
-            .padding(.top, 8)
-            .padding(.trailing, 8)
+        VStack(spacing: 0) {
+            // Top: Channel icon area with gradient overlay
+            channelIconArea
 
-            // Main content
-            VStack(spacing: 8) {
-                // Channel Icon
-                ChannelIconView(
-                    url: URL(string: displayModel.channel.streamIcon ?? ""),
-                    size: CGSize(width: iconSize, height: iconSize)
-                )
-                .frame(height: iconSize)
-
-                // Channel Name
-                Text(displayModel.channel.name)
-                    .font(titleFont)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.8)
-
-                // LIVE Badge
-                LiveBadge(size: badgeSize)
-                    .padding(.top, 2)
-
-                // EPG Section (if available)
-                if displayModel.hasEPG {
-                    VStack(spacing: 4) {
-                        // Programme Title
-                        Text(displayModel.programmeTitle ?? "No program information")
-                            .font(programmeFont)
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .multilineTextAlignment(.leading)
-                            .minimumScaleFactor(0.9)
-
-                        // Time Range
-                        Text(displayModel.timeRange)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-
-                        // Progress Bar
-                        EPGProgressBar(progress: displayModel.progress)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 8)
-                }
-            }
-            .padding(8)
+            // Bottom: Channel info
+            channelInfoArea
         }
-        .frame(width: cardSize.width, height: cardSize.height)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.ultraThinMaterial.opacity(0.3))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
-                            isHovered ? Color.accentColor : Color.clear,
-                            lineWidth: isPressed ? 2 : 1
-                        )
-                )
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.secondary.opacity(isPressed ? 0.2 : 0.1), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .scaleEffect(hoverScale)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
+        .shadow(color: .black.opacity(0.15), radius: isPressed ? 8 : 4, y: isPressed ? 4 : 2)
+        .scaleEffect(isPressed ? 1.02 : 1)
+        .brightness(isPressed ? 0.03 : 0)
+        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+
+    // MARK: - Channel Icon Area
+
+    private var channelIconArea: some View {
+        ZStack(alignment: .topTrailing) {
+            // Background
+            CachedAsyncImage(url: URL(string: displayModel.channel.streamIcon ?? "")) { phase in
+                switch phase {
+                case .empty:
+                    SkeletonLoader()
+                        .aspectRatio(posterAspectRatio, contentMode: .fill)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
+                case .failure:
+                    placeholderIcon
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .aspectRatio(posterAspectRatio, contentMode: .fit)
+            .overlay(
+                // Bottom gradient for readability
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.6)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+            )
+
+            // LIVE badge (top-right)
+            LiveBadge(size: .compact)
+                .padding(8)
+
+            // Favorite star (top-left)
+            if displayModel.isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.yellow)
+                    .padding(6)
+                    .adaptiveGlass(in: Circle(), fallbackOpacity: 0.6)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // EPG progress at bottom of icon area
+            if displayModel.hasEPG {
+                VStack {
+                    Spacer()
+                    EPGProgressBar(progress: displayModel.progress)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 4)
+                }
+            }
         }
     }
 
-    // MARK: - Private Methods
+    // MARK: - Channel Info Area
 
-    private func toggleFavorite() {
-        // Toggle favorite via the favorites manager
-        Task { @MainActor in
-            LiveChannelFavoritesManager.shared.toggleFavorite(displayModel.id)
+    private var channelInfoArea: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Channel name
+            Text(displayModel.channel.name)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+
+            // EPG programme info
+            if displayModel.hasEPG, let programme = displayModel.programmeTitle {
+                Text(programme)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            // Time range
+            if displayModel.hasEPG, !displayModel.timeRange.isEmpty {
+                Text(displayModel.timeRange)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
+            // Football event badge
+            if let event = displayModel.footballEvent {
+                FootballEventBadge(event: event, size: .compact)
+                    .padding(.top, 2)
+            }
         }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.ultraThinMaterial)
+    }
+
+    // MARK: - Placeholder
+
+    private var placeholderIcon: some View {
+        ZStack {
+            Color.secondary.opacity(0.15)
+            Image(systemName: "tv")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+        }
+        .aspectRatio(posterAspectRatio, contentMode: .fit)
     }
 }

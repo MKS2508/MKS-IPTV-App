@@ -285,6 +285,9 @@ class LiveChannelListViewModel: ObservableObject {
             // Update loading state - CRITICAL for UI to show content
             loadingState = .loaded(channelCount: cached.value.count)
 
+            // Build display models immediately so UI shows channels
+            await buildDisplayModels()
+
             // Load categories from API (categories are small, always fresh)
             await loadCategories()
 
@@ -332,6 +335,10 @@ class LiveChannelListViewModel: ObservableObject {
             didLoadChannels = true
             loadingState = .loaded(channelCount: fetchedChannels.count)
             self.logger.info("Fetched \(fetchedChannels.count) channels")
+
+            // Build display models immediately so UI shows channels
+            // without waiting for EPG (EPG enriches them later).
+            await buildDisplayModels()
 
         case .failure(let error):
             self.logger.error("Failed to load channels: \(error.localizedDescription)")

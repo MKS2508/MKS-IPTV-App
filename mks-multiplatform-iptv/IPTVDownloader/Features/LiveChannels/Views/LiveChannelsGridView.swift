@@ -54,8 +54,6 @@ struct LiveChannelsGridView: View {
     @State private var showSortSheet = false
     @State private var showCategoryPicker = false
 
-    @Namespace private var animation
-
     // MARK: - Platform-Specific Configuration
     #if os(iOS)
     private let cardMinWidth: CGFloat = 160
@@ -188,7 +186,7 @@ struct LiveChannelsGridView: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 8)
         }
-        .background(.ultraThinMaterial)
+        .adaptiveGlass(in: Rectangle(), fallbackOpacity: 0.8)
     }
 
     // MARK: - Main Content Area
@@ -280,7 +278,6 @@ struct LiveChannelsGridView: View {
         LazyVGrid(columns: columns, spacing: gridSpacing) {
             ForEach(viewModel.filteredDisplayModels, id: \.id) { displayModel in
                 LiveChannelCardView(displayModel: displayModel)
-                    .matchedGeometryEffect(id: displayModel.id, in: animation)
                     .contextMenu {
                         channelContextMenu(for: displayModel)
                     }
@@ -307,7 +304,6 @@ struct LiveChannelsGridView: View {
                     displayModel: displayModel,
                     categoryName: viewModel.categoryName(for: displayModel.channel.categoryId)
                 )
-                .matchedGeometryEffect(id: displayModel.id, in: animation)
                 .contextMenu {
                     channelContextMenu(for: displayModel)
                 }
@@ -696,7 +692,7 @@ struct LiveChannelsGridView: View {
 
 // MARK: - Category Chip
 
-/// A styled chip button for category selection.
+/// A styled chip button for category selection with adaptive glass.
 struct CategoryChip: View {
     let title: String
     let icon: String?
@@ -709,34 +705,36 @@ struct CategoryChip: View {
             HStack(spacing: 6) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption.weight(.medium))
                 }
 
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .lineLimit(1)
 
                 if count > 0 {
-                    Text("(\(count))")
-                        .font(.system(size: 11, weight: .regular))
-                        .opacity(0.7)
+                    Text("\(count)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .foregroundColor(isSelected ? .white : .primary)
+            .foregroundStyle(isSelected ? .white : .primary)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
-            )
         }
         .buttonStyle(.plain)
+        .if(isSelected) { view in
+            view.background(Capsule().fill(Color.accentColor))
+        }
+        .if(!isSelected) { view in
+            view.adaptiveGlass(in: Capsule(), fallbackOpacity: 0.6)
+        }
     }
 }
 
 // MARK: - Channel List Row
 
-/// A list row for displaying a channel.
+/// A list row for displaying a channel with semantic fonts.
 struct ChannelListRow: View {
     let displayModel: LiveChannelDisplayModel
     let categoryName: String
@@ -754,33 +752,36 @@ struct ChannelListRow: View {
             // Channel Info
             VStack(alignment: .leading, spacing: 4) {
                 Text(displayModel.channel.name)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.body.weight(.medium))
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
-                    // Category
                     Text(categoryName)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
-                    // LIVE badge
                     LiveBadge(size: .compact)
+
+                    if displayModel.hasEPG, let programme = displayModel.programmeTitle {
+                        Text(programme)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
                 }
             }
 
             Spacer()
 
-            // Favorite indicator
             if displayModel.isFavorite {
                 Image(systemName: "star.fill")
-                    .foregroundColor(.yellow)
-                    .font(.system(size: 14))
+                    .foregroundStyle(.yellow)
+                    .font(.caption)
             }
 
-            // Disclosure indicator
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.secondary)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -788,9 +789,9 @@ struct ChannelListRow: View {
     }
 }
 
-// MARK: - Live Channel Detail Sheet (Enhanced)
+// MARK: - Live Channel Detail Sheet
 
-/// Enhanced detail sheet for live channel information.
+/// Detail sheet for live channel with adaptive glass styling.
 struct LiveChannelDetailSheet: View {
     let channel: LiveChannel
     let categoryName: String
@@ -805,13 +806,8 @@ struct LiveChannelDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Channel Header
                     headerSection
-
-                    // Quick Actions
                     quickActionsSection
-
-                    // Channel Info
                     infoSection
                 }
                 .padding()
@@ -822,9 +818,7 @@ struct LiveChannelDetailSheet: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        onClose()
-                    }
+                    Button("Done") { onClose() }
                 }
             }
         }
@@ -833,86 +827,52 @@ struct LiveChannelDetailSheet: View {
     // MARK: - Header Section
     private var headerSection: some View {
         VStack(spacing: 16) {
-            // Channel Icon
-            if let iconURL = URL(string: channel.streamIcon ?? "") {
-                AsyncImage(url: iconURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    case .failure:
-                        Image(systemName: "tv")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                    case .empty:
-                        ProgressView()
-                    @unknown default:
-                        Image(systemName: "tv")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .frame(width: 100, height: 70)
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            ChannelIconView(
+                url: URL(string: channel.streamIcon ?? ""),
+                size: CGSize(width: 100, height: 70),
+                cornerRadius: 12
+            )
 
-            // LIVE Badge
             LiveBadge(size: .regular)
         }
     }
 
     // MARK: - Quick Actions
     private var quickActionsSection: some View {
-        HStack(spacing: 16) {
-            // Play Button
+        HStack(spacing: 12) {
             Button {
                 onPlay()
                 onClose()
             } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 20))
-                    Text("Play")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Color.accentColor)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                Label("Play", systemImage: "play.fill")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
             }
+            .buttonStyle(.borderedProminent)
 
-            // Favorite Button
             Button {
                 onFavorite()
             } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: isFavorite ? "star.fill" : "star")
-                        .font(.system(size: 20))
-                    Text(isFavorite ? "Favorited" : "Favorite")
-                        .font(.system(size: 12, weight: .medium))
-                }
+                Label(
+                    isFavorite ? "Favorited" : "Favorite",
+                    systemImage: isFavorite ? "star.fill" : "star"
+                )
+                .font(.body.weight(.medium))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(isFavorite ? Color.yellow.opacity(0.2) : Color.secondary.opacity(0.1))
-                .foregroundColor(isFavorite ? .yellow : .primary)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.vertical, 14)
             }
+            .buttonStyle(.bordered)
+            .tint(isFavorite ? .yellow : nil)
         }
     }
 
     // MARK: - Info Section
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Category
             LabeledContent("Category", value: categoryName)
-
-            // Stream ID
             LabeledContent("Stream ID", value: "\(channel.streamId)")
 
-            // Added Date
             if let timestamp = Double(channel.added),
                timestamp > 0 {
                 let date = Date(timeIntervalSince1970: timestamp)
@@ -920,7 +880,6 @@ struct LiveChannelDetailSheet: View {
             }
         }
         .padding()
-        .background(.secondary.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadiusSmall), fallbackOpacity: 0.5)
     }
 }

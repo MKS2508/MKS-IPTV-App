@@ -41,15 +41,12 @@ struct MKSPlayerView: View {
         controlsConfiguration.mode == .native
     }
 
-    /// True when macOS fullscreen — NO SwiftUI overlays should exist above
-    /// the NSViewRepresentable (Apple bug FB9818366). DLNA/Cast is handled
-    /// entirely by `actionPopUpButtonMenu` in the native transport bar.
-    private var macOSFullscreen: Bool {
-        #if os(macOS)
-        return presentationMode == .fullscreen
-        #else
-        return false
-        #endif
+    /// True when fullscreen on ANY platform — NO SwiftUI overlays should exist
+    /// above the native player view. On macOS this avoids the NSViewRepresentable
+    /// blocking bug (FB9818366); on iOS/tvOS this lets AVPlayerViewController own
+    /// the entire UI with its native controls, PiP, and metadata.
+    private var isNativeFullscreen: Bool {
+        presentationMode == .fullscreen
     }
 
     var body: some View {
@@ -60,8 +57,8 @@ struct MKSPlayerView: View {
                 .background(Color.black)
 
             // MARK: - Layer 1: Debug overlay (top-left, non-blocking)
-            // Hidden on macOS native fullscreen to avoid blocking NSView (FB9818366).
-            if showDebugOverlay, !macOSFullscreen {
+            // Hidden in native fullscreen — let the system player own the UI.
+            if showDebugOverlay, !isNativeFullscreen {
                 VStack {
                     HStack {
                         PlayerDebugOverlay(player: player)
@@ -80,10 +77,8 @@ struct MKSPlayerView: View {
             }
 
             // MARK: - Layer 3: Top trailing buttons (individual, no full-screen wrapper)
-            // Hidden on macOS fullscreen — any SwiftUI view above the
-            // NSViewRepresentable blocks native AVPlayerView controls (FB9818366).
-            // DLNA/Cast is handled by actionPopUpButtonMenu gear icon on macOS fullscreen.
-            if showRemotePlayButton, !macOSFullscreen {
+            // Hidden in native fullscreen — native player owns all controls.
+            if showRemotePlayButton, !isNativeFullscreen {
                 RemotePlayButton()
                     .buttonStyle(.plain)
                     .adaptiveGlass(in: Capsule())
@@ -98,7 +93,7 @@ struct MKSPlayerView: View {
             }
 
             // MARK: - Layer 5: Auto-play next episode overlay (bottom-right)
-            if let nextInfo = nextEpisodeInfo, !macOSFullscreen {
+            if let nextInfo = nextEpisodeInfo, !isNativeFullscreen {
                 AutoPlayNextOverlay(
                     info: nextInfo,
                     onPlayNow: { onPlayNextEpisode?(nextInfo.episode) },
@@ -113,8 +108,8 @@ struct MKSPlayerView: View {
             switch phase {
             case .active:
                 // Only manage controlsVisible for inline glass controls.
-                // macOS fullscreen uses native controls exclusively.
-                if !macOSFullscreen, !useNativeControls {
+                // Fullscreen uses native controls exclusively.
+                if !isNativeFullscreen, !useNativeControls {
                     controlsVisible = true
                 }
             case .ended:
@@ -130,6 +125,9 @@ struct MKSPlayerView: View {
             }
         }
         .ignoresSafeArea(.all, edges: .bottom)
+        .onAppear {
+            remotePlayManager.ensureDiscoveryActive()
+        }
         .onDisappear {
             // Stop RemotePlay when player view is dismissed to prevent
             // leaked polling tasks, transmux monitors, and SOAP calls.
@@ -188,8 +186,7 @@ struct MKSPlayerView: View {
     @ViewBuilder
     private var nativeControlsOverlays: some View {
         // Native mode: inline overlays only.
-        // macOS fullscreen: title/metadata injected into AVPlayerView.contentOverlayView
-        // (does NOT block native transport controls — Apple bug FB9818366 workaround).
+        // Fullscreen: native player owns UI on all platforms.
         if presentationMode == .inline {
             if let metadata, showMetadata {
                 GlassMetadataOverlay(metadata: metadata)
@@ -215,9 +212,8 @@ struct MKSPlayerView: View {
 
     @ViewBuilder
     private var glassControlsOverlay: some View {
-        // Glass controls only for inline mode on all platforms.
-        // macOS fullscreen uses native controls + actionPopUpButtonMenu for DLNA/Cast.
-        // iOS fullscreen uses AVPlayerViewController native controls.
+        // Glass controls only for inline mode.
+        // Fullscreen uses native player controls on all platforms.
         let showGlassControls = presentationMode == .inline
 
         if showGlassControls {

@@ -96,6 +96,16 @@ final class RemotePlayManager: @unchecked Sendable {
         ssdpDiscovery.refresh()
     }
 
+    /// Ensures discovery is running. Call when entering player context
+    /// or returning from background — SSDP sockets may have been killed by iOS.
+    func ensureDiscoveryActive() {
+        if !isDiscovering {
+            startDiscovery()
+        } else {
+            ssdpDiscovery.refresh()
+        }
+    }
+
     /// Clear all discovered devices.
     func clearDiscoveredDevices() {
         ssdpDiscovery.clearDevices()

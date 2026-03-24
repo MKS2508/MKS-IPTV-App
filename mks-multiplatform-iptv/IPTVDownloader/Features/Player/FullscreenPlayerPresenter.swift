@@ -23,6 +23,7 @@ struct FullscreenPlayerModifier: ViewModifier {
             .fullScreenCover(isPresented: $isPresented) {
                 if let player {
                     fullscreenContent(player: player)
+                        .environment(RemotePlayManager.shared)
                         .ignoresSafeArea()
                 }
             }

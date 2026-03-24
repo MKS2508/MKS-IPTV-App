@@ -175,6 +175,11 @@ struct MainWindowContent: View {
                 .environmentObject(profilesManager)
                 .environmentObject(activeProfile)
                 .environment(RemotePlayManager.shared)
+                #if os(iOS)
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    RemotePlayManager.shared.ensureDiscoveryActive()
+                }
+                #endif
         } else {
             IPTVProfilesView(manager: profilesManager)
         }

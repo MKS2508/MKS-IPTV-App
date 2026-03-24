@@ -138,18 +138,17 @@ struct MediaCardViewiOS: View {
     private let overlayBlurRadius: CGFloat = 16
     private let textGlowRadius: CGFloat = 6
     private let detailsPadding: CGFloat = 10
-    private let titleFontSize: CGFloat = 14
-    private let detailsFontSize: CGFloat = 11
-    private let smallDetailsFontSize: CGFloat = 10
     #else
     private let posterAspectRatio: CGFloat = 2/3
     private let overlayBlurRadius: CGFloat = 20
     private let textGlowRadius: CGFloat = 8
     private let detailsPadding: CGFloat = 16
-    private let titleFontSize: CGFloat = 15
-    private let detailsFontSize: CGFloat = 13
-    private let smallDetailsFontSize: CGFloat = 11
     #endif
+
+    // Dynamic Type-aware fonts (scale with user's text size setting)
+    private var titleFont: Font { .subheadline.weight(.semibold) }
+    private var detailsFont: Font { .caption }
+    private var smallDetailsFont: Font { .caption2 }
     
     #if os(iOS)
     private let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
@@ -224,6 +223,7 @@ struct MediaCardViewiOS: View {
             insertion: .opacity.combined(with: .scale(scale: 0.95)),
             removal: .opacity
         ))
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .onAppear(perform: handleAppear)
         .onChange(of: isDetailsExpanded) { _, newValue in
             handleDetailsExpansionChange(newValue)
@@ -274,7 +274,7 @@ struct MediaCardViewiOS: View {
         return VStack(alignment: .leading, spacing: 8) {
             // Título
             Text(mediaCardType.title)
-                .font(.system(size: titleFontSize, weight: .semibold, design: .rounded))
+                .font(titleFont)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
                 .foregroundColor(.white)
@@ -293,7 +293,7 @@ struct MediaCardViewiOS: View {
                         TagView(
                             icon: tag.icon,
                             text: tag.text,
-                            fontSize: detailsFontSize,
+                            fontSize: 11,
                             backgroundColor: Color(.darkGray).opacity(0.5)
                         )
                     }
@@ -320,12 +320,12 @@ struct MediaCardViewiOS: View {
             ForEach(Array(provider.expandedTags().enumerated()), id: \.offset) { _, tag in
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: tag.icon)
-                        .font(.system(size: detailsFontSize))
+                        .font(detailsFont)
                         .frame(width: 20)
                         .foregroundColor(.white.opacity(0.8))
-                    
+
                     Text(tag.text)
-                        .font(.system(size: detailsFontSize, weight: .medium))
+                        .font(detailsFont.weight(.medium))
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(2)
                 }
@@ -338,7 +338,7 @@ struct MediaCardViewiOS: View {
     private var detailButton: some View {
         Button(action: onViewDetails) {
             Text("Details")
-                .font(.system(size: detailsFontSize, weight: .semibold))
+                .font(detailsFont.weight(.semibold))
                 .padding(.vertical, 6)
                 .padding(.horizontal, 12)
         }
@@ -359,7 +359,7 @@ struct MediaCardViewiOS: View {
         RatingBadgeView(
             rating: mediaCardType.rating,
             style: config.ratingStyle,
-            fontSize: smallDetailsFontSize
+            fontSize: 10
         )
         .padding(6)
         .background(
@@ -408,7 +408,7 @@ struct MediaCardViewiOS: View {
         RatingBadgeView(
             rating: mediaCardType.rating,
             style: config.ratingStyle,
-            fontSize: detailsFontSize
+            fontSize: 11
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 2)

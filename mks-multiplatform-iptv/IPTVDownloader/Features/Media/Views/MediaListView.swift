@@ -17,6 +17,8 @@ struct MediaListView: View {
     
     @EnvironmentObject private var profile: IPTVProfile
     @State var searchText = ""
+    @State private var debouncedSearchText = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
     @State private var selectedMediaItemId: Int?
     @Binding var selectedView: String?
     @State var selectedCategories: Set<String> = []
@@ -209,7 +211,6 @@ struct MediaListView: View {
     // Propiedad computada para el contenido de películas
     private var moviesContent: some View {
         ForEach(filteredMovies) { movie in
-            #if os(iOS)
             PlatformSpecificMovieCardViewAdvanced(
                 movie: movie,
                 namespace: animation,
@@ -217,29 +218,9 @@ struct MediaListView: View {
                     showMovieDetail(for: movie)
                 }
             )
-            .matchedGeometryEffect(id: "movie-\(movie.id)", in: animation)
             .accessibilityLabel("\(movie.name), Rating: \(movie.rating5Based?.formatted() ?? "N/A")")
-            .transition(.asymmetric(
-                insertion: .scale.combined(with: .opacity),
-                removal: .opacity
-            ))
-            #else
-            // macOS: Agregar un gesto de clic explícito
-            PlatformSpecificMovieCardViewAdvanced(
-                movie: movie,
-                namespace: animation,
-                onViewDetails: {
-                    showMovieDetail(for: movie)
-                }
-            )
-            .matchedGeometryEffect(id: "movie-\(movie.id)", in: animation)
-            .accessibilityLabel("\(movie.name), Rating: \(movie.rating5Based?.formatted() ?? "N/A")")
-            .transition(.asymmetric(
-                insertion: .scale.combined(with: .opacity),
-                removal: .opacity
-            ))
+            #if os(macOS)
             .onTapGesture {
-                // Asegurarnos de que en macOS también se llame a showMovieDetail
                 showMovieDetail(for: movie)
             }
             #endif
@@ -249,7 +230,6 @@ struct MediaListView: View {
     // Propiedad computada para el contenido de series
     private var seriesContent: some View {
         ForEach(filteredSeries) { serie in
-            #if os(iOS)
             PlatformSpecificSerieCardViewAdvanced(
                 serie: serie,
                 namespace: animation,
@@ -257,29 +237,9 @@ struct MediaListView: View {
                     showSerieDetail(for: serie)
                 }
             )
-            .matchedGeometryEffect(id: "serie-\(serie.id)", in: animation)
             .accessibilityLabel("\(serie.name), Category: \(serie.categoryId)")
-            .transition(.asymmetric(
-                insertion: .scale.combined(with: .opacity),
-                removal: .opacity
-            ))
-            #else
-            // macOS: Agregar un gesto de clic explícito
-            PlatformSpecificSerieCardViewAdvanced(
-                serie: serie,
-                namespace: animation,
-                onViewDetails: {
-                    showSerieDetail(for: serie)
-                }
-            )
-            .matchedGeometryEffect(id: "serie-\(serie.id)", in: animation)
-            .accessibilityLabel("\(serie.name), Category: \(serie.categoryId)")
-            .transition(.asymmetric(
-                insertion: .scale.combined(with: .opacity),
-                removal: .opacity
-            ))
+            #if os(macOS)
             .onTapGesture {
-                // Asegurarnos de que en macOS también se llame a showSerieDetail
                 showSerieDetail(for: serie)
             }
             #endif
@@ -594,6 +554,20 @@ struct MediaListView: View {
         .frame(minWidth: 800, minHeight: 600)
 }
 #endif
+        // Debounce search: wait 300ms after last keystroke before filtering
+        .onChange(of: searchText) { _, newValue in
+            searchDebounceTask?.cancel()
+            if newValue.isEmpty {
+                // Clear immediately for responsive UX
+                debouncedSearchText = ""
+            } else {
+                searchDebounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    debouncedSearchText = newValue
+                }
+            }
+        }
         #if os(macOS)
         // Sync internal changes to TouchBarManager
         .onChange(of: searchText) { _, newValue in
@@ -655,7 +629,7 @@ struct MediaListView: View {
     }
 
     var effectiveSearchText: String {
-        return searchText
+        return debouncedSearchText
     }
 
     var effectiveSelectedCategories: Set<String> {

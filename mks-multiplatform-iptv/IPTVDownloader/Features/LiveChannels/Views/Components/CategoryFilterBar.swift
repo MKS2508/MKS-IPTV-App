@@ -39,9 +39,9 @@ struct CategoryFilterBar: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "tv")
-                            .font(.system(size: 12))
+                            .font(.caption)
                         Text("All")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                     }
                     .foregroundColor(selectedCategory == nil ? .primary : .secondary)
                     .padding(.horizontal, 14)
@@ -70,9 +70,9 @@ struct CategoryFilterBar: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: categoryIcon(for: category.categoryId))
-                                .font(.system(size: 12))
+                                .font(.caption)
                             Text(category.categoryName)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.subheadline.weight(.medium))
                                 .lineLimit(1)
                         }
                         .foregroundColor(selectedCategory == category.categoryId ? .primary : .secondary)
@@ -99,8 +99,7 @@ struct CategoryFilterBar: View {
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .adaptiveGlass(in: RoundedRectangle(cornerRadius: 12), fallbackOpacity: 0.8)
     }
 
     // MARK: - Platform-Specific Colors

@@ -41,12 +41,23 @@ struct MKSPlayerView: View {
         controlsConfiguration.mode == .native
     }
 
-    /// True when fullscreen on ANY platform — NO SwiftUI overlays should exist
-    /// above the native player view. On macOS this avoids the NSViewRepresentable
+    /// True when fullscreen on ANY platform — most SwiftUI overlays should not
+    /// exist above the native player view. On macOS this avoids the NSViewRepresentable
     /// blocking bug (FB9818366); on iOS/tvOS this lets AVPlayerViewController own
     /// the entire UI with its native controls, PiP, and metadata.
     private var isNativeFullscreen: Bool {
         presentationMode == .fullscreen
+    }
+
+    /// True when the platform handles DLNA/Cast natively inside the player controls.
+    /// macOS: actionPopUpButtonMenu gear icon. tvOS: transportBarCustomMenuItems.
+    /// iOS has NO native API for this — RemotePlayButton must remain as floating overlay.
+    private var platformHandlesCastNatively: Bool {
+        #if os(macOS) || os(tvOS)
+        return presentationMode == .fullscreen
+        #else
+        return false
+        #endif
     }
 
     var body: some View {
@@ -77,8 +88,9 @@ struct MKSPlayerView: View {
             }
 
             // MARK: - Layer 3: Top trailing buttons (individual, no full-screen wrapper)
-            // Hidden in native fullscreen — native player owns all controls.
-            if showRemotePlayButton, !isNativeFullscreen {
+            // Hidden only when the platform handles Cast natively (macOS gear menu, tvOS transport bar).
+            // iOS has no native AVPlayerViewController Cast API, so the floating button stays visible.
+            if showRemotePlayButton, !platformHandlesCastNatively {
                 RemotePlayButton()
                     .buttonStyle(.plain)
                     .adaptiveGlass(in: Capsule())

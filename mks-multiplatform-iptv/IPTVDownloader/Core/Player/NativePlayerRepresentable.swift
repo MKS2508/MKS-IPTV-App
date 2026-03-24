@@ -45,7 +45,9 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         coordinator.onDeviceSelected = onDeviceSelected
         coordinator.onDisconnect = onDisconnect
         coordinator.onRefreshDevices = onRefreshDevices
+        #if os(tvOS)
         controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
+        #endif
 
         return controller
     }
@@ -65,7 +67,9 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         coordinator.onDeviceSelected = onDeviceSelected
         coordinator.onDisconnect = onDisconnect
         coordinator.onRefreshDevices = onRefreshDevices
+        #if os(tvOS)
         controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
+        #endif
     }
 
     func makeCoordinator() -> Coordinator {

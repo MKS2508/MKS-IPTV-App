@@ -718,7 +718,9 @@ private struct ReactiveFullscreenSurface: View {
     var onDismiss: (() -> Void)?
     var videoGravity: AVLayerVideoGravity = .resizeAspect
 
-    // MARK: - Remote Play (macOS actionPopUpButtonMenu)
+    // MARK: - Remote Play (native transport bar integration)
+    // macOS: actionPopUpButtonMenu gear icon
+    // iOS: transportBarCustomMenuItems in AVPlayerViewController
 
     var remoteDevices: [RemoteDevice] = []
     var connectedDevice: RemoteDevice? = nil
@@ -738,7 +740,12 @@ private struct ReactiveFullscreenSurface: View {
                 NativeAVPlayerViewController(
                     player: avPlayer,
                     onDismiss: onDismiss,
-                    videoGravity: videoGravity
+                    videoGravity: videoGravity,
+                    remoteDevices: remoteDevices,
+                    connectedDevice: connectedDevice,
+                    onDeviceSelected: onDeviceSelected,
+                    onDisconnect: onDisconnect,
+                    onRefreshDevices: onRefreshDevices
                 )
                 #elseif os(macOS)
                 NativeAVPlayerView(

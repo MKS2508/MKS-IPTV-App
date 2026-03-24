@@ -10,7 +10,20 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
     var videoGravity: AVLayerVideoGravity = .resizeAspect
     var allowsPictureInPicture: Bool = true
     var allowsVideoFrameAnalysis: Bool = true
-    
+
+    // MARK: - Remote Play (transportBarCustomMenuItems)
+
+    /// Discovered DLNA/Cast devices to show in the transport bar menu.
+    var remoteDevices: [RemoteDevice] = []
+    /// Currently connected device (shown with checkmark).
+    var connectedDevice: RemoteDevice? = nil
+    /// Called when the user selects a device.
+    var onDeviceSelected: ((RemoteDevice) -> Void)? = nil
+    /// Called when the user chooses "Disconnect".
+    var onDisconnect: (() -> Void)? = nil
+    /// Called when the user chooses "Refresh Devices".
+    var onRefreshDevices: (() -> Void)? = nil
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.player = player
@@ -18,65 +31,125 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         controller.allowsPictureInPicturePlayback = allowsPictureInPicture
         controller.videoGravity = videoGravity
         controller.delegate = context.coordinator
-        
+
         #if os(iOS)
         if #available(iOS 16.0, *) {
             controller.allowsVideoFrameAnalysis = allowsVideoFrameAnalysis
         }
-
-        // ContextualActions available in iOS 16.2+ but requires UIAction types
-        // Enable when ready to implement custom playback controls:
-        // if #available(iOS 16.2, *) {
-        //     controller.contextualActions = context.coordinator.contextualActions
-        // }
         #endif
-        
+
+        // Seed coordinator and build initial Cast menu
+        let coordinator = context.coordinator
+        coordinator.remoteDevices = remoteDevices
+        coordinator.connectedDevice = connectedDevice
+        coordinator.onDeviceSelected = onDeviceSelected
+        coordinator.onDisconnect = onDisconnect
+        coordinator.onRefreshDevices = onRefreshDevices
+        controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
+
         return controller
     }
-    
+
     func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
         if controller.player !== player {
             controller.player = player
         }
-        
         if controller.videoGravity != videoGravity {
             controller.videoGravity = videoGravity
         }
+
+        // Update coordinator state and rebuild Cast menu
+        let coordinator = context.coordinator
+        coordinator.remoteDevices = remoteDevices
+        coordinator.connectedDevice = connectedDevice
+        coordinator.onDeviceSelected = onDeviceSelected
+        coordinator.onDisconnect = onDisconnect
+        coordinator.onRefreshDevices = onRefreshDevices
+        controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(onDismiss: onDismiss)
     }
-    
+
     class Coordinator: NSObject, AVPlayerViewControllerDelegate {
         var onDismiss: (() -> Void)?
-        
+        var remoteDevices: [RemoteDevice] = []
+        var connectedDevice: RemoteDevice?
+        var onDeviceSelected: ((RemoteDevice) -> Void)?
+        var onDisconnect: (() -> Void)?
+        var onRefreshDevices: (() -> Void)?
+
         init(onDismiss: (() -> Void)?) {
             self.onDismiss = onDismiss
         }
-        
-        // MARK: - Contextual Actions (iOS 16.2+)
-        // Uncomment when ready to implement custom playback controls:
-        //
-        // #if os(iOS)
-        // @available(iOS 16.2, *)
-        // var contextualActions: [UIAction] {
-        //     let infoAction = UIAction(
-        //         title: "Info",
-        //         image: UIImage(systemName: "info.circle")
-        //     ) { _ in
-        //         // Handle info action
-        //     }
-        //     return [infoAction]
-        // }
-        // #endif
-        
+
+        // MARK: - Transport Bar Menu (iOS equivalent of macOS actionPopUpButtonMenu)
+
+        func buildTransportBarMenuItems() -> [UIMenuElement] {
+            var items: [UIMenuElement] = []
+
+            // Device list or searching state
+            if remoteDevices.isEmpty {
+                let searching = UIAction(
+                    title: "Searching for devices...",
+                    image: UIImage(systemName: "wifi"),
+                    attributes: .disabled
+                ) { _ in }
+                items.append(searching)
+            } else {
+                let deviceActions = remoteDevices.enumerated().map { index, device in
+                    let title = "\(device.name) (\(device.type.displayName))"
+                    let isConnected = connectedDevice?.id == device.id
+                    return UIAction(
+                        title: title,
+                        image: UIImage(systemName: device.type.icon),
+                        state: isConnected ? .on : .off
+                    ) { [weak self] _ in
+                        self?.onDeviceSelected?(device)
+                    }
+                }
+                let castMenu = UIMenu(title: "Cast To", options: .displayInline, children: deviceActions)
+                items.append(castMenu)
+
+                // Disconnect action when connected
+                if let connected = connectedDevice {
+                    let disconnect = UIAction(
+                        title: "Disconnect from \(connected.name)",
+                        image: UIImage(systemName: "xmark.circle"),
+                        attributes: .destructive
+                    ) { [weak self] _ in
+                        self?.onDisconnect?()
+                    }
+                    items.append(disconnect)
+                }
+            }
+
+            // Refresh action
+            let refresh = UIAction(
+                title: "Refresh Devices",
+                image: UIImage(systemName: "arrow.clockwise")
+            ) { [weak self] _ in
+                self?.onRefreshDevices?()
+            }
+            items.append(refresh)
+
+            // Wrap everything in a top-level Cast menu with the cast icon
+            return [UIMenu(
+                title: "Cast",
+                image: UIImage(systemName: "tv.badge.wifi"),
+                children: items
+            )]
+        }
+
+        // MARK: - AVPlayerViewControllerDelegate
+
         func playerViewController(
             _ playerViewController: AVPlayerViewController,
             willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator
         ) {
         }
-        
+
         func playerViewController(
             _ playerViewController: AVPlayerViewController,
             willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator

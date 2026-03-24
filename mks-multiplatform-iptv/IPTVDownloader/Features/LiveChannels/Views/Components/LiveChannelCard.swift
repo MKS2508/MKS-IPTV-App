@@ -381,30 +381,6 @@ private extension View {
     }
 }
 
-// MARK: - Skeleton Loader
-
-/// Placeholder skeleton for loading states
-struct SkeletonLoader: View {
-    var body: some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.secondary.opacity(0.1),
-                        Color.secondary.opacity(0.2),
-                        Color.secondary.opacity(0.1)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .overlay(
-                ProgressView()
-                    .scaleEffect(0.7)
-            )
-    }
-}
-
 // MARK: - Previews
 
 #Preview("Grid Mode") {

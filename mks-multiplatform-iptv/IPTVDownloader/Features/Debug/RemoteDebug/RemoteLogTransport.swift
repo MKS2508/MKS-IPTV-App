@@ -1,7 +1,4 @@
 import Foundation
-#if os(iOS) || os(tvOS)
-import UIKit
-#endif
 
 /// Thread-safe WebSocket log transport. Sends structured log entries as JSON
 /// to the remote transmux-log-viewer. Buffers entries when disconnected and
@@ -199,12 +196,10 @@ actor RemoteLogTransport {
     // MARK: - Device Info Helpers
 
     private func deviceName() -> String {
-        #if os(iOS)
-        return UIDevice.current.name
-        #elseif os(macOS)
+        #if os(macOS)
         return Host.current().localizedName ?? "Mac"
         #else
-        return "Unknown"
+        return ProcessInfo.processInfo.hostName
         #endif
     }
 
@@ -213,11 +208,13 @@ actor RemoteLogTransport {
     }
 
     private func systemVersion() -> String {
-        #if os(iOS)
-        return "iOS \(UIDevice.current.systemVersion)"
-        #elseif os(macOS)
         let v = ProcessInfo.processInfo.operatingSystemVersion
+        #if os(iOS)
+        return "iOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+        #elseif os(macOS)
         return "macOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
+        #elseif os(tvOS)
+        return "tvOS \(v.majorVersion).\(v.minorVersion).\(v.patchVersion)"
         #else
         return "unknown"
         #endif

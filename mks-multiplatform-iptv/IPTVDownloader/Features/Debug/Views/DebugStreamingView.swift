@@ -332,6 +332,26 @@ struct DebugStreamingView: View {
                 Text("Logs")
                     .font(.headline)
 
+                // Source filter (All / Local / Remote)
+                Picker("Source", selection: $viewModel.logSource) {
+                    ForEach(DebugStreamingViewModel.LogSource.allCases, id: \.self) { source in
+                        Text(source.rawValue).tag(source)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+
+                #if os(macOS)
+                if !RemoteLogReceiver.shared.connectedDevices.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle().fill(.green).frame(width: 6, height: 6)
+                        Text("\(RemoteLogReceiver.shared.connectedDevices.count) device(s)")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                }
+                #endif
+
                 Spacer()
 
                 Toggle("Auto-scroll", isOn: $viewModel.autoScroll)

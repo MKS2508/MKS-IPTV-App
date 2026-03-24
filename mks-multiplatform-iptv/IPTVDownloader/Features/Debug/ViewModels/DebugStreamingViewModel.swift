@@ -86,20 +86,22 @@ struct DebugLog: Identifiable {
     let timestamp: String
     let message: String
     let type: LogType
-    
+    let source: DebugStreamingViewModel.LogSource
+
     enum LogType {
         case info
         case success
         case warning
         case error
     }
-    
-    init(message: String, type: LogType = .info) {
+
+    init(message: String, type: LogType = .info, source: DebugStreamingViewModel.LogSource = .local) {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss.SSS"
         self.timestamp = formatter.string(from: Date())
         self.message = message
         self.type = type
+        self.source = source
     }
 }
 
@@ -149,11 +151,20 @@ class DebugStreamingViewModel: ObservableObject {
     let movieService: MovieService
     private var cancellables = Set<AnyCancellable>()
     
+    /// Source filter for log display.
+    enum LogSource: String, CaseIterable {
+        case all = "All"
+        case local = "Local"
+        case remote = "Remote"
+    }
+
+    @Published var logSource: LogSource = .all
+    @Published var connectedDevices: [RemoteLogReceiver.ConnectedDevice] = []
+
     init(movieService: MovieService) {
         self.movieService = movieService
 
-        // Subscribe to ALL MKSLog output so every log from every subsystem
-        // (player, transmux, DLNA, cast, live, app, network) appears here.
+        // Subscribe to ALL MKSLog output (local logs from this process).
         MKSLog.localObserver = { [weak self] message, category, level in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -162,18 +173,48 @@ class DebugStreamingViewModel: ObservableObject {
                 case "warning": .warning
                 default: .info
                 }
-                // Don't re-emit to MKSLog (the log() method below does MKSLog.debug)
-                let entry = DebugLog(message: "[\(category)] \(message)", type: type)
-                self.logs.append(entry)
-                if self.logs.count > 2000 {
-                    self.logs.removeFirst(self.logs.count - 2000)
-                }
+                let entry = DebugLog(message: "[\(category)] \(message)", type: type, source: .local)
+                self.appendLog(entry)
             }
         }
+
+        // Subscribe to remote device logs (macOS receives from iPhone via WS).
+        #if os(macOS)
+        let receiver = RemoteLogReceiver.shared
+        receiver.onLogReceived = { [weak self] entry, device in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let type: DebugLog.LogType = switch entry.level {
+                case "error": .error
+                case "warning": .warning
+                default: .info
+                }
+                let msg = "📱 [\(device.name)] [\(entry.tag)] \(entry.message)"
+                let log = DebugLog(message: msg, type: type, source: .remote)
+                self.appendLog(log)
+            }
+        }
+        receiver.start()
+        #endif
     }
 
     deinit {
         MKSLog.localObserver = nil
+        #if os(macOS)
+        RemoteLogReceiver.shared.onLogReceived = nil
+        #endif
+    }
+
+    // MARK: - Log Management
+
+    private func appendLog(_ entry: DebugLog) {
+        // Filter by source if not showing all
+        if logSource != .all && entry.source != logSource { return }
+
+        logs.append(entry)
+        if logs.count > 2000 {
+            logs.removeFirst(logs.count - 2000)
+        }
     }
     
     // MARK: - Public Methods

@@ -105,7 +105,12 @@ public enum TransmuxLog {
             else if lvl <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
             else { swiftLevel = .debug }                // MKS_LOG_DEBUG+
 
-            let swiftTag = tag.map { String(cString: $0) } ?? "C"
+            let swiftTag: String
+            if let tag = tag {
+                swiftTag = String(cString: tag)
+            } else {
+                swiftTag = "C"
+            }
 
             // Forward to the same external observer as Swift logs
             externalObserver?(message, swiftTag, swiftLevel)

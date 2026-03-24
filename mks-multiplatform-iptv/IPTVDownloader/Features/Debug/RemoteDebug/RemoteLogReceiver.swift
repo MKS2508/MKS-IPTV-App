@@ -91,7 +91,7 @@ final class RemoteLogReceiver {
             self.listener = listener
 
             listener.service = NWListener.Service(
-                name: "MKS-IPTV Debug (\(Host.current().localizedName ?? "Mac"))",
+                name: "MKS-IPTV Debug (\(ProcessInfo.processInfo.hostName))",
                 type: bonjourType,
                 txtRecord: NWTXTRecord(["ws": "/ws/device", "version": "1.0"])
             )

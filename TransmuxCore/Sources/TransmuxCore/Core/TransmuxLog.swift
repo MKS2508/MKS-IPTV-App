@@ -90,7 +90,11 @@ public enum TransmuxLog {
         mks_log_set_callback { tag, level, fmt, vl in
             // Format the C message
             var buf = [CChar](repeating: 0, count: 2048)
-            vsnprintf(&buf, 2048, fmt, vl)
+            if let vl = vl {
+                vsnprintf(&buf, 2048, fmt, vl)
+            } else if let fmt = fmt {
+                strncpy(&buf, fmt, 2047)
+            }
             let message = String(cString: buf)
 
             // Map C level to Swift Level

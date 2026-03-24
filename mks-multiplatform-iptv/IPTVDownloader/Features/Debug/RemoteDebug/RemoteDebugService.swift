@@ -192,7 +192,7 @@ final class RemoteDebugService {
 
         // Wire up command handling
         Task {
-            await transport.onMessage = { [weak self] data in
+            await transport.setOnMessage { [weak self] data in
                 Task { @MainActor in
                     self?.handleIncomingMessage(data)
                 }

@@ -118,8 +118,12 @@ actor RemoteLogTransport {
     var connected: Bool { isConnected }
 
     /// Callback for incoming messages (commands from viewer).
-    /// Set by RemoteDebugService.
-    var onMessage: ((Data) -> Void)?
+    private var onMessage: ((Data) -> Void)?
+
+    /// Set the message handler (actor-safe entry point for external callers).
+    func setOnMessage(_ handler: @escaping (Data) -> Void) {
+        onMessage = handler
+    }
 
     // MARK: - Private
 

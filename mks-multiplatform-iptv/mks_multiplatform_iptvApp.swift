@@ -66,9 +66,11 @@ struct mks_iptv_downloaderApp: App {
         Self.configureAudioSession()
         #endif
 
+        #if os(macOS)
         Task {
             _ = await DownloadNotificationService.shared.requestPermission()
         }
+        #endif
     }
 
     var body: some Scene {
@@ -126,8 +128,12 @@ struct mks_iptv_downloaderApp: App {
     static func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .moviePlayback)
-            print("[Audio] AVAudioSession configured: .playback, .moviePlayback")
+            // .playback: audio continues when screen locks or app backgrounds (required for PiP)
+            // .moviePlayback: optimized routing for video content
+            // .duckOthers: lower other audio instead of stopping it (e.g. navigation)
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.duckOthers])
+            try session.setActive(true)
+            print("[Audio] AVAudioSession configured and activated: .playback, .moviePlayback, .duckOthers")
         } catch {
             print("[Audio] Failed to configure AVAudioSession: \(error)")
         }

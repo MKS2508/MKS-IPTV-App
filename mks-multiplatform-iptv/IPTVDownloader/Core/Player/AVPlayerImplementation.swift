@@ -226,6 +226,7 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // The default (true) queues the play intent and waits for sufficient buffer.
         // NOTE: load(asset:) still uses false for direct fMP4 resource-loader streaming.
 
+        configurePlayerDefaults()
         setupObservers()
     }
 
@@ -254,6 +255,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // Don't wait for large buffer — start playback as soon as first frames are available
         player?.automaticallyWaitsToMinimizeStalling = false
 
+        configurePlayerDefaults()
+
         PlayerLog.log("PLAYER_CREATED", category: "lifecycle", fields: [
             "status": playerItem?.status.rawValue ?? -1,
             "waitToMinimizeStalling": false
@@ -262,6 +265,28 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         setupObservers()
     }
     
+    // MARK: - Player Configuration
+
+    /// Applies essential defaults that must be set on every AVPlayer instance:
+    /// AirPlay routing, display sleep prevention, and live stream policies.
+    private func configurePlayerDefaults() {
+        guard let player else { return }
+
+        // AirPlay: allow video output to external displays and AirPlay receivers.
+        // Without this, only audio routes externally — video stays on device.
+        player.allowsExternalPlayback = true
+        player.usesExternalPlaybackWhileExternalScreenIsActive = true
+
+        // Prevent screen from dimming/locking during video playback.
+        player.preventsDisplaySleepDuringVideoPlayback = true
+
+        // Live streams: allow buffering network data even while paused,
+        // so resuming from pause doesn't require re-buffering from live edge.
+        if isLiveStream {
+            playerItem?.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+        }
+    }
+
     func play() {
         player?.play()
         player?.rate = rate
@@ -443,6 +468,8 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         if !isLiveStream {
             player?.automaticallyWaitsToMinimizeStalling = false
         }
+
+        configurePlayerDefaults()
 
         PlayerLog.log("RELOAD_PLAYER_CREATED", category: "lifecycle", fields: [:])
 

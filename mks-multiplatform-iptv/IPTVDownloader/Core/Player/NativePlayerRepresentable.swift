@@ -31,6 +31,9 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         controller.allowsPictureInPicturePlayback = allowsPictureInPicture
         controller.videoGravity = videoGravity
         controller.delegate = context.coordinator
+        // We manage MPNowPlayingInfoCenter manually via PlayerMetadataHelper.
+        // Prevent AVPlayerViewController from overwriting our metadata.
+        controller.updatesNowPlayingInfoCenter = false
 
         #if os(iOS)
         if #available(iOS 16.0, *) {

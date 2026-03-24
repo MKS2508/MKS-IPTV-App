@@ -49,15 +49,13 @@ struct MKSPlayerView: View {
         presentationMode == .fullscreen
     }
 
-    /// True when the platform handles DLNA/Cast natively inside the player controls.
-    /// macOS: actionPopUpButtonMenu gear icon. tvOS: transportBarCustomMenuItems.
-    /// iOS has NO native API for this — RemotePlayButton must remain as floating overlay.
+    /// True when fullscreen Cast/DLNA is handled inside the native player view.
+    /// macOS: actionPopUpButtonMenu gear icon.
+    /// tvOS: transportBarCustomMenuItems.
+    /// iOS: RemotePlayButton embedded in AVPlayerViewController.contentOverlayView.
+    /// In all cases the SwiftUI floating RemotePlayButton overlay is unnecessary.
     private var platformHandlesCastNatively: Bool {
-        #if os(macOS) || os(tvOS)
-        return presentationMode == .fullscreen
-        #else
-        return false
-        #endif
+        presentationMode == .fullscreen
     }
 
     var body: some View {

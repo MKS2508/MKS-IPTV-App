@@ -11,11 +11,11 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
     var allowsPictureInPicture: Bool = true
     var allowsVideoFrameAnalysis: Bool = true
 
-    // MARK: - Remote Play (transportBarCustomMenuItems)
+    // MARK: - Remote Play
 
-    /// Discovered DLNA/Cast devices to show in the transport bar menu.
+    /// Discovered DLNA/Cast devices.
     var remoteDevices: [RemoteDevice] = []
-    /// Currently connected device (shown with checkmark).
+    /// Currently connected device.
     var connectedDevice: RemoteDevice? = nil
     /// Called when the user selects a device.
     var onDeviceSelected: ((RemoteDevice) -> Void)? = nil
@@ -38,15 +38,20 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         }
         #endif
 
-        // Seed coordinator and build initial Cast menu
         let coordinator = context.coordinator
         coordinator.remoteDevices = remoteDevices
         coordinator.connectedDevice = connectedDevice
         coordinator.onDeviceSelected = onDeviceSelected
         coordinator.onDisconnect = onDisconnect
         coordinator.onRefreshDevices = onRefreshDevices
+
         #if os(tvOS)
+        // tvOS: inject Cast menu into native transport bar
         controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
+        #elseif os(iOS)
+        // iOS: embed RemotePlayButton in contentOverlayView (Apple's official
+        // layer between video and native controls — no tvOS menu API on iOS).
+        coordinator.installCastButton(in: controller)
         #endif
 
         return controller
@@ -60,16 +65,18 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
             controller.videoGravity = videoGravity
         }
 
-        // Update coordinator state and rebuild Cast menu
         let coordinator = context.coordinator
         coordinator.remoteDevices = remoteDevices
         coordinator.connectedDevice = connectedDevice
         coordinator.onDeviceSelected = onDeviceSelected
         coordinator.onDisconnect = onDisconnect
         coordinator.onRefreshDevices = onRefreshDevices
+
         #if os(tvOS)
         controller.transportBarCustomMenuItems = coordinator.buildTransportBarMenuItems()
         #endif
+        // iOS: contentOverlayView hosting controller updates automatically via
+        // RemotePlayManager @Observable environment — no manual rebuild needed.
     }
 
     func makeCoordinator() -> Coordinator {
@@ -84,16 +91,52 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
         var onDisconnect: (() -> Void)?
         var onRefreshDevices: (() -> Void)?
 
+        /// Tag to find the hosting view in contentOverlayView
+        private let castButtonTag = 9999
+
         init(onDismiss: (() -> Void)?) {
             self.onDismiss = onDismiss
         }
 
-        // MARK: - Transport Bar Menu (iOS equivalent of macOS actionPopUpButtonMenu)
+        // MARK: - iOS: Cast Button in contentOverlayView
 
+        #if os(iOS)
+        /// Embeds a RemotePlayButton (SwiftUI) into the AVPlayerViewController's
+        /// contentOverlayView using UIHostingController. This is Apple's recommended
+        /// layer for custom controls — sits between the video and native chrome.
+        func installCastButton(in controller: AVPlayerViewController) {
+            guard let overlay = controller.contentOverlayView else { return }
+            // Avoid duplicate installs
+            guard overlay.viewWithTag(castButtonTag) == nil else { return }
+
+            let button = RemotePlayButton()
+                .buttonStyle(.plain)
+                .adaptiveGlass(in: Capsule())
+                .environment(RemotePlayManager.shared)
+
+            let host = UIHostingController(rootView: button)
+            host.view.backgroundColor = .clear
+            host.view.tag = castButtonTag
+            host.view.translatesAutoresizingMaskIntoConstraints = false
+
+            overlay.addSubview(host.view)
+            NSLayoutConstraint.activate([
+                host.view.topAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.topAnchor, constant: 8),
+                host.view.trailingAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+            ])
+
+            // Let the hosting view size itself
+            host.view.setContentHuggingPriority(.required, for: .horizontal)
+            host.view.setContentHuggingPriority(.required, for: .vertical)
+        }
+        #endif
+
+        // MARK: - tvOS: Transport Bar Menu
+
+        #if os(tvOS)
         func buildTransportBarMenuItems() -> [UIMenuElement] {
             var items: [UIMenuElement] = []
 
-            // Device list or searching state
             if remoteDevices.isEmpty {
                 let searching = UIAction(
                     title: "Searching for devices...",
@@ -102,7 +145,7 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
                 ) { _ in }
                 items.append(searching)
             } else {
-                let deviceActions = remoteDevices.enumerated().map { index, device in
+                let deviceActions = remoteDevices.map { device in
                     let title = "\(device.name) (\(device.type.displayName))"
                     let isConnected = connectedDevice?.id == device.id
                     return UIAction(
@@ -113,38 +156,33 @@ struct NativeAVPlayerViewController: UIViewControllerRepresentable {
                         self?.onDeviceSelected?(device)
                     }
                 }
-                let castMenu = UIMenu(title: "Cast To", options: .displayInline, children: deviceActions)
-                items.append(castMenu)
+                items.append(UIMenu(title: "Cast To", options: .displayInline, children: deviceActions))
 
-                // Disconnect action when connected
                 if let connected = connectedDevice {
-                    let disconnect = UIAction(
+                    items.append(UIAction(
                         title: "Disconnect from \(connected.name)",
                         image: UIImage(systemName: "xmark.circle"),
                         attributes: .destructive
                     ) { [weak self] _ in
                         self?.onDisconnect?()
-                    }
-                    items.append(disconnect)
+                    })
                 }
             }
 
-            // Refresh action
-            let refresh = UIAction(
+            items.append(UIAction(
                 title: "Refresh Devices",
                 image: UIImage(systemName: "arrow.clockwise")
             ) { [weak self] _ in
                 self?.onRefreshDevices?()
-            }
-            items.append(refresh)
+            })
 
-            // Wrap everything in a top-level Cast menu with the cast icon
             return [UIMenu(
                 title: "Cast",
                 image: UIImage(systemName: "tv.badge.wifi"),
                 children: items
             )]
         }
+        #endif
 
         // MARK: - AVPlayerViewControllerDelegate
 

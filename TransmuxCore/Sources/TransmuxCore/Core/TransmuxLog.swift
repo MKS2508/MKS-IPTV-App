@@ -87,39 +87,7 @@ public enum TransmuxLog {
     /// through the same `externalObserver` as Swift TransmuxLog entries.
     /// Call this once after `configure()` to capture ALL log output from C code.
     public static func installCLogBridge() {
-        mks_log_set_callback { tag, level, fmt, vl in
-            // Format the C message (fmt and tag are non-optional UnsafePointer<CChar>)
-            var buf = [CChar](repeating: 0, count: 2048)
-            if let vl = vl {
-                vsnprintf(&buf, 2048, fmt, vl)
-            } else {
-                strncpy(&buf, fmt, 2047)
-            }
-            let message = String(cString: buf)
-            let swiftTag = String(cString: tag)
-
-            // Map C level to Swift Level
-            let lvl = level.rawValue
-            let swiftLevel: Level
-            if lvl <= 16 { swiftLevel = .error }      // MKS_LOG_ERROR
-            else if lvl <= 24 { swiftLevel = .warn }   // MKS_LOG_WARNING
-            else if lvl <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
-            else { swiftLevel = .debug }                // MKS_LOG_DEBUG+
-
-            // Forward to the same external observer as Swift logs
-            externalObserver?(message, swiftTag, swiftLevel)
-
-            // Also write to the TransmuxLog file buffer (normal path)
-            let entry = formatEntry(tag: swiftTag, level: swiftLevel, message: message)
-            queue.async {
-                _ = sessionID
-                _ = flushTimer
-                buffer.append(entry)
-                if swiftLevel >= .warn || buffer.count >= bufferCapacity {
-                    flushBuffer()
-                }
-            }
-        }
+        mks_log_set_callback(cLogBridgeCallback)
     }
 
     /// Log file path — uses the configured directory, falling back to $TMPDIR.
@@ -310,7 +278,19 @@ public enum TransmuxLog {
     // MARK: - Format Helper
 
     /// Format a timestamped log entry string.
-    private static func formatEntry(tag: String, level: Level, message: String) -> String {
+    /// Append a pre-formatted entry to the ring buffer (used by C bridge to avoid double observer call).
+    fileprivate static func appendToBuffer(_ entry: String, level: Level) {
+        queue.async {
+            _ = sessionID
+            _ = flushTimer
+            buffer.append(entry)
+            if level >= .warn || buffer.count >= bufferCapacity {
+                flushBuffer()
+            }
+        }
+    }
+
+    fileprivate static func formatEntry(tag: String, level: Level, message: String) -> String {
         let ts = dateFormatter.string(from: Date())
         return "[\(ts)] [\(level.rawValue)] [\(tag)] \(message)"
     }
@@ -378,4 +358,41 @@ public enum TransmuxLog {
     ) {
         log(message, tag: "LiveSeg", level: level)
     }
+}
+
+// MARK: - C Log Bridge (free function — cannot capture context)
+
+/// Global C function pointer for mks_log_set_callback. Accesses TransmuxLog
+/// statics directly (no captures) so it's valid as a C function pointer.
+private func cLogBridgeCallback(
+    _ tag: UnsafePointer<CChar>,
+    _ level: MKSLogLevel,
+    _ fmt: UnsafePointer<CChar>,
+    _ vl: CVaListPointer?
+) {
+    // Format the C message
+    var buf = [CChar](repeating: 0, count: 2048)
+    if let vl = vl {
+        vsnprintf(&buf, 2048, fmt, vl)
+    } else {
+        strncpy(&buf, fmt, 2047)
+    }
+    let message = String(cString: buf)
+    let swiftTag = String(cString: tag)
+
+    // Map C level to Swift Level
+    let lvl = level.rawValue
+    let swiftLevel: TransmuxLog.Level
+    if lvl <= 16 { swiftLevel = .error }
+    else if lvl <= 24 { swiftLevel = .warn }
+    else if lvl <= 32 { swiftLevel = .info }
+    else { swiftLevel = .debug }
+
+    // Forward to external observer (MKSLog bridge)
+    TransmuxLog.externalObserver?(message, swiftTag, swiftLevel)
+
+    // Write to TransmuxLog's own file buffer directly (don't call log()
+    // which would trigger externalObserver again → double emission).
+    let entry = TransmuxLog.formatEntry(tag: swiftTag, level: swiftLevel, message: message)
+    TransmuxLog.appendToBuffer(entry, level: swiftLevel)
 }

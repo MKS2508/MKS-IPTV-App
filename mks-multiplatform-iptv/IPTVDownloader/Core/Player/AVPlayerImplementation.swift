@@ -172,11 +172,11 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         load(url: url, metadata: nil)
     }
 
-    func load(url: URL, metadata: MetadataResult?) {
+    func load(url: URL, metadata: MetadataResult?, isLive: Bool = false) {
         stop()
 
         self.sourceURL = url
-        self.isLiveStream = url.path.lowercased().contains("/live/") || url.pathExtension.lowercased() == "m3u8" && url.path.lowercased().contains("/live/")
+        self.isLiveStream = isLive || url.path.lowercased().contains("/live/") || url.pathExtension.lowercased() == "m3u8" && url.path.lowercased().contains("/live/")
 
         // Start structured logging session
         PlayerLog.startSession(playerType: "AVPlayer", url: url.absoluteString)

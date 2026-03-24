@@ -2163,6 +2163,8 @@ public actor TransmuxServer {
         let path = request.path
         let fileName = (path as NSString).lastPathComponent
 
+        TransmuxLog.log("LIVE-SEG REQ \(request.method) \(path)", tag: "Server")
+
         // Security: only serve .m3u8 and .ts files
         guard fileName.hasSuffix(".m3u8") || fileName.hasSuffix(".ts") else {
             TransmuxLog.log("LIVE-SEG 404 unsupported: \(path)", tag: "Server", level: .warn)
@@ -2176,6 +2178,12 @@ public actor TransmuxServer {
         // Playlist: serve from in-memory cache (always fresh, no disk read)
         if fileName.hasSuffix(".m3u8") {
             if let playlistData = segmenter.getPlaylist() {
+                // Log playlist content on first few requests for diagnostics
+                if segmenter.totalSegmentsProduced <= 10 {
+                    let playlistStr = String(data: playlistData, encoding: .utf8) ?? "<binary>"
+                    TransmuxLog.log("LIVE-SEG PLAYLIST (\(playlistData.count)B):\n\(playlistStr)", tag: "Server")
+                }
+
                 var header = "HTTP/1.1 200 OK\r\n"
                 header += "Content-Type: application/vnd.apple.mpegurl\r\n"
                 header += "Content-Length: \(playlistData.count)\r\n"
@@ -2187,10 +2195,11 @@ public actor TransmuxServer {
                 var responseData = Data(header.utf8)
                 responseData.append(playlistData)
                 connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
+                    // Playlist is small — cancel() is safe here
                     connection.cancel()
                 })
             } else {
-                // No playlist yet — tell client to retry
+                TransmuxLog.log("LIVE-SEG 503 no playlist yet", tag: "Server", level: .warn)
                 let retryHeader = "HTTP/1.1 503 Service Unavailable\r\nRetry-After: 1\r\nConnection: close\r\n\r\n"
                 connection.send(content: Data(retryHeader.utf8), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                     connection.cancel()
@@ -2205,12 +2214,19 @@ public actor TransmuxServer {
         if FileManager.default.fileExists(atPath: filePath) {
             handleLiveSegServeFile(connection: connection, filePath: filePath, fileName: fileName)
         } else {
-            // Segment not yet written — poll briefly
+            TransmuxLog.log("LIVE-SEG WAIT \(fileName) (not on disk yet)", tag: "Server")
             handleLiveSegWait(connection: connection, filePath: filePath, fileName: fileName)
         }
     }
 
     /// Serve a .ts segment file from the live-segmented output directory.
+    ///
+    /// Sends the HTTP header first, then the segment body separately. This avoids
+    /// allocating a single contiguous buffer for header+body (segments can be 500KB+).
+    /// Uses `.finalMessage` on the body send and lets NWConnection handle the
+    /// graceful TCP close. Calling `connection.cancel()` in the send completion
+    /// was causing premature TCP RST before all data was transmitted to AVPlayer,
+    /// resulting in truncated segments → FigStreamPlayer video init failure.
     private nonisolated func handleLiveSegServeFile(connection: NWConnection, filePath: String, fileName: String) {
         guard let data = FileManager.default.contents(atPath: filePath) else {
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
@@ -2220,6 +2236,8 @@ public actor TransmuxServer {
             return
         }
 
+        TransmuxLog.log("LIVE-SEG SERVE \(fileName) (\(data.count) bytes)", tag: "Server")
+
         var header = "HTTP/1.1 200 OK\r\n"
         header += "Content-Type: video/mp2t\r\n"
         header += "Content-Length: \(data.count)\r\n"
@@ -2228,10 +2246,26 @@ public actor TransmuxServer {
         header += "Connection: close\r\n"
         header += "\r\n"
 
-        var responseData = Data(header.utf8)
-        responseData.append(data)
-        connection.send(content: responseData, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
-            connection.cancel()
+        // Send header first (non-final)
+        let headerData = Data(header.utf8)
+        connection.send(content: headerData, contentContext: .defaultMessage, isComplete: false, completion: .contentProcessed { [data] error in
+            if let error = error {
+                TransmuxLog.log("LIVE-SEG header send error \(fileName): \(error)", tag: "Server", level: .error)
+                connection.cancel()
+                return
+            }
+            // Send body as final message — NWConnection will close the write
+            // direction and the TCP connection will close gracefully after the
+            // peer acknowledges receipt of all data.
+            connection.send(content: data, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { error in
+                if let error = error {
+                    TransmuxLog.log("LIVE-SEG body send error \(fileName): \(error)", tag: "Server", level: .error)
+                }
+                // Do NOT call connection.cancel() here. The .finalMessage +
+                // isComplete:true signals TCP FIN. Calling cancel() can trigger
+                // RST before all data is ACK'd by the peer (AVPlayer), truncating
+                // the segment and causing video decoder init failure.
+            })
         })
     }
 
@@ -2241,8 +2275,11 @@ public actor TransmuxServer {
         DispatchQueue.global(qos: .userInitiated).async {
             for _ in 0..<100 {
                 if FileManager.default.fileExists(atPath: filePath) {
-                    // Wait briefly for the file to be fully written
-                    Thread.sleep(forTimeInterval: 0.05)
+                    // Wait for the file to be fully written. FFmpeg's segment muxer
+                    // may still be flushing the last TS packets when the file first
+                    // appears. 200ms is conservative but avoids serving partial segments.
+                    Thread.sleep(forTimeInterval: 0.2)
+                    TransmuxLog.log("LIVE-SEG WAIT→READY \(fileName)", tag: "Server")
                     self.handleLiveSegServeFile(connection: connection, filePath: filePath, fileName: fileName)
                     return
                 }
@@ -2250,6 +2287,7 @@ public actor TransmuxServer {
             }
 
             // Timeout — segment not produced
+            TransmuxLog.log("LIVE-SEG WAIT TIMEOUT \(fileName)", tag: "Server", level: .warn)
             let response = Data("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".utf8)
             connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                 connection.cancel()

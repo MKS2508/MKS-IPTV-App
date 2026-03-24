@@ -64,16 +64,25 @@ public class LiveSegmenter {
         /// Uses C-style format: `%05d` = 5 digits zero-padded.
         public var segmentPattern: String
 
+        /// Minimum segments that must be produced before the session is considered
+        /// ready for AVPlayer. Apple's HLS spec requires >= 3 segments in a live
+        /// playlist for reliable video pipeline initialization. With fewer segments,
+        /// FigStreamPlayer fails to start the video decoder (err=-12860) and falls
+        /// back to audio-only playback.
+        public var minSegmentsBeforeReady: Int
+
         public init(
             segmentDuration: Double = 2.0,
             windowSize: Int = 5,
             maxRetainedSegments: Int = 300,
-            segmentPattern: String = "seg_%05d.ts"
+            segmentPattern: String = "seg_%05d.ts",
+            minSegmentsBeforeReady: Int = 3
         ) {
             self.segmentDuration = segmentDuration
             self.windowSize = windowSize
             self.maxRetainedSegments = maxRetainedSegments
             self.segmentPattern = segmentPattern
+            self.minSegmentsBeforeReady = minSegmentsBeforeReady
         }
     }
 
@@ -237,6 +246,9 @@ public class LiveSegmenter {
         m3u8 += "#EXT-X-VERSION:3\n"
         m3u8 += "#EXT-X-TARGETDURATION:\(targetDuration)\n"
         m3u8 += "#EXT-X-MEDIA-SEQUENCE:\(mediaSequence)\n"
+        // Signal that each segment starts with a keyframe and can be decoded
+        // independently. AVPlayer uses this hint for faster startup and seeking.
+        m3u8 += "#EXT-X-INDEPENDENT-SEGMENTS\n"
 
         for entry in windowEntries {
             let fileName = (entry.filePath as NSString).lastPathComponent

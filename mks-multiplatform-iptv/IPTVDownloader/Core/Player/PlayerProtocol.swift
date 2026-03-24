@@ -518,4 +518,7 @@ struct PlayerConfiguration {
     var networkCachingTime: Int = 1000 // milliseconds
     var requirePiPSupport: Bool = false
     var requireAirPlaySupport: Bool = false
+    /// Hint that the content is a live stream. When true, AVPlayer uses
+    /// live-optimized buffer settings regardless of URL path heuristics.
+    var isLive: Bool = false
 }

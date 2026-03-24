@@ -1607,14 +1607,24 @@ public actor TransmuxingService {
         av_dict_set(&options, "segment_list", ffmpegPlaylistPath, 0)
         av_dict_set(&options, "segment_list_type", "m3u8", 0)
         av_dict_set(&options, "segment_list_flags", "live+cache", 0)
-        // reset_timestamps=1: Each segment starts at PTS≈0, making segments
-        // self-contained. Prevents PCR/PTS discontinuities at segment boundaries
-        // that cause AVPlayer timebase errors (-12753) on live IPTV input.
-        av_dict_set(&options, "reset_timestamps", "1", 0)
+        // Do NOT use reset_timestamps=1 — it restarts PTS/PCR at 0 per segment,
+        // creating timestamp discontinuities. TS_NORMALIZE handles offset.
         // Tolerance for splitting near keyframes (avoids very short segments)
         av_dict_set(&options, "segment_time_delta", "0.5", 0)
         // Low-latency: flush immediately
         av_dict_set(&options, "flush_packets", "1", 0)
+
+        // --- mpegts muxer options (forwarded by segment muxer) ---
+        // pat_pmt_at_frames: Write PAT/PMT before every video keyframe.
+        // Critical for HLS: each .ts segment MUST start with PAT/PMT so
+        // AVPlayer can discover PIDs without reading previous segments.
+        // Without this, the mpegts muxer might not write PAT/PMT at segment
+        // boundaries if its internal timer hasn't expired.
+        av_dict_set(&options, "mpegts_flags", "+pat_pmt_at_frames+resend_headers", 0)
+        // Lower PCR period (default 20ms → 10ms). PCR establishes the decoder
+        // timebase. More frequent PCR means AVPlayer can lock onto the timebase
+        // faster, reducing FigStreamPlayer initialization time.
+        av_dict_set(&options, "pcr_period", "10", 0)
 
         let liveTranscodeLabel = audioTranscoder != nil ? " TRANSCODE→AAC" : ""
         TransmuxLog.liveSegmenter("STREAMS v:\(bestVideo) a:\(bestAudio) | format=segment/mpegts segDur=\(config.segmentDuration)s\(liveTranscodeLabel)")
@@ -1797,11 +1807,13 @@ public actor TransmuxingService {
                     handle.recordSegment()
                     lastKnownSegmentIndex = completedIndex
 
-                    // Resume continuation after first COMPLETE segment is available.
-                    // The segment is guaranteed to have data (not 0 bytes) because
-                    // look-ahead detection only fires after FFmpeg finalized it.
-                    if !continuationResumed {
-                        TransmuxLog.liveSegmenter("FIRST_COMPLETE seg[\(completedIndex)] → resuming continuation")
+                    // Resume continuation only after enough segments are available.
+                    // Apple's HLS spec requires >= 3 segments in a live playlist for
+                    // the video decoder to initialize. With fewer, FigStreamPlayer
+                    // fails 3 times (err=-12860) and permanently abandons video,
+                    // leaving audio-only playback.
+                    if !continuationResumed && segmenter.totalSegmentsProduced >= config.minSegmentsBeforeReady {
+                        TransmuxLog.liveSegmenter("READY seg[\(completedIndex)] (total=\(segmenter.totalSegmentsProduced)/\(config.minSegmentsBeforeReady)) → resuming continuation")
                         let audioTracks = audioInfo.map { [$0] } ?? []
                         let session = LiveTransmuxSession(
                             sessionID: sessionID,

@@ -22,38 +22,49 @@ class PlayerFactory {
     ///   3. VLCKit available → VLC fallback
     ///   4. Last resort → AVPlayer (may fail with MKV)
     func createPlayer(for url: URL) -> any VideoPlayerProtocol {
-        createPlayer(for: url, metadata: nil)
+        createPlayer(for: url, metadata: nil, isLive: false)
     }
 
     /// Create the optimal player for a given URL with metadata for Control Center / Lock Screen / AirPlay.
     func createPlayer(for url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
+        createPlayer(for: url, metadata: metadata, isLive: false)
+    }
+
+    /// Create the optimal player for a given URL with metadata and live stream hint.
+    /// - Parameter isLive: When true, AVPlayer uses live-optimized buffer settings
+    ///   regardless of URL path heuristics (e.g. locally-served HLS from TransmuxServer).
+    func createPlayer(for url: URL, metadata: MetadataResult?, isLive: Bool) -> any VideoPlayerProtocol {
         let format = url.pathExtension.lowercased()
 
         if configuration.autoSelectPlayer {
-            return createBestPlayer(for: format, url: url, metadata: metadata)
+            return createBestPlayer(for: format, url: url, metadata: metadata, isLive: isLive)
         }
 
         // Manual selection with fallback chain
         if configuration.preferredPlayer.supports(format: format) {
-            return createPlayer(type: configuration.preferredPlayer, url: url, metadata: metadata)
+            return createPlayer(type: configuration.preferredPlayer, url: url, metadata: metadata, isLive: isLive)
         }
         if configuration.fallbackPlayer.supports(format: format) {
             print("[PlayerFactory] Preferred player doesn't support \(format), using fallback")
-            return createPlayer(type: configuration.fallbackPlayer, url: url, metadata: metadata)
+            return createPlayer(type: configuration.fallbackPlayer, url: url, metadata: metadata, isLive: isLive)
         }
         print("[PlayerFactory] No preferred player supports \(format), auto-selecting")
-        return createBestPlayer(for: format, url: url, metadata: metadata)
+        return createBestPlayer(for: format, url: url, metadata: metadata, isLive: isLive)
     }
 
     func createPlayer(type: PlayerType, url: URL) -> any VideoPlayerProtocol {
-        createPlayer(type: type, url: url, metadata: nil)
+        createPlayer(type: type, url: url, metadata: nil, isLive: false)
     }
 
     func createPlayer(type: PlayerType, url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
+        createPlayer(type: type, url: url, metadata: metadata, isLive: false)
+    }
+
+    func createPlayer(type: PlayerType, url: URL, metadata: MetadataResult?, isLive: Bool) -> any VideoPlayerProtocol {
         switch type {
         case .avplayer:
             let player = AVPlayerImplementation()
-            player.load(url: url, metadata: metadata)
+            player.load(url: url, metadata: metadata, isLive: isLive)
             return player
 
         case .vlc:
@@ -65,7 +76,7 @@ class PlayerFactory {
             }
             print("[PlayerFactory] VLCKit not available, falling back to AVPlayer")
             let player = AVPlayerImplementation()
-            player.load(url: url, metadata: metadata)
+            player.load(url: url, metadata: metadata, isLive: isLive)
             return player
 
         case .ffmpeg:
@@ -118,28 +129,28 @@ class PlayerFactory {
         return ""
     }
 
-    private func createBestPlayer(for format: String, url: URL, metadata: MetadataResult?) -> any VideoPlayerProtocol {
+    private func createBestPlayer(for format: String, url: URL, metadata: MetadataResult?, isLive: Bool) -> any VideoPlayerProtocol {
         // Detect actual format from URL (handles IPTV URLs better)
         let detectedFormat = format.isEmpty ? detectFormat(from: url) : format
 
         // 1. Native formats → AVPlayer (best PiP + AirPlay)
         if Self.nativeFormats.contains(detectedFormat) {
-            print("[PlayerFactory] Native format (\(detectedFormat)) → AVPlayer")
-            return createPlayer(type: .avplayer, url: url, metadata: metadata)
+            print("[PlayerFactory] Native format (\(detectedFormat)) → AVPlayer (isLive=\(isLive))")
+            return createPlayer(type: .avplayer, url: url, metadata: metadata, isLive: isLive)
         }
 
         // 2. MKV and other non-native → FFmpeg transmux pipeline (ALWAYS for MKV)
         // This is the primary path for IPTV VOD content
         if Self.transmuxFormats.contains(detectedFormat) {
             print("[PlayerFactory] Transmux format (\(detectedFormat)) → FFmpeg transmux pipeline")
-            return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
+            return createPlayer(type: .ffmpeg, url: url, metadata: metadata, isLive: isLive)
         }
 
         // 3. Live stream → AVPlayer (native HLS/TS handling)
         let path = url.path.lowercased()
         if path.contains("/live/") || path.hasSuffix(".m3u8") {
-            print("[PlayerFactory] Live stream detected → AVPlayer")
-            return createPlayer(type: .avplayer, url: url, metadata: metadata)
+            print("[PlayerFactory] Live stream detected → AVPlayer (isLive=true)")
+            return createPlayer(type: .avplayer, url: url, metadata: metadata, isLive: true)
         }
 
         // 4. Everything else → FFmpeg transmux (safest for IPTV content)
@@ -147,7 +158,7 @@ class PlayerFactory {
         // and any other URL that doesn't match native formats.
         // VLC is still available via manual player selection.
         print("[PlayerFactory] Non-native/unknown format (\(detectedFormat)) → FFmpeg transmux pipeline")
-        return createPlayer(type: .ffmpeg, url: url, metadata: metadata)
+        return createPlayer(type: .ffmpeg, url: url, metadata: metadata, isLive: isLive)
     }
 
     // MARK: - Stream Detection

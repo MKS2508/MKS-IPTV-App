@@ -637,9 +637,11 @@ struct LiveChannelsGridView: View {
     }
 
     /// Present the player on the appropriate platform.
+    /// - Parameter isLive: Pass `true` for live streams so AVPlayer uses
+    ///   live-optimized buffer settings even when the URL is a local proxy.
     @MainActor
-    private func presentPlayer(url: URL, title: String) {
-        let player = PlayerFactory.shared.createPlayer(for: url)
+    private func presentPlayer(url: URL, title: String, isLive: Bool = true) {
+        let player = PlayerFactory.shared.createPlayer(for: url, metadata: nil, isLive: isLive)
         player.play()
 
         #if os(macOS)

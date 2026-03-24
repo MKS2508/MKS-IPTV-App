@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS) || os(tvOS)
+import UIKit
+#endif
 
 /// Thread-safe WebSocket log transport. Sends structured log entries as JSON
 /// to the remote transmux-log-viewer. Buffers entries when disconnected and

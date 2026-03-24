@@ -151,17 +151,29 @@ class DebugStreamingViewModel: ObservableObject {
     
     init(movieService: MovieService) {
         self.movieService = movieService
-        
-        // Start capturing all logs
-        DebugLogCapture.shared.startCapturing { [weak self] message, type in
+
+        // Subscribe to ALL MKSLog output so every log from every subsystem
+        // (player, transmux, DLNA, cast, live, app, network) appears here.
+        MKSLog.localObserver = { [weak self] message, category, level in
             DispatchQueue.main.async {
-                self?.log(message, type: type)
+                guard let self else { return }
+                let type: DebugLog.LogType = switch level {
+                case "error": .error
+                case "warning": .warning
+                default: .info
+                }
+                // Don't re-emit to MKSLog (the log() method below does MKSLog.debug)
+                let entry = DebugLog(message: "[\(category)] \(message)", type: type)
+                self.logs.append(entry)
+                if self.logs.count > 2000 {
+                    self.logs.removeFirst(self.logs.count - 2000)
+                }
             }
         }
     }
-    
+
     deinit {
-        DebugLogCapture.shared.stopCapturing()
+        MKSLog.localObserver = nil
     }
     
     // MARK: - Public Methods
@@ -348,17 +360,15 @@ class DebugStreamingViewModel: ObservableObject {
         }
     }
     
+    /// Log a message from the DebugStreamingView itself (user actions, test results).
+    /// These go to MKSLog (which feeds back through localObserver → logs array).
     func log(_ message: String, type: DebugLog.LogType = .info) {
-        let log = DebugLog(message: message, type: type)
-        logs.append(log)
-        
-        // Keep only last 1000 logs
-        if logs.count > 1000 {
-            logs.removeFirst(logs.count - 1000)
+        switch type {
+        case .error:   MKSLog.debug.error(message)
+        case .warning: MKSLog.debug.warning(message)
+        case .success: MKSLog.debug.info(message)
+        case .info:    MKSLog.debug.info(message)
         }
-        
-        // Also print to console
-        MKSLog.debug.debug("[Debug Stream] \(log.timestamp) \(message)")
     }
     
     func clearLogs() {

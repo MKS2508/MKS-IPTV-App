@@ -36,6 +36,13 @@ enum MKSLog {
     static let media    = Logger(category: "media",       tag: "Media")
     static let debug    = Logger(category: "debug",       tag: "Debug")
 
+    // MARK: - Local UI Observer
+
+    /// Callback for the in-app debug view. Every log entry is forwarded here
+    /// so DebugStreamingViewModel can display ALL logs (local + transmux + DLNA).
+    /// Set by DebugStreamingViewModel on init, cleared on deinit.
+    static var localObserver: ((_ message: String, _ category: String, _ level: String) -> Void)?
+
     // MARK: - Session Management
 
     /// Session ID for correlating events across logs.
@@ -103,6 +110,13 @@ enum MKSLog {
         }
 
         private func emit(level: String, message: String, fields: [String: String]?) {
+            // Local UI observer (DebugStreamingView)
+            let fullMessage = fields.map { f in
+                let fStr = f.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
+                return "[\(tag)] \(message) \(fStr)"
+            } ?? "[\(tag)] \(message)"
+            MKSLog.localObserver?(fullMessage, category, level)
+
             // WebSocket transport (non-blocking)
             if let transport = MKSLog.remoteTransport {
                 Task {

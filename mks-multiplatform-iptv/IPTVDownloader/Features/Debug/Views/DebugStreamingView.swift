@@ -190,11 +190,41 @@ struct DebugStreamingView: View {
                 .fontWeight(.medium)
                 .foregroundColor(FFProbeUtilities.isAvailable() ? .green : .orange)
 
+            Divider()
+                .frame(height: 14)
+
+            // Remote Debug status
+            remoteDebugIndicator
+
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(Color.secondary.opacity(0.05))
+    }
+
+    /// Shows remote debug viewer connection status (Bonjour + WebSocket).
+    private var remoteDebugIndicator: some View {
+        HStack(spacing: 4) {
+            let debugService = RemoteDebugService.shared
+            Circle()
+                .fill(debugService.isConnected ? Color.green : (debugService.isBrowsing ? Color.orange : Color.red))
+                .frame(width: 6, height: 6)
+
+            if debugService.isConnected {
+                Text("Viewer: \(debugService.viewerName ?? "Connected")")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            } else if debugService.isBrowsing {
+                Text("Scanning...")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            } else {
+                Text("Viewer: Off")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 
     // MARK: - Tab Selector

@@ -1,8 +1,9 @@
 import { Badge, Button } from "@mks2508/mks-ui/react";
 import { type IAnimationSettings, SettingsModal } from "@mks2508/theme-manager-react";
-import { Activity, Settings, Terminal } from "lucide-react";
+import { Activity, MonitorSmartphone, Settings, Terminal } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ThemeTogglerButton } from "@/components/animate-ui/components/buttons/theme-toggler";
+import { DeviceLogViewer } from "@/components/DeviceLogViewer";
 import { HLSPlayer } from "@/components/HLSPlayer";
 import { LogViewer } from "@/components/LogViewer";
 import { SessionInfo } from "@/components/SessionInfo";
@@ -28,6 +29,7 @@ export function App() {
   });
 
   const [availableDuration, setAvailableDuration] = useState(0);
+  const [activeTab, setActiveTab] = useState<"cli" | "device">("cli");
 
   const { logs, stats, connected, clearLogs } = useLogStream();
   const { activeSession, loading, runCLI, stopSession, seekSession } = useCLISession();
@@ -85,8 +87,34 @@ export function App() {
             <div className="flex items-center gap-2">
               <h1 className="font-mono-emphasis text-sm uppercase tracking-wider">TransmuxCore</h1>
               <Badge variant="outline" className="font-mono text-[9px] h-4 px-1.5 border-border/30">
-                Test Pipeline
+                Debug Viewer
               </Badge>
+            </div>
+
+            {/* Tab switcher */}
+            <div className="flex items-center gap-1 ml-4">
+              <button
+                onClick={() => setActiveTab("cli")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  activeTab === "cli"
+                    ? "bg-primary/15 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                }`}
+              >
+                <Terminal className="size-3" />
+                CLI Pipeline
+              </button>
+              <button
+                onClick={() => setActiveTab("device")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                  activeTab === "device"
+                    ? "bg-primary/15 text-primary border border-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                }`}
+              >
+                <MonitorSmartphone className="size-3" />
+                Device Logs
+              </button>
             </div>
           </div>
 
@@ -128,43 +156,52 @@ export function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Left panel - Source selector */}
-        <aside className="w-[280px] shrink-0 border-r border-border/15 bg-background/20 overflow-hidden">
-          <SourcePanel onRun={handleRun} onStop={handleStop} isRunning={isRunning} />
-        </aside>
+        {activeTab === "cli" ? (
+          <>
+            {/* Left panel - Source selector */}
+            <aside className="w-[280px] shrink-0 border-r border-border/15 bg-background/20 overflow-hidden">
+              <SourcePanel onRun={handleRun} onStop={handleStop} isRunning={isRunning} />
+            </aside>
 
-        {/* Right panel - Player + Logs */}
-        <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
-          <div className="flex-1 flex flex-col gap-2 p-3 min-h-0 overflow-hidden">
-            {/* HLS Player */}
-            <div className="shrink-0">
-              <HLSPlayer
-                sessionId={
-                  activeSession &&
-                  !activeSession.sessionId.startsWith("pending-") &&
-                  (activeSession.status === "running" || activeSession.status === "completed")
-                    ? activeSession.sessionId
-                    : null
-                }
-                onSeek={isRunning ? handleSeek : undefined}
-                onAvailableDurationChange={setAvailableDuration}
-              />
-            </div>
+            {/* Right panel - Player + Logs */}
+            <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-2 p-3 min-h-0 overflow-hidden">
+                {/* HLS Player */}
+                <div className="shrink-0">
+                  <HLSPlayer
+                    sessionId={
+                      activeSession &&
+                      !activeSession.sessionId.startsWith("pending-") &&
+                      (activeSession.status === "running" || activeSession.status === "completed")
+                        ? activeSession.sessionId
+                        : null
+                    }
+                    onSeek={isRunning ? handleSeek : undefined}
+                    onAvailableDurationChange={setAvailableDuration}
+                  />
+                </div>
 
-            {/* Session Info */}
-            <div className="shrink-0">
-              <SessionInfo session={activeSession} onStop={(id) => stopSession(id)} />
-            </div>
+                {/* Session Info */}
+                <div className="shrink-0">
+                  <SessionInfo session={activeSession} onStop={(id) => stopSession(id)} />
+                </div>
 
-            {/* Log Viewer */}
-            <div className="flex-1 min-h-0">
-              <LogViewer logs={logs} onClear={clearLogs} />
-            </div>
-          </div>
+                {/* Log Viewer */}
+                <div className="flex-1 min-h-0">
+                  <LogViewer logs={logs} onClear={clearLogs} />
+                </div>
+              </div>
 
-          {/* Stats Bar */}
-          <StatsBar stats={stats} connected={connected} availableDuration={availableDuration} />
-        </main>
+              {/* Stats Bar */}
+              <StatsBar stats={stats} connected={connected} availableDuration={availableDuration} />
+            </main>
+          </>
+        ) : (
+          /* Device Logs tab — full-width Terminal panel */
+          <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden p-3">
+            <DeviceLogViewer />
+          </main>
+        )}
       </div>
 
       {/* Settings Modal */}

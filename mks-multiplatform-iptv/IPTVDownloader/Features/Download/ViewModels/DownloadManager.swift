@@ -924,16 +924,16 @@ class DownloadManager: ObservableObject {
         do {
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
-                print("[DownloadManager] Photos authorization denied: \(status)")
+                MKSLog.media.error("[DownloadManager] Photos authorization denied: \(status)")
                 return
             }
 
             try await PHPhotoLibrary.shared().performChanges {
                 PHAssetCreationRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
             }
-            print("[DownloadManager] Video saved to Photos: \(fileURL.lastPathComponent)")
+            MKSLog.media.info("[DownloadManager] Video saved to Photos: \(fileURL.lastPathComponent)")
         } catch {
-            print("[DownloadManager] Failed to save to Photos: \(error.localizedDescription)")
+            MKSLog.media.error("[DownloadManager] Failed to save to Photos: \(error.localizedDescription)")
         }
     }
     #endif
@@ -1079,14 +1079,14 @@ class PreviewDownloadManager: DownloadManager {
     }
 
     override func cancelDownload(id: UUID) {
-        print("Cancelling download with ID: \(id)")
+        MKSLog.media.info("Cancelling download with ID: \(id)")
     }
 
     override func pauseDownload(id: UUID) {
-        print("Pausing download with ID: \(id)")
+        MKSLog.media.info("Pausing download with ID: \(id)")
     }
 
     override func resumeDownload(id: UUID) {
-        print("Resuming download with ID: \(id)")
+        MKSLog.media.info("Resuming download with ID: \(id)")
     }
 }

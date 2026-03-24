@@ -51,11 +51,11 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
             // Fallback: 2 GB — enough for AVPlayer to start; the actual
             // EOF is handled by isComplete + finishLoading().
             self.expectedSize = 2_147_483_648
-            print("[TransmuxResourceLoader] WARNING: expectedSize was 0, using 2GB fallback")
+            MKSLog.transmux.warning("expectedSize was 0, using 2GB fallback")
         }
         super.init()
         startPolling()
-        print("[TransmuxResourceLoader] Created for \(filePath), expectedSize=\(self.expectedSize), duration=\(duration)s")
+        MKSLog.transmux.info("Created for \(filePath), expectedSize=\(self.expectedSize), duration=\(duration)s")
     }
 
     deinit {
@@ -64,7 +64,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         // "Cannot form weak reference to instance in the process of deallocation".
         pollingTimer?.cancel()
         pollingTimer = nil
-        print("[TransmuxResourceLoader] deinit")
+        MKSLog.transmux.debug("deinit")
     }
 
     // MARK: - Public API
@@ -72,10 +72,10 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
     /// Create an AVURLAsset with the custom URL scheme and this delegate.
     func makeAsset() -> AVURLAsset {
         let url = URL(string: "\(Self.customScheme)://localhost/stream.mp4")!
-        print("[TransmuxResourceLoader] Creating asset with URL: \(url)")
+        MKSLog.transmux.debug("Creating asset with URL: \(url)")
         let asset = AVURLAsset(url: url)
         asset.resourceLoader.setDelegate(self, queue: delegateQueue)
-        print("[TransmuxResourceLoader] Delegate set on asset.resourceLoader, preloading playable key...")
+        MKSLog.transmux.debug("Delegate set on asset.resourceLoader, preloading playable key...")
         return asset
     }
 
@@ -85,7 +85,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         delegateQueue.async { [weak self] in
             guard let self else { return }
             self.isComplete = true
-            print("[TransmuxResourceLoader] Transmux marked complete")
+            MKSLog.transmux.info("Transmux marked complete")
             self.processPendingRequests()
         }
     }
@@ -98,7 +98,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         pollingTimer = nil
         // pendingRequests are discarded with the object — no finishLoading(with:)
         // because AVPlayer may already be deallocated (causes abort).
-        print("[TransmuxResourceLoader] Stopped")
+        MKSLog.transmux.info("Stopped")
     }
 
     // MARK: - AVAssetResourceLoaderDelegate
@@ -109,7 +109,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
     ) -> Bool {
         let hasContentInfo = loadingRequest.contentInformationRequest != nil
         let hasData = loadingRequest.dataRequest != nil
-        print("[TransmuxResourceLoader] shouldWaitForLoadingOfRequestedResource called — contentInfo=\(hasContentInfo) dataRequest=\(hasData)")
+        MKSLog.transmux.debug("shouldWaitForLoadingOfRequestedResource called — contentInfo=\(hasContentInfo) dataRequest=\(hasData)")
 
         // Fill content information if requested
         if let contentRequest = loadingRequest.contentInformationRequest {
@@ -119,17 +119,17 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
             // non-seekable live stream, which uses much more conservative buffering
             // and may never reach .readyToPlay for large files.
             contentRequest.isByteRangeAccessSupported = true
-            print("[TransmuxResourceLoader] Filled contentInfo: type=\(contentRequest.contentType ?? "nil"), length=\(contentRequest.contentLength), byteRange=\(contentRequest.isByteRangeAccessSupported)")
+            MKSLog.transmux.debug("Filled contentInfo: type=\(contentRequest.contentType ?? "nil"), length=\(contentRequest.contentLength), byteRange=\(contentRequest.isByteRangeAccessSupported)")
         }
 
         // Handle data request
         if let dataReq = loadingRequest.dataRequest {
-            print("[TransmuxResourceLoader] DataRequest: offset=\(dataReq.requestedOffset), length=\(dataReq.requestedLength), currentOffset=\(dataReq.currentOffset)")
+            MKSLog.transmux.debug("DataRequest: offset=\(dataReq.requestedOffset), length=\(dataReq.requestedLength), currentOffset=\(dataReq.currentOffset)")
             pendingRequests.append(loadingRequest)
             processPendingRequests()
         } else {
             // Content-info-only request
-            print("[TransmuxResourceLoader] Content-info-only request, finishing immediately")
+            MKSLog.transmux.debug("Content-info-only request, finishing immediately")
             loadingRequest.finishLoading()
         }
 
@@ -140,7 +140,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         _ resourceLoader: AVAssetResourceLoader,
         didCancel loadingRequest: AVAssetResourceLoadingRequest
     ) {
-        print("[TransmuxResourceLoader] didCancel called")
+        MKSLog.transmux.debug("didCancel called")
         pendingRequests.removeAll { $0 === loadingRequest }
     }
 
@@ -179,7 +179,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         let bytesRemaining = Int64(dataRequest.requestedLength) - (dataRequest.currentOffset - dataRequest.requestedOffset)
 
         guard bytesRemaining > 0 else {
-            print("[TransmuxResourceLoader] fillData: 0 bytes remaining, finishing")
+            MKSLog.transmux.debug("fillData: 0 bytes remaining, finishing")
             request.finishLoading()
             return true
         }
@@ -189,7 +189,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         // Data not available yet
         if requestedOffset >= fileSize {
             if isComplete {
-                print("[TransmuxResourceLoader] fillData: offset \(requestedOffset) >= fileSize \(fileSize), transmux complete — finishing")
+                MKSLog.transmux.debug("fillData: offset \(requestedOffset) >= fileSize \(fileSize), transmux complete — finishing")
                 request.finishLoading()
                 return true
             }
@@ -200,7 +200,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
             // of polling forever. AVPlayer will work with the data it already has.
             let gap = requestedOffset - fileSize
             if gap > 50_000_000 {
-                print("[TransmuxResourceLoader] fillData: offset \(requestedOffset) is \(gap / 1_048_576)MB beyond fileSize \(fileSize) — finishing to unblock AVPlayer")
+                MKSLog.transmux.debug("fillData: offset \(requestedOffset) is \(gap / 1_048_576)MB beyond fileSize \(fileSize) — finishing to unblock AVPlayer")
                 request.finishLoading()
                 return true
             }
@@ -210,7 +210,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
 
         // Read available data from file
         guard let fileHandle = FileHandle(forReadingAtPath: filePath) else {
-            print("[TransmuxResourceLoader] fillData: Cannot open file at \(filePath)")
+            MKSLog.transmux.error("fillData: Cannot open file at \(filePath)")
             request.finishLoading(with: NSError(
                 domain: "TransmuxResourceLoader", code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Cannot open \(filePath)"]
@@ -222,7 +222,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         do {
             try fileHandle.seek(toOffset: UInt64(requestedOffset))
         } catch {
-            print("[TransmuxResourceLoader] fillData: seek failed: \(error)")
+            MKSLog.transmux.error("fillData: seek failed: \(error)")
             request.finishLoading(with: error)
             return true
         }
@@ -236,7 +236,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
             dataRequest.respond(with: data)
             // Log first few data deliveries
             if dataRequest.currentOffset < 2_000_000 {
-                print("[TransmuxResourceLoader] fillData: served \(data.count) bytes at offset \(requestedOffset), fileSize=\(fileSize)")
+                MKSLog.transmux.debug("fillData: served \(data.count) bytes at offset \(requestedOffset), fileSize=\(fileSize)")
             }
         }
 
@@ -245,14 +245,14 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
         let endOffset = dataRequest.requestedOffset + Int64(dataRequest.requestedLength)
 
         if newOffset >= endOffset {
-            print("[TransmuxResourceLoader] fillData: request fully satisfied (offset \(newOffset) >= end \(endOffset))")
+            MKSLog.transmux.debug("fillData: request fully satisfied (offset \(newOffset) >= end \(endOffset))")
             request.finishLoading()
             return true
         }
 
         // Transmux done and we've served all available data
         if isComplete && newOffset >= fileSize {
-            print("[TransmuxResourceLoader] fillData: transmux complete, all data served")
+            MKSLog.transmux.debug("fillData: transmux complete, all data served")
             request.finishLoading()
             return true
         }
@@ -276,7 +276,7 @@ class TransmuxResourceLoader: NSObject, AVAssetResourceLoaderDelegate {
                     .deletingLastPathComponent + "/.transmux_complete"
                 if FileManager.default.fileExists(atPath: sentinelPath) {
                     self.isComplete = true
-                    print("[TransmuxResourceLoader] Detected transmux completion via sentinel")
+                    MKSLog.transmux.info("Detected transmux completion via sentinel")
                 }
             }
 

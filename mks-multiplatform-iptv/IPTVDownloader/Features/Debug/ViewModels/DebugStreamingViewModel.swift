@@ -358,7 +358,7 @@ class DebugStreamingViewModel: ObservableObject {
         }
         
         // Also print to console
-        print("[Debug Stream] \(log.timestamp) \(message)")
+        MKSLog.debug.debug("[Debug Stream] \(log.timestamp) \(message)")
     }
     
     func clearLogs() {

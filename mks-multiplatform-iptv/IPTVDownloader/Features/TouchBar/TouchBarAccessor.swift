@@ -8,7 +8,7 @@ struct TouchBarAccessor: NSViewRepresentable {
     @ObservedObject var touchBarManager: TouchBarManager
     
     func makeNSView(context: Context) -> NSView {
-        print("📱 TouchBar: Creating TouchBarAccessor NSView")
+        MKSLog.app.debug("TouchBar: Creating TouchBarAccessor NSView")
         return TouchBarHostingView(touchBarManager: touchBarManager)
     }
     
@@ -30,7 +30,7 @@ class TouchBarHostingView: NSView {
     private var cancellables = Set<AnyCancellable>()
     
     init(touchBarManager: TouchBarManager) {
-        print("📱 TouchBar: Initializing TouchBarHostingView")
+        MKSLog.app.debug("TouchBar: Initializing TouchBarHostingView")
         self.touchBarManager = touchBarManager
         super.init(frame: .zero)
         setupSubscriptions()
@@ -102,7 +102,7 @@ class TouchBarHostingView: NSView {
     }
     
     private func updateTouchBar() {
-        print("TouchBar: Updating TouchBar...")
+        MKSLog.app.debug("TouchBar: Updating TouchBar...")
         self.touchBar = makeTouchBar()
         
         // Force the window to update its TouchBar
@@ -123,35 +123,35 @@ class TouchBarHostingView: NSView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard let window = self.window else {
-            print("TouchBar: No window found")
+            MKSLog.app.debug("TouchBar: No window found")
             return
         }
         
-        print("TouchBar: View moved to window")
+        MKSLog.app.debug("TouchBar: View moved to window")
         
         // Ensure the view can become first responder
         DispatchQueue.main.async {
             // Make window key and set first responder
             window.makeKey()
             if window.makeFirstResponder(self) {
-                print("TouchBar: Successfully became first responder")
+                MKSLog.app.debug("TouchBar: Successfully became first responder")
             } else {
-                print("TouchBar: Failed to become first responder")
+                MKSLog.app.debug("TouchBar: Failed to become first responder")
             }
             
             // Force TouchBar update
             self.updateTouchBar()
             if self.touchBar != nil {
-                print("TouchBar: TouchBar created successfully")
+                MKSLog.app.debug("TouchBar: TouchBar created successfully")
             } else {
-                print("TouchBar: Failed to create TouchBar")
+                MKSLog.app.debug("TouchBar: Failed to create TouchBar")
             }
         }
     }
     
     override func makeTouchBar() -> NSTouchBar? {
-        print("TouchBar: makeTouchBar called with context: \(touchBarManager.currentContext)")
-        print("TouchBar: Available categories: \(touchBarManager.availableCategories.count)")
+        MKSLog.app.debug("TouchBar: makeTouchBar called with context: \(touchBarManager.currentContext)")
+        MKSLog.app.debug("TouchBar: Available categories: \(touchBarManager.availableCategories.count)")
         
         let touchBar = NSTouchBar()
         touchBar.delegate = self
@@ -169,18 +169,18 @@ class TouchBarHostingView: NSView {
                     .refreshButton
                 ]
             }
-            print("TouchBar: Configured for downloads context")
+            MKSLog.app.debug("TouchBar: Configured for downloads context")
         case .mediaList:
             if touchBarManager.availableCategories.isEmpty {
                 touchBar.defaultItemIdentifiers = [
                     .mediaListLoadingView
                 ]
-                print("TouchBar: Configured for media list context (loading)")
+                MKSLog.app.debug("TouchBar: Configured for media list context (loading)")
             } else {
                 touchBar.defaultItemIdentifiers = [
                     .mediaListFullView
                 ]
-                print("TouchBar: Configured for media list context (loaded)")
+                MKSLog.app.debug("TouchBar: Configured for media list context (loaded)")
             }
         case .liveTV:
             if touchBarManager.availableChannels.isEmpty {
@@ -188,7 +188,7 @@ class TouchBarHostingView: NSView {
                     .flexibleSpace,
                     .refreshButton
                 ]
-                print("TouchBar: Configured for live TV context (loading)")
+                MKSLog.app.debug("TouchBar: Configured for live TV context (loading)")
             } else {
                 touchBar.defaultItemIdentifiers = [
                     .playPauseButton,
@@ -196,7 +196,7 @@ class TouchBarHostingView: NSView {
                     .flexibleSpace,
                     .channelPicker
                 ]
-                print("TouchBar: Configured for live TV context (loaded)")
+                MKSLog.app.debug("TouchBar: Configured for live TV context (loaded)")
             }
         case .movieDetail, .serieDetail:
             touchBar.defaultItemIdentifiers = [
@@ -205,7 +205,7 @@ class TouchBarHostingView: NSView {
                 .flexibleSpace,
                 .ratingDisplay
             ]
-            print("TouchBar: Configured for detail context")
+            MKSLog.app.debug("TouchBar: Configured for detail context")
         }
         return touchBar
     }
@@ -284,7 +284,7 @@ extension TouchBarHostingView: NSTouchBarDelegate {
     private func makeTestButton() -> NSTouchBarItem {
         let item = NSCustomTouchBarItem(identifier: .testButton)
         let button = Button(action: {
-            print("TouchBar: Test button tapped!")
+            MKSLog.app.debug("TouchBar: Test button tapped!")
         }) {
             HStack {
                 Image(systemName: "star.fill")
@@ -332,12 +332,12 @@ extension TouchBarHostingView: NSTouchBarDelegate {
     @objc private func selectAllCategories(_ sender: NSButtonTouchBarItem) {
         touchBarManager.selectedCategories.removeAll()
         touchBarManager.onCategoryToggle?("")
-        print("TouchBar: All categories selected")
+        MKSLog.app.debug("TouchBar: All categories selected")
     }
     
     @objc private func selectCategory(_ sender: NSButtonTouchBarItem) {
         let title = sender.title
-        print("TouchBar: Category selected: \(title)")
+        MKSLog.app.debug("TouchBar: Category selected: \(title)")
         touchBarManager.selectCategory(title)
     }
     

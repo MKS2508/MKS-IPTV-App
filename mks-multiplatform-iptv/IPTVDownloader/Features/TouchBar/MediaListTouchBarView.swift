@@ -334,7 +334,7 @@ class MediaListTouchBarDelegate: NSObject, NSTouchBarDelegate {
     
     @objc private func showSortOptions() {
         // Sort options implementation
-        print("Show sort options")
+        MKSLog.app.debug("Show sort options")
     }
     
     @objc private func refreshContent() {

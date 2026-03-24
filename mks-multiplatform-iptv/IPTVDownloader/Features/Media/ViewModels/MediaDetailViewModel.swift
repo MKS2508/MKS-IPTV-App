@@ -195,7 +195,7 @@ final class MediaDetailViewModel {
             }
         } catch {
             self.error = error
-            print("[MediaDetailVM] Error fetching details: \(error)")
+            MKSLog.media.error("[MediaDetailVM] Error fetching details: \(error)")
         }
 
         isLoading = false
@@ -244,7 +244,7 @@ final class MediaDetailViewModel {
                 }
             }
         } catch {
-            print("[MediaDetailViewModel] Background refresh failed: \(error)")
+            MKSLog.media.error("[MediaDetailViewModel] Background refresh failed: \(error)")
         }
     }
 }

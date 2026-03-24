@@ -56,7 +56,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         // Note: VLC doesn't support externalMetadata like AVPlayer does
         // Metadata is ignored but we log it for debugging
         if let metadata = metadata {
-            print("[VLCPlayerImplementation] Metadata provided but VLC doesn't support externalMetadata: \(metadata.title)")
+            MKSLog.player.debug("Metadata provided but VLC doesn't support externalMetadata: \(metadata.title)")
         }
         loadInternal(url: url)
     }
@@ -65,14 +65,14 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         self.sourceURL = url
         guard VLCPlayerImplementation.isAvailable() else {
             error = .unsupportedFormat
-            print("[VLCPlayerImplementation] VLCKit not available")
+            MKSLog.player.error("VLCKit not available")
             return
         }
         
         // Validate URL
         guard url.scheme != nil else {
             error = .networkError(NSError(domain: "VLCPlayer", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
-            print("[VLCPlayerImplementation] Invalid URL: \(url)")
+            MKSLog.player.error("Invalid URL: \(url)")
             return
         }
         
@@ -80,14 +80,14 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         stop()
         
         #if canImport(VLCKitSPM)
-        print("[VLCPlayerImplementation] Loading URL: \(url)")
+        MKSLog.player.info("Loading URL: \(url)")
         
         // Create media with IPTV-optimized options
         let newMedia = VLCMediaType(url: url)
         guard newMedia.url != nil else {
             error = .networkError(NSError(domain: "VLCPlayer", code: -2,
                                          userInfo: [NSLocalizedDescriptionKey: "VLCMedia failed to initialize for URL: \(url)"]))
-            print("[VLCPlayerImplementation] VLCMedia creation returned invalid media for URL: \(url)")
+            MKSLog.player.error("VLCMedia creation returned invalid media for URL: \(url)")
             return
         }
         media = newMedia
@@ -125,21 +125,21 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         
         // Additional optimization for live streams
         if url.absoluteString.contains(".m3u8") || url.absoluteString.contains("/live/") {
-            print("[VLCPlayerImplementation] Detected live stream, applying live optimizations")
+            MKSLog.player.info("Detected live stream, applying live optimizations")
             media?.addOption(":program=0")     // Use first program
             media?.addOption(":dvb-adapter=0") // Default DVB adapter
         }
         
         // Log format-specific optimizations
         let fileExtension = url.pathExtension.lowercased()
-        print("[VLCPlayerImplementation] Format: \(fileExtension)")
+        MKSLog.player.debug("Format: \(fileExtension)")
         
         // Create media player and assign media
         let player = VLCMediaPlayerType()
         guard let validMedia = media else {
             error = .networkError(NSError(domain: "VLCPlayer", code: -3,
                                          userInfo: [NSLocalizedDescriptionKey: "Media became nil before player assignment"]))
-            print("[VLCPlayerImplementation] Media is nil, cannot assign to player")
+            MKSLog.player.error("Media is nil, cannot assign to player")
             return
         }
         player.media = validMedia
@@ -151,7 +151,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         mediaPlayer?.audio?.volume = Int32(volume * 100)
         mediaPlayer?.rate = rate
         
-        print("[VLCPlayerImplementation] Successfully loaded URL with VLC")
+        MKSLog.player.info("Successfully loaded URL with VLC")
         #endif
     }
     
@@ -162,7 +162,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         guard let player = mediaPlayer else { return }
         
         player.play()
-        print("[VLCPlayerImplementation] Starting playback")
+        MKSLog.player.info("Starting playback")
         #endif
     }
     
@@ -174,7 +174,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         
         player.pause()
         isPlaying = false
-        print("[VLCPlayerImplementation] Paused playback")
+        MKSLog.player.info("Paused playback")
         #endif
     }
     
@@ -193,7 +193,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         duration = 0
         isReady = false
         
-        print("[VLCPlayerImplementation] Stopped playback")
+        MKSLog.player.info("Stopped playback")
     }
     
     func seek(to time: Double) {
@@ -205,7 +205,7 @@ class VLCPlayerImplementation: NSObject, VideoPlayerProtocol, ObservableObject {
         player.time = VLCTimeType(int: Int32(time * 1000)) // Convert to milliseconds
         currentTime = time
         
-        print("[VLCPlayerImplementation] Seeked to \(time)s")
+        MKSLog.player.info("Seeked to \(time)s")
         #endif
     }
     
@@ -282,32 +282,32 @@ extension VLCPlayerImplementation: VLCMediaPlayerDelegate {
         DispatchQueue.main.async { [weak self] in
             switch player.state {
             case .opening:
-                print("[VLCPlayerImplementation] State: Opening")
+                MKSLog.player.debug("State: Opening")
             case .buffering:
-                print("[VLCPlayerImplementation] State: Buffering")
+                MKSLog.player.debug("State: Buffering")
             case .playing:
                 self?.isPlaying = true
                 self?.isReady = true
                 self?.startProgressTimer()
-                print("[VLCPlayerImplementation] State: Playing")
+                MKSLog.player.info("State: Playing")
             case .paused:
                 self?.isPlaying = false
-                print("[VLCPlayerImplementation] State: Paused")
+                MKSLog.player.info("State: Paused")
             case .stopped:
                 self?.isPlaying = false
                 self?.progressTimer?.invalidate()
-                print("[VLCPlayerImplementation] State: Stopped")
+                MKSLog.player.info("State: Stopped")
             case .ended:
                 self?.isPlaying = false
                 self?.currentTime = self?.duration ?? 0
                 self?.progressTimer?.invalidate()
-                print("[VLCPlayerImplementation] State: Ended")
+                MKSLog.player.info("State: Ended")
             case .error:
                 self?.error = .decodingError
-                print("[VLCPlayerImplementation] State: Playback error occurred")
-                print("[VLCPlayerImplementation] URL: \(String(describing: self?.media?.url))")
+                MKSLog.player.error("State: Playback error occurred")
+                MKSLog.player.error("URL: \(String(describing: self?.media?.url))")
             case .esAdded:
-                print("[VLCPlayerImplementation] State: Elementary stream added")
+                MKSLog.player.debug("State: Elementary stream added")
             @unknown default:
                 break
             }

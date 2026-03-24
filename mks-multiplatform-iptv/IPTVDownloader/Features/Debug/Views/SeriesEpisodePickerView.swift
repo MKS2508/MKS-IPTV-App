@@ -87,7 +87,7 @@ struct SeriesEpisodePickerView: View {
                 }
             }
         } catch {
-            print("Failed to load series details: \(error)")
+            MKSLog.debug.error("Failed to load series details: \(error)")
         }
         isLoading = false
     }

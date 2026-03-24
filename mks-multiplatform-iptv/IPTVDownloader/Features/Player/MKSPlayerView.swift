@@ -347,13 +347,13 @@ struct MKSPlayerView: View {
 
     private func handleCastConnected() {
         guard let sourceURL = player.sourceURL else {
-            print("[DLNACast] No sourceURL on player — cannot auto-load on Cast device")
+            MKSLog.dlna.warning("No sourceURL on player — cannot auto-load on Cast device")
             return
         }
 
-        print("[DLNACast] handleCastConnected — sourceURL=\(sourceURL.absoluteString)")
-        print("[DLNACast] handleCastConnected — player.isPlaying=\(player.isPlaying), player.currentTime=\(player.currentTime)")
-        print("[DLNACast] handleCastConnected — device transport=\(remotePlayManager.connectedDevice?.effectiveTransport.rawValue ?? "nil")")
+        MKSLog.dlna.info("handleCastConnected — sourceURL=\(sourceURL.absoluteString)")
+        MKSLog.dlna.debug("handleCastConnected — player.isPlaying=\(player.isPlaying), player.currentTime=\(player.currentTime)")
+        MKSLog.dlna.debug("handleCastConnected — device transport=\(remotePlayManager.connectedDevice?.effectiveTransport.rawValue ?? "nil")")
 
         wasPlayingBeforeCast = player.isPlaying
         didLoadOnCastDevice = true
@@ -363,7 +363,7 @@ struct MKSPlayerView: View {
         // Pause local playback — audio should come from the TV, not the Mac
         if player.isPlaying {
             player.pause()
-            print("[DLNACast] Local player paused before cast handoff")
+            MKSLog.dlna.info("Local player paused before cast handoff")
         }
 
         Task {
@@ -371,20 +371,20 @@ struct MKSPlayerView: View {
                 // Use transmux pipeline: FFmpeg remuxes the source to MPEG-TS/HLS,
                 // TransmuxServer serves it over HTTP, TV gets a LAN URL with
                 // compatible content instead of raw MKV from the IPTV server.
-                print("[DLNACast] Starting loadWithTransmux...")
+                MKSLog.dlna.info("Starting loadWithTransmux...")
                 try await remotePlayManager.loadWithTransmux(
                     url: sourceURL,
                     metadata: metadata,
                     startPosition: startPosition
                 )
-                print("[DLNACast] Content transmuxed and loaded on device at position \(String(format: "%.1f", startPosition))s")
+                MKSLog.dlna.info("Content transmuxed and loaded on device at position \(String(format: "%.1f", startPosition))s")
             } catch {
-                print("[DLNACast] Failed to load on device: \(error)")
+                MKSLog.dlna.error("Failed to load on device: \(error)")
                 didLoadOnCastDevice = false
                 // Resume local playback on failure
                 if wasPlayingBeforeCast {
                     player.play()
-                    print("[DLNACast] Resumed local playback after cast failure")
+                    MKSLog.dlna.info("Resumed local playback after cast failure")
                 }
             }
         }

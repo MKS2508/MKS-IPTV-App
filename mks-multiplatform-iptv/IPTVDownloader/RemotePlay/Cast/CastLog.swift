@@ -201,7 +201,7 @@ enum CastLog {
 
     private static func writeEntry(_ entry: String) {
         let line = entry + "\n"
-        print(line, terminator: "")
+        MKSLog.cast.debug(entry)
 
         guard let data = line.data(using: .utf8) else { return }
         if let handle = FileHandle(forWritingAtPath: filePath) {

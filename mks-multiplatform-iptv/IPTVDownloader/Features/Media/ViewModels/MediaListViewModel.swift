@@ -132,7 +132,7 @@ class MediaListViewModel: ObservableObject {
                 movies = orderByAddedDesc(freshMovies)
             }
         } catch {
-            print("[MediaListVM] Background movie refresh failed: \(error)")
+            MKSLog.media.error("[MediaListVM] Background movie refresh failed: \(error)")
         }
     }
 
@@ -145,7 +145,7 @@ class MediaListViewModel: ObservableObject {
                 series = orderByAddedDesc(freshSeries)
             }
         } catch {
-            print("[MediaListVM] Background series refresh failed: \(error)")
+            MKSLog.media.error("[MediaListVM] Background series refresh failed: \(error)")
         }
     }
     

@@ -60,21 +60,21 @@ enum DLNASOAPClient {
         )
         request.setValue("text/xml; charset=utf-8", forHTTPHeaderField: "Content-Type")
 
-        print("[DLNACast] SOAP >> \(action) → \(controlURL.absoluteString)")
+        MKSLog.dlna.debug("SOAP >> \(action) → \(controlURL.absoluteString)")
 
         // Send request
         let (data, response) = try await URLSession.shared.data(for: request)
 
         // Check HTTP status
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("[DLNACast] SOAP << \(action) — invalid HTTP response")
+            MKSLog.dlna.error("SOAP << \(action) — invalid HTTP response")
             throw RemotePlayError.transportError("Invalid HTTP response")
         }
 
         let responseBody = String(data: data, encoding: .utf8) ?? "<binary>"
-        print("[DLNACast] SOAP << \(action) — HTTP \(httpResponse.statusCode), body length=\(data.count)")
+        MKSLog.dlna.debug("SOAP << \(action) — HTTP \(httpResponse.statusCode), body length=\(data.count)")
         if httpResponse.statusCode != 200 {
-            print("[DLNACast] SOAP << \(action) — ERROR body: \(String(responseBody.prefix(1000)))")
+            MKSLog.dlna.error("SOAP << \(action) — ERROR body: \(String(responseBody.prefix(1000)))")
         }
 
         // Parse response
@@ -84,7 +84,7 @@ enum DLNASOAPClient {
         if let errorCode = parsedResponse["errorCode"],
            let code = Int(errorCode) {
             let errorDescription = parsedResponse["errorDescription"] ?? "Unknown error"
-            print("[DLNACast] SOAP << \(action) — UPnP error \(code): \(errorDescription)")
+            MKSLog.dlna.error("SOAP << \(action) — UPnP error \(code): \(errorDescription)")
             throw RemotePlayError.soapError(code, errorDescription)
         }
 

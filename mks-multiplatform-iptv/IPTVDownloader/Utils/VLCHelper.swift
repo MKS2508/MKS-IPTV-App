@@ -42,7 +42,7 @@ struct VLCHelper {
                                   withApplicationAt: vlcURL,
                                   configuration: configuration) { _, error in
                 if let error = error {
-                    print("Error opening VLC: \(error)")
+                    MKSLog.app.error("Error opening VLC: \(error)")
                 }
             }
         } else {
@@ -54,7 +54,7 @@ struct VLCHelper {
             do {
                 try task.run()
             } catch {
-                print("Failed to open VLC: \(error)")
+                MKSLog.app.error("Failed to open VLC: \(error)")
             }
         }
         #else

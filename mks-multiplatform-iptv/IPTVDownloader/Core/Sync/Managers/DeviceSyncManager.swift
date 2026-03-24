@@ -54,9 +54,9 @@ final class DeviceSyncManager: ObservableObject {
 
         do {
             _ = try await engine.saveRecords([record])
-            print("[DeviceSync] Registered device: \(device.deviceName) (\(device.platform))")
+            MKSLog.network.info("[DeviceSync] Registered device: \(device.deviceName) (\(device.platform))")
         } catch {
-            print("[DeviceSync] Failed to register device: \(error)")
+            MKSLog.network.error("[DeviceSync] Failed to register device: \(error)")
         }
     }
 
@@ -73,9 +73,9 @@ final class DeviceSyncManager: ObservableObject {
             let devices = records.compactMap { SyncedDevice.fromRecord($0) }
                 .sorted { $0.lastActiveDate > $1.lastActiveDate }
             syncedDevices = devices
-            print("[DeviceSync] Fetched \(devices.count) synced device(s)")
+            MKSLog.network.info("[DeviceSync] Fetched \(devices.count) synced device(s)")
         } catch {
-            print("[DeviceSync] Failed to fetch devices: \(error)")
+            MKSLog.network.error("[DeviceSync] Failed to fetch devices: \(error)")
         }
     }
 
@@ -92,9 +92,9 @@ final class DeviceSyncManager: ObservableObject {
         do {
             try await engine.deleteRecord(recordID)
             syncedDevices.removeAll { $0.id == device.id }
-            print("[DeviceSync] Removed device: \(device.deviceName)")
+            MKSLog.network.info("[DeviceSync] Removed device: \(device.deviceName)")
         } catch {
-            print("[DeviceSync] Failed to remove device: \(error)")
+            MKSLog.network.error("[DeviceSync] Failed to remove device: \(error)")
         }
     }
 }

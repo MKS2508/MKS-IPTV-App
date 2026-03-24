@@ -100,20 +100,20 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     // MARK: - RemoteDeviceController
 
     func connect() async throws {
-        print("[DLNACast] DLNAController.connect — controlURL=\(controlURL.absoluteString)")
+        MKSLog.dlna.info("DLNAController.connect — controlURL=\(controlURL.absoluteString)")
         // DLNA is connectionless - verify device is reachable by querying state
         playbackState = .connected(deviceId: device.id)
 
         // Query initial state
         do {
             let pos = try await queryPosition()
-            print("[DLNACast] DLNAController.connect — device responsive, state=\(pos)")
+            MKSLog.dlna.info("DLNAController.connect — device responsive, state=\(pos)")
         } catch let error as RemotePlayError {
-            print("[DLNACast] DLNAController.connect — FAILED: \(error)")
+            MKSLog.dlna.error("DLNAController.connect — FAILED: \(error)")
             playbackState = .error(error)
             throw error
         } catch {
-            print("[DLNACast] DLNAController.connect — FAILED: \(error)")
+            MKSLog.dlna.error("DLNAController.connect — FAILED: \(error)")
             let remoteError = RemotePlayError.transportError(error.localizedDescription)
             playbackState = .error(remoteError)
             throw remoteError
@@ -132,10 +132,10 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     // MARK: - Content Loading
 
     func load(url: URL, metadata: MetadataResult?, startPosition: Double, streaming: Bool = false) async throws {
-        print("[DLNACast] DLNAController.load — url=\(url.absoluteString)")
-        print("[DLNACast] DLNAController.load — controlURL=\(controlURL.absoluteString)")
-        print("[DLNACast] DLNAController.load — streaming=\(streaming)")
-        print("[DLNACast] DLNAController.load — metadata.title=\(metadata?.title ?? "nil"), sourceContentURL=\(sourceContentURL?.lastPathComponent ?? "nil")")
+        MKSLog.dlna.info("DLNAController.load — url=\(url.absoluteString)")
+        MKSLog.dlna.debug("DLNAController.load — controlURL=\(controlURL.absoluteString)")
+        MKSLog.dlna.debug("DLNAController.load — streaming=\(streaming)")
+        MKSLog.dlna.debug("DLNAController.load — metadata.title=\(metadata?.title ?? "nil"), sourceContentURL=\(sourceContentURL?.lastPathComponent ?? "nil")")
         playbackState = .loading
 
         // Save load parameters for fake-pause resume
@@ -154,12 +154,12 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             streaming: streaming,
             fallbackTitle: deriveFallbackTitle()
         )
-        print("[DLNACast] DLNAController.load — DIDL metadata length=\(didlMetadata.count)")
+        MKSLog.dlna.debug("DLNAController.load — DIDL metadata length=\(didlMetadata.count)")
 
         do {
             // 0. Stop any current playback — many TVs reject SetAVTransportURI
             //    with error 705 "Access denied" if the transport is busy/locked.
-            print("[DLNACast] DLNAController.load — sending Stop (clear transport)...")
+            MKSLog.dlna.debug("DLNAController.load — sending Stop (clear transport)...")
             let stopAction = DLNASOAPClient.AVTransportAction.stop(instanceId: instanceId)
             do {
                 _ = try await DLNASOAPClient.send(
@@ -168,16 +168,16 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
                     controlURL: controlURL,
                     arguments: stopAction.arguments
                 )
-                print("[DLNACast] DLNAController.load — Stop OK")
+                MKSLog.dlna.debug("DLNAController.load — Stop OK")
                 // Give the TV time to release the transport lock
                 try? await Task.sleep(for: .seconds(1))
             } catch {
                 // Stop failing is non-fatal — TV might already be stopped
-                print("[DLNACast] DLNAController.load — Stop failed (non-fatal): \(error)")
+                MKSLog.dlna.warning("DLNAController.load — Stop failed (non-fatal): \(error)")
             }
 
             // 1. SetAVTransportURI — tell the TV what to play
-            print("[DLNACast] DLNAController.load — sending SetAVTransportURI...")
+            MKSLog.dlna.debug("DLNAController.load — sending SetAVTransportURI...")
             let setURIAction = DLNASOAPClient.AVTransportAction.setAVTransportURI(
                 instanceId: instanceId,
                 uri: url.absoluteString,
@@ -189,39 +189,39 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
                 controlURL: controlURL,
                 arguments: setURIAction.arguments
             )
-            print("[DLNACast] DLNAController.load — SetAVTransportURI response=\(setURIResponse)")
+            MKSLog.dlna.debug("DLNAController.load — SetAVTransportURI response=\(setURIResponse)")
 
             // 2. Play FIRST — most TVs reject Seek until content is playing/buffered
-            print("[DLNACast] DLNAController.load — sending Play...")
+            MKSLog.dlna.debug("DLNAController.load — sending Play...")
             try await play()
-            print("[DLNACast] DLNAController.load — Play sent")
+            MKSLog.dlna.debug("DLNAController.load — Play sent")
 
             // 3. Seek AFTER Play (non-fatal) — TV needs time to buffer before accepting seeks.
             //    If seek fails, playback continues from the beginning which is acceptable.
             if startPosition > 0 {
                 // Give the TV time to start buffering before attempting seek
                 try? await Task.sleep(for: .seconds(2))
-                print("[DLNACast] DLNAController.load — seeking to \(startPosition)s...")
+                MKSLog.dlna.debug("DLNAController.load — seeking to \(startPosition)s...")
                 do {
                     try await seek(to: startPosition)
-                    print("[DLNACast] DLNAController.load — Seek succeeded")
+                    MKSLog.dlna.debug("DLNAController.load — Seek succeeded")
                 } catch {
-                    print("[DLNACast] DLNAController.load — Seek failed (non-fatal, playing from start): \(error)")
+                    MKSLog.dlna.warning("DLNAController.load — Seek failed (non-fatal, playing from start): \(error)")
                     // Restore playing state since seek may have changed it
                     playbackState = .playing
                 }
             }
 
             // Start polling for state updates
-            print("[DLNACast] DLNAController.load — starting polling")
+            MKSLog.dlna.debug("DLNAController.load — starting polling")
             startPolling()
 
         } catch let error as RemotePlayError {
-            print("[DLNACast] DLNAController.load — FAILED (RemotePlayError): \(error)")
+            MKSLog.dlna.error("DLNAController.load — FAILED (RemotePlayError): \(error)")
             playbackState = .error(error)
             throw error
         } catch {
-            print("[DLNACast] DLNAController.load — FAILED: \(error)")
+            MKSLog.dlna.error("DLNAController.load — FAILED: \(error)")
             let remoteError = RemotePlayError.transportError(error.localizedDescription)
             playbackState = .error(remoteError)
             throw remoteError
@@ -231,7 +231,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     func play() async throws {
         // Resume from fake pause (Stop was used as pause substitute)
         if isFakePaused, let resumePos = savedPositionForResume, let url = loadedContentURL {
-            print("[DLNACast] Resuming from fake pause at \(String(format: "%.1f", resumePos))s")
+            MKSLog.dlna.info("Resuming from fake pause at \(String(format: "%.1f", resumePos))s")
             isFakePaused = false
             savedPositionForResume = nil
             try await load(url: url, metadata: loadedMetadata, startPosition: resumePos, streaming: loadedStreaming)
@@ -265,7 +265,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     func pause() async throws {
         if pauseUnsupported {
-            print("[DLNACast] Pause skipped — already confirmed unsupported by this device")
+            MKSLog.dlna.debug("Pause skipped — already confirmed unsupported by this device")
             throw RemotePlayError.soapError(501, "Pause not supported by this device")
         }
 
@@ -291,7 +291,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             return
         } catch let error as RemotePlayError {
             if case .soapError(let code, _) = error, code == 501 || code == 701 {
-                print("[DLNACast] Pause failed (UPnP \(code)), trying Play(Speed=0)...")
+                MKSLog.dlna.warning("Pause failed (UPnP \(code)), trying Play(Speed=0)...")
             } else {
                 playbackState = .error(error)
                 throw error
@@ -316,10 +316,10 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             )
             playbackState = .paused
             deviceState.transportState = .paused
-            print("[DLNACast] Play(Speed=0) fallback succeeded")
+            MKSLog.dlna.info("Play(Speed=0) fallback succeeded")
             return
         } catch {
-            print("[DLNACast] Play(Speed=0) also failed: \(error), trying Stop-as-pause...")
+            MKSLog.dlna.warning("Play(Speed=0) also failed: \(error), trying Stop-as-pause...")
         }
 
         // Tier 3: Stop + save position (fake pause) — re-loads on play()
@@ -328,7 +328,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
             useStopAsPause = true  // Next time, skip tiers 1 & 2
             return
         } catch {
-            print("[DLNACast] Stop-as-pause also failed: \(error)")
+            MKSLog.dlna.error("Stop-as-pause also failed: \(error)")
         }
 
         // All three tiers failed — downgrade capability permanently
@@ -342,7 +342,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
     /// Used as a last-resort pause fallback when Pause and Play(Speed=0) fail.
     private func performStopAsPause() async throws {
         let currentPos = deviceState.currentTime
-        print("[DLNACast] Stop-as-pause — saving position \(String(format: "%.1f", currentPos))s before stopping")
+        MKSLog.dlna.info("Stop-as-pause — saving position \(String(format: "%.1f", currentPos))s before stopping")
 
         let stopAction = DLNASOAPClient.AVTransportAction.stop(instanceId: instanceId)
         _ = try await DLNASOAPClient.send(
@@ -357,12 +357,12 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         playbackState = .paused
         deviceState.transportState = .paused
         stopPolling()
-        print("[DLNACast] Stop-as-pause succeeded — will resume at \(String(format: "%.1f", currentPos))s on play()")
+        MKSLog.dlna.info("Stop-as-pause succeeded — will resume at \(String(format: "%.1f", currentPos))s on play()")
     }
 
     func seek(to time: Double) async throws {
         if seekUnsupported {
-            print("[DLNACast] Seek skipped — already confirmed unsupported by this device")
+            MKSLog.dlna.debug("Seek skipped — already confirmed unsupported by this device")
             throw RemotePlayError.soapError(710, "Seek not supported by this device")
         }
 
@@ -395,7 +395,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         } catch let error as RemotePlayError {
             // Downgrade seeking capability on known unsupported errors
             if case .soapError(let code, _) = error, code == 710 || code == 501 || code == 711 {
-                print("[DLNACast] Seek failed (UPnP \(code)), disabling seek capability")
+                MKSLog.dlna.warning("Seek failed (UPnP \(code)), disabling seek capability")
                 seekUnsupported = true
                 downgradeCapability(.seeking)
                 // Restore playback state — seek failure is non-fatal for content
@@ -509,9 +509,9 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
         let duration = knownDuration ?? tvDuration
 
         // Log raw GetPositionInfo response for first few polls
-        print("[DLNACast] GetPositionInfo raw — RelTime=\(relTimeStr), TrackDuration=\(durationStr), TrackURI=\(trackURI.prefix(80))")
+        MKSLog.dlna.debug("GetPositionInfo raw — RelTime=\(relTimeStr), TrackDuration=\(durationStr), TrackURI=\(trackURI.prefix(80))")
         if let known = knownDuration, abs(tvDuration - known) > 60 {
-            print("[DLNACast] Duration override — TV reported \(durationStr) (\(String(format: "%.0f", tvDuration))s), using known \(String(format: "%.1f", known))s")
+            MKSLog.dlna.info("Duration override — TV reported \(durationStr) (\(String(format: "%.0f", tvDuration))s), using known \(String(format: "%.1f", known))s")
         }
 
         // Query transport state for isPlaying
@@ -585,7 +585,7 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
 
     /// Remove a capability and notify the manager to update the UI.
     private func downgradeCapability(_ capability: DeviceCapabilities) {
-        print("[DLNACast] Downgrading capability: removing \(capability) from device")
+        MKSLog.dlna.info("Downgrading capability: removing \(capability) from device")
         onCapabilityDowngrade?(capability)
     }
 
@@ -637,12 +637,12 @@ final class DLNAController: RemoteDeviceController, @unchecked Sendable {
                         pollCount += 1
                         // Log first 5 polls and then every 10th for ongoing monitoring
                         if pollCount <= 5 || pollCount % 10 == 0 {
-                            print("[DLNACast] Poll #\(pollCount) — transport=\(state.transportState.rawValue), time=\(String(format: "%.1f", state.currentTime))/\(String(format: "%.1f", state.duration)), isPlaying=\(pos?.isPlaying ?? false)")
+                            MKSLog.dlna.debug("Poll #\(pollCount) — transport=\(state.transportState.rawValue), time=\(String(format: "%.1f", state.currentTime))/\(String(format: "%.1f", state.duration)), isPlaying=\(pos?.isPlaying ?? false)")
                         }
                         self?.onStateUpdate?(state)
                     }
                 } catch {
-                    print("[DLNACast] Poll error: \(error)")
+                    MKSLog.dlna.error("Poll error: \(error)")
                 }
 
                 try? await Task.sleep(for: .seconds(self?.pollingInterval ?? 2.0))

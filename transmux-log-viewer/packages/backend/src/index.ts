@@ -2,6 +2,7 @@ import { cors } from "@elysiajs/cors";
 import logger from "@mks2508/better-logger";
 import { Elysia } from "elysia";
 import { cliModule } from "./modules/cli";
+import { deviceModule } from "./modules/device";
 import { healthModule } from "./modules/health";
 import { hlsModule } from "./modules/hls";
 import { logsModule } from "./modules/logs";
@@ -42,6 +43,7 @@ const app = new Elysia()
   .use(cliModule)
   .use(hlsModule)
   .use(sourcesModule)
+  .use(deviceModule)
   .onStart(({ decorator, server }) => {
     // Wire CLIService into HLSService so it can access session metadata
     const cli = (decorator as any).cliService;
@@ -54,6 +56,25 @@ const app = new Elysia()
     serverLog.info("TransmuxCore Log Viewer API started");
     serverLog.info(`Watching log file: /tmp/mks-iptv-transmux.log`);
     serverLog.info(`API: http://localhost:${server?.port ?? port}`);
+
+    // Publish Bonjour service so iOS devices can auto-discover this viewer.
+    // Uses macOS built-in dns-sd command — zero npm dependencies.
+    const actualPort = server?.port ?? port;
+    try {
+      const bonjourProc = Bun.spawn(
+        ["dns-sd", "-R", "MKS-IPTV Debug Viewer", "_mksiptv-debug._tcp", "local", String(actualPort),
+         "ws=/ws/device", "version=1.0"],
+        { stdout: "ignore", stderr: "ignore" }
+      );
+      serverLog.info(`Bonjour: publishing _mksiptv-debug._tcp on port ${actualPort} (pid ${bonjourProc.pid})`);
+
+      // Cleanup on process exit
+      process.on("exit", () => bonjourProc.kill());
+      process.on("SIGINT", () => { bonjourProc.kill(); process.exit(0); });
+      process.on("SIGTERM", () => { bonjourProc.kill(); process.exit(0); });
+    } catch (err) {
+      serverLog.warn(`Bonjour: failed to publish service — ${err}`);
+    }
   })
   .onError(({ code, error, set }) => {
     const errorLog = logger.component("Error");

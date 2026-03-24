@@ -142,7 +142,7 @@ class TouchBarManager: ObservableObject {
     
     // MARK: - Context Management
     func switchToContext(_ context: Context) {
-        print("TouchBarManager: Switching context from \(currentContext) to \(context)")
+        MKSLog.app.debug("TouchBarManager: Switching context from \(currentContext) to \(context)")
         currentContext = context
     }
     
@@ -155,7 +155,7 @@ class TouchBarManager: ObservableObject {
     }
     
     func updateCategories(_ categories: [String]) {
-        print("TouchBarManager: Updating categories to: \(categories)")
+        MKSLog.app.debug("TouchBarManager: Updating categories to: \(categories)")
         availableCategories = categories
     }
     

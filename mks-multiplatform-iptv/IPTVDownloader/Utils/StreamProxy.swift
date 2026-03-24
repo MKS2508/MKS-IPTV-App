@@ -40,7 +40,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed(let error):
-                print("[StreamProxy] Client connection failed: \(error.localizedDescription)")
+                MKSLog.network.debug("Client connection failed: \(error.localizedDescription)")
                 self?.cancelBackend()
             case .cancelled:
                 self?.cancelBackend()
@@ -57,7 +57,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
 
         if let range = rangeHeader {
             request.setValue(range, forHTTPHeaderField: "Range")
-            print("[StreamProxy] GET forwarding Range: \(range)")
+            MKSLog.network.debug("GET forwarding Range: \(range)")
         }
 
         let config = URLSessionConfiguration.ephemeral
@@ -92,7 +92,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
 
         task?.cancel()
         session?.invalidateAndCancel()
-        print("[StreamProxy] Backend cancelled (\(totalBytesSent) bytes sent to client)")
+        MKSLog.network.debug("Backend cancelled (\(totalBytesSent) bytes sent to client)")
     }
 
     // MARK: - URLSessionDataDelegate
@@ -115,7 +115,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
         }
 
         let statusCode = httpResponse.statusCode
-        print("[StreamProxy] Backend responded: HTTP \(statusCode)")
+        MKSLog.network.debug("Backend responded: HTTP \(statusCode)")
 
         // Build raw HTTP response header with standard reason phrases
         // (not localized — FFmpeg's parser expects ASCII)
@@ -130,7 +130,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
         for key in forwardHeaders {
             if let value = httpResponse.value(forHTTPHeaderField: key) {
                 header += "\(key): \(value)\r\n"
-                print("[StreamProxy]   \(key): \(value)")
+                MKSLog.network.debug("  \(key): \(value)")
             }
         }
 
@@ -144,7 +144,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
         let headerData = Data(header.utf8)
         connection.send(content: headerData, completion: .contentProcessed { [weak self] error in
             if let error = error {
-                print("[StreamProxy] Failed to send headers: \(error)")
+                MKSLog.network.error("Failed to send headers: \(error)")
                 self?.cancelBackend()
             }
         })
@@ -179,10 +179,10 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
             let nsError = error as NSError
             // Don't log cancellation as errors — it's normal when FFmpeg seeks
             if nsError.code != NSURLErrorCancelled {
-                print("[StreamProxy] Backend transfer error: \(error.localizedDescription) (\(totalBytesSent) bytes sent)")
+                MKSLog.network.error("Backend transfer error: \(error.localizedDescription) (\(totalBytesSent) bytes sent)")
             }
         } else {
-            print("[StreamProxy] Backend transfer completed (\(totalBytesSent) bytes sent)")
+            MKSLog.network.debug("Backend transfer completed (\(totalBytesSent) bytes sent)")
         }
 
         guard !isCancelled else {
@@ -214,7 +214,7 @@ private final class StreamForwarder: NSObject, URLSessionDataDelegate, @unchecke
         var redirected = request
         redirected.setValue("VLC/3.0.18 LibVLC/3.0.18", forHTTPHeaderField: "User-Agent")
         redirected.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-        print("[StreamProxy] Following redirect -> \(request.url?.host ?? "?")")
+        MKSLog.network.debug("Following redirect -> \(request.url?.host ?? "?")")
         completionHandler(redirected)
     }
 
@@ -380,11 +380,11 @@ actor StreamProxy {
         listener.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                print("[StreamProxy] NWListener ready on port \(port)")
+                MKSLog.network.info("NWListener ready on port \(port)")
             case .failed(let error):
-                print("[StreamProxy] NWListener failed on port \(port): \(error)")
+                MKSLog.network.error("NWListener failed on port \(port): \(error)")
             case .cancelled:
-                print("[StreamProxy] NWListener cancelled on port \(port)")
+                MKSLog.network.debug("NWListener cancelled on port \(port)")
             default:
                 break
             }
@@ -392,9 +392,9 @@ actor StreamProxy {
 
         listener.start(queue: networkQueue)
 
-        print("[StreamProxy] Started streaming proxy session #\(sessionID) on port \(port)")
-        print("[StreamProxy]   Local:   \(localURL.absoluteString)")
-        print("[StreamProxy]   Backend: \(backendURL.absoluteString.prefix(80))...")
+        MKSLog.network.info("Started streaming proxy session #\(sessionID) on port \(port)")
+        MKSLog.network.debug("  Local:   \(localURL.absoluteString)")
+        MKSLog.network.debug("  Backend: \(backendURL.absoluteString.prefix(80))...")
 
         return session
     }
@@ -413,7 +413,7 @@ actor StreamProxy {
         listeners[session.port]?.cancel()
         listeners.removeValue(forKey: session.port)
 
-        print("[StreamProxy] Stopped proxy session #\(sessionID)")
+        MKSLog.network.info("Stopped proxy session #\(sessionID)")
     }
 
     func stopAll() {
@@ -424,12 +424,12 @@ actor StreamProxy {
                 }
             }
             listener.cancel()
-            print("[StreamProxy] Stopped listener on port \(port)")
+            MKSLog.network.debug("Stopped listener on port \(port)")
         }
         listeners.removeAll()
         activeForwarders.removeAll()
         sessions.removeAll()
-        print("[StreamProxy] All proxy sessions stopped")
+        MKSLog.network.info("All proxy sessions stopped")
     }
 
     func session(for url: URL) -> ProxySession? {
@@ -450,7 +450,7 @@ actor StreamProxy {
         // so the logging-only handler is sufficient.
         connection.stateUpdateHandler = { state in
             if case .ready = state {
-                print("[StreamProxy] Connection accepted")
+                MKSLog.network.debug("Connection accepted")
             }
         }
 
@@ -460,14 +460,14 @@ actor StreamProxy {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { [weak self] data, _, _, error in
             guard let data = data, !data.isEmpty else {
                 if let error = error {
-                    print("[StreamProxy] Read error: \(error)")
+                    MKSLog.network.error("Read error: \(error)")
                 }
                 connection.cancel()
                 return
             }
 
             guard let request = HTTPRequestParser.parse(data) else {
-                print("[StreamProxy] Failed to parse HTTP request")
+                MKSLog.network.error("Failed to parse HTTP request")
                 let response = Data("HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n".utf8)
                 connection.send(content: response, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                     connection.cancel()
@@ -475,7 +475,7 @@ actor StreamProxy {
                 return
             }
 
-            print("[StreamProxy] \(request.method.rawValue) \(request.path) Range: \(request.rangeHeader ?? "none")")
+            MKSLog.network.debug("\(request.method.rawValue) \(request.path) Range: \(request.rangeHeader ?? "none")")
 
             Task { [weak self] in
                 await self?.dispatchRequest(request, connection: connection, backendURL: backendURL, port: port)
@@ -516,7 +516,7 @@ actor StreamProxy {
                     return
                 }
 
-                print("[StreamProxy] HEAD -> HTTP \(httpResponse.statusCode)")
+                MKSLog.network.debug("HEAD -> HTTP \(httpResponse.statusCode)")
 
                 let statusText = Self.headReasonPhrase(for: httpResponse.statusCode)
                 var header = "HTTP/1.1 \(httpResponse.statusCode) \(statusText)\r\n"
@@ -541,7 +541,7 @@ actor StreamProxy {
                     connection.cancel()
                 })
             } catch {
-                print("[StreamProxy] HEAD failed: \(error.localizedDescription)")
+                MKSLog.network.error("HEAD failed: \(error.localizedDescription)")
                 let errorResp = Data("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n".utf8)
                 connection.send(content: errorResp, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in
                     connection.cancel()

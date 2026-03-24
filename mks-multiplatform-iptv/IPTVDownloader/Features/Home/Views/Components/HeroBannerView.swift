@@ -474,11 +474,19 @@ private extension Button {
             VStack {
                 HeroBannerView(
                     item: Movie(
-                        id: 1,
                         name: "Dune: Part Two",
-                        coverImage: "https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+                        streamType: "movie",
                         streamId: 1,
-                        rating: "8.5"
+                        tmdbId: nil,
+                        streamIcon: "https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg",
+                        rating: "8.5",
+                        rating5Based: 4.25,
+                        added: nil,
+                        isAdult: "0",
+                        categoryId: "1",
+                        containerExtension: "mp4",
+                        customSid: nil,
+                        directSource: nil
                     ),
                     selectedView: .constant(nil)
                 )

@@ -196,7 +196,7 @@ final class SSDPDiscoveryService: @unchecked Sendable {
         // Create UDP socket
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else {
-            print("[SSDP] Failed to create socket: \(String(cString: strerror(errno)))")
+            MKSLog.dlna.error("SSDP Failed to create socket: \(String(cString: strerror(errno)))")
             return
         }
         defer { close(fd) }
@@ -228,7 +228,7 @@ final class SSDPDiscoveryService: @unchecked Sendable {
                 addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sa in
                     let sent = sendto(fd, ptr, strlen(ptr), 0, sa, socklen_t(MemoryLayout<sockaddr_in>.size))
                     if sent < 0 {
-                        print("[SSDP] sendto failed for \(target): \(String(cString: strerror(errno)))")
+                        MKSLog.dlna.error("SSDP sendto failed for \(target): \(String(cString: strerror(errno)))")
                     }
                 }
             }
@@ -329,7 +329,7 @@ final class SSDPDiscoveryService: @unchecked Sendable {
             if parsed.avTransportControlURL == nil && !parsed.hasDIALService,
                let ip = locationURL.host {
                 let ssdpPort = locationURL.port ?? 80
-                print("[SSDP] Device \(parsed.friendlyName) has no AVTransport, probing for MediaRenderer on \(ip)...")
+                MKSLog.dlna.debug("SSDP Device \(parsed.friendlyName) has no AVTransport, probing for MediaRenderer on \(ip)...")
                 if let upgraded = await DLNADeviceParser.probeForMediaRenderer(ip: ip, ssdpPort: ssdpPort) {
                     parsed = upgraded
                 }
@@ -339,7 +339,7 @@ final class SSDPDiscoveryService: @unchecked Sendable {
             // These are typically AirPlay-only devices (e.g. Apple TV) that advertise
             // via SSDP but can't receive DLNA or Cast content.
             if parsed.avTransportControlURL == nil && !parsed.hasDIALService {
-                print("[SSDP] Skipping \(parsed.friendlyName) — no AVTransport and no DIAL (likely AirPlay-only)")
+                MKSLog.dlna.debug("SSDP Skipping \(parsed.friendlyName) — no AVTransport and no DIAL (likely AirPlay-only)")
                 await MainActor.run { [weak self] in
                     self?.fetchTasks.removeValue(forKey: udn)
                 }
@@ -356,7 +356,7 @@ final class SSDPDiscoveryService: @unchecked Sendable {
                 self.onDeviceFound?(device)
             }
         } catch {
-            print("[SSDP] Failed to parse device at \(locationURL): \(error)")
+            MKSLog.dlna.error("SSDP Failed to parse device at \(locationURL): \(error)")
             await MainActor.run { [weak self] in
                 self?.fetchTasks.removeValue(forKey: udn)
             }

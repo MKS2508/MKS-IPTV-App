@@ -167,7 +167,7 @@ final class HomeViewModel {
             sections.insert(contentsOf: epgSections, at: insertionIndex)
         }
 
-        print("[HomeViewModel] Inserted \(epgSections.count) EPG sections")
+        MKSLog.app.info("[HomeViewModel] Inserted \(epgSections.count) EPG sections")
     }
 
     // MARK: - Continue Watching Section (deferred)
@@ -203,9 +203,9 @@ final class HomeViewModel {
                 sections.insert(section, at: insertionIndex)
             }
 
-            print("[HomeViewModel] Inserted Continue Watching section with \(items.count) items")
+            MKSLog.app.info("[HomeViewModel] Inserted Continue Watching section with \(items.count) items")
         } catch {
-            print("[HomeViewModel] Failed to load continue watching: \(error)")
+            MKSLog.app.error("[HomeViewModel] Failed to load continue watching: \(error)")
         }
     }
 
@@ -238,9 +238,9 @@ final class HomeViewModel {
                 sections.insert(section, at: insertionIndex)
             }
 
-            print("[HomeViewModel] Inserted Recent Channels section with \(channels.count) items")
+            MKSLog.app.info("[HomeViewModel] Inserted Recent Channels section with \(channels.count) items")
         } catch {
-            print("[HomeViewModel] Failed to load recent channels: \(error)")
+            MKSLog.app.error("[HomeViewModel] Failed to load recent channels: \(error)")
         }
     }
 
@@ -501,6 +501,6 @@ final class HomeViewModel {
             }
         }
 
-        print("[HomeViewModel] Metadata prefetch completed")
+        MKSLog.app.info("[HomeViewModel] Metadata prefetch completed")
     }
 }

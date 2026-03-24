@@ -899,14 +899,14 @@ struct MediaDetailSheet: View {
                     contentType: "movie",
                     contentId: contentId
                 ), entry.lastPosition > 30, !entry.isCompleted {
-                    print("[PlaybackTracker] Resume dialog: pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
+                    MKSLog.player.debug("[PlaybackTracker] Resume dialog: pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
                     resumeEntry = entry
                     pendingPlayAction = { [self] in
                         launchMoviePlayer(movie: movie, ext: ext)
                     }
                     showResumeDialog = true
                 } else {
-                    print("[PlaybackTracker] No resume — launching directly")
+                    MKSLog.player.debug("[PlaybackTracker] No resume — launching directly")
                     launchMoviePlayer(movie: movie, ext: ext)
                 }
             }
@@ -962,14 +962,14 @@ struct MediaDetailSheet: View {
                 contentType: "episode",
                 contentId: contentId
             ), entry.lastPosition > 30, !entry.isCompleted {
-                print("[PlaybackTracker] Resume dialog (episode): pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
+                MKSLog.player.debug("[PlaybackTracker] Resume dialog (episode): pos=\(entry.lastPosition)s progress=\(entry.progress) completed=\(entry.isCompleted)")
                 resumeEntry = entry
                 pendingPlayAction = { [self] in
                     launchEpisodePlayer(episode)
                 }
                 showResumeDialog = true
             } else {
-                print("[PlaybackTracker] No resume (episode) — launching directly")
+                MKSLog.player.debug("[PlaybackTracker] No resume (episode) — launching directly")
                 launchEpisodePlayer(episode)
             }
         }
@@ -1139,19 +1139,19 @@ struct MediaDetailSheet: View {
         Task { @MainActor in
             for attempt in 0..<150 {
                 guard let player = activePlayer else {
-                    print("[Resume] Player is nil — aborting seek")
+                    MKSLog.player.debug("[Resume] Player is nil — aborting seek")
                     return
                 }
                 if player.isReady && player.duration > 0 {
                     player.seek(to: position)
-                    print("[Resume] Seeked to \(String(format: "%.1f", position))s (after \(attempt * 100)ms)")
+                    MKSLog.player.debug("[Resume] Seeked to \(String(format: "%.1f", position))s (after \(attempt * 100)ms)")
                     return
                 }
                 try? await Task.sleep(for: .milliseconds(100))
             }
             // Timeout — try seeking anyway as a last resort
             activePlayer?.seek(to: position)
-            print("[Resume] Timeout after 15s — attempted seek to \(String(format: "%.1f", position))s anyway")
+            MKSLog.player.debug("[Resume] Timeout after 15s — attempted seek to \(String(format: "%.1f", position))s anyway")
         }
     }
 

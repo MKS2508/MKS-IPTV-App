@@ -112,7 +112,7 @@ final class AppDataLoader {
 
         if hasCache {
             // Cache hit: show cached content immediately
-            print("[AppDataLoader] Cache hit — showing cached data immediately")
+            MKSLog.app.info("[AppDataLoader] Cache hit — showing cached data immediately")
 
             loadingStatus = .loadingMovies
             await mediaViewModel?.loadMedia(contentType: .all)
@@ -134,7 +134,7 @@ final class AppDataLoader {
             }
         } else {
             // No cache: load from network with retry
-            print("[AppDataLoader] No cache — loading from network")
+            MKSLog.app.info("[AppDataLoader] No cache — loading from network")
             await loadFromNetworkWithRetry()
         }
 
@@ -175,7 +175,7 @@ final class AppDataLoader {
         }
 
         if foundCache {
-            print("[AppDataLoader] Loaded categories from cache: \(movieCategories.count) movies, \(seriesCategories.count) series, \(liveChannelCategories.count) live channels")
+            MKSLog.app.info("[AppDataLoader] Loaded categories from cache: \(movieCategories.count) movies, \(seriesCategories.count) series, \(liveChannelCategories.count) live channels")
         }
 
         return foundCache
@@ -208,7 +208,7 @@ final class AppDataLoader {
                 cacheManager.cacheSeriesCategories(fetchedSeriesCategories)
                 cacheManager.cacheLiveChannelCategories(fetchedLiveChannelCategories)
 
-                print("[AppDataLoader] Categories loaded from network: \(movieCategories.count) movies, \(seriesCategories.count) series, \(liveChannelCategories.count) live channels")
+                MKSLog.app.info("[AppDataLoader] Categories loaded from network: \(movieCategories.count) movies, \(seriesCategories.count) series, \(liveChannelCategories.count) live channels")
 
                 // Load media content
                 loadingStatus = .loadingMovies
@@ -230,7 +230,7 @@ final class AppDataLoader {
                 return // Success — exit retry loop
 
             } catch {
-                print("[AppDataLoader] Network attempt \(attempt + 1)/\(maxRetries + 1) failed: \(error.localizedDescription)")
+                MKSLog.app.error("[AppDataLoader] Network attempt \(attempt + 1)/\(maxRetries + 1) failed: \(error.localizedDescription)")
 
                 if attempt < maxRetries {
                     // Exponential backoff: 2s, 4s, 8s
@@ -239,7 +239,7 @@ final class AppDataLoader {
                     try? await Task.sleep(nanoseconds: delay)
                 } else {
                     // Final failure
-                    print("[AppDataLoader] All \(maxRetries + 1) attempts failed")
+                    MKSLog.app.error("[AppDataLoader] All \(maxRetries + 1) attempts failed")
                     loadingStatus = .error("Connection error. Please check your internet.")
                     isLoading = false
                 }
@@ -272,9 +272,9 @@ final class AppDataLoader {
             // Re-assemble Home with fresh categories
             await assembleHomeSections()
 
-            print("[AppDataLoader] Background refresh completed: categories updated")
+            MKSLog.app.info("[AppDataLoader] Background refresh completed: categories updated")
         } catch {
-            print("[AppDataLoader] Background refresh failed (non-fatal): \(error.localizedDescription)")
+            MKSLog.app.warning("[AppDataLoader] Background refresh failed (non-fatal): \(error.localizedDescription)")
         }
     }
 
@@ -293,13 +293,13 @@ final class AppDataLoader {
             }
 
             let matchCount = await epgService.matchCount
-            print("[AppDataLoader] EPG loaded in background. Matched channels: \(matchCount)")
+            MKSLog.app.info("[AppDataLoader] EPG loaded in background. Matched channels: \(matchCount)")
 
             // Insert EPG sections into the already-visible Home screen
             await homeViewModel?.insertEPGSections()
         } catch {
             // Non-fatal: Home screen works without EPG, just hides EPG sections
-            print("[AppDataLoader] EPG background load failed (non-fatal): \(error.localizedDescription)")
+            MKSLog.app.warning("[AppDataLoader] EPG background load failed (non-fatal): \(error.localizedDescription)")
         }
     }
 

@@ -45,10 +45,10 @@ class PlayerFactory {
             return createPlayer(type: configuration.preferredPlayer, url: url, metadata: metadata, isLive: isLive)
         }
         if configuration.fallbackPlayer.supports(format: format) {
-            print("[PlayerFactory] Preferred player doesn't support \(format), using fallback")
+            MKSLog.player.info("Preferred player doesn't support \(format), using fallback")
             return createPlayer(type: configuration.fallbackPlayer, url: url, metadata: metadata, isLive: isLive)
         }
-        print("[PlayerFactory] No preferred player supports \(format), auto-selecting")
+        MKSLog.player.info("No preferred player supports \(format), auto-selecting")
         return createBestPlayer(for: format, url: url, metadata: metadata, isLive: isLive)
     }
 
@@ -74,7 +74,7 @@ class PlayerFactory {
                 // Note: VLC doesn't support externalMetadata, but the default load(url:metadata:) will call load(url:)
                 return player
             }
-            print("[PlayerFactory] VLCKit not available, falling back to AVPlayer")
+            MKSLog.player.warning("VLCKit not available, falling back to AVPlayer")
             let player = AVPlayerImplementation()
             player.load(url: url, metadata: metadata, isLive: isLive)
             return player
@@ -116,7 +116,7 @@ class PlayerFactory {
         // Check URL structure for content type hints
         if path.contains("/movie/") || path.contains("/series/") {
             // VOD content - default to mkv (most common)
-            print("[PlayerFactory] No extension detected, VOD path → assuming mkv")
+            MKSLog.player.info("No extension detected, VOD path → assuming mkv")
             return "mkv"
         }
 
@@ -135,21 +135,21 @@ class PlayerFactory {
 
         // 1. Native formats → AVPlayer (best PiP + AirPlay)
         if Self.nativeFormats.contains(detectedFormat) {
-            print("[PlayerFactory] Native format (\(detectedFormat)) → AVPlayer (isLive=\(isLive))")
+            MKSLog.player.info("Native format (\(detectedFormat)) → AVPlayer (isLive=\(isLive))")
             return createPlayer(type: .avplayer, url: url, metadata: metadata, isLive: isLive)
         }
 
         // 2. MKV and other non-native → FFmpeg transmux pipeline (ALWAYS for MKV)
         // This is the primary path for IPTV VOD content
         if Self.transmuxFormats.contains(detectedFormat) {
-            print("[PlayerFactory] Transmux format (\(detectedFormat)) → FFmpeg transmux pipeline")
+            MKSLog.player.info("Transmux format (\(detectedFormat)) → FFmpeg transmux pipeline")
             return createPlayer(type: .ffmpeg, url: url, metadata: metadata, isLive: isLive)
         }
 
         // 3. Live stream → AVPlayer (native HLS/TS handling)
         let path = url.path.lowercased()
         if path.contains("/live/") || path.hasSuffix(".m3u8") {
-            print("[PlayerFactory] Live stream detected → AVPlayer (isLive=true)")
+            MKSLog.player.info("Live stream detected → AVPlayer (isLive=true)")
             return createPlayer(type: .avplayer, url: url, metadata: metadata, isLive: true)
         }
 
@@ -157,7 +157,7 @@ class PlayerFactory {
         // This covers: VOD with unknown format, proxy URLs (localhost),
         // and any other URL that doesn't match native formats.
         // VLC is still available via manual player selection.
-        print("[PlayerFactory] Non-native/unknown format (\(detectedFormat)) → FFmpeg transmux pipeline")
+        MKSLog.player.info("Non-native/unknown format (\(detectedFormat)) → FFmpeg transmux pipeline")
         return createPlayer(type: .ffmpeg, url: url, metadata: metadata, isLive: isLive)
     }
 
@@ -233,6 +233,6 @@ class PlayerManager: ObservableObject {
         }
 
         let titleInfo = metadata?.title ?? url.lastPathComponent
-        print("[PlayerManager] Loaded \"\(titleInfo)\" with \(currentPlayerType.displayName)")
+        MKSLog.player.info("Loaded \"\(titleInfo)\" with \(currentPlayerType.displayName)")
     }
 }

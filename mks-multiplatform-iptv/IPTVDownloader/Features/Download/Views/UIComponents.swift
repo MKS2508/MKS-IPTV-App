@@ -2053,7 +2053,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
                                                       relativeTo: nil)
                 UserDefaults.standard.set(bookmarkData, forKey: "selectedFolderBookmark")
             } catch {
-                print("Failed to create bookmark: \(error.localizedDescription)")
+                MKSLog.media.error("Failed to create bookmark: \(error.localizedDescription)")
             }
             
             // Release the security-scoped resource when done
@@ -2063,7 +2063,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
         }
         
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            print("Document picker was cancelled")
+            MKSLog.media.debug("Document picker was cancelled")
         }
     }
 }
@@ -2114,7 +2114,7 @@ struct DocumentPicker: NSViewControllerRepresentable {
                                                               relativeTo: nil)
                         UserDefaults.standard.set(bookmarkData, forKey: "selectedFolderBookmark")
                     } catch {
-                        print("Error al crear bookmark: \(error.localizedDescription)")
+                        MKSLog.media.error("Error al crear bookmark: \(error.localizedDescription)")
                     }
                     
                     // Liberar el recurso cuando se termina

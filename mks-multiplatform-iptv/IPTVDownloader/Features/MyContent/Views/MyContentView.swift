@@ -228,11 +228,11 @@ struct MyContentView: View {
                 let file = LocalVideoFile(url: url)
                 if !localFiles.contains(where: { $0.url == url }) {
                     localFiles.append(file)
-                    print("[MyContent] Added local file: \(file.displayName)")
+                    MKSLog.media.info("[MyContent] Added local file: \(file.displayName)")
                 }
             }
         case .failure(let error):
-            print("[MyContent] Import error: \(error)")
+            MKSLog.media.error("[MyContent] Import error: \(error)")
         }
     }
 
@@ -252,7 +252,7 @@ struct MyContentView: View {
 
     private func removeLocalFile(_ file: LocalVideoFile) {
         localFiles.removeAll { $0.id == file.id }
-        print("[MyContent] Removed local file: \(file.displayName)")
+        MKSLog.media.info("[MyContent] Removed local file: \(file.displayName)")
     }
 
     // MARK: - TouchBar (macOS)

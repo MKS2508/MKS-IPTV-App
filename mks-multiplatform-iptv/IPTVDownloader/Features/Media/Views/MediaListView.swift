@@ -571,11 +571,11 @@ struct MediaListView: View {
         #if os(macOS)
         // Sync internal changes to TouchBarManager
         .onChange(of: searchText) { _, newValue in
-            print("[MediaListView] Internal searchText changed to: '\(newValue)'")
+            MKSLog.media.debug("[MediaListView] Internal searchText changed to: '\(newValue)'")
             touchBarManager.searchText = newValue
         }
         .onChange(of: selectedCategories) { _, newValue in
-            print("[MediaListView] Internal selectedCategories changed to: \(newValue)")
+            MKSLog.media.debug("[MediaListView] Internal selectedCategories changed to: \(newValue)")
             touchBarManager.selectedCategoryIDs = newValue
             // Update category names in TouchBarManager
             var categoryNames: Set<String> = []
@@ -587,13 +587,13 @@ struct MediaListView: View {
         }
         // Sync TouchBarManager changes to internal state
         .onChange(of: touchBarManager.searchText) { _, newValue in
-            print("[MediaListView] TouchBarManager searchText changed to: '\(newValue)'")
+            MKSLog.media.debug("[MediaListView] TouchBarManager searchText changed to: '\(newValue)'")
             if newValue != searchText {
                 searchText = newValue
             }
         }
         .onChange(of: touchBarManager.selectedCategoryIDs) { _, newValue in
-            print("[MediaListView] TouchBarManager selectedCategoryIDs changed to: \(newValue)")
+            MKSLog.media.debug("[MediaListView] TouchBarManager selectedCategoryIDs changed to: \(newValue)")
             if newValue != selectedCategories {
                 selectedCategories = newValue
             }

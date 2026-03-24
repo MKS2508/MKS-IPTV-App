@@ -37,7 +37,7 @@ actor EPGService {
         if let cached = cacheManager.getCachedEPG(), !isStale(cached) {
             epgData = cached
             buildProgrammeIndex()
-            print("[EPGService] Loaded EPG from disk cache (\(cached.channels.count) channels, \(cached.programmes.count) programmes)")
+            MKSLog.live.debug("[EPGService] Loaded EPG from disk cache (\(cached.channels.count) channels, \(cached.programmes.count) programmes)")
             return
         }
 
@@ -51,7 +51,7 @@ actor EPGService {
         // Try loading from cache first
         if let cached = cacheManager.getCachedMatchTable() {
             await matchingService.loadCachedTable(cached)
-            print("[EPGService] Match table loaded from cache (\(cached.count) entries)")
+            MKSLog.live.debug("[EPGService] Match table loaded from cache (\(cached.count) entries)")
             return
         }
 
@@ -136,7 +136,7 @@ actor EPGService {
             throw EPGError.invalidURL
         }
 
-        print("[EPGService] Fetching EPG from \(epgURL)...")
+        MKSLog.live.debug("[EPGService] Fetching EPG from \(epgURL)...")
 
         let (data, response) = try await URLSession.shared.data(from: url)
 
@@ -149,7 +149,7 @@ actor EPGService {
             throw EPGError.noData
         }
 
-        print("[EPGService] Downloaded \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))")
+        MKSLog.live.debug("[EPGService] Downloaded \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))")
 
         // Set time window: 1 hour ago → 24 hours from now
         let now = Date()
@@ -164,7 +164,7 @@ actor EPGService {
         // Cache to disk
         cacheManager.cacheEPG(parsed)
 
-        print("[EPGService] Parsed EPG: \(parsed.channels.count) channels, \(parsed.programmes.count) programmes")
+        MKSLog.live.debug("[EPGService] Parsed EPG: \(parsed.channels.count) channels, \(parsed.programmes.count) programmes")
     }
 
     private func buildProgrammeIndex() {

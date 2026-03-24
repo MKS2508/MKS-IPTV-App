@@ -78,17 +78,17 @@ actor EPGMatchingService {
             }
         }
 
-        print("[EPGMatchingService] Matched \(matchTable.count)/\(liveChannels.count) channels to EPG data")
+        MKSLog.live.debug("[EPGMatchingService] Matched \(matchTable.count)/\(liveChannels.count) channels to EPG data")
 
         // Log how many unique EPG channels were matched
         let uniqueEPG = Set(matchTable.values)
-        print("[EPGMatchingService] Unique EPG channels matched: \(uniqueEPG.count)/\(epgChannels.count)")
+        MKSLog.live.debug("[EPGMatchingService] Unique EPG channels matched: \(uniqueEPG.count)/\(epgChannels.count)")
     }
 
     /// Load a pre-built match table from cache without recomputing
     func loadCachedTable(_ table: [Int: String]) {
         matchTable = table
-        print("[EPGMatchingService] Loaded cached match table: \(table.count) entries")
+        MKSLog.live.debug("[EPGMatchingService] Loaded cached match table: \(table.count) entries")
     }
 
     /// Get the EPG channel ID for a live channel

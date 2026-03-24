@@ -60,7 +60,7 @@ struct GlassCategoryFilterBar: View {
     private var chipsStack: some View {
         HStack(spacing: 8) {
             // All categories chip
-            GlassCategoryChip(
+            GlassCategoryFilterChip(
                 title: "All",
                 icon: "tv",
                 count: nil,
@@ -74,7 +74,7 @@ struct GlassCategoryFilterBar: View {
 
             // Favorites chip (only if favorites exist)
             if favoritesCount > 0 {
-                GlassCategoryChip(
+                GlassCategoryFilterChip(
                     title: "Favorites",
                     icon: "star.fill",
                     count: favoritesCount,
@@ -89,7 +89,7 @@ struct GlassCategoryFilterBar: View {
 
             // Category chips
             ForEach(categories) { category in
-                GlassCategoryChip(
+                GlassCategoryFilterChip(
                     title: category.categoryName,
                     icon: categoryIcon(for: category.categoryId),
                     count: nil,
@@ -123,10 +123,10 @@ struct GlassCategoryFilterBar: View {
     }
 }
 
-// MARK: - Glass Category Chip
+// MARK: - Glass Category Filter Chip
 
 /// Individual category chip with Liquid Glass styling.
-struct GlassCategoryChip: View {
+struct GlassCategoryFilterChip: View {
     let title: String
     let icon: String?
     let count: Int?
@@ -172,7 +172,7 @@ private extension View {
     func glassChipStyle(isSelected: Bool) -> some View {
         if #available(iOS 26, macOS 26, tvOS 26, *) {
             if isSelected {
-                self.glassEffect(.prominent.tint(AppColors.accent.opacity(0.3)).interactive(), in: .capsule)
+                self.glassEffect(.regular.tint(AppColors.accent.opacity(0.3)).interactive(), in: .capsule)
             } else {
                 self.glassEffect(.regular.interactive(), in: .capsule)
             }

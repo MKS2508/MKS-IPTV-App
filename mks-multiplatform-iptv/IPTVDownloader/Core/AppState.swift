@@ -18,7 +18,7 @@ final class AppState {
     /// Set a file to open (called from onOpenURL or File → Open)
     func setLaunchedFile(_ url: URL) {
         self.launchedWithFile = url
-        print("[AppState] Set launched file: \(url.path)")
+        MKSLog.app.info("[AppState] Set launched file: \(url.path)")
     }
     
     /// Clear the launched file after handling

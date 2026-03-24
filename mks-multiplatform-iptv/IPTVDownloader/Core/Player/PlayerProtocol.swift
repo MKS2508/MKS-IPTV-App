@@ -200,7 +200,7 @@ enum PlayerMetadataHelper {
             return .success
         }
 
-        print("[PlayerMetadataHelper] Remote transport controls registered")
+        MKSLog.player.info("Remote transport controls registered")
     }
 
     /// Remove all remote command handlers. Call during `stop()`.
@@ -216,7 +216,7 @@ enum PlayerMetadataHelper {
         cc.skipBackwardCommand.removeTarget(nil)
 
         isRemoteCommandsActive = false
-        print("[PlayerMetadataHelper] Remote transport controls removed")
+        MKSLog.player.info("Remote transport controls removed")
     }
 
     // MARK: - Now Playing Info
@@ -270,7 +270,7 @@ enum PlayerMetadataHelper {
 
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
         MPNowPlayingInfoCenter.default().playbackState = .playing
-        print("[PlayerMetadataHelper] Set Now Playing: \(displayTitle) (duration: \(String(format: "%.0f", duration))s)")
+        MKSLog.player.info("Set Now Playing: \(displayTitle) (duration: \(String(format: "%.0f", duration))s)")
     }
 
     /// Update playback state to paused in the Now Playing session.
@@ -319,10 +319,10 @@ enum PlayerMetadataHelper {
                     #endif
 
                     MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-                    print("[PlayerMetadataHelper] Artwork loaded and set")
+                    MKSLog.player.info("Artwork loaded and set")
                 }
             } catch {
-                print("[PlayerMetadataHelper] Failed to load artwork: \(error)")
+                MKSLog.player.error("Failed to load artwork: \(error)")
             }
         }
     }
@@ -331,7 +331,7 @@ enum PlayerMetadataHelper {
     static func clearNowPlayingInfo() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         MPNowPlayingInfoCenter.default().playbackState = .stopped
-        print("[PlayerMetadataHelper] Cleared Now Playing info")
+        MKSLog.player.info("Cleared Now Playing info")
     }
 
     // MARK: - AVPlayerItem External Metadata (iOS / tvOS only)
@@ -413,10 +413,10 @@ enum PlayerMetadataHelper {
                     var existing = playerItem.externalMetadata
                     existing.append(artworkItem)
                     playerItem.externalMetadata = existing
-                    print("[PlayerMetadataHelper] External artwork set on AVPlayerItem")
+                    MKSLog.player.info("External artwork set on AVPlayerItem")
                 }
             } catch {
-                print("[PlayerMetadataHelper] Failed to load external artwork: \(error)")
+                MKSLog.player.error("Failed to load external artwork: \(error)")
             }
         }
     }

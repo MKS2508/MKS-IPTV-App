@@ -59,7 +59,7 @@ enum LiveLogger {
         let entry = "[\(ts)] [\(level)] [live] \(message) file=\(fileName) line=\(line)"
 
         // Console
-        print(entry)
+        MKSLog.live.debug(entry)
 
         // File (async, thread-safe)
         queue.async {

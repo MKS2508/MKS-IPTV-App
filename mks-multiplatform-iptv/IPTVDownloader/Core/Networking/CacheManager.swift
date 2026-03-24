@@ -152,12 +152,12 @@ class CacheManager {
         do {
             try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
         } catch {
-            print("[CacheManager] Failed to create cache directory: \(error)")
+            MKSLog.network.error("Failed to create cache directory: \(error)")
             cacheDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("IPTVCache")
             do {
                 try FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
             } catch {
-                print("[CacheManager] Failed to create temp cache directory: \(error)")
+                MKSLog.network.error("Failed to create temp cache directory: \(error)")
                 let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
                 cacheDirectory = documentsPath.appendingPathComponent("IPTVCache")
                 try? FileManager.default.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
@@ -225,7 +225,7 @@ class CacheManager {
                     key: key
                 )
             } catch {
-                print("[CacheManager] SWR read error for \(key): \(error)")
+                MKSLog.network.debug("SWR read error for \(key): \(error)")
                 return nil
             }
         }
@@ -339,7 +339,7 @@ class CacheManager {
                 let data = try JSONEncoder().encode(object)
                 try data.write(to: fileURL)
             } catch {
-                print("[CacheManager] Write error for \(key): \(error)")
+                MKSLog.network.error("Write error for \(key): \(error)")
             }
         }
     }
@@ -373,7 +373,7 @@ class CacheManager {
                 let data = try Data(contentsOf: fileURL)
                 return try PropertyListDecoder().decode(EPGData.self, from: data)
             } catch {
-                print("[CacheManager] EPG plist read error: \(error)")
+                MKSLog.network.debug("EPG plist read error: \(error)")
                 return nil
             }
         }
@@ -389,7 +389,7 @@ class CacheManager {
                 let plistData = try encoder.encode(data)
                 try plistData.write(to: fileURL)
             } catch {
-                print("[CacheManager] EPG plist write error: \(error)")
+                MKSLog.network.error("EPG plist write error: \(error)")
             }
 
             // Remove legacy JSON cache
@@ -424,7 +424,7 @@ class CacheManager {
                 }
                 return result
             } catch {
-                print("[CacheManager] Match table plist read error: \(error)")
+                MKSLog.network.debug("Match table plist read error: \(error)")
                 return nil
             }
         }
@@ -441,7 +441,7 @@ class CacheManager {
                 let data = try encoder.encode(stringKeyed)
                 try data.write(to: fileURL)
             } catch {
-                print("[CacheManager] Match table plist write error: \(error)")
+                MKSLog.network.error("Match table plist write error: \(error)")
             }
         }
     }
@@ -457,9 +457,9 @@ class CacheManager {
                 for file in files {
                     try FileManager.default.removeItem(at: file)
                 }
-                print("[CacheManager] Cleared all cache (\(files.count) files)")
+                MKSLog.network.info("Cleared all cache (\(files.count) files)")
             } catch {
-                print("[CacheManager] Error clearing cache: \(error)")
+                MKSLog.network.error("Error clearing cache: \(error)")
             }
         }
     }
@@ -494,10 +494,10 @@ class CacheManager {
                 }
 
                 if removedCount > 0 {
-                    print("[CacheManager] Cleared \(removedCount) expired files")
+                    MKSLog.network.info("Cleared \(removedCount) expired files")
                 }
             } catch {
-                print("[CacheManager] Error clearing expired cache: \(error)")
+                MKSLog.network.error("Error clearing expired cache: \(error)")
             }
         }
     }
@@ -516,9 +516,9 @@ class CacheManager {
                         removedCount += 1
                     }
                 }
-                print("[CacheManager] Cleared \(removedCount) \(type.displayName) files")
+                MKSLog.network.info("Cleared \(removedCount) \(type.displayName) files")
             } catch {
-                print("[CacheManager] Error clearing \(type.displayName) cache: \(error)")
+                MKSLog.network.error("Error clearing \(type.displayName) cache: \(error)")
             }
         }
     }
@@ -556,7 +556,7 @@ class CacheManager {
                 return Date().timeIntervalSince(modDate)
             }
         } catch {
-            print("[CacheManager] Error getting cache age for \(key): \(error)")
+            MKSLog.network.debug("Error getting cache age for \(key): \(error)")
         }
         return nil
     }
@@ -604,7 +604,7 @@ class CacheManager {
 
                 return CacheStats(totalSizeBytes: totalSize, entries: entries)
             } catch {
-                print("[CacheManager] Error computing stats: \(error)")
+                MKSLog.network.error("Error computing stats: \(error)")
                 return CacheStats(totalSizeBytes: 0, entries: [])
             }
         }

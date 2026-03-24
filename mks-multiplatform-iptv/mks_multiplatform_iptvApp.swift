@@ -25,7 +25,7 @@ struct mks_iptv_downloaderApp: App {
         do {
             watchHistoryContainer = try WatchHistoryConfiguration.createContainer()
             WatchHistoryManager.shared = WatchHistoryManager(modelContainer: watchHistoryContainer)
-            print("[WatchHistory] SwiftData container initialized")
+            MKSLog.app.info("[WatchHistory] SwiftData container initialized")
             // Repair entries corrupted by the duration=0 bug (progress=1.0 with low position)
             Task {
                 try? await WatchHistoryManager.shared.repairCorruptedEntries()
@@ -64,6 +64,14 @@ struct mks_iptv_downloaderApp: App {
         Self.configurePlayerEngines()
         #if os(iOS)
         Self.configureAudioSession()
+        #endif
+
+        // Start remote debug service — Bonjour browses for transmux-log-viewer
+        // on the LAN and auto-connects WebSocket for real-time log streaming.
+        #if DEBUG
+        Task { @MainActor in
+            RemoteDebugService.shared.start()
+        }
         #endif
 
         Task {
@@ -119,7 +127,7 @@ struct mks_iptv_downloaderApp: App {
     // MARK: - Player Engine Configuration
 
     static func configurePlayerEngines() {
-        print("[Player] Using FFmpeg transmux pipeline (TransmuxCore) + AVPlayer")
+        MKSLog.app.info("[Player] Using FFmpeg transmux pipeline (TransmuxCore) + AVPlayer")
     }
 
     #if os(iOS)
@@ -131,9 +139,9 @@ struct mks_iptv_downloaderApp: App {
             // .duckOthers: lower other audio instead of stopping it (e.g. navigation)
             try session.setCategory(.playback, mode: .moviePlayback, options: [.duckOthers])
             try session.setActive(true)
-            print("[Audio] AVAudioSession configured and activated: .playback, .moviePlayback, .duckOthers")
+            MKSLog.app.info("[Audio] AVAudioSession configured and activated: .playback, .moviePlayback, .duckOthers")
         } catch {
-            print("[Audio] Failed to configure AVAudioSession: \(error)")
+            MKSLog.app.error("[Audio] Failed to configure AVAudioSession: \(error)")
         }
     }
     #endif
@@ -191,7 +199,7 @@ struct MainWindowContent: View {
 
     private func handleOpenURL(_ url: URL) {
         guard url.isFileURL else {
-            print("[App] Ignoring non-file URL: \(url)")
+            MKSLog.app.info("[App] Ignoring non-file URL: \(url)")
             return
         }
 
@@ -222,7 +230,7 @@ enum FilePlayerOpener {
     
     @MainActor
     static func openPlayerWindow(with url: URL) {
-        print("[FilePlayerOpener] Opening player window for: \(url.path)")
+        MKSLog.app.info("[FilePlayerOpener] Opening player window for: \(url.path)")
         
         let title = url.deletingPathExtension().lastPathComponent
         let player = PlayerFactory.shared.createPlayer(for: url)
@@ -233,12 +241,12 @@ enum FilePlayerOpener {
             metadata: nil
         )
         
-        print("[FilePlayerOpener] Player configured in PlayerWindowManager")
+        MKSLog.app.info("[FilePlayerOpener] Player configured in PlayerWindowManager")
 
         player.load(url: url)
         player.play()
         
-        print("[FilePlayerOpener] Player loaded and playing")
+        MKSLog.app.info("[FilePlayerOpener] Player loaded and playing")
 
         // Create or show the player window directly via AppKit
         createAndShowPlayerWindow()
@@ -250,13 +258,13 @@ enum FilePlayerOpener {
         if let existingWindow = NSApplication.shared.windows.first(where: { 
             $0.identifier?.rawValue == "mks-player-window"
         }) {
-            print("[FilePlayerOpener] Reusing existing player window")
+            MKSLog.app.info("[FilePlayerOpener] Reusing existing player window")
             existingWindow.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
             return
         }
         
-        print("[FilePlayerOpener] Creating new player window")
+        MKSLog.app.info("[FilePlayerOpener] Creating new player window")
         
         // Create window programmatically
         let window = NSWindow(
@@ -289,12 +297,12 @@ enum FilePlayerOpener {
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
         
-        print("[FilePlayerOpener] Player window created and shown")
+        MKSLog.app.info("[FilePlayerOpener] Player window created and shown")
         
         // Debug: List all windows
-        print("[FilePlayerOpener] Current windows:")
+        MKSLog.app.info("[FilePlayerOpener] Current windows:")
         for w in NSApplication.shared.windows {
-            print("  - \(w.title) [id: \(w.identifier?.rawValue ?? "nil")]")
+            MKSLog.app.debug("  - \(w.title) [id: \(w.identifier?.rawValue ?? "nil")]")
         }
     }
 }

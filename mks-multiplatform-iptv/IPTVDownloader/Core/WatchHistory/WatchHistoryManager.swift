@@ -153,7 +153,7 @@ actor WatchHistoryManager {
 
         if deletedCount > 0 {
             try modelContext.save()
-            print("[WatchHistory] Deduplicated \(deletedCount) entries after CloudKit sync")
+            MKSLog.app.info("[WatchHistory] Deduplicated \(deletedCount) entries after CloudKit sync")
         }
     }
 
@@ -186,7 +186,7 @@ actor WatchHistoryManager {
         }
         if repaired > 0 {
             try modelContext.save()
-            print("[WatchHistory] Repaired \(repaired) corrupted entries")
+            MKSLog.app.info("[WatchHistory] Repaired \(repaired) corrupted entries")
         }
     }
 

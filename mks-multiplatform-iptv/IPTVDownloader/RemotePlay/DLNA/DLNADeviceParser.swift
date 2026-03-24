@@ -106,7 +106,7 @@ enum DLNADeviceParser {
                     guard let device = parser.parse(data),
                           device.avTransportControlURL != nil else { continue }
 
-                    print("[DLNAParser] Probe HIT: found MediaRenderer at \(url) with AVTransport")
+                    MKSLog.dlna.info("Probe HIT: found MediaRenderer at \(url) with AVTransport")
                     return device
                 } catch {
                     continue
@@ -125,14 +125,14 @@ enum DLNADeviceParser {
                 guard let device = parser.parse(data),
                       device.avTransportControlURL != nil else { continue }
 
-                print("[DLNAParser] Probe HIT: found MediaRenderer at \(url) with AVTransport")
+                MKSLog.dlna.info("Probe HIT: found MediaRenderer at \(url) with AVTransport")
                 return device
             } catch {
                 continue
             }
         }
 
-        print("[DLNAParser] Probe: no MediaRenderer found on \(ip)")
+        MKSLog.dlna.debug("Probe: no MediaRenderer found on \(ip)")
         return nil
     }
 
@@ -267,7 +267,7 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
 
         guard parser.parse() else {
             lastError = "XML parsing failed"
-            print("[DLNAParser] XML parsing failed, raw data length: \(data.count)")
+            MKSLog.dlna.error("XML parsing failed, raw data length: \(data.count)")
             return nil
         }
 
@@ -290,24 +290,24 @@ private final class UPnPDeviceXMLParser: NSObject, XMLParserDelegate {
         let connectionManager = services.first { $0.type.contains("ConnectionManager") }
         let hasDIAL = services.contains { $0.type.contains("dial-multiscreen") || $0.type.contains("dial:") }
 
-        print("[DLNAParser] Device: \(friendlyName ?? "?")")
-        print("[DLNAParser] Base URL: \(resolvedBaseURL.absoluteString)")
-        print("[DLNAParser] Services found: \(services.count)")
+        MKSLog.dlna.debug("Device: \(friendlyName ?? "?")")
+        MKSLog.dlna.debug("Base URL: \(resolvedBaseURL.absoluteString)")
+        MKSLog.dlna.debug("Services found: \(services.count)")
         for svc in services {
-            print("[DLNAParser]   type=\(svc.type) controlURL=\(svc.controlURL ?? "nil") eventSubURL=\(svc.eventSubURL ?? "nil")")
+            MKSLog.dlna.debug("  type=\(svc.type) controlURL=\(svc.controlURL ?? "nil") eventSubURL=\(svc.eventSubURL ?? "nil")")
         }
         if services.isEmpty {
             // Dump first 2000 chars of raw XML for debugging
             let rawXML = String(data: data, encoding: .utf8) ?? "<binary data>"
-            print("[DLNAParser] WARNING: 0 services parsed! Raw XML (first 2000 chars):")
-            print(String(rawXML.prefix(2000)))
+            MKSLog.dlna.warning("WARNING: 0 services parsed! Raw XML (first 2000 chars):")
+            MKSLog.dlna.warning(String(rawXML.prefix(2000)))
         }
-        print("[DLNAParser] AVTransport: \(avTransport != nil ? "found" : "MISSING")")
+        MKSLog.dlna.debug("AVTransport: \(avTransport != nil ? "found" : "MISSING")")
         if let ctrl = avTransport?.controlURL {
             let resolved = resolveURL(ctrl, base: resolvedBaseURL)
-            print("[DLNAParser] AVTransport controlURL raw='\(ctrl)' resolved=\(resolved?.absoluteString ?? "nil")")
+            MKSLog.dlna.debug("AVTransport controlURL raw='\(ctrl)' resolved=\(resolved?.absoluteString ?? "nil")")
         } else if avTransport != nil {
-            print("[DLNAParser] WARNING: AVTransport found but controlURL is nil!")
+            MKSLog.dlna.warning("WARNING: AVTransport found but controlURL is nil!")
         }
 
         // Build capabilities based on available services

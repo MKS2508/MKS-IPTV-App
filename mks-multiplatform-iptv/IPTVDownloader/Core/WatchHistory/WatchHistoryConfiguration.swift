@@ -30,7 +30,7 @@ enum WatchHistoryConfiguration {
             )
             return try ModelContainer(for: schema, configurations: [cloudConfig])
         } catch {
-            print("[WatchHistory] CloudKit store failed, falling back to local: \(error)")
+            MKSLog.app.warning("[WatchHistory] CloudKit store failed, falling back to local: \(error)")
             let localConfig = ModelConfiguration(
                 "WatchHistory",
                 schema: schema,

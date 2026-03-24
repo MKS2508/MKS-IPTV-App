@@ -102,7 +102,7 @@ final class PlaybackTracker {
             }
             .store(in: &cancellables)
 
-        print("[PlaybackTracker] Started tracking: \(content.displayTitle)")
+        MKSLog.player.debug("[PlaybackTracker] Started tracking: \(content.displayTitle)")
     }
 
     /// Stop tracking and save final position.
@@ -126,12 +126,12 @@ final class PlaybackTracker {
         seriesDetail = nil
         nextEpisodeReady = nil
 
-        print("[PlaybackTracker] Stopped tracking (captured pos: \(String(format: "%.1f", capturedPosition))s)")
+        MKSLog.player.debug("[PlaybackTracker] Stopped tracking (captured pos: \(String(format: "%.1f", capturedPosition))s)")
 
         // Save final position with captured values
         guard let content = capturedContent, capturedPosition > 1, capturedDuration > 0 else {
             if capturedPosition > 1 && capturedDuration <= 0 {
-                print("[PlaybackTracker] Skipping final save — duration unavailable")
+                MKSLog.player.debug("[PlaybackTracker] Skipping final save — duration unavailable")
             }
             return
         }
@@ -155,9 +155,9 @@ final class PlaybackTracker {
                     episodeTitle: content.episodeTitle,
                     containerExtension: content.containerExtension
                 )
-                print("[PlaybackTracker] Final position saved: \(String(format: "%.1f", capturedPosition))s / \(String(format: "%.1f", duration))s")
+                MKSLog.player.debug("[PlaybackTracker] Final position saved: \(String(format: "%.1f", capturedPosition))s / \(String(format: "%.1f", duration))s")
             } catch {
-                print("[PlaybackTracker] Final save failed: \(error)")
+                MKSLog.player.error("[PlaybackTracker] Final save failed: \(error)")
             }
         }
     }
@@ -218,7 +218,7 @@ final class PlaybackTracker {
                     showTitle: content.showTitle ?? content.displayTitle,
                     posterURL: posterURL
                 )
-                print("[PlaybackTracker] Next episode ready: S\(nextEp.season)E\(nextEp.episodeNum) — \(nextEp.title)")
+                MKSLog.player.debug("[PlaybackTracker] Next episode ready: S\(nextEp.season)E\(nextEp.episodeNum) — \(nextEp.title)")
             }
         }
     }
@@ -238,7 +238,7 @@ final class PlaybackTracker {
         // Require real duration — transmux content may report 0 briefly during startup.
         // Saving with duration=0 would create entries with progress=1.0 (broken).
         guard duration > 0 else {
-            print("[PlaybackTracker] Skipping save — duration not yet available (pos: \(String(format: "%.1f", position))s)")
+            MKSLog.player.debug("[PlaybackTracker] Skipping save — duration not yet available (pos: \(String(format: "%.1f", position))s)")
             return
         }
 
@@ -263,9 +263,9 @@ final class PlaybackTracker {
                 containerExtension: content.containerExtension
             )
             let savedProgress = duration > 0 ? position / duration : 0
-            print("[PlaybackTracker] Saved position: \(String(format: "%.1f", position))s / \(String(format: "%.1f", duration))s (progress: \(String(format: "%.4f", savedProgress)))")
+            MKSLog.player.debug("[PlaybackTracker] Saved position: \(String(format: "%.1f", position))s / \(String(format: "%.1f", duration))s (progress: \(String(format: "%.4f", savedProgress)))")
         } catch {
-            print("[PlaybackTracker] Save failed: \(error)")
+            MKSLog.player.error("[PlaybackTracker] Save failed: \(error)")
         }
     }
 

@@ -11,16 +11,16 @@ import UIKit
 struct DownloadActions {
     
     static func playAction(movieDetail: MovieDetail, profile: IPTVProfile, onPlayerReady: @escaping (AVPlayer) -> Void) {
-        print("▶️ Acción Play para: \(movieDetail.movieData.name)")
+        MKSLog.media.info("Acción Play para: \(movieDetail.movieData.name)")
         let urlString = IPTVConfiguration.buildMovieURL(
             profile: profile,
             vodID: String(movieDetail.movieData.streamId),
             vodExtension: movieDetail.movieData.containerExtension ?? "mp4"
         )
-        print("🔗 URL: \(urlString)")
+        MKSLog.media.debug("URL: \(urlString)")
         
         guard let originalUrl = URL(string: urlString) else {
-            print("❌ URL inválida: \(urlString)")
+            MKSLog.media.error("URL inválida: \(urlString)")
             return
         }
         
@@ -28,18 +28,18 @@ struct DownloadActions {
         
         streamManager.resolveStreamURL(from: originalUrl) { resolvedUrl in
             guard let resolvedUrl = resolvedUrl else {
-                print("❌ No se pudo resolver la URL del stream")
+                MKSLog.media.error("No se pudo resolver la URL del stream")
                 return
             }
             
             streamManager.setupStreamPlayer(with: resolvedUrl) { player in
                 DispatchQueue.main.async {
                     if let player = player {
-                        print("✅ Player configurado para película")
+                        MKSLog.media.info("Player configurado para película")
                         onPlayerReady(player)
                         player.play()
                     } else {
-                        print("❌ No se pudo configurar el player")
+                        MKSLog.media.error("No se pudo configurar el player")
                     }
                 }
             }
@@ -60,7 +60,7 @@ struct DownloadActions {
         UIPasteboard.general.string = urlString
         #endif
         
-        print("📋 URL copiada al portapapeles")
+        MKSLog.media.info("URL copiada al portapapeles")
     }
     
     static func extractYear(from dateString: String) -> String {

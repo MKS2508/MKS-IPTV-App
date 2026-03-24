@@ -8,9 +8,16 @@ struct LiveChannelCategory: Identifiable, Codable, Equatable {
     let categoryId: String
     let categoryName: String
     @CodableStringInt var parentId: Int
-    
+
     var id: String { categoryId }
-    
+
+    /// Manual initializer for Previews and testing
+    init(categoryId: String, categoryName: String, parentId: Int) {
+        self.categoryId = categoryId
+        self.categoryName = categoryName
+        self._parentId = CodableStringInt(wrappedValue: parentId)
+    }
+
     static func == (lhs: LiveChannelCategory, rhs: LiveChannelCategory) -> Bool {
         lhs.categoryId == rhs.categoryId
     }

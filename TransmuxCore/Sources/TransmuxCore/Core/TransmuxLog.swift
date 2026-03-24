@@ -88,14 +88,15 @@ public enum TransmuxLog {
     /// Call this once after `configure()` to capture ALL log output from C code.
     public static func installCLogBridge() {
         mks_log_set_callback { tag, level, fmt, vl in
-            // Format the C message
+            // Format the C message (fmt and tag are non-optional UnsafePointer<CChar>)
             var buf = [CChar](repeating: 0, count: 2048)
             if let vl = vl {
                 vsnprintf(&buf, 2048, fmt, vl)
-            } else if let fmt = fmt {
+            } else {
                 strncpy(&buf, fmt, 2047)
             }
             let message = String(cString: buf)
+            let swiftTag = String(cString: tag)
 
             // Map C level to Swift Level
             let lvl = level.rawValue
@@ -104,13 +105,6 @@ public enum TransmuxLog {
             else if lvl <= 24 { swiftLevel = .warn }   // MKS_LOG_WARNING
             else if lvl <= 32 { swiftLevel = .info }   // MKS_LOG_INFO
             else { swiftLevel = .debug }                // MKS_LOG_DEBUG+
-
-            let swiftTag: String
-            if let tag = tag {
-                swiftTag = String(cString: tag)
-            } else {
-                swiftTag = "C"
-            }
 
             // Forward to the same external observer as Swift logs
             externalObserver?(message, swiftTag, swiftLevel)

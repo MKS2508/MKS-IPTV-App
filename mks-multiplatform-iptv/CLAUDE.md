@@ -168,3 +168,28 @@ Stream URLs: `{baseURL}/{movie|series|live}/{username}/{password}/{id}.{extensio
 - Use `EnvironmentObject` for shared services (DownloadManager, IPTVProfile)
 - Conditional compilation with `#if os(macOS)` / `#if os(iOS)` for platform-specific code
 - Actor isolation for thread-safe services (MovieService)
+
+### Logging — NEVER use print()
+
+**ALWAYS use `MKSLog` for ALL logging.** Never use `print()`, `debugPrint()`, or `NSLog()`.
+
+```swift
+// CORRECT:
+MKSLog.player.info("LOAD url=\(url), isLive=\(isLive)")
+MKSLog.dlna.error("Failed to connect: \(error)")
+MKSLog.live.debug("Segmenter pipeline started")
+MKSLog.app.warning("Audio session activation failed")
+
+// WRONG — NEVER DO THIS:
+print("[Player] Loading...")
+```
+
+**Available loggers**: `MKSLog.player`, `.live`, `.dlna`, `.cast`, `.transmux`, `.app`, `.network`, `.media`, `.debug`
+**Levels**: `.debug()`, `.info()`, `.warning()`, `.error()`
+
+MKSLog sends to 3 destinations simultaneously:
+1. `os.Logger` → Console.app / Xcode
+2. File → `MKSLogConfig` path
+3. WebSocket → remote transmux-log-viewer (when connected via Bonjour)
+
+For specialized player events, use `MKSLog.seekStart()`, `MKSLog.glitch()`, `MKSLog.stateChange()`, etc.

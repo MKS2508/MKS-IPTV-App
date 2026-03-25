@@ -200,9 +200,7 @@ class DebugStreamingViewModel: ObservableObject {
 
     deinit {
         MKSLog.localObserver = nil
-        #if os(macOS)
-        RemoteLogReceiver.shared.onLogReceived = nil
-        #endif
+        // RemoteLogReceiver.onLogReceived uses [weak self] — goes nil automatically.
     }
 
     // MARK: - Log Management

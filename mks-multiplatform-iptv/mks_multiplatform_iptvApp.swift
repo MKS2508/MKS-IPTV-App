@@ -80,9 +80,10 @@ struct mks_iptv_downloaderApp: App {
         Self.configureAudioSession()
         #endif
 
-        // Start remote debug service — Bonjour browses for transmux-log-viewer
-        // on the LAN and auto-connects WebSocket for real-time log streaming.
-        #if DEBUG
+        // Remote debug: iOS browses for a Mac/viewer to send logs to.
+        // macOS acts as the RECEIVER (RemoteLogReceiver), not a browser —
+        // otherwise it discovers itself in a loop.
+        #if DEBUG && !os(macOS)
         Task { @MainActor in
             RemoteDebugService.shared.start()
         }

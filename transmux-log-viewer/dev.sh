@@ -71,16 +71,25 @@ PANE_FRONTEND="${PANE_FRONTEND:-1}"
 PANE_LOG="${PANE_LOG:-2}"
 PANE_CLI="${PANE_CLI:-3}"
 
-# Theme colors
-C_BLUE="${TMUX_COLOR_BLUE:-#7aa2f7}"
+# Theme colors (Tokyo Night / Synthwave)
+C_BG="${TMUX_COLOR_BG:-#0d0d1a}"
+C_BG2="${TMUX_COLOR_BG2:-#1a1b26}"
+C_BORDER="${TMUX_COLOR_BORDER:-#3b4261}"
 C_MUTED="${TMUX_COLOR_MUTED:-#565f89}"
+C_BLUE="${TMUX_COLOR_BLUE:-#7aa2f7}"
+C_RED="${TMUX_COLOR_RED:-#f7768e}"
+C_PURPLE="${TMUX_COLOR_PURPLE:-#bb9af7}"
+C_CYAN="${TMUX_COLOR_CYAN:-#7dcfff}"
+C_GREEN="${TMUX_COLOR_GREEN:-#9ece6a}"
+C_YELLOW="${TMUX_COLOR_YELLOW:-#e0af68}"
+C_FG="${TMUX_COLOR_FG:-#c0caf5}"
 
 # Package filters
 BACKEND_PACKAGE="${BACKEND_PACKAGE:-@transmux-viewer/backend}"
 FRONTEND_PACKAGE="${FRONTEND_PACKAGE:-mks-iptv-client}"
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Terminal Colors
+# Terminal Colors (Tokyo Night palette)
 # ═══════════════════════════════════════════════════════════════════════════
 
 RED='\033[38;2;247;118;142m'
@@ -88,6 +97,7 @@ GREEN='\033[38;2;158;206;106m'
 BLUE='\033[38;2;122;162;247m'
 PURPLE='\033[38;2;187;154;247m'
 YELLOW='\033[38;2;224;175;104m'
+CYAN='\033[38;2;125;207;255m'
 MUTED='\033[38;2;86;95;137m'
 FG='\033[38;2;192;202;245m'
 NC='\033[0m'
@@ -284,25 +294,32 @@ print_banner() {
   echo -e "${NC}"
   echo -e "  ${MUTED}Session:${NC}  ${FG}$SESSION_NAME${NC}  ${MUTED}│${NC}  ${MUTED}Mode:${NC} ${FG}$URL_MODE${NC}"
   echo ""
-  echo -e "  ${MUTED}┌─────────────────────────────┬─────────────────────────────┐${NC}"
-  echo -e "  ${MUTED}│${NC} ${BLUE}${BOLD}0:api${NC} ${MUTED}Elysia Backend${NC}       ${MUTED}│${NC} ${GREEN}${BOLD}1:web${NC} ${MUTED}Vite Frontend${NC}       ${MUTED}│${NC}"
-  echo -e "  ${MUTED}│${NC}   ${FG}$BACKEND_URL${NC}        ${MUTED}│${NC}   ${FG}$FRONTEND_URL${NC}       ${MUTED}│${NC}"
-  echo -e "  ${MUTED}├─────────────────────────────┼─────────────────────────────┤${NC}"
-  echo -e "  ${MUTED}│${NC} ${YELLOW}${BOLD}2:logs${NC} ${MUTED}tail -f log${NC}          ${MUTED}│${NC} ${PURPLE}${BOLD}3:shell${NC} ${MUTED}CLI + Tests${NC}        ${MUTED}│${NC}"
-  echo -e "  ${MUTED}│${NC}   ${FG}$LOG_FILE${NC}  ${MUTED}│${NC}   ${FG}transmux-cli ready${NC}       ${MUTED}│${NC}"
-  echo -e "  ${MUTED}└─────────────────────────────┴─────────────────────────────┘${NC}"
+  echo -e "  ${MUTED}┌───────────────────────────────────────────────────────────┐${NC}"
+  echo -e "  ${MUTED}│${NC} ${BLUE}${BOLD}󰘚 0:api${NC}    ${MUTED}Elysia Backend${NC}                      ${MUTED}│${NC}"
+  echo -e "  ${MUTED}│${NC}     ${FG}$BACKEND_URL${NC}                           ${MUTED}│${NC}"
+  echo -e "  ${MUTED}├───────────────────────────────────────────────────────────┤${NC}"
+  echo -e "  ${MUTED}│${NC} ${GREEN}${BOLD}󰖟 1:web${NC}    ${MUTED}Vite Frontend${NC}                     ${MUTED}│${NC}"
+  echo -e "  ${MUTED}│${NC}     ${FG}$FRONTEND_URL${NC}                          ${MUTED}│${NC}"
+  echo -e "  ${MUTED}├───────────────────────────────────────────────────────────┤${NC}"
+  echo -e "  ${MUTED}│${NC} ${YELLOW}${BOLD}󰛣 2:logs${NC}   ${MUTED}tail -f transmux log${NC}                ${MUTED}│${NC}"
+  echo -e "  ${MUTED}│${NC}     ${FG}$LOG_FILE${NC}       ${MUTED}│${NC}"
+  echo -e "  ${MUTED}├───────────────────────────────────────────────────────────┤${NC}"
+  echo -e "  ${MUTED}│${NC} ${PURPLE}${BOLD}󰆍 3:shell${NC}  ${MUTED}TransmuxCore CLI + Testing${NC}          ${MUTED}│${NC}"
+  echo -e "  ${MUTED}│${NC}     ${FG}transmux-cli ready${NC}                           ${MUTED}│${NC}"
+  echo -e "  ${MUTED}└───────────────────────────────────────────────────────────┘${NC}"
   echo ""
-  echo -e "  ${MUTED}Shortcuts:${NC}"
-  echo -e "    ${FG}Ctrl+b Q${NC}    ${MUTED}Exit session (popup confirm)${NC}"
-  echo -e "    ${FG}Ctrl+b 0-3${NC}   ${MUTED}Jump to pane by index${NC}"
-  echo -e "    ${FG}Ctrl+b arrows${NC} ${MUTED}Navigate between panes${NC}"
+  echo -e "  ${CYAN}${BOLD}󰘖 Shortcuts${NC}"
+  echo -e "    ${FG}Ctrl+b q${NC}        ${MUTED}Exit session (popup confirm)${NC}"
+  echo -e "    ${FG}Ctrl+b 0-3${NC}       ${MUTED}Jump to pane by index${NC}"
+  echo -e "    ${FG}Ctrl+b arrows${NC}   ${MUTED}Navigate between panes${NC}"
+  echo -e "    ${FG}Alt+arrows${NC}      ${MUTED}Navigate (no prefix needed)${NC}"
   echo ""
-  echo -e "  ${MUTED}CLI Commands (tracked via API):${NC}"
-  echo -e "    ${FG}./dev.sh cli basic${NC}           ${MUTED}10s transmux test${NC}"
-  echo -e "    ${FG}./dev.sh cli seek 300${NC}        ${MUTED}Seek to 5min${NC}"
-  echo -e "    ${FG}./dev.sh cli stop${NC}            ${MUTED}Stop running session${NC}"
-  echo -e "    ${FG}./dev.sh cli sessions${NC}        ${MUTED}List tracked sessions${NC}"
-  echo -e "    ${FG}./dev.sh grep ac3${NC}            ${MUTED}Filter AC3 logs${NC}"
+  echo -e "  ${YELLOW}${BOLD}󰛁 CLI Commands${NC} ${MUTED}(tracked via API)${NC}"
+  echo -e "    ${FG}./dev.sh cli basic${NC}             ${MUTED}10s transmux test${NC}"
+  echo -e "    ${FG}./dev.sh cli seek 300${NC}          ${MUTED}Seek to 5min${NC}"
+  echo -e "    ${FG}./dev.sh cli stop${NC}              ${MUTED}Stop running session${NC}"
+  echo -e "    ${FG}./dev.sh cli sessions${NC}          ${MUTED}List tracked sessions${NC}"
+  echo -e "    ${FG}./dev.sh grep ac3${NC}              ${MUTED}Filter AC3 logs${NC}"
   echo ""
 }
 
@@ -314,14 +331,27 @@ style_panes() {
   # Enable mouse support
   tmux set-option -t "$SESSION_NAME" mouse on 2>/dev/null || true
 
+  # Terminal capabilities (OSC 52 clipboard support)
+  tmux set-option -t "$SESSION_NAME" set-clipboard on 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" terminal-overrides "xterm-256color:clipboard=on" 2>/dev/null || true
+
+  # Large history
+  tmux set-option -t "$SESSION_NAME" history-limit 50000 2>/dev/null || true
+
+  # No escape delay (important for vim/nvim)
+  tmux set-option -t "$SESSION_NAME" escape-time 0 2>/dev/null || true
+
+  # Heavy pane borders
+  tmux set-option -t "$SESSION_NAME" pane-border-lines heavy 2>/dev/null || true
+
   # Enable pane border status on top
   tmux set-option -t "$SESSION_NAME" pane-border-status top 2>/dev/null || true
   tmux set-option -t "$SESSION_NAME" pane-border-format \
-    " #{?pane_active,#[fg=$C_BLUE#,bold],#[fg=$C_MUTED]} #{pane_index}:#{pane_title} #[default]" 2>/dev/null || true
+    " #{?pane_active,#[fg=$C_RED#,bold],#[fg=$C_MUTED]} #{pane_index}:#{pane_title} #[default]" 2>/dev/null || true
 
-  # Border colors
-  tmux set-option -t "$SESSION_NAME" pane-border-style "fg=$C_MUTED" 2>/dev/null || true
-  tmux set-option -t "$SESSION_NAME" pane-active-border-style "fg=$C_BLUE" 2>/dev/null || true
+  # Border colors (Tokyo Night)
+  tmux set-option -t "$SESSION_NAME" pane-border-style "fg=$C_BORDER" 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" pane-active-border-style "fg=$C_BLUE,bold" 2>/dev/null || true
 
   # Pane titles
   tmux select-pane -t "$(pane_target $PANE_BACKEND)"  -T "api"   2>/dev/null || true
@@ -329,33 +359,62 @@ style_panes() {
   tmux select-pane -t "$(pane_target $PANE_LOG)"      -T "logs"  2>/dev/null || true
   tmux select-pane -t "$(pane_target $PANE_CLI)"      -T "shell" 2>/dev/null || true
 
-  # Status bar
+  # Status bar (topbar with powerline style)
   get_urls
-  local status_left="#[fg=$C_BLUE,bold] TRANSMUX #[default]#[fg=$C_MUTED]│#[default]"
-  status_left+=" #[fg=white]${URL_MODE}#[default]"
+  local status_left='\
+#[fg='$C_BG',bg='$C_RED',bold] 󰆍 \
+#[fg='$C_RED',bg='$C_BLUE']\
+#[fg='$C_BG',bg='$C_BLUE',bold] TRANSMUX \
+#[fg='$C_BLUE',bg='$C_BORDER']\
+#[fg='$C_FG',bg='$C_BORDER'] '${URL_MODE}' \
+#[fg='$C_BORDER',bg='$C_BG']'
 
-  local status_right="#[fg=$C_MUTED]Exit:#[fg=white] Ctrl+b Q#[default]"
-  status_right+=" #[fg=$C_MUTED]│#[default]"
-  status_right+=" #[fg=$C_BLUE]%H:%M:%S#[default]"
+  local status_right='\
+#[fg='$C_BORDER',bg='$C_BG']\
+#[fg='$C_MUTED',bg='$C_BORDER'] 󰘖 0-3 \
+#[fg='$C_BG',bg='$C_BORDER']\
+#[fg='$C_CYAN',bg='$C_BG'] 󰘕 arrows \
+#[fg='$C_BORDER',bg='$C_BG']\
+#[fg='$C_YELLOW',bg='$C_BORDER'] 󰗈 q \
+#[fg='$C_PURPLE',bg='$C_BORDER']\
+#[fg='$C_BG',bg='$C_PURPLE',bold]  %H:%M \
+#[fg='$C_RED',bg='$C_PURPLE']\
+#[fg='$C_BG',bg='$C_RED',bold] 󱐋 '
 
   tmux set-option -t "$SESSION_NAME" status on 2>/dev/null || true
-  tmux set-option -t "$SESSION_NAME" status-position bottom 2>/dev/null || true
-  tmux set-option -t "$SESSION_NAME" status-style "bg=#1a1b26,fg=$C_MUTED" 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" status-position top 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" status-style "bg=$C_BG,fg=$C_MUTED" 2>/dev/null || true
   tmux set-option -t "$SESSION_NAME" status-left "$status_left " 2>/dev/null || true
-  tmux set-option -t "$SESSION_NAME" status-left-length 30 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" status-left-length 50 2>/dev/null || true
   tmux set-option -t "$SESSION_NAME" status-right " $status_right" 2>/dev/null || true
-  tmux set-option -t "$SESSION_NAME" status-right-length 40 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" status-right-length 100 2>/dev/null || true
   tmux set-option -t "$SESSION_NAME" status-justify centre 2>/dev/null || true
 
   # Window status
   tmux set-option -t "$SESSION_NAME" window-status-format \
     "#[fg=$C_MUTED] #I:#W #[default]" 2>/dev/null || true
   tmux set-option -t "$SESSION_NAME" window-status-current-format \
-    "#[fg=$C_BLUE,bold] #[fg=white]#I:#W #[fg=$C_BLUE]#[default]" 2>/dev/null || true
+    "#[fg=$C_RED,bold] #I:#W #[default]" 2>/dev/null || true
 
-  # Exit key binding
-  tmux bind-key -T prefix Q confirm-before -p "Kill $SESSION_NAME session? (y/n) " \
+  # Message styling (Tokyo Night)
+  tmux set-option -t "$SESSION_NAME" message-style "fg=$C_BG,bg=$C_RED,bold" 2>/dev/null || true
+  tmux set-option -t "$SESSION_NAME" message-command-style "fg=$C_BG,bg=$C_PURPLE,bold" 2>/dev/null || true
+
+  # Exit key binding (lowercase q for easier access)
+  tmux bind-key -T prefix q confirm-before -p "Kill $SESSION_NAME session? (y/n) " \
     "kill-session -t $SESSION_NAME" 2>/dev/null || true
+
+  # Navigate panes with Alt+arrows (no prefix needed)
+  tmux bind-key -n M-Left select-pane -L 2>/dev/null || true
+  tmux bind-key -n M-Right select-pane -R 2>/dev/null || true
+  tmux bind-key -n M-Up select-pane -U 2>/dev/null || true
+  tmux bind-key -n M-Down select-pane -D 2>/dev/null || true
+
+  # Resize panes with Ctrl+Alt+arrows
+  tmux bind-key -n C-M-Left resize-pane -L 5 2>/dev/null || true
+  tmux bind-key -n C-M-Right resize-pane -R 5 2>/dev/null || true
+  tmux bind-key -n C-M-Up resize-pane -U 5 2>/dev/null || true
+  tmux bind-key -n C-M-Down resize-pane -D 5 2>/dev/null || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════

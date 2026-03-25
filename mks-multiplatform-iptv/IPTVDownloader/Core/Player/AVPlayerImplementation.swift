@@ -275,7 +275,9 @@ class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {
         // AirPlay: allow video output to external displays and AirPlay receivers.
         // Without this, only audio routes externally — video stays on device.
         player.allowsExternalPlayback = true
+        #if !os(macOS)
         player.usesExternalPlaybackWhileExternalScreenIsActive = true
+        #endif
 
         // Prevent screen from dimming/locking during video playback.
         player.preventsDisplaySleepDuringVideoPlayback = true

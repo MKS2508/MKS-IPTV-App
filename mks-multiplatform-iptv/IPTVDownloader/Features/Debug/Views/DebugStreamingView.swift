@@ -326,72 +326,41 @@ struct DebugStreamingView: View {
 
     // MARK: - Logs Panel
 
+    /// Unified logs panel — embeds LogsDebugView which provides:
+    /// - Source tabs (Transmux / Player / Cast log files)
+    /// - Level filtering with badges (INF/WRN/ERR/DBG)
+    /// - Search with live filtering
+    /// - Log deduplication (collapsed repeated entries)
+    /// - File polling (1s interval, incremental reads)
+    /// - Remote device indicator
+    /// - Copy/export/clear actions
     private var logsPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Logs")
-                    .font(.headline)
-
-                // Source filter (All / Local / Remote)
-                Picker("Source", selection: $viewModel.logSource) {
-                    ForEach(DebugStreamingViewModel.LogSource.allCases, id: \.self) { source in
-                        Text(source.rawValue).tag(source)
+        VStack(spacing: 0) {
+            #if os(macOS)
+            // Remote device indicator bar (only when devices connected)
+            if !RemoteLogReceiver.shared.connectedDevices.isEmpty {
+                HStack(spacing: 6) {
+                    Circle().fill(.green).frame(width: 6, height: 6)
+                    Text("\(RemoteLogReceiver.shared.connectedDevices.count) remote device(s)")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    ForEach(RemoteLogReceiver.shared.connectedDevices, id: \.id) { device in
+                        Text("📱 \(device.name)")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(.green.opacity(0.15)))
                     }
+                    Spacer()
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-
-                #if os(macOS)
-                if !RemoteLogReceiver.shared.connectedDevices.isEmpty {
-                    HStack(spacing: 4) {
-                        Circle().fill(.green).frame(width: 6, height: 6)
-                        Text("\(RemoteLogReceiver.shared.connectedDevices.count) device(s)")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-                }
-                #endif
-
-                Spacer()
-
-                Toggle("Auto-scroll", isOn: $viewModel.autoScroll)
-                    #if os(macOS)
-                    .toggleStyle(.checkbox)
-                    #else
-                    .toggleStyle(SwitchToggleStyle())
-                    #endif
-
-                Toggle("Verbose", isOn: $viewModel.verboseMode)
-                    #if os(macOS)
-                    .toggleStyle(.checkbox)
-                    #else
-                    .toggleStyle(SwitchToggleStyle())
-                    #endif
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.green.opacity(0.05))
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            #endif
 
-            Divider()
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(viewModel.logs) { log in
-                            DebugLogRow(log: log)
-                                .id(log.id)
-                        }
-                    }
-                    .padding(8)
-                }
-                .background(.ultraThinMaterial)
-                .onChange(of: viewModel.logs.count) {
-                    if viewModel.autoScroll, let lastLog = viewModel.logs.last {
-                        withAnimation {
-                            proxy.scrollTo(lastLog.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
+            // Full LogsDebugView (source tabs, level filter, search, dedup, polling)
+            LogsDebugView()
         }
     }
 

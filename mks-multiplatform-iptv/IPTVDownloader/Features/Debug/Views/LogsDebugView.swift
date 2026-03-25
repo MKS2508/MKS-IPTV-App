@@ -67,10 +67,52 @@ final class LogsDebugViewModel {
     // MARK: - Loading
 
     func loadAllSources() {
-        for source in LogSource.allCases {
+        for source in LogSource.allCases where source.isFileBased {
             loadSource(source)
         }
+        setupRemoteLogReceiver()
         recomputeDisplay()
+    }
+
+    /// Subscribe to RemoteLogReceiver for the .remote source tab.
+    private func setupRemoteLogReceiver() {
+        #if os(macOS)
+        let receiver = RemoteLogReceiver.shared
+        receiver.onLogReceived = { [weak self] entry, device in
+            guard let self else { return }
+            // Parse the remote log entry into our LogEntry model
+            let level: LogLevel = switch entry.level {
+            case "error": .error
+            case "warning": .warning
+            case "debug": .debug
+            default: .info
+            }
+            let logEntry = LogEntry(
+                id: UUID(),
+                timestamp: ISO8601DateFormatter().date(from: entry.timestamp) ?? Date(),
+                level: level,
+                tag: entry.tag,
+                action: entry.message,
+                fields: entry.fields ?? [:],
+                rawLine: "📱[\(device.name)] [\(entry.tag)] \(entry.message)",
+                source: .remote
+            )
+            var existing = self.allEntries[.remote] ?? []
+            existing.append(logEntry)
+            if existing.count > self.maxEntries {
+                existing = Array(existing.suffix(self.maxEntries))
+            }
+            self.allEntries[.remote] = existing
+            self.updateFileStats(.remote)
+            if self.selectedSource == .remote {
+                self.recomputeDisplay()
+            }
+        }
+        if !receiver.isListening {
+            receiver.start()
+        }
+        allEntries[.remote] = []
+        #endif
     }
 
     func refresh() {
@@ -80,9 +122,11 @@ final class LogsDebugViewModel {
     }
 
     func clearLog(source: LogSource) {
-        try? "".write(toFile: source.filePath, atomically: true, encoding: .utf8)
+        if source.isFileBased {
+            try? "".write(toFile: source.filePath, atomically: true, encoding: .utf8)
+            lastFileOffsets[source] = 0
+        }
         allEntries[source] = []
-        lastFileOffsets[source] = 0
         recomputeDisplay()
     }
 
@@ -136,6 +180,7 @@ final class LogsDebugViewModel {
     // MARK: - Private
 
     private func loadSource(_ source: LogSource) {
+        guard source.isFileBased else { return }
         let path = source.filePath
         guard FileManager.default.fileExists(atPath: path) else {
             allEntries[source] = []
@@ -164,7 +209,7 @@ final class LogsDebugViewModel {
     private func pollForChanges() async {
         var changed = false
 
-        for source in LogSource.allCases {
+        for source in LogSource.allCases where source.isFileBased {
             let path = source.filePath
             guard FileManager.default.fileExists(atPath: path) else { continue }
 

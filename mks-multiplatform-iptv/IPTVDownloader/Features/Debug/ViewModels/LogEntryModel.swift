@@ -16,10 +16,16 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
     case player = "Player"
     case cast = "Cast"
     case live = "Live"
+    case remote = "Remote"
 
     var id: String { rawValue }
 
-    var displayName: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .remote: return "📱 Remote"
+        default: return rawValue
+        }
+    }
 
     var iconName: String {
         switch self {
@@ -27,6 +33,7 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
         case .player: return "play.circle"
         case .cast: return "airplayvideo"
         case .live: return "antenna.radiowaves.left.and.right"
+        case .remote: return "iphone.radiowaves.left.and.right"
         }
     }
 
@@ -36,22 +43,31 @@ enum LogSource: String, CaseIterable, Identifiable, Sendable {
         case .player: return .blue
         case .cast: return .green
         case .live: return .orange
+        case .remote: return .cyan
         }
     }
 
-    /// Corresponding MKSLogConfig subsystem.
-    var configSubsystem: MKSLogConfig.Subsystem {
+    /// Whether this source reads from a log file (vs real-time WS).
+    var isFileBased: Bool {
+        self != .remote
+    }
+
+    /// Corresponding MKSLogConfig subsystem (nil for remote).
+    var configSubsystem: MKSLogConfig.Subsystem? {
         switch self {
         case .transmux: return .transmux
         case .player: return .player
         case .cast: return .cast
         case .live: return .live
+        case .remote: return nil
         }
     }
 
     /// File path for this log source, resolved from MKSLogConfig.
+    /// Returns empty string for remote (no file).
     var filePath: String {
-        MKSLogConfig.shared.filePath(for: configSubsystem)
+        guard let subsystem = configSubsystem else { return "" }
+        return MKSLogConfig.shared.filePath(for: subsystem)
     }
 }
 

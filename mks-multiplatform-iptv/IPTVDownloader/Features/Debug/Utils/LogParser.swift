@@ -43,6 +43,8 @@ enum LogParser {
             return parseTransmuxLine(line)
         case .player, .cast, .live:
             return parseStructuredLine(line, source: source)
+        case .remote:
+            return parseStructuredLine(line, source: source)
         }
     }
 

@@ -32,7 +32,6 @@ struct RemoteCommandMessage: Codable, Sendable {
 @MainActor
 @Observable
 final class RemoteDebugService {
-
     // MARK: - Singleton
 
     static let shared = RemoteDebugService()
@@ -171,7 +170,20 @@ final class RemoteDebugService {
                         }
                     }
 
-                    let wsURL = URL(string: "ws://\(host):\(port)\(wsPath)")!
+                    // Clean host: strip IPv6 zone ID (%en0 etc.), wrap IPv6 in brackets
+                    var cleanHost = host
+                    if cleanHost.contains("%") {
+                        cleanHost = String(cleanHost.prefix(while: { $0 != "%" }))
+                    }
+                    if cleanHost.contains(":") {
+                        cleanHost = "[\(cleanHost)]"
+                    }
+
+                    guard let wsURL = URL(string: "ws://\(cleanHost):\(port)\(wsPath)") else {
+                        MKSLog.debug.error("RemoteDebug: invalid WS URL from host=\(host) port=\(port)")
+                        connection.cancel()
+                        return
+                    }
                     Task { @MainActor in
                         self?.connectWebSocket(to: wsURL)
                     }

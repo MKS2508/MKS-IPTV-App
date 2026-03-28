@@ -47,6 +47,12 @@ final class RemoteDebugService {
     /// Whether Bonjour is actively browsing for viewers.
     private(set) var isBrowsing = false
 
+    /// Discovered Bonjour viewers on the LAN (name + endpoint).
+    private(set) var discoveredViewers: [(name: String, endpoint: String)] = []
+
+    /// Last error message for UI display.
+    private(set) var lastError: String?
+
     // MARK: - Callbacks
 
     /// Called when a remote command is received. Set by the app to wire up player actions.
@@ -111,6 +117,19 @@ final class RemoteDebugService {
         browser.start(queue: .main)
     }
 
+    /// Connect manually to a viewer by IP and port (bypasses Bonjour).
+    func connectManually(host: String, port: UInt16) {
+        let wsPath = "/ws/device"
+        guard let url = URL(string: "ws://\(host):\(port)\(wsPath)") else {
+            lastError = "Invalid URL: ws://\(host):\(port)\(wsPath)"
+            MKSLog.debug.error("RemoteDebug: manual connect failed — invalid URL")
+            return
+        }
+        lastError = nil
+        MKSLog.debug.info("RemoteDebug: Manual connect to \(url.absoluteString)")
+        connectWebSocket(to: url)
+    }
+
     /// Stop browsing and disconnect.
     func stop() {
         browser?.cancel()
@@ -126,8 +145,16 @@ final class RemoteDebugService {
     // MARK: - Private: Bonjour Discovery
 
     private func handleBrowseResults(_ results: Set<NWBrowser.Result>) {
-        // Connect to the first discovered viewer
-        guard let result = results.first else { return }
+        // Update discovered list for Settings UI
+        discoveredViewers = results.compactMap { result in
+            if case .service(let name, let type, let domain, _) = result.endpoint {
+                return (name: name, endpoint: "\(type) in \(domain)")
+            }
+            return nil
+        }
+
+        // Auto-connect to the first discovered viewer (if not already connected)
+        guard !isConnected, let result = results.first else { return }
 
         switch result.endpoint {
         case .service(let name, let type, let domain, _):

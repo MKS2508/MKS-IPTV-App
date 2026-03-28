@@ -20,6 +20,7 @@ struct LoggingSettingsView: View {
             storageSection
             levelsSection
             filesSection
+            remoteDebugSection
         }
         .formStyle(.grouped)
         .navigationTitle("Logging")
@@ -105,6 +106,137 @@ struct LoggingSettingsView: View {
             }
         } header: {
             Label("Log Files", systemImage: "doc.text")
+        }
+    }
+
+    // MARK: - Remote Debug Section
+
+    @ViewBuilder
+    private var remoteDebugSection: some View {
+        Section {
+            // macOS is a RECEIVER — shows listener status + connected iOS devices
+            let receiver = RemoteLogReceiver.shared
+
+            // Listener status
+            LabeledContent("Receiver Status") {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(receiver.isListening ? .green : .red)
+                        .frame(width: 8, height: 8)
+                    Text(receiver.isListening ? "Listening on port \(receiver.port)" : "Off")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            // Start/stop
+            HStack {
+                Button(receiver.isListening ? "Stop Receiver" : "Start Receiver") {
+                    if receiver.isListening {
+                        receiver.stop()
+                    } else {
+                        receiver.start()
+                    }
+                    refreshToken = UUID()
+                }
+                .controlSize(.small)
+
+                Spacer()
+
+                Text("Publishes _mksiptv-debug._tcp on LAN")
+                    .font(.caption2)
+                    .foregroundColor(.tertiary)
+            }
+
+            // Connected devices
+            if receiver.connectedDevices.isEmpty {
+                LabeledContent("Connected Devices") {
+                    Text("None — open the iOS app on the same network")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                ForEach(receiver.connectedDevices, id: \.id) { device in
+                    LabeledContent(device.name) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(device.systemVersion)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("v\(device.appVersion)")
+                                .font(.caption2)
+                                .foregroundColor(.tertiary)
+                            Text("Connected \(device.connectedAt.formatted(.relative(presentation: .named)))")
+                                .font(.caption2)
+                                .foregroundColor(.tertiary)
+                        }
+                    }
+                }
+            }
+
+            // Manual connect (to send commands to a remote viewer/Elysia)
+            manualConnectRow
+        } header: {
+            Label("Remote Debug", systemImage: "antenna.radiowaves.left.and.right")
+        } footer: {
+            Text("macOS receives logs from iOS devices on the same network via Bonjour + WebSocket. Logs appear in the Remote tab of the Log Inspector.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @State private var manualHost: String = ""
+    @State private var manualPort: String = "3000"
+    @State private var manualConnectStatus: String?
+
+    @ViewBuilder
+    private var manualConnectRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Manual Connect (send logs to viewer)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                TextField("IP or hostname", text: $manualHost)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 200)
+
+                TextField("Port", text: $manualPort)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+
+                Button("Connect") {
+                    guard let port = UInt16(manualPort), !manualHost.isEmpty else {
+                        manualConnectStatus = "Invalid host or port"
+                        return
+                    }
+                    RemoteDebugService.shared.connectManually(host: manualHost, port: port)
+                    manualConnectStatus = "Connecting to \(manualHost):\(port)..."
+                }
+                .controlSize(.small)
+                .buttonStyle(.borderedProminent)
+            }
+
+            if let status = manualConnectStatus {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            }
+
+            // Show RemoteDebugService state
+            let service = RemoteDebugService.shared
+            if service.isConnected {
+                HStack(spacing: 4) {
+                    Circle().fill(.green).frame(width: 6, height: 6)
+                    Text("Connected to \(service.viewerName ?? "viewer")")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            }
+            if let error = service.lastError {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            }
         }
     }
 }

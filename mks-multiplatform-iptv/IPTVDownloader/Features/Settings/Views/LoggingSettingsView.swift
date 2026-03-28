@@ -145,7 +145,7 @@ struct LoggingSettingsView: View {
 
                 Text("Publishes _mksiptv-debug._tcp on LAN")
                     .font(.caption2)
-                    .foregroundColor(.tertiary)
+                    .foregroundStyle(.tertiary)
             }
 
             // Connected devices
@@ -164,10 +164,10 @@ struct LoggingSettingsView: View {
                                 .foregroundColor(.secondary)
                             Text("v\(device.appVersion)")
                                 .font(.caption2)
-                                .foregroundColor(.tertiary)
+                                .foregroundStyle(.tertiary)
                             Text("Connected \(device.connectedAt.formatted(.relative(presentation: .named)))")
                                 .font(.caption2)
-                                .foregroundColor(.tertiary)
+                                .foregroundStyle(.tertiary)
                         }
                     }
                 }

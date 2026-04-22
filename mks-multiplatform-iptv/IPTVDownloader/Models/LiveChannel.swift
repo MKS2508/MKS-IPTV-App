@@ -15,7 +15,7 @@ struct LiveChannel: Identifiable, Codable, Equatable {
     let streamIcon: String?
     let epgChannelId: String?
     let added: String
-    let isAdult: String
+    let isAdult: String?
     let categoryId: String?
     let customSid: String?
     let tvArchive: Int

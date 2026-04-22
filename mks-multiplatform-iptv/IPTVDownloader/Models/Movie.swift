@@ -71,7 +71,14 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
             tmdbId = nil
         }
         streamIcon = try container.decodeIfPresent(String.self, forKey: .streamIcon)
-        rating = try container.decodeIfPresent(String.self, forKey: .rating)
+        // rating can come as String or Double from different servers
+        if let str = try? container.decodeIfPresent(String.self, forKey: .rating) {
+            rating = str
+        } else if let num = try? container.decodeIfPresent(Double.self, forKey: .rating) {
+            rating = String(num)
+        } else {
+            rating = nil
+        }
         rating5Based = try container.decodeIfPresent(Double.self, forKey: .rating5Based)
         added = try container.decodeIfPresent(String.self, forKey: .added)
         isAdult = try container.decodeIfPresent(String.self, forKey: .isAdult)

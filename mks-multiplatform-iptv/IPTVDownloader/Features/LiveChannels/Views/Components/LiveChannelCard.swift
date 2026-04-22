@@ -54,10 +54,9 @@ struct LiveChannelCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Double tap to play")
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5)
-                .onEnded { _ in onLongPress?() }
-        )
+        .onLongPressGesture(minimumDuration: 0.5, pressing: nil, perform: {
+            onLongPress?()
+        })
     }
 
     // MARK: - Card Content

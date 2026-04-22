@@ -74,6 +74,11 @@ struct ContentView: View {
             SettingsView()
                 .environmentObject(profilesManager)
         }
+        #else
+        .sheet(isPresented: $showingSettings) {
+            iOSSettingsView()
+                .environmentObject(profilesManager)
+        }
         #endif
     }
 

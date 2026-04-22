@@ -19,6 +19,7 @@
 | **Logging** | @mks2508/better-logger v4.0.0 | Logging estructurado |
 | **Error Handling** | @mks2508/no-throw v0.1.0 | Result pattern |
 | **Commit Generation** | gemini-commit-wizard v1.1.3 | Commits estructurados con IA multi-provider |
+| **Dev Sessions** | @mks2508/mks-dev-session v0.1.0 | Sesiones tmux configurables por proyecto |
 
 ---
 
@@ -1807,6 +1808,217 @@ Glassmorphism es la combinación controlada de:
 
 ---
 
+## REGLA 19: Dev Sessions — @mks2508/mks-dev-session
+
+### Package
+
+**OBLIGATORIO**: Usar `@mks2508/mks-dev-session` para gestionar sesiones tmux de desarrollo en todos los proyectos.
+
+```bash
+bun add -d @mks2508/mks-dev-session
+```
+
+### Qué es
+
+CLI y librería que crea sesiones tmux configurables por proyecto via `.devsession.json`. Detecta automáticamente el tipo de proyecto, genera panes con los comandos correctos, aplica theming powerline, maneja networking (portless/direct) y health checks.
+
+### Comandos
+
+| Comando | Descripción | Ejemplo |
+|---------|-------------|---------|
+| `mks-dev-session init` | Detecta proyecto y genera `.devsession.json` + patchea `package.json` | `mks-dev-session init --name my-app` |
+| `mks-dev-session start` | Crea sesión tmux y attach (comando default) | `bun run dev` |
+| `mks-dev-session stop` | Envía Ctrl+C a todos los panes | `bun run dev:stop` |
+| `mks-dev-session restart [pane]` | Reinicia un pane específico o todos | `mks-dev-session restart api` |
+| `mks-dev-session kill` | Mata la sesión tmux completa | `bun run dev:kill` |
+| `mks-dev-session status` | Muestra estado y health checks | `mks-dev-session status --json` |
+| `mks-dev-session attach` | Attach a sesión existente | `mks-dev-session attach` |
+| `mks-dev-session run <cmd>` | Ejecuta comando custom definido en config | `mks-dev-session run test-basic` |
+| `mks-dev-session output <pane> [N]` | Captura últimas N líneas de un pane | `mks-dev-session output api 100` |
+
+### Workflow OBLIGATORIO
+
+```bash
+# 1. Inicializar (primera vez en el proyecto)
+mks-dev-session init          # Auto-detecta tipo, genera .devsession.json
+                              # Patchea package.json con scripts dev:*
+
+# 2. Instalar dependencia
+bun install
+
+# 3. Personalizar .devsession.json si necesario
+
+# 4. Iniciar desarrollo
+bun run dev                   # = mks-dev-session start (attach automático)
+bun run dev:no-attach         # = mks-dev-session start --no-attach
+
+# 5. Gestionar sesión
+bun run dev:status            # Ver estado + health checks
+bun run dev:restart           # Reiniciar todos los panes
+bun run dev:stop              # Parar todos los comandos
+bun run dev:kill              # Matar sesión completa
+```
+
+### Scripts inyectados en package.json
+
+Al ejecutar `init`, se agregan automáticamente estos scripts:
+
+```json
+{
+  "scripts": {
+    "dev": "mks-dev-session start",
+    "dev:no-attach": "mks-dev-session start --no-attach",
+    "dev:stop": "mks-dev-session stop",
+    "dev:restart": "mks-dev-session restart",
+    "dev:status": "mks-dev-session status",
+    "dev:kill": "mks-dev-session kill"
+  }
+}
+```
+
+> Si ya existe un script `dev`, se preserva como `dev:original`.
+
+### Detección automática de proyecto
+
+`init` analiza `package.json`, `apps/`, `packages/` y dependencias para detectar:
+
+| Tipo | Indicadores | Layout default |
+|------|-------------|----------------|
+| `monorepo-fullstack` | workspaces + apps/ + backend+frontend deps | `2x2` (panes por sub-package) |
+| `monorepo-packages` | workspaces + packages/ | Según cantidad de sub-packages |
+| `backend` | Elysia, Express, Hono, Fastify, Koa | `1+2` (server + logs + shell) |
+| `frontend` | Vite, Next.js, React, Vue, Svelte, Astro | `1+2` (dev + test + shell) |
+| `library` | Sin framework de server ni frontend | `vertical` (dev watch + shell) |
+| `custom` | No detectado | `single` |
+
+Para **monorepos**, escanea `apps/`, `packages/`, `core/packages/` recursivamente (hasta 2 niveles) buscando sub-packages con script `dev`. Genera un pane por sub-package (máx 3) + shell.
+
+### Configuración `.devsession.json`
+
+```json
+{
+  "$schema": "https://unpkg.com/@mks2508/mks-dev-session/schema.json",
+  "name": "my-project",
+  "project": "My Project",
+  "layout": "2x2",
+  "theme": "tokyo-night",
+  "panes": [
+    {
+      "name": "api",
+      "title": "API Server (Elysia)",
+      "command": "bun run --filter 'my-api' dev",
+      "icon": "󰒍",
+      "color": "blue",
+      "cwd": "apps/api",
+      "env": { "API_URL": "{{api.url}}" },
+      "healthCheck": {
+        "url": "{{url}}/health",
+        "interval": 5000,
+        "timeout": 2000
+      }
+    },
+    {
+      "name": "web",
+      "title": "Frontend (Next.js)",
+      "command": "bun run --filter 'my-web' dev",
+      "icon": "󰜈",
+      "color": "green",
+      "cwd": "apps/web"
+    },
+    {
+      "name": "shell",
+      "title": "Shell + Tests",
+      "command": null,
+      "icon": "",
+      "color": "purple"
+    }
+  ],
+  "networking": {
+    "mode": "portless",
+    "portless": {
+      "port": 80,
+      "routes": {
+        "api": "api",
+        "web": "web"
+      }
+    },
+    "direct": {
+      "api": 3000,
+      "web": 3001
+    }
+  },
+  "commands": {
+    "test-basic": {
+      "description": "Run basic tests",
+      "pane": "shell",
+      "command": "bun run test"
+    }
+  }
+}
+```
+
+### Layout Presets
+
+| Layout | Descripción | Panes |
+|--------|-------------|-------|
+| `2x2` | Grid 4 panes | 4 |
+| `1+2` | 1 grande izquierda + 2 stacked derecha | 3 |
+| `2+1` | 2 stacked izquierda + 1 grande derecha | 3 |
+| `horizontal` | N panes lado a lado | N |
+| `vertical` | N panes apilados | N |
+| `single` | 1 solo pane | 1 |
+
+### Networking Modes
+
+| Modo | URL Format | Requiere |
+|------|-----------|----------|
+| `portless` | `http://api.localhost` | CLI `portless` instalado |
+| `direct` | `http://localhost:3000` | Nada (fallback) |
+| `none` | Sin URLs | — |
+
+Template variables: `{{pane.url}}` se resuelve automáticamente en `env` y `command` de cada pane.
+
+### Themes
+
+Presets disponibles: `tokyo-night` (default), `catppuccin`, `synthwave`.
+
+También acepta colores custom (hex):
+
+```json
+{
+  "theme": {
+    "bg": "#1a1b26", "bg2": "#24283b", "border": "#3b4261",
+    "muted": "#565f89", "fg": "#c0caf5",
+    "red": "#f7768e", "green": "#9ece6a", "blue": "#7aa2f7",
+    "purple": "#bb9af7", "cyan": "#7dcfff", "yellow": "#e0af68"
+  }
+}
+```
+
+### Integración con Claude Code
+
+`mks-dev-session status --json` produce output consumible por agentes:
+
+```json
+{
+  "sessionName": "my-project",
+  "exists": true,
+  "panes": [
+    { "name": "api", "title": "API Server", "running": true, "healthy": true, "url": "http://api.localhost" },
+    { "name": "web", "title": "Frontend", "running": true, "healthy": null, "url": "http://web.localhost" }
+  ],
+  "networkingMode": "portless"
+}
+```
+
+### Prohibido
+
+- Ejecutar `bun run dev` directamente sin sesión tmux (duplica procesos)
+- Crear sesiones tmux manualmente cuando `.devsession.json` existe
+- Usar `tmux send-keys` directo en lugar de `mks-dev-session run`
+
+---
+
 ## Fuentes de Referencia
 
 - **CLAUDE.md** - Guia de arquitectura del monorepo
@@ -1822,6 +2034,7 @@ Glassmorphism es la combinación controlada de:
 - **Shadcn MCP** - https://ui.shadcn.com/docs/mcp
 - **React Bits** - https://reactbits.dev/
 - **lucide-animated** - https://lucide-animated.com/
+- **@mks2508/mks-dev-session** - Sesiones tmux configurables por proyecto
 
 ### Documentación en Dotfiles
 
@@ -1843,3 +2056,112 @@ mks-ui service ProductService      # Servicio Elysia
 mks-ui hook useProducts            # Custom hook
 mks-ui type Product                # Tipos TypeScript
 ```
+
+---
+
+## Coolify Deployment Workflow
+
+### Herramientas
+
+| Herramienta | Version | Uso |
+|-------------|---------|-----|
+| **create-bunspace** (mks-scaffolder) | latest | Genera Docker configs + deploy CLI |
+| **@mks2508/coolify-mks-cli-mcp** | ^0.4.x | SDK + MCP + CLI para Coolify API |
+
+### Workflow OBLIGATORIO para Deploy
+
+**NUNCA pushear codigo sin validar localmente. Cada build fallido en Coolify son 2-3 minutos perdidos.**
+
+```
+1. Local build     →  bun run build (debe pasar sin errores)
+2. Docker build    →  docker build -f Dockerfile -t <name> . (si Docker esta up)
+3. Push            →  git push (Coolify auto-deploys on push)
+```
+
+### Comandos create-bunspace coolify
+
+```bash
+# ─── Generar Docker configs ───
+create-bunspace coolify init          # Analiza proyecto → genera Dockerfile + compose + .dockerignore
+create-bunspace coolify init -y       # Modo automatico (usa defaults detectados)
+
+# ─── Deploy a Coolify ───
+create-bunspace coolify deploy        # Primera vez: crea proyecto/app + deploy
+                                      # Siguiente: redeploy desde .coolify.json
+
+# ─── Status ───
+create-bunspace coolify status        # Estado de la app + ultimos deployments
+
+# ─── Environment Variables ───
+create-bunspace coolify env sync      # Sync .env.local/.env → Coolify (upsert)
+create-bunspace coolify env sync <f>  # Sync archivo especifico
+create-bunspace coolify env list      # Listar vars en Coolify
+create-bunspace coolify env set K=V   # Setear una variable
+create-bunspace coolify env delete K  # Eliminar una variable
+```
+
+### Integrado en creacion de proyectos
+
+Al crear un proyecto nuevo con `create-bunspace`, se ofrece generar Docker configs automaticamente:
+
+```bash
+create-bunspace my-project --template monorepo
+# ... prompts del template ...
+# ? Generate Docker configs for Coolify deployment? › (Y/n)
+
+create-bunspace my-project --template monorepo --yes
+# Auto-genera Dockerfile + compose + .dockerignore con defaults
+```
+
+### Reglas Docker para Coolify
+
+| Regla | Motivo |
+|-------|--------|
+| **NUNCA usar `ports` en compose** | Usar `expose` — Coolify proxy maneja routing. `ports` causa "port already allocated" en redeploy |
+| **SIEMPRE `expose` interno** | Coolify necesita saber el puerto para proxying |
+| **Auto-deploy SIEMPRE ON** | `isAutoDeployEnabled: true` en toda app |
+| **Healthcheck sin curl** | Usar `bun -e "fetch()"` para HTTP, `kill -0 1` para procesos |
+| **Non-root user** | Debian: `groupadd/useradd`, Alpine: verificar con `id bun` |
+| **Native bindings** | `bun add <pkg> --no-save` en builder + `cp -rL` para resolver symlinks de .bun/ |
+
+### Bun Native Bindings en Docker (5 capas del problema)
+
+1. **Bun workspace hoisting**: bindings nativos van a `.bun/` cache, no a `node_modules/@pkg/`
+2. **Next.js usa Node.js**: no puede resolver desde `.bun/` → `bun add <pkg> --no-save` en root
+3. **Turbopack traza imports estaticos**: incluso en `force-dynamic` → usar `await import()` para pkgs nativos
+4. **Docker COPY ignora symlinks**: `.bun/` symlinks se rompen → `cp -rL` para aplanar antes de COPY
+5. **Standalone excluye serverExternalPackages**: COPY individual al runner
+
+**Paquetes nativos conocidos**: oxc-parser, sharp, lightningcss, @swc/core, esbuild, prisma, rolldown
+
+### Deteccion automatica del analyzer
+
+El `coolify init` detecta automaticamente:
+
+| Deteccion | Metodo |
+|-----------|--------|
+| **Framework** | deps directas + workspace deps transitivas (1 nivel) |
+| **HTTP server** | deps (elysia, express, etc.) + source (Bun.serve, .listen) |
+| **CLI subcommands** | Parsea `.command('name')` de commander/yargs en source |
+| **Build type** | `compiled` (tiene build script → dist/) o `direct-source` (run src/ directo) |
+| **Native bindings** | Scan deps contra lista conocida → genera cp -rL + COPY |
+| **Build-time vars** | `VITE_*`, `NEXT_PUBLIC_*`, `NITRO_*` → genera ARG + ENV |
+| **Postinstall** | Detecta fumadocs-mdx, prisma → `--ignore-scripts` |
+
+### .coolify.json (gitignored)
+
+Despues del primer `coolify deploy`, se guarda `.coolify.json` con el estado:
+
+```json
+{
+  "appUuid": "abc123",
+  "serverUuid": "...",
+  "projectUuid": "...",
+  "environmentUuid": "...",
+  "branch": "main",
+  "buildPack": "dockercompose",
+  "autoDeployEnabled": true
+}
+```
+
+Siguiente `coolify deploy` lee este archivo y hace redeploy directo sin prompts.

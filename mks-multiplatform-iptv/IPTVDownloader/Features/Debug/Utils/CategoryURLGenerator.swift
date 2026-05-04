@@ -273,6 +273,15 @@ class CategoryURLGenerator {
         }
     }
     
+    /// Returns the episodes for a season, probing by season.id first and
+    /// then by String(season.seasonNumber) as a fallback.
+    /// Xtream IPTV panels key episodes by season number, not by season ID.
+    private static func episodes(for season: SerieDetail.Season, in details: SerieDetail) -> [SerieDetail.Episode] {
+        details.episodes[season.id]
+            ?? details.episodes[String(season.seasonNumber)]
+            ?? []
+    }
+
     private static func generateEpisodeTextFormat(
         serie: Serie,
         details: SerieDetail,
@@ -285,15 +294,13 @@ class CategoryURLGenerator {
         for season in details.seasons.sorted(by: { $0.seasonNumber < $1.seasonNumber }) {
             result += "--- Season \(season.seasonNumber) ---\n"
             
-            if let episodes = details.episodes[season.id] {
-                for episode in episodes.sorted(by: { $0.episodeNum < $1.episodeNum }) {
-                    let url = IPTVConfiguration.buildSeriesURL(
-                        profile: profile,
-                        vodID: episode.id,
-                        vodExtension: episode.containerExtension
-                    )
-                    result += "S\(season.seasonNumber)E\(episode.episodeNum). \(episode.title) - \(url)\n"
-                }
+            for episode in episodes(for: season, in: details).sorted(by: { $0.episodeNum < $1.episodeNum }) {
+                let url = IPTVConfiguration.buildSeriesURL(
+                    profile: profile,
+                    vodID: episode.id,
+                    vodExtension: episode.containerExtension
+                )
+                result += "S\(season.seasonNumber)E\(episode.episodeNum). \(episode.title) - \(url)\n"
             }
             result += "\n"
         }
@@ -310,23 +317,21 @@ class CategoryURLGenerator {
         var items: [CategoryURLItem] = []
         
         for season in details.seasons {
-            if let episodes = details.episodes[season.id] {
-                for episode in episodes {
-                    let url = IPTVConfiguration.buildSeriesURL(
-                        profile: profile,
-                        vodID: episode.id,
-                        vodExtension: episode.containerExtension
-                    )
-                    let item = CategoryURLItem(
-                        id: "episode_\(episode.id)",
-                        name: "\(serie.name) - S\(season.seasonNumber)E\(episode.episodeNum) - \(episode.title)",
-                        url: url,
-                        type: "episode",
-                        category: category,
-                        containerExtension: episode.containerExtension
-                    )
-                    items.append(item)
-                }
+            for episode in episodes(for: season, in: details) {
+                let url = IPTVConfiguration.buildSeriesURL(
+                    profile: profile,
+                    vodID: episode.id,
+                    vodExtension: episode.containerExtension
+                )
+                let item = CategoryURLItem(
+                    id: "episode_\(episode.id)",
+                    name: "\(serie.name) - S\(season.seasonNumber)E\(episode.episodeNum) - \(episode.title)",
+                    url: url,
+                    type: "episode",
+                    category: category,
+                    containerExtension: episode.containerExtension
+                )
+                items.append(item)
             }
         }
         

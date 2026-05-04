@@ -71,9 +71,9 @@ final class RemotePlayManager: @unchecked Sendable {
 
     private init() {
         setupDiscoveryCallbacks()
-        // Auto-start SSDP discovery at launch so devices are ready
-        // before the user opens the player or gear menu.
-        startDiscovery()
+        // Discovery is started lazily via ensureDiscoveryActive() when the user
+        // opens the device picker. Auto-starting at init floods the main thread
+        // with hundreds of SSDP probe TCP connections before any view is shown.
     }
 
     // MARK: - Public API - Discovery

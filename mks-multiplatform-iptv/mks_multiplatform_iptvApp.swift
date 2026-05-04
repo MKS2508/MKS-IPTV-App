@@ -30,9 +30,12 @@ struct mks_iptv_downloaderApp: App {
             Task {
                 try? await WatchHistoryManager.shared.repairCorruptedEntries()
             }
-            // Remove duplicate entries created by CloudKit sync across devices
+            // Pull remote watch history from CloudKit (delayed 3s to not block launch UI).
+            // Uses incremental CKFetchRecordZoneChangesOperation with persisted change token
+            // so only records changed since the last pull are fetched.
             Task {
-                try? await WatchHistoryManager.shared.deduplicateEntries()
+                try? await Task.sleep(for: .seconds(3))
+                await WatchHistorySyncEngine.shared.pull()
             }
             // Register this device in CloudKit for cross-device tracking
             Task {
@@ -171,6 +174,36 @@ struct MainWindowContent: View {
     @Environment(\.openWindow) private var openWindow
     #endif
 
+    /// DownloadManager is kept as a stable @StateObject so it is created exactly
+    /// once per window and never recreated when profilesManager.activeProfile changes.
+    ///
+    /// Previously it was created inline as:
+    ///   `.environmentObject(DownloadManager(profile: activeProfile))`
+    /// inside the @ViewBuilder `mainIPTVContent` computed property. This meant every
+    /// time SwiftUI re-evaluated that property (on ANY state change — tab selection,
+    /// category filter, toolbar updates) it allocated a brand-new DownloadManager,
+    /// which caused:
+    ///   1. "Loaded N persisted downloads" logged 6+ times (multiple CoreData loads)
+    ///   2. The EnvironmentObject identity changing → SwiftUI tearing down the entire
+    ///      ContentView subtree, invalidating all child @StateObject instances and
+    ///      cancelling in-flight .task{} closures → CPU 100% hang on every tab change.
+    ///
+    /// By lifting it to @StateObject here it is allocated exactly once for the lifetime
+    /// of the window. Profile changes (profile switch in Settings) don't require a new
+    /// DownloadManager because DownloadManager only stores the profile to satisfy its
+    /// init signature — it never reads profile after initialisation.
+    @StateObject private var downloadManager: DownloadManager = {
+        // Use the already-loaded active profile from the shared manager.
+        // IPTVProfilesManager.shared is a singleton initialised at app startup,
+        // so activeProfile is already populated by the time this closure runs.
+        // If there's no active profile yet (fresh install, no profile created),
+        // we create a dummy profile. DownloadManager never reads the profile after
+        // init, so this is safe — it will load any persisted downloads correctly.
+        let profile = IPTVProfilesManager.shared.activeProfile
+            ?? IPTVProfile(name: "", baseURL: "", username: "", password: "")
+        return DownloadManager(profile: profile)
+    }()
+
     var body: some View {
         Group {
             #if os(macOS)
@@ -191,6 +224,10 @@ struct MainWindowContent: View {
         .onReceive(NotificationCenter.default.publisher(for: .openPlayerWindow)) { _ in
             openWindow(id: "player")
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+            // Flush pending debounced push when app loses focus (user switches away).
+            Task { await WatchHistorySyncEngine.shared.pushNow() }
+        }
         #endif
     }
 
@@ -198,13 +235,19 @@ struct MainWindowContent: View {
     private var mainIPTVContent: some View {
         if let activeProfile = profilesManager.activeProfile {
             ContentView(showingSettings: $showingSettings)
-                .environmentObject(DownloadManager(profile: activeProfile))
+                .environmentObject(downloadManager)
                 .environmentObject(profilesManager)
                 .environmentObject(activeProfile)
                 .environment(RemotePlayManager.shared)
                 #if os(iOS)
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     RemotePlayManager.shared.ensureDiscoveryActive()
+                    // Pull remote watch history changes when app comes back to foreground
+                    Task { await WatchHistorySyncEngine.shared.pull() }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                    // Flush any pending debounced push immediately on background
+                    Task { await WatchHistorySyncEngine.shared.pushNow() }
                 }
                 #endif
         } else {

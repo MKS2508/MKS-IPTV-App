@@ -37,74 +37,29 @@ class TouchBarHostingView: NSView {
     }
     
     private func setupSubscriptions() {
-        // Subscribe to context changes
-        touchBarManager.$currentContext
+        // Merge all state-change publishers into one stream and debounce so that
+        // a burst of rapid property changes (e.g. categories loading at startup)
+        // collapses into a single TouchBar rebuild instead of one per change.
+        let voidPublishers: [AnyPublisher<Void, Never>] = [
+            touchBarManager.$currentContext.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$availableCategories.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$availableChannels.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$isRefreshing.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$activeDownloads.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$selectedCategories.map { _ in () }.eraseToAnyPublisher(),
+            touchBarManager.$estimatedTimeRemaining.map { _ in () }.eraseToAnyPublisher()
+        ]
+        Publishers.MergeMany(voidPublishers)
+            .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Subscribe to available categories changes
-        touchBarManager.$availableCategories
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to available channels changes
-        touchBarManager.$availableChannels
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to loading state changes
-        touchBarManager.$isRefreshing
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to download progress changes
-        touchBarManager.$activeDownloads
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to selected categories changes
-        touchBarManager.$selectedCategories
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to ETA changes
-        touchBarManager.$estimatedTimeRemaining
-            .sink { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.updateTouchBar()
-                }
+                self?.updateTouchBar()
             }
             .store(in: &cancellables)
     }
     
     private func updateTouchBar() {
-        MKSLog.app.debug("TouchBar: Updating TouchBar...")
         self.touchBar = makeTouchBar()
-        
+
         // Force the window to update its TouchBar
         if let window = self.window {
             window.touchBar = self.touchBar
@@ -150,62 +105,35 @@ class TouchBarHostingView: NSView {
     }
     
     override func makeTouchBar() -> NSTouchBar? {
-        MKSLog.app.debug("TouchBar: makeTouchBar called with context: \(touchBarManager.currentContext)")
-        MKSLog.app.debug("TouchBar: Available categories: \(touchBarManager.availableCategories.count)")
-        
         let touchBar = NSTouchBar()
         touchBar.delegate = self
-        
+
         // Configure TouchBar items based on current context
         switch touchBarManager.currentContext {
         case .downloads:
             if touchBarManager.activeDownloads > 0 {
-                touchBar.defaultItemIdentifiers = [
-                    .fullWidthDownloadBar
-                ]
+                touchBar.defaultItemIdentifiers = [.fullWidthDownloadBar]
             } else {
-                touchBar.defaultItemIdentifiers = [
-                    .flexibleSpace,
-                    .refreshButton
-                ]
+                touchBar.defaultItemIdentifiers = [.flexibleSpace, .refreshButton]
             }
-            MKSLog.app.debug("TouchBar: Configured for downloads context")
         case .mediaList:
             if touchBarManager.availableCategories.isEmpty {
-                touchBar.defaultItemIdentifiers = [
-                    .mediaListLoadingView
-                ]
-                MKSLog.app.debug("TouchBar: Configured for media list context (loading)")
+                touchBar.defaultItemIdentifiers = [.mediaListLoadingView]
             } else {
-                touchBar.defaultItemIdentifiers = [
-                    .mediaListFullView
-                ]
-                MKSLog.app.debug("TouchBar: Configured for media list context (loaded)")
+                touchBar.defaultItemIdentifiers = [.mediaListFullView]
             }
         case .liveTV:
             if touchBarManager.availableChannels.isEmpty {
-                touchBar.defaultItemIdentifiers = [
-                    .flexibleSpace,
-                    .refreshButton
-                ]
-                MKSLog.app.debug("TouchBar: Configured for live TV context (loading)")
+                touchBar.defaultItemIdentifiers = [.flexibleSpace, .refreshButton]
             } else {
                 touchBar.defaultItemIdentifiers = [
-                    .playPauseButton,
-                    .volumeSlider,
-                    .flexibleSpace,
-                    .channelPicker
+                    .playPauseButton, .volumeSlider, .flexibleSpace, .channelPicker
                 ]
-                MKSLog.app.debug("TouchBar: Configured for live TV context (loaded)")
             }
         case .movieDetail, .serieDetail:
             touchBar.defaultItemIdentifiers = [
-                .playButton,
-                .downloadButton,
-                .flexibleSpace,
-                .ratingDisplay
+                .playButton, .downloadButton, .flexibleSpace, .ratingDisplay
             ]
-            MKSLog.app.debug("TouchBar: Configured for detail context")
         }
         return touchBar
     }

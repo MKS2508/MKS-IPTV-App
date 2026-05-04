@@ -82,9 +82,10 @@ struct SeriesEpisodePickerView: View {
             serieDetail = detail
             if let firstSeason = detail.seasons.first {
                 selectedSeason = firstSeason.id
-                if let seasonEpisodes = detail.episodes[firstSeason.id] {
-                    episodes = seasonEpisodes
-                }
+                // API returns episodes keyed by season number (e.g. "1"), not by season ID.
+                // Try season.id first, fall back to String(season.seasonNumber).
+                let key = episodesKey(for: firstSeason, in: detail)
+                episodes = detail.episodes[key] ?? []
             }
         } catch {
             MKSLog.debug.error("Failed to load series details: \(error)")
@@ -93,12 +94,28 @@ struct SeriesEpisodePickerView: View {
     }
     
     private func updateEpisodes() {
-        guard let detail = serieDetail else { return }
-        if let seasonEpisodes = detail.episodes[selectedSeason] {
-            episodes = seasonEpisodes
-        } else {
+        guard let detail = serieDetail,
+              let season = detail.seasons.first(where: { $0.id == selectedSeason }) else {
             episodes = []
+            return
         }
+        let key = episodesKey(for: season, in: detail)
+        episodes = detail.episodes[key] ?? []
+    }
+
+    /// Resolves the correct dictionary key for a season's episodes.
+    /// Xtream IPTV panels use the season number as key ("1", "2"…) rather than
+    /// the season's internal ID. We probe both and return whichever exists.
+    private func episodesKey(for season: SerieDetail.Season, in detail: SerieDetail) -> String {
+        if detail.episodes[season.id] != nil {
+            return season.id
+        }
+        let numberKey = String(season.seasonNumber)
+        if detail.episodes[numberKey] != nil {
+            return numberKey
+        }
+        // Last resort: return season.id and let the caller handle empty result
+        return season.id
     }
 }
 

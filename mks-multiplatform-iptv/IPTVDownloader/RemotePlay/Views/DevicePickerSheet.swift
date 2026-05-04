@@ -135,6 +135,10 @@ struct DevicePickerSheet: View {
             .listStyle(.sidebar)
             #endif
         }
+        .onAppear {
+            // Start discovery lazily when the picker opens (not at app launch).
+            remotePlayManager.ensureDiscoveryActive()
+        }
         #if os(macOS)
         .frame(minWidth: 400, minHeight: 400)
         #endif

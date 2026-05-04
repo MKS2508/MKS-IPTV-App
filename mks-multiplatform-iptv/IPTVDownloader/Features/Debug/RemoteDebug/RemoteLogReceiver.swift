@@ -69,6 +69,10 @@ final class RemoteLogReceiver {
     private var deviceInfo: [String: ConnectedDevice] = [:]
     private let bonjourType = "_mksiptv-debug._tcp"
     private let decoder = JSONDecoder()
+    /// Dedicated background queue for NWListener and NWConnection callbacks.
+    /// Keeping Network callbacks off .main prevents blocking the UI thread
+    /// when a new connection arrives or data is received.
+    private let networkQueue = DispatchQueue(label: "RemoteLogReceiver.network", qos: .utility)
 
     private init() {}
 
@@ -120,7 +124,7 @@ final class RemoteLogReceiver {
                 }
             }
 
-            listener.start(queue: .main)
+            listener.start(queue: networkQueue)
         } catch {
             MKSLog.debug.error("RemoteLogReceiver: failed to start: \(error)")
         }
@@ -184,7 +188,7 @@ final class RemoteLogReceiver {
             }
         }
 
-        connection.start(queue: .main)
+        connection.start(queue: networkQueue)
     }
 
     private func receiveMessages(from connection: NWConnection, id: String) {

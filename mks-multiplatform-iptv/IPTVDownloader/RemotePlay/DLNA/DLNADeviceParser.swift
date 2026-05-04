@@ -87,53 +87,66 @@ enum DLNADeviceParser {
     private static let probePaths = ["/dmr.xml", "/DeviceDescription.xml", "/description.xml", "/rootDesc.xml"]
     private static let probePorts: [Int] = [2870, 8008, 49152, 1400, 8080]
 
+    /// Short-timeout URLSession for probe requests.
+    /// URLSession.shared has a 60s default — probing 20 unreachable endpoints
+    /// serially would block for up to 20 min and pin the CPU.
+    private static let probeSession: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 2
+        config.timeoutIntervalForResource = 2
+        return URLSession(configuration: config)
+    }()
+
     /// Probe common alternative device description paths on the same IP to find
-    /// a MediaRenderer with AVTransport. Called when the SSDP LOCATION description
-    /// has no AVTransport service.
-    /// - Parameter initialDevice: The parsed device from SSDP (no AVTransport)
+    /// a MediaRenderer with AVTransport. All candidates are probed in parallel
+    /// with a 2-second per-request timeout so the entire scan completes in ~2s
+    /// regardless of how many hosts refuse the connection.
     /// - Returns: An upgraded `ParsedDevice` with AVTransport, or `nil` if none found
     static func probeForMediaRenderer(ip: String, ssdpPort: Int) async -> ParsedDevice? {
-        // Probe known paths on known ports, skipping the port+path already tried via SSDP
+        // Build the full candidate URL list
+        var candidates: [URL] = []
         for port in probePorts where port != ssdpPort {
             for path in probePaths {
-                guard let url = URL(string: "http://\(ip):\(port)\(path)") else { continue }
-                do {
-                    let (data, response) = try await URLSession.shared.data(from: url)
-                    guard let httpResponse = response as? HTTPURLResponse,
-                          httpResponse.statusCode == 200 else { continue }
-
-                    let parser = UPnPDeviceXMLParser(baseURL: url)
-                    guard let device = parser.parse(data),
-                          device.avTransportControlURL != nil else { continue }
-
-                    MKSLog.dlna.info("Probe HIT: found MediaRenderer at \(url) with AVTransport")
-                    return device
-                } catch {
-                    continue
+                if let url = URL(string: "http://\(ip):\(port)\(path)") {
+                    candidates.append(url)
                 }
             }
         }
-        // Also try probePaths on the SSDP port (different path, same port)
         for path in probePaths {
-            guard let url = URL(string: "http://\(ip):\(ssdpPort)\(path)") else { continue }
-            do {
-                let (data, response) = try await URLSession.shared.data(from: url)
-                guard let httpResponse = response as? HTTPURLResponse,
-                      httpResponse.statusCode == 200 else { continue }
-
-                let parser = UPnPDeviceXMLParser(baseURL: url)
-                guard let device = parser.parse(data),
-                      device.avTransportControlURL != nil else { continue }
-
-                MKSLog.dlna.info("Probe HIT: found MediaRenderer at \(url) with AVTransport")
-                return device
-            } catch {
-                continue
+            if let url = URL(string: "http://\(ip):\(ssdpPort)\(path)") {
+                candidates.append(url)
             }
         }
 
-        MKSLog.dlna.debug("Probe: no MediaRenderer found on \(ip)")
-        return nil
+        // Race all candidates in parallel — return on first valid MediaRenderer hit.
+        return await withTaskGroup(of: ParsedDevice?.self) { group in
+            for url in candidates {
+                group.addTask {
+                    do {
+                        let (data, response) = try await probeSession.data(from: url)
+                        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                            return nil
+                        }
+                        let parser = UPnPDeviceXMLParser(baseURL: url)
+                        guard let device = parser.parse(data),
+                              device.avTransportControlURL != nil else { return nil }
+                        MKSLog.dlna.info("Probe HIT: found MediaRenderer at \(url) with AVTransport")
+                        return device
+                    } catch {
+                        return nil
+                    }
+                }
+            }
+
+            for await result in group {
+                if let device = result {
+                    group.cancelAll()
+                    return device
+                }
+            }
+            MKSLog.dlna.debug("Probe: no MediaRenderer found on \(ip)")
+            return nil
+        }
     }
 
     /// Convert parsed device to RemoteDevice struct.

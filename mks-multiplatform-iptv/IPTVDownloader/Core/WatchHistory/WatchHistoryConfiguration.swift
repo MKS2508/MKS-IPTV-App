@@ -3,41 +3,33 @@ import SwiftData
 
 /// Creates and configures the SwiftData ModelContainer for watch history persistence.
 ///
-/// When iCloud sync is available, uses `cloudKitDatabase: .automatic` so SwiftData
-/// transparently mirrors the local store to the user's private CloudKit database.
-/// Falls back to local-only storage if CloudKit migration fails (e.g. schema conflicts
-/// on first upgrade from a non-CloudKit store).
+/// Uses local-only storage (`cloudKitDatabase: .none`).
+///
+/// CloudKit sync (`cloudKitDatabase: .automatic`) was previously enabled but caused
+/// sustained 90-100% CPU usage: `NSCloudKitMirroringDelegate remoteStoreDidChange:`
+/// triggered a continuous import storm (`PFCloudKitImportRecordsWorkItem`) that
+/// saturated background GCD queues. Instruments Time Profiler confirmed 100% of CPU
+/// samples were in CoreData/CloudKit plumbing with zero app code visible.
+///
+/// Watch history is per-device data (resume positions, recently watched) and does not
+/// require cross-device sync. Local storage is sufficient and eliminates the CPU issue.
 enum WatchHistoryConfiguration {
 
     /// Creates a ModelContainer for `WatchHistoryEntry` and `RecentChannelEntry`.
     ///
-    /// Attempts CloudKit-backed storage first (`cloudKitDatabase: .automatic`).
-    /// If the migration to a CloudKit-compatible store fails, falls back to
-    /// local-only storage so the app never crashes on launch.
+    /// Uses local-only storage to avoid CloudKit sync CPU overhead.
     static func createContainer() throws -> ModelContainer {
         let schema = Schema([
             WatchHistoryEntry.self,
             RecentChannelEntry.self
         ])
 
-        // Try CloudKit-backed store first
-        do {
-            let cloudConfig = ModelConfiguration(
-                "WatchHistory",
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic
-            )
-            return try ModelContainer(for: schema, configurations: [cloudConfig])
-        } catch {
-            MKSLog.app.warning("[WatchHistory] CloudKit store failed, falling back to local: \(error)")
-            let localConfig = ModelConfiguration(
-                "WatchHistory",
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .none
-            )
-            return try ModelContainer(for: schema, configurations: [localConfig])
-        }
+        let localConfig = ModelConfiguration(
+            "WatchHistory",
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+        return try ModelContainer(for: schema, configurations: [localConfig])
     }
 }

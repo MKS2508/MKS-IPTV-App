@@ -30,57 +30,86 @@ actor EPGMatchingService {
     /// Build the match table between LiveChannels and EPG channels.
     /// Multiple LiveChannels (mirrors, different quality/language/backup streams)
     /// can map to the same EPG channel — this is intentional.
+    ///
+    /// Matching passes (in order, cheapest first):
+    ///   Pass 1: Exact `epgChannelId` field match — O(1) per channel
+    ///   Pass 2a: Exact normalized name match — O(n) per channel via Dictionary
+    ///   Pass 2b: Fuzzy Levenshtein — only for channels that still have no match,
+    ///            skips pairs whose length ratio would make similarity < threshold
     func buildMatchTable(liveChannels: [LiveChannel], epgChannels: [EPGChannel]) {
         matchTable = [:]
 
         // Build lookup: EPGChannel.id → EPGChannel (keep first on duplicate IDs)
         let epgById = Dictionary(epgChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
-        // Build lookup: normalized display name → EPGChannel.id (may have duplicates)
-        var normalizedNameToEPGId: [(String, String)] = []
+        // Build lookup: normalized display name → EPGChannel.id as Dictionary for O(1) exact lookup
+        var normalizedNameToEPGId: [String: String] = [:]
+        // Also keep an array for fuzzy pass (dictionary has no ordering, but we need all pairs)
+        var normalizedNamesForFuzzy: [(normalized: String, epgId: String)] = []
+
         for channel in epgChannels {
             for displayName in channel.displayNames {
                 let normalized = normalizeChannelName(displayName)
-                normalizedNameToEPGId.append((normalized, channel.id))
+                if normalizedNameToEPGId[normalized] == nil {
+                    normalizedNameToEPGId[normalized] = channel.id
+                }
+                normalizedNamesForFuzzy.append((normalized, channel.id))
             }
         }
 
+        // Channels that didn't match in pass 1 or 2a — these need expensive fuzzy matching
+        var needsFuzzy: [(streamId: Int, normalizedName: String)] = []
+
         for liveChannel in liveChannels {
-            // Pass 1: Exact epgChannelId match
+            // Pass 1: Exact epgChannelId match — O(1)
             if let epgId = liveChannel.epgChannelId, !epgId.isEmpty, epgById[epgId] != nil {
                 matchTable[liveChannel.streamId] = epgId
                 continue
             }
 
-            // Pass 2: Normalized name matching
+            // Pass 2a: Exact normalized name match — O(1) via Dictionary
             let normalizedLiveName = normalizeChannelName(liveChannel.name)
-
-            // 2a: Exact normalized match
-            if let exactMatch = normalizedNameToEPGId.first(where: { $0.0 == normalizedLiveName }) {
-                matchTable[liveChannel.streamId] = exactMatch.1
+            if let epgId = normalizedNameToEPGId[normalizedLiveName] {
+                matchTable[liveChannel.streamId] = epgId
                 continue
             }
 
-            // 2b: Fuzzy Levenshtein match — pick best above threshold
-            var bestMatch: (epgId: String, similarity: Double)?
+            // Defer to fuzzy pass
+            needsFuzzy.append((liveChannel.streamId, normalizedLiveName))
+        }
 
-            for (normalizedName, epgId) in normalizedNameToEPGId {
-                let similarity = StringSimilarity.normalizedLevenshtein(normalizedLiveName, normalizedName)
-                if similarity >= similarityThreshold {
-                    if bestMatch == nil || similarity > bestMatch!.similarity {
-                        bestMatch = (epgId, similarity)
+        // Pass 2b: Fuzzy Levenshtein — only for unmatched channels
+        // Skip pairs where the length ratio makes similarity < threshold (fast pre-filter)
+        if !needsFuzzy.isEmpty {
+            for (streamId, normalizedLiveName) in needsFuzzy {
+                var bestMatch: (epgId: String, similarity: Double)?
+                let liveLen = normalizedLiveName.count
+                guard liveLen > 0 else { continue }
+
+                for (normalizedName, epgId) in normalizedNamesForFuzzy {
+                    let epgLen = normalizedName.count
+                    guard epgLen > 0 else { continue }
+
+                    // Length ratio pre-filter: if ratio < threshold, Levenshtein can't reach it
+                    let ratio = Double(min(liveLen, epgLen)) / Double(max(liveLen, epgLen))
+                    guard ratio >= similarityThreshold else { continue }
+
+                    let similarity = StringSimilarity.normalizedLevenshtein(normalizedLiveName, normalizedName)
+                    if similarity >= similarityThreshold {
+                        if bestMatch == nil || similarity > bestMatch!.similarity {
+                            bestMatch = (epgId, similarity)
+                            if similarity == 1.0 { break } // Perfect match — no need to continue
+                        }
                     }
                 }
-            }
 
-            if let match = bestMatch {
-                matchTable[liveChannel.streamId] = match.epgId
+                if let match = bestMatch {
+                    matchTable[streamId] = match.epgId
+                }
             }
         }
 
         MKSLog.live.debug("[EPGMatchingService] Matched \(matchTable.count)/\(liveChannels.count) channels to EPG data")
-
-        // Log how many unique EPG channels were matched
         let uniqueEPG = Set(matchTable.values)
         MKSLog.live.debug("[EPGMatchingService] Unique EPG channels matched: \(uniqueEPG.count)/\(epgChannels.count)")
     }

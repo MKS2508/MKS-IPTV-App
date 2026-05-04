@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CloudKit
 
 /// Thread-safe service for reading and writing watch history data.
 ///
@@ -81,6 +82,7 @@ actor WatchHistoryManager {
         }
 
         try modelContext.save()
+        Task { await WatchHistorySyncEngine.shared.schedulePush() }
     }
 
     // MARK: - Continue Watching Queries
@@ -199,6 +201,7 @@ actor WatchHistoryManager {
         entry.progress = 1.0
         entry.lastModifiedDate = Date()
         try modelContext.save()
+        Task { await WatchHistorySyncEngine.shared.schedulePush() }
     }
 
     /// Remove a single entry from continue watching (user action).
@@ -206,6 +209,7 @@ actor WatchHistoryManager {
         guard let entry = try fetchEntry(profileId: profileId, contentType: contentType, contentId: contentId) else { return }
         modelContext.delete(entry)
         try modelContext.save()
+        Task { await WatchHistorySyncEngine.shared.schedulePush() }
     }
 
     /// Delete all watch history for a profile (called when profile is deleted).
@@ -227,6 +231,8 @@ actor WatchHistoryManager {
         }
 
         try modelContext.save()
+        // No push needed for profile delete — deletions aren't synced to CloudKit.
+        // The record will be cleaned up next time the other device logs in.
     }
 
     // MARK: - Live Channel History
@@ -263,6 +269,7 @@ actor WatchHistoryManager {
         }
 
         try modelContext.save()
+        Task { await WatchHistorySyncEngine.shared.schedulePush() }
     }
 
     /// Recent channels sorted by `lastWatchedAt DESC`.
@@ -276,6 +283,84 @@ actor WatchHistoryManager {
         var limited = descriptor
         limited.fetchLimit = limit
         return try modelContext.fetch(limited)
+    }
+
+    // MARK: - CloudKit Sync Support
+
+    /// Merges a remote `WatchHistoryEntry` into the local store.
+    ///
+    /// - If a local entry exists: merge using last-write-wins on `lastModifiedDate`.
+    /// - If no local entry: insert the remote entry as-is.
+    /// Merges a remote `WatchHistoryEntry` received from CloudKit pull.
+    ///
+    /// Does NOT call `schedulePush()` — this is an inbound sync write, not a
+    /// user-initiated change. Calling schedulePush here would cause an infinite
+    /// loop: pull → merge → save → schedulePush → push → CloudKit notifies → pull…
+    func mergeRemoteWatchEntry(_ remote: WatchHistoryEntry) throws {
+        if let local = try fetchEntry(
+            profileId: remote.profileId,
+            contentType: remote.contentType,
+            contentId: remote.contentId
+        ) {
+            // last-write-wins: only overwrite if remote is newer
+            guard remote.lastModifiedDate > local.lastModifiedDate else { return }
+            local.lastPosition = remote.lastPosition
+            local.totalDuration = max(local.totalDuration, remote.totalDuration)
+            local.progress = remote.progress
+            local.isCompleted = remote.isCompleted
+            local.displayTitle = remote.displayTitle
+            local.posterURL = remote.posterURL
+            local.backdropURL = remote.backdropURL
+            local.seriesId = remote.seriesId
+            local.showTitle = remote.showTitle
+            local.seasonNumber = remote.seasonNumber
+            local.episodeNumber = remote.episodeNumber
+            local.episodeTitle = remote.episodeTitle
+            local.containerExtension = remote.containerExtension
+            local.lastWatchedAt = remote.lastWatchedAt
+            local.lastModifiedDate = remote.lastModifiedDate
+        } else {
+            modelContext.insert(remote)
+        }
+        // Save silently — no schedulePush(), this is inbound sync data.
+        try modelContext.save()
+    }
+
+    /// Merges a remote `RecentChannelEntry` received from CloudKit pull.
+    ///
+    /// Does NOT call `schedulePush()` for the same reason as `mergeRemoteWatchEntry`.
+    func mergeRemoteChannelEntry(_ remote: RecentChannelEntry) throws {
+        let remoteProfileId = remote.profileId
+        let remoteChannelId = remote.channelStreamId
+        let descriptor = FetchDescriptor<RecentChannelEntry>(
+            predicate: #Predicate<RecentChannelEntry> { entry in
+                entry.profileId == remoteProfileId &&
+                entry.channelStreamId == remoteChannelId
+            }
+        )
+        if let local = try modelContext.fetch(descriptor).first {
+            // Keep the higher watchCount and most recent timestamp
+            if remote.lastWatchedAt > local.lastWatchedAt {
+                local.watchCount = max(local.watchCount, remote.watchCount)
+                local.lastWatchedAt = remote.lastWatchedAt
+                local.channelName = remote.channelName
+                local.channelIcon = remote.channelIcon
+            }
+        } else {
+            modelContext.insert(remote)
+        }
+        // Save silently — no schedulePush(), this is inbound sync data.
+        try modelContext.save()
+    }
+
+    /// Returns all local entries as CKRecords for upload to CloudKit.
+    func allRecordsForSync(zoneID: CKRecordZone.ID) throws -> (watch: [CKRecord], channels: [CKRecord]) {
+        let watchEntries = try modelContext.fetch(FetchDescriptor<WatchHistoryEntry>())
+        let channelEntries = try modelContext.fetch(FetchDescriptor<RecentChannelEntry>())
+        return (
+            watchEntries.map { $0.toCKRecord(in: zoneID) },
+            channelEntries.map { $0.toCKRecord(in: zoneID) }
+        )
     }
 
     // MARK: - Private Helpers

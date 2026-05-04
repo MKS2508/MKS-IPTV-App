@@ -135,6 +135,38 @@ struct StreamError: Identifiable {
     }
 }
 
+// MARK: - Log Entry Buffer
+
+/// Thread-safe accumulator that coalesces rapid log entries into batched
+/// main-thread deliveries (max ~30 flushes/sec). Prevents main-thread
+/// saturation when logging sources fire hundreds of messages per second.
+private final class LogEntryBuffer: @unchecked Sendable {
+    private var pending: [DebugLog] = []
+    private var flushScheduled = false
+    private let lock = NSLock()
+
+    /// Append an entry and schedule a flush if one is not already pending.
+    /// The flush callback is always invoked on the main thread.
+    func enqueue(_ entry: DebugLog, flush: @MainActor @escaping ([DebugLog]) -> Void) {
+        lock.lock()
+        pending.append(entry)
+        let needsSchedule = !flushScheduled
+        if needsSchedule { flushScheduled = true }
+        lock.unlock()
+
+        guard needsSchedule else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.033) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let batch = self.pending
+            self.pending.removeAll()
+            self.flushScheduled = false
+            self.lock.unlock()
+            Task { @MainActor in flush(batch) }
+        }
+    }
+}
+
 // MARK: - ViewModel
 
 @MainActor
@@ -161,20 +193,29 @@ class DebugStreamingViewModel: ObservableObject {
     @Published var logSource: LogSource = .all
     @Published var connectedDevices: [RemoteLogReceiver.ConnectedDevice] = []
 
+    /// Buffer that accumulates log entries off the main thread and flushes
+    /// them in batches to avoid main-thread saturation during heavy logging.
+    private let logBuffer = LogEntryBuffer()
+
     init(movieService: MovieService) {
         self.movieService = movieService
 
         // Subscribe to ALL MKSLog output (local logs from this process).
+        // Buffered + throttled: entries are accumulated in a thread-safe buffer and
+        // flushed to the main thread at most once per ~33ms (~30 fps).
+        // Without throttling, heavy transmux logging (100s of msgs/sec) saturates
+        // the main thread and causes CPU 100% / crash.
         MKSLog.localObserver = { [weak self] message, category, level in
-            DispatchQueue.main.async {
+            guard let self else { return }
+            let type: DebugLog.LogType = switch level {
+            case "error": .error
+            case "warning": .warning
+            default: .info
+            }
+            let entry = DebugLog(message: "[\(category)] \(message)", type: type, source: .local)
+            self.logBuffer.enqueue(entry) { [weak self] batch in
                 guard let self else { return }
-                let type: DebugLog.LogType = switch level {
-                case "error": .error
-                case "warning": .warning
-                default: .info
-                }
-                let entry = DebugLog(message: "[\(category)] \(message)", type: type, source: .local)
-                self.appendLog(entry)
+                for e in batch { self.appendLog(e) }
             }
         }
 
@@ -340,8 +381,9 @@ class DebugStreamingViewModel: ObservableObject {
                 log("  Genre: \(details.info.genre)", type: .info)
                 
                 // Show first season episodes if available
+                // API keys episodes by season number ("1", "2"...) not by season ID
                 if let firstSeason = details.seasons.first,
-                   let episodes = details.episodes[firstSeason.id] {
+                   let episodes = details.episodes[firstSeason.id] ?? details.episodes[String(firstSeason.seasonNumber)] {
                     log("  Season 1 has \(episodes.count) episodes", type: .info)
                     if verboseMode, let firstEpisode = episodes.first {
                         let episodeURL = IPTVConfiguration.buildSeriesURL(

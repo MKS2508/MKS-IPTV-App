@@ -42,6 +42,11 @@ final class LogsDebugViewModel {
     private var pollingTask: Task<Void, Never>?
     private var lastFileOffsets: [LogSource: Int] = [:]
     private let maxEntries = 5000
+    /// Maximum rows shown in the List at any time to keep AppKit layout fast.
+    private let maxDisplayItems = 300
+    /// Pending recompute task — cancelled and replaced on each call to avoid
+    /// stacking expensive background work during rapid filter changes.
+    private var recomputeTask: Task<Void, Never>?
 
     // MARK: - Lifecycle
 
@@ -50,9 +55,12 @@ final class LogsDebugViewModel {
         // Initial full load
         loadAllSources()
 
+        // 3s interval: frequent enough for a debug viewer, cheap enough not to
+        // saturate the CPU. At 1s, parsing + deduplication of large log files
+        // runs continuously and pushes CPU to 90-100%.
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .seconds(3))
                 guard let self, self.isPolling, !Task.isCancelled else { continue }
                 await self.pollForChanges()
             }
@@ -62,16 +70,60 @@ final class LogsDebugViewModel {
     func stopPolling() {
         pollingTask?.cancel()
         pollingTask = nil
+        recomputeTask?.cancel()
+        recomputeTask = nil
     }
 
     // MARK: - Loading
 
     func loadAllSources() {
-        for source in LogSource.allCases where source.isFileBased {
-            loadSource(source)
-        }
         setupRemoteLogReceiver()
-        recomputeDisplay()
+        // Load all file-based sources off the main thread to avoid blocking
+        // navigation — log files can be several MB from previous sessions.
+        //
+        // IMPORTANT: we call the nonisolated static helper here rather than
+        // an instance method, because instance methods of a @MainActor class
+        // are themselves @MainActor-isolated even inside Task.detached —
+        // Swift 6 re-hops back to the main actor, causing the parse to block
+        // the main thread for the entire duration (observed: 1+ minute).
+        let maxEntries = self.maxEntries
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            // Build results locally inside the detached task — Swift 6 safe.
+            let results: [(LogSource, [LogEntry], Int)] = LogSource.allCases
+                .filter { $0.isFileBased }
+                .map { source in
+                    LogsDebugViewModel.readAndParse(source: source, maxEntries: maxEntries)
+                        ?? (source, [], 0)
+                }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                for (source, entries, offset) in results {
+                    self.allEntries[source] = entries
+                    self.lastFileOffsets[source] = offset
+                    self.updateFileStats(source)
+                }
+                self.recomputeDisplay()
+            }
+        }
+    }
+
+    /// Reads a log file and parses its entries entirely off-actor.
+    /// Returns `nil` if the file does not exist or cannot be read.
+    /// This is `nonisolated static` so Swift schedules it on the cooperative
+    /// thread pool regardless of which actor calls it.
+    private nonisolated static func readAndParse(
+        source: LogSource,
+        maxEntries: Int
+    ) -> (LogSource, [LogEntry], Int)? {
+        let path = source.filePath
+        guard FileManager.default.fileExists(atPath: path),
+              let content = try? String(contentsOfFile: path, encoding: .utf8)
+        else { return nil }
+        let entries = LogParser.parse(content: content, source: source)
+        let trimmed = entries.count > maxEntries ? Array(entries.suffix(maxEntries)) : entries
+        let offset = content.utf8.count
+        return (source, trimmed, offset)
     }
 
     /// Subscribe to RemoteLogReceiver for the .remote source tab.
@@ -177,118 +229,117 @@ final class LogsDebugViewModel {
         return header + timestamp + stats + body
     }
 
-    // MARK: - Private
-
-    private func loadSource(_ source: LogSource) {
-        guard source.isFileBased else { return }
-        let path = source.filePath
-        guard FileManager.default.fileExists(atPath: path) else {
-            allEntries[source] = []
-            updateFileStats(source)
-            return
-        }
-
-        guard let content = try? String(contentsOfFile: path, encoding: .utf8) else {
-            allEntries[source] = []
-            updateFileStats(source)
-            return
-        }
-
-        let entries = LogParser.parse(content: content, source: source)
-        // Keep only the last maxEntries
-        if entries.count > maxEntries {
-            allEntries[source] = Array(entries.suffix(maxEntries))
-        } else {
-            allEntries[source] = entries
-        }
-
-        lastFileOffsets[source] = content.utf8.count
-        updateFileStats(source)
-    }
-
     private func pollForChanges() async {
-        var changed = false
+        // Snapshot offsets on MainActor before hopping off.
+        let offsets = lastFileOffsets
 
-        for source in LogSource.allCases where source.isFileBased {
-            let path = source.filePath
-            guard FileManager.default.fileExists(atPath: path) else { continue }
+        // Do ALL file I/O and stat lookups off the main thread.
+        let updates: [(LogSource, [LogEntry], Int)] = await Task.detached(priority: .utility) {
+            var result: [(LogSource, [LogEntry], Int)] = []
+            for source in LogSource.allCases where source.isFileBased {
+                let path = source.filePath
+                guard FileManager.default.fileExists(atPath: path) else { continue }
 
-            // Check file size to detect changes
-            guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
-                  let fileSize = attrs[.size] as? Int else { continue }
+                guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+                      let fileSize = attrs[.size] as? Int else { continue }
 
-            let lastOffset = lastFileOffsets[source] ?? 0
-            guard fileSize > lastOffset else { continue }
+                let lastOffset = offsets[source] ?? 0
+                guard fileSize > lastOffset else { continue }
 
-            // Read only new content
-            guard let handle = FileHandle(forReadingAtPath: path) else { continue }
-            defer { try? handle.close() }
+                guard let handle = FileHandle(forReadingAtPath: path) else { continue }
+                defer { try? handle.close() }
 
-            handle.seek(toFileOffset: UInt64(lastOffset))
-            guard let newData = try? handle.readToEnd(),
-                  let newContent = String(data: newData, encoding: .utf8) else { continue }
+                handle.seek(toFileOffset: UInt64(lastOffset))
+                guard let newData = try? handle.readToEnd(),
+                      let newContent = String(data: newData, encoding: .utf8) else { continue }
 
-            let newEntries = LogParser.parse(content: newContent, source: source)
-            guard !newEntries.isEmpty else { continue }
+                let newEntries = LogParser.parse(content: newContent, source: source)
+                guard !newEntries.isEmpty else { continue }
 
+                result.append((source, newEntries, fileSize))
+            }
+            return result
+        }.value
+
+        guard !updates.isEmpty else { return }
+
+        // Apply results on MainActor — no file I/O here.
+        lastRefresh = Date()
+        var activeSourceUpdated = false
+        for (source, newEntries, fileSize) in updates {
             var existing = allEntries[source] ?? []
             existing.append(contentsOf: newEntries)
-
-            // Trim if over limit
             if existing.count > maxEntries {
                 existing = Array(existing.suffix(maxEntries))
             }
-
             allEntries[source] = existing
             lastFileOffsets[source] = fileSize
-            updateFileStats(source)
-            changed = true
+            // Update stats without extra I/O: size is already known from the poll.
+            fileStats[source] = LogFileStats(
+                source: source,
+                fileSize: Int64(fileSize),
+                lineCount: existing.count,
+                exists: true
+            )
+            if source == selectedSource { activeSourceUpdated = true }
         }
-
-        if changed {
-            await MainActor.run {
-                lastRefresh = Date()
-                recomputeDisplay()
-            }
-        }
+        // Only recompute display if the currently-viewed source has new entries.
+        if activeSourceUpdated { recomputeDisplay() }
     }
 
     private func recomputeDisplay() {
+        // Cancel any in-flight recompute so we never stack expensive work.
+        recomputeTask?.cancel()
+
+        // Capture inputs (all @MainActor-isolated) before going async.
         let entries = allEntries[selectedSource] ?? []
+        let levels = selectedLevels
+        let query = searchText
+        let limit = maxDisplayItems
 
-        // Apply level filter
-        var filtered = entries.filter { selectedLevels.contains($0.level) }
+        recomputeTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard !Task.isCancelled else { return }
 
-        // Apply search filter
-        if !searchText.isEmpty {
-            let query = searchText.lowercased()
-            filtered = filtered.filter { entry in
-                entry.action.lowercased().contains(query) ||
-                entry.tag.lowercased().contains(query) ||
-                entry.rawLine.lowercased().contains(query)
+            // Filter by level
+            var filtered = entries.filter { levels.contains($0.level) }
+
+            // Filter by search text
+            if !query.isEmpty {
+                let q = query.lowercased()
+                filtered = filtered.filter { entry in
+                    entry.action.lowercased().contains(q) ||
+                    entry.tag.lowercased().contains(q) ||
+                    entry.rawLine.lowercased().contains(q)
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            // Deduplicate — O(n), done off main thread
+            let allItems = LogDeduplicator.deduplicate(filtered)
+
+            // Cap to the last `limit` items so the List never renders thousands of rows.
+            // HIToolbox hover tracking is O(n) rows and causes CPU spike above ~300.
+            let capped = allItems.count > limit ? Array(allItems.suffix(limit)) : allItems
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run { [weak self] in
+                self?.displayItems = capped
             }
         }
-
-        // Deduplicate
-        displayItems = LogDeduplicator.deduplicate(filtered)
     }
 
+    /// Updates file stats using already-loaded entry counts — NO disk I/O.
+    /// File size is approximated from the known offset (set during load/poll).
     private func updateFileStats(_ source: LogSource) {
-        let path = source.filePath
-        let exists = FileManager.default.fileExists(atPath: path)
-        var size: Int64 = 0
-        var lineCount = 0
-
-        if exists {
-            if let attrs = try? FileManager.default.attributesOfItem(atPath: path) {
-                size = attrs[.size] as? Int64 ?? 0
-            }
-            lineCount = allEntries[source]?.count ?? 0
-        }
+        let lineCount = allEntries[source]?.count ?? 0
+        let knownOffset = lastFileOffsets[source] ?? 0
+        let exists = source.isFileBased ? knownOffset > 0 || lineCount > 0 : true
 
         fileStats[source] = LogFileStats(
             source: source,
-            fileSize: size,
+            fileSize: Int64(knownOffset),
             lineCount: lineCount,
             exists: exists
         )
@@ -632,8 +683,6 @@ private struct LogEntryRow: View {
     let entry: LogEntry
     let onCopy: () -> Void
 
-    @State private var isHovered = false
-
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             // Timestamp
@@ -668,28 +717,21 @@ private struct LogEntryRow: View {
             }
 
             Spacer(minLength: 4)
-
-            // Copy button (visible on hover)
-            if isHovered {
-                Button(action: onCopy) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .transition(.opacity)
-            }
         }
         .padding(.vertical, 2)
         .padding(.horizontal, 4)
         .background(rowBackground, in: RoundedRectangle(cornerRadius: 4))
-        .onHover { isHovered = $0 }
+        // Use contextMenu for copy instead of onHover — onHover registers a
+        // mouse-tracking area per row in AppKit/HIToolbox; with 1000s of rows
+        // this causes O(n) event dispatch overhead and pins the main thread.
+        .contextMenu {
+            Button(action: onCopy) {
+                Label("Copy Entry", systemImage: "doc.on.doc")
+            }
+        }
     }
 
     private var rowBackground: some ShapeStyle {
-        if isHovered {
-            return AnyShapeStyle(Color.secondary.opacity(0.08))
-        }
         switch entry.level {
         case .error:
             return AnyShapeStyle(Color.red.opacity(0.06))
@@ -709,8 +751,6 @@ private struct CollapsedLogGroupRow: View {
     let onToggle: () -> Void
     let onCopyGroup: () -> Void
     let onCopyEntry: (LogEntry) -> Void
-
-    @State private var isHovered = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -750,24 +790,17 @@ private struct CollapsedLogGroupRow: View {
                 }
 
                 Spacer(minLength: 4)
-
-                // Copy group button
-                if isHovered {
-                    Button(action: onCopyGroup) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.borderless)
-                    .transition(.opacity)
-                }
             }
             .padding(.vertical, 2)
             .padding(.horizontal, 4)
-            .background(Color.secondary.opacity(isHovered ? 0.08 : 0.04), in: RoundedRectangle(cornerRadius: 4))
+            .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 4))
             .contentShape(Rectangle())
             .onTapGesture(perform: onToggle)
-            .onHover { isHovered = $0 }
+            .contextMenu {
+                Button(action: onCopyGroup) {
+                    Label("Copy Group", systemImage: "doc.on.doc")
+                }
+            }
 
             // Expanded entries
             if isExpanded {

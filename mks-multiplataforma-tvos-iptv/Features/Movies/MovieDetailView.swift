@@ -17,6 +17,7 @@ struct MovieDetailView: View {
 
     @State private var detail: MovieDetail?
     @State private var loadError: String?
+    @State private var playingItem: PlayableItem?
     @FocusState private var isPlayFocused: Bool
 
     var body: some View {
@@ -39,6 +40,9 @@ struct MovieDetailView: View {
             await loadDetail()
         }
         .onAppear { isPlayFocused = true }
+        .fullScreenCover(item: $playingItem) { item in
+            TVPlayerView(item: item) { playingItem = nil }
+        }
     }
 
     private var hero: some View {
@@ -86,7 +90,7 @@ struct MovieDetailView: View {
                 }
 
                 HStack(spacing: 24) {
-                    Button(action: { MKSLog.app.info("Play tapped streamId=\(movie.streamId)") }) {
+                    Button(action: playMovie) {
                         HStack(spacing: 12) {
                             Image(systemName: "play.fill")
                             Text("Play")
@@ -198,6 +202,16 @@ struct MovieDetailView: View {
                 .font(.title3.weight(.medium))
                 .foregroundStyle(.white)
         }
+    }
+
+    private func playMovie() {
+        guard let profile = profileStore.profile,
+              let item = PlayableItem.movie(movie, profile: profile) else {
+            MKSLog.player.error("Could not build PlayableItem for movie streamId=\(movie.streamId)")
+            return
+        }
+        MKSLog.player.info("Play tapped streamId=\(movie.streamId)")
+        playingItem = item
     }
 
     private func loadDetail() async {

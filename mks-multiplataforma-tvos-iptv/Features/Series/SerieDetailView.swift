@@ -16,6 +16,7 @@ struct SerieDetailView: View {
     @State private var detail: SerieDetail?
     @State private var loadError: String?
     @State private var selectedSeasonKey: String?
+    @State private var playingItem: PlayableItem?
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -43,6 +44,19 @@ struct SerieDetailView: View {
         .background(Color.black.ignoresSafeArea())
         .ignoresSafeArea(edges: .top)
         .task { await loadDetail() }
+        .fullScreenCover(item: $playingItem) { item in
+            TVPlayerView(item: item) { playingItem = nil }
+        }
+    }
+
+    private func playEpisode(_ episode: SerieDetail.Episode) {
+        guard let profile = profileStore.profile,
+              let item = PlayableItem.episode(episode, serie: serie, profile: profile) else {
+            MKSLog.player.error("Could not build PlayableItem for episode id=\(episode.id)")
+            return
+        }
+        MKSLog.player.info("Episode play id=\(episode.id) S\(episode.season)E\(episode.episodeNum)")
+        playingItem = item
     }
 
     private var hero: some View {
@@ -188,7 +202,7 @@ struct SerieDetailView: View {
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(episodes.sorted(by: { $0.episodeNum < $1.episodeNum })) { episode in
-                        EpisodeRow(episode: episode)
+                        EpisodeRow(episode: episode) { playEpisode(episode) }
                             .padding(.horizontal, 80)
                     }
                 }
@@ -254,13 +268,12 @@ struct SerieDetailView: View {
 
 private struct EpisodeRow: View {
     let episode: SerieDetail.Episode
+    let onPlay: () -> Void
 
     @Environment(\.isFocused) private var isFocused
 
     var body: some View {
-        Button {
-            MKSLog.app.info("Episode tap id=\(episode.id) S\(episode.season)E\(episode.episodeNum)")
-        } label: {
+        Button(action: onPlay) {
             HStack(spacing: 24) {
                 Text(String(format: "%02d", episode.episodeNum))
                     .font(.system(size: 56, weight: .heavy, design: .rounded))

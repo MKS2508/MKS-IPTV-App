@@ -11,7 +11,9 @@ import IPTVCore
 struct ChannelDetailView: View {
     let channel: LiveChannel
 
+    @EnvironmentObject private var profileStore: ProfileStore
     @State private var schedule: [MockProgramme] = []
+    @State private var playingItem: PlayableItem?
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -27,6 +29,9 @@ struct ChannelDetailView: View {
         .ignoresSafeArea(edges: .top)
         .onAppear {
             schedule = MockEPG.schedule(for: channel)
+        }
+        .fullScreenCover(item: $playingItem) { item in
+            TVPlayerView(item: item) { playingItem = nil }
         }
     }
 
@@ -74,9 +79,7 @@ struct ChannelDetailView: View {
                     .foregroundStyle(.white.opacity(0.7))
                 }
 
-                Button(action: {
-                    MKSLog.app.info("Channel play streamId=\(channel.streamId)")
-                }) {
+                Button(action: playLive) {
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                         Text("Watch Live")
@@ -140,6 +143,16 @@ struct ChannelDetailView: View {
             }
         }
         .padding(.top, 40)
+    }
+
+    private func playLive() {
+        guard let profile = profileStore.profile,
+              let item = PlayableItem.live(channel, profile: profile) else {
+            MKSLog.player.error("Could not build PlayableItem for channel streamId=\(channel.streamId)")
+            return
+        }
+        MKSLog.player.info("Channel play streamId=\(channel.streamId)")
+        playingItem = item
     }
 
     private func timeRange(_ p: MockProgramme) -> String {

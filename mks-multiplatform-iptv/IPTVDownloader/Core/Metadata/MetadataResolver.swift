@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Heuristic scoring engine that queries multiple ``MetadataProvider``s in parallel
 /// and selects the best matching result.

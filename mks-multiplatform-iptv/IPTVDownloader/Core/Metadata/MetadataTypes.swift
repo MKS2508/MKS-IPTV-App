@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 // MARK: - Media Type
 

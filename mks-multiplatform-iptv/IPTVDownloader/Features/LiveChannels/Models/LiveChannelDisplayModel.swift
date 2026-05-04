@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 // MARK: - Live Channel Display Model
 

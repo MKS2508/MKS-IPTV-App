@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct DownloadsView: View {
     @EnvironmentObject private var downloadManager: DownloadManager

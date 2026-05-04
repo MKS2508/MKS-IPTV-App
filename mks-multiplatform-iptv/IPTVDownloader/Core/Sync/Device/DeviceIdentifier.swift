@@ -1,3 +1,4 @@
+import IPTVCore
 //
 //  DeviceIdentifier.swift
 //  mks-multiplatform-iptv
@@ -8,6 +9,7 @@
 import Foundation
 #if canImport(UIKit)
 import UIKit
+import IPTVCore
 #endif
 
 /// Provides stable, cross-platform device metadata for CloudKit device tracking.

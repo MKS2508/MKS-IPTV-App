@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct NowOnTVCarousel: View {
     let channels: [(liveChannel: LiveChannel, epgChannel: EPGChannel?, programme: EPGProgramme)]

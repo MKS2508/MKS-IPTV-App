@@ -1,3 +1,4 @@
+import IPTVCore
 //
 //  PlatformNavigationView.swift
 //  mks-multiplatform-iptv
@@ -208,6 +209,7 @@ extension NavigationDestination {
 
 #if canImport(UIKit)
 import UIKit
+import IPTVCore
 
 extension UIDevice {
     /// Whether the current device is an iPad

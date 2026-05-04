@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // MARK: - Tag System Protocol
 protocol TagContentProvider {

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Stores user preferences for CloudKit synchronization.
 ///

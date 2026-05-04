@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// Provides access to the app's CloudKit container with runtime availability checks.
 ///

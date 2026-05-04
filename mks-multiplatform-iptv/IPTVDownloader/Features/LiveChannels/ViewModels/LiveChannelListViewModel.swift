@@ -10,6 +10,7 @@
 import Foundation
 import os
 import SwiftUI
+import IPTVCore
 
 // MARK: - Channel Loading State
 

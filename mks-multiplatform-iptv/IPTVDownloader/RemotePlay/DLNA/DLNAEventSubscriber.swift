@@ -7,6 +7,7 @@
 
 import Foundation
 import Network
+import IPTVCore
 
 /// Placeholder for DLNA GENA (General Event Notification Architecture) event subscription.
 ///

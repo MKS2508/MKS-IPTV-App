@@ -1,3 +1,4 @@
+import IPTVCore
 //
 //  LogsDebugView.swift
 //  mks-multiplatform-iptv
@@ -10,6 +11,7 @@
 import SwiftUI
 #if os(macOS)
 import AppKit
+import IPTVCore
 #endif
 
 // MARK: - ViewModel

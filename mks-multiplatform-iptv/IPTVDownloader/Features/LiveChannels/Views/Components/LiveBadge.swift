@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Live Badge
 

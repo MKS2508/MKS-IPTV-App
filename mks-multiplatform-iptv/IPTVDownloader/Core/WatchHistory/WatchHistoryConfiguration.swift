@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import IPTVCore
 
 /// Creates and configures the SwiftData ModelContainer for watch history persistence.
 ///

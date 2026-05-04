@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Native launch screen that follows Apple Human Interface Guidelines
 /// - Uses skeleton loading pattern (shows app structure)

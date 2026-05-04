@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Metadata provider using TheTVDB API v4.
 ///

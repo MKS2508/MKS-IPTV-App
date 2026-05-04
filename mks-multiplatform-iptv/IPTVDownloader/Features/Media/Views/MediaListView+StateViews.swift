@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 extension MediaListView {
     // MARK: - Loading View

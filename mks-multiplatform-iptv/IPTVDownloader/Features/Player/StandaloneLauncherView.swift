@@ -2,6 +2,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import IPTVCore
 
 /// Minimal view shown when app launches in standalone player mode (Open With).
 /// Auto-opens player window and closes the main window.

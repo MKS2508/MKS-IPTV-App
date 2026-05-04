@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Liquid Glass Availability Detection
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct LocalFileRowView: View {
     let file: LocalVideoFile

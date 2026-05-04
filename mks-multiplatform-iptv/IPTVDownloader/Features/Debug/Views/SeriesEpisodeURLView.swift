@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct SeriesEpisodeURLView: View {
     let serie: Serie

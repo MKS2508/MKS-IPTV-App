@@ -13,6 +13,7 @@ import SwiftUI
 import AVKit
 import os
 import TransmuxCore
+import IPTVCore
 
 // MARK: - View Mode
 

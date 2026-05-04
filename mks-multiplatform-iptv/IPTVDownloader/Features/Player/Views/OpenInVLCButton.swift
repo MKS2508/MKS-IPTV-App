@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Unified VLC button for use in movies, series, episodes, and live channels.
 /// Handles UI, logic, hiding if VLC unavailable, and URL construction.

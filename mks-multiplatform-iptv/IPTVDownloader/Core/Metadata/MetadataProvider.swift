@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Protocol that all metadata providers must conform to.
 ///

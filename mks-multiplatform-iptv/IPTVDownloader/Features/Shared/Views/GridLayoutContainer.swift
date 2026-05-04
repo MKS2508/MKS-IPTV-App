@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Universal grid container that properly handles overflow across iOS and macOS
 /// Follows Apple's recommended patterns for LazyVGrid implementation with dynamic sizing

@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct GlassSeekBar: View {
     @Binding var progress: Double

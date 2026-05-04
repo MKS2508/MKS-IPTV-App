@@ -1,3 +1,4 @@
+import IPTVCore
 import SwiftUI
 
 #if os(macOS)
@@ -5,6 +6,7 @@ import AppKit
 typealias PlatformImage = NSImage
 #else
 import UIKit
+import IPTVCore
 typealias PlatformImage = UIImage
 #endif
 

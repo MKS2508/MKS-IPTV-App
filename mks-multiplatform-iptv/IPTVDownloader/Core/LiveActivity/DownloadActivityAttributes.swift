@@ -1,6 +1,8 @@
 #if os(iOS)
 import ActivityKit
 import Foundation
+import IPTVCore
+import IPTVCore
 
 struct DownloadActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {

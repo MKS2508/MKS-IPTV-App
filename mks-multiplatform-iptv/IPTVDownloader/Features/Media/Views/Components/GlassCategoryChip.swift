@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Glass Category Chip
 

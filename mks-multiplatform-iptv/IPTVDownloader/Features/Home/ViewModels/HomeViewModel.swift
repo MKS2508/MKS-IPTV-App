@@ -21,12 +21,12 @@ struct HomeSection: Identifiable {
 
 /// Types of sections displayed on the Home screen
 enum HomeSectionType {
-    case heroBanner(item: any LibraryItem)
+    case heroBanner(item: any MediaLibraryItem)
     case continueWatching(items: [WatchHistoryEntry])
     case recentChannels(channels: [RecentChannelEntry])
     case nowOnTV(channels: [(liveChannel: LiveChannel, epgChannel: EPGChannel?, programme: EPGProgramme)])
     case comingUpNext(programmes: [(programme: EPGProgramme, channelName: String)])
-    case mediaCarousel(items: [any LibraryItem])
+    case mediaCarousel(items: [any MediaLibraryItem])
     case liveTVCategory(channels: [LiveChannel], categoryName: String)
 }
 
@@ -247,7 +247,7 @@ final class HomeViewModel {
 
     // MARK: - Hero Banner
 
-    private func pickHeroBanner(movies: [Movie], series: [Serie]) -> (any LibraryItem)? {
+    private func pickHeroBanner(movies: [Movie], series: [Serie]) -> (any MediaLibraryItem)? {
         // Combine top-rated items from both movies and series
         let topMovies = movies
             .filter { ($0.rating5Based ?? 0) >= 3.5 && $0.streamIcon != nil && !($0.streamIcon?.isEmpty ?? true) }
@@ -259,7 +259,7 @@ final class HomeViewModel {
             .sorted { $0.rating5Based > $1.rating5Based }
             .prefix(20)
 
-        let candidates: [any LibraryItem] = Array(topMovies) + Array(topSeries)
+        let candidates: [any MediaLibraryItem] = Array(topMovies) + Array(topSeries)
 
         guard !candidates.isEmpty else {
             // Fallback: just pick any movie/serie with a cover
@@ -328,18 +328,18 @@ final class HomeViewModel {
         series: [Serie],
         since: Date,
         until: Date
-    ) -> [any LibraryItem] {
+    ) -> [any MediaLibraryItem] {
         let sinceTimestamp = since.timeIntervalSince1970
         let untilTimestamp = until.timeIntervalSince1970
 
-        let recentMovies: [any LibraryItem] = movies.filter { movie in
+        let recentMovies: [any MediaLibraryItem] = movies.filter { movie in
             guard let addedStr = movie.added, let added = Double(addedStr) else { return false }
             return added >= sinceTimestamp && added < untilTimestamp
         }.sorted {
             Double($0.added ?? "0") ?? 0 > Double($1.added ?? "0") ?? 0
         }
 
-        let recentSeries: [any LibraryItem] = series.filter { serie in
+        let recentSeries: [any MediaLibraryItem] = series.filter { serie in
             guard let modified = Double(serie.lastModified) else { return false }
             return modified >= sinceTimestamp && modified < untilTimestamp
         }.sorted {
@@ -402,11 +402,11 @@ final class HomeViewModel {
         let top3 = allCategories.sorted { $0.count > $1.count }.prefix(3)
 
         return top3.map { cat in
-            let items: [any LibraryItem]
+            let items: [any MediaLibraryItem]
             if cat.isMovie {
-                items = movies.filter { $0.categoryId == cat.id }.prefix(20).map { $0 as any LibraryItem }
+                items = movies.filter { $0.categoryId == cat.id }.prefix(20).map { $0 as any MediaLibraryItem }
             } else {
-                items = series.filter { $0.categoryId == cat.id }.prefix(20).map { $0 as any LibraryItem }
+                items = series.filter { $0.categoryId == cat.id }.prefix(20).map { $0 as any MediaLibraryItem }
             }
 
             return HomeSection(

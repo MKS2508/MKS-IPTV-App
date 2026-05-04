@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // Implementación de una versión más personalizada del proveedor de tags para series
 struct EnhancedSerieTagProvider: TagContentProvider {

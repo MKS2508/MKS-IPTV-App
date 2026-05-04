@@ -2,7 +2,7 @@
 //  HomeMediaCarousel.swift
 //  mks-multiplatform-iptv
 //
-//  Apple TV-style horizontal carousel for LibraryItem arrays (movies/series).
+//  Apple TV-style horizontal carousel for MediaLibraryItem arrays (movies/series).
 //  Features:
 //  - Native Liquid Glass container (iOS 26+)
 //  - Smooth scrolling with proper spacing
@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Home Media Carousel
 
@@ -22,7 +23,7 @@ import SwiftUI
 /// - tvOS focus support
 ///
 struct HomeMediaCarousel: View {
-    let items: [any LibraryItem]
+    let items: [any MediaLibraryItem]
     @Binding var selectedView: String?
 
     // MARK: - Platform-Specific Spacing

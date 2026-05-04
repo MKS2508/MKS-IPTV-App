@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct ContentView: View {
     @Binding var showingSettings: Bool

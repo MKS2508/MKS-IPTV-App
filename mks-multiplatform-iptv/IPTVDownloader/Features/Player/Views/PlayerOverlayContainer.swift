@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Orchestrates the gesture layer and control bars for the player.
 ///

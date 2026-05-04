@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import IPTVCore
 
 /// Tracks playback position for VOD content (movies and episodes).
 ///

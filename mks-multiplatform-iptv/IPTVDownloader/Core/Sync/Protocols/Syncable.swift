@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// A type that can be serialized to and from CloudKit records.
 ///

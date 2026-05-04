@@ -6,26 +6,26 @@
 //
 import Foundation
 
-struct Movie: Identifiable, Codable, Equatable, TitleParseable {
-    let name: String
-    let streamType: String?
-    let streamId: Int
-    let tmdbId: String?
-    let streamIcon: String?
-    let rating: String?
-    let rating5Based: Double?
-    let added: String?
-    let isAdult: String?
-    let categoryId: String
-    let containerExtension: String?
-    let customSid: String?
-    let directSource: String?
+public struct Movie: Identifiable, Codable, Equatable, TitleParseable {
+    public let name: String
+    public let streamType: String?
+    public let streamId: Int
+    public let tmdbId: String?
+    public let streamIcon: String?
+    public let rating: String?
+    public let rating5Based: Double?
+    public let added: String?
+    public let isAdult: String?
+    public let categoryId: String
+    public let containerExtension: String?
+    public let customSid: String?
+    public let directSource: String?
     
-    let id = UUID()
+    public let id = UUID()
     
-    var apiId: Int { streamId }
+    public var apiId: Int { streamId }
     
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case name
         case streamType = "stream_type"
         case streamId = "stream_id"
@@ -41,7 +41,7 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
         case directSource = "direct_source"
     }
 
-    init(name: String, streamType: String?, streamId: Int, tmdbId: String?, streamIcon: String?, rating: String?, rating5Based: Double?, added: String?, isAdult: String?, categoryId: String, containerExtension: String?, customSid: String?, directSource: String?) {
+    public init(name: String, streamType: String?, streamId: Int, tmdbId: String?, streamIcon: String?, rating: String?, rating5Based: Double?, added: String?, isAdult: String?, categoryId: String, containerExtension: String?, customSid: String?, directSource: String?) {
         self.name = name
         self.streamType = streamType
         self.streamId = streamId
@@ -57,7 +57,7 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
         self.directSource = directSource
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
         streamType = try container.decodeIfPresent(String.self, forKey: .streamType)
@@ -88,13 +88,13 @@ struct Movie: Identifiable, Codable, Equatable, TitleParseable {
         directSource = try container.decodeIfPresent(String.self, forKey: .directSource)
     }
 
-    static func == (lhs: Movie, rhs: Movie) -> Bool {
+    public static func == (lhs: Movie, rhs: Movie) -> Bool {
         lhs.streamId == rhs.streamId
     }
 }
 
 extension Movie {
-    static var placeholder: Movie {
+    public static var placeholder: Movie {
         Movie(name: "Placeholder Movie",
               streamType: "movie",
               streamId: 0,

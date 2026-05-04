@@ -1,3 +1,4 @@
+import IPTVCore
 import SwiftUI
 import AVFoundation
 
@@ -343,6 +344,7 @@ struct GlassPlayerControlBar: View {
 #if os(iOS)
 import UIKit
 import AVKit
+import IPTVCore
 
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {

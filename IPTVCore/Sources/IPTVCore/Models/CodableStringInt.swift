@@ -7,15 +7,15 @@
 
 
 @propertyWrapper
-struct CodableStringInt: Codable {
-    var wrappedValue: Int
+public struct CodableStringInt: Codable {
+    public var wrappedValue: Int
 
     // Add this initializer to accept Int directly
-    init(wrappedValue: Int) {
+    public init(wrappedValue: Int) {
         self.wrappedValue = wrappedValue
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if let intValue = try? container.decode(Int.self) {
             wrappedValue = intValue
@@ -26,7 +26,7 @@ struct CodableStringInt: Codable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(wrappedValue)
     }

@@ -1,19 +1,18 @@
 import Foundation
-import IPTVCore
 
-struct SerieDetail: Codable {
+public struct SerieDetail: Codable {
     /// Set from the calling context after decoding (the API response doesn't include it).
-    var seriesId: Int = 0
+    public var seriesId: Int = 0
 
-    let seasons: [Season]
-    let info: SerieInfo
-    let episodes: [String: [Episode]]
+    public let seasons: [Season]
+    public let info: SerieInfo
+    public let episodes: [String: [Episode]]
 
     enum CodingKeys: String, CodingKey {
         case seasons, info, episodes
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         seasons = try container.decode([Season].self, forKey: .seasons)
         info = try container.decode(SerieInfo.self, forKey: .info)
@@ -160,22 +159,22 @@ struct SerieDetail: Codable {
         return result
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(seasons, forKey: .seasons)
         try container.encode(info, forKey: .info)
         try container.encode(episodes, forKey: .episodes)
     }
 
-    struct Season: Codable {
-        let airDate: String
-        let episodeCount: Int
-        let id: String
-        let name: String
-        @CodableStringInt var seasonNumber: Int
-        let overview: String
-        let cover: String?
-        let coverBig: String?
+    public struct Season: Codable {
+        public let airDate: String
+        public let episodeCount: Int
+        public let id: String
+        public let name: String
+        @CodableStringInt public var seasonNumber: Int
+        public let overview: String
+        public let cover: String?
+        public let coverBig: String?
 
         enum CodingKeys: String, CodingKey {
             case airDate = "air_date"
@@ -189,21 +188,21 @@ struct SerieDetail: Codable {
         }
     }
 
-    struct SerieInfo: Codable {
-        let name: String
-        let cover: String?
-        let youtubeTrailer: String?
-        let genre: String
-        let releaseDate: String
-        let plot: String
-        let cast: String
-        let rating: String
-        let rating5Based: Double
-        let director: String?
-        let backdropPath: [String]
-        let lastModified: String
-        let episodeRunTime: String
-        let categoryId: String
+    public struct SerieInfo: Codable {
+        public let name: String
+        public let cover: String?
+        public let youtubeTrailer: String?
+        public let genre: String
+        public let releaseDate: String
+        public let plot: String
+        public let cast: String
+        public let rating: String
+        public let rating5Based: Double
+        public let director: String?
+        public let backdropPath: [String]
+        public let lastModified: String
+        public let episodeRunTime: String
+        public let categoryId: String
 
         enum CodingKeys: String, CodingKey {
             case name
@@ -223,22 +222,22 @@ struct SerieDetail: Codable {
         }
     }
 
-    struct Episode: Identifiable, Codable {
-        let id: String
-        let episodeNum: Int
-        let title: String
-        let containerExtension: String
-        let added: String
-        let info: EpisodeInfo
-        let season: Int
-        let customSid: String?
-        let directSource: String?
+    public struct Episode: Identifiable, Codable {
+        public let id: String
+        public let episodeNum: Int
+        public let title: String
+        public let containerExtension: String
+        public let added: String
+        public let info: EpisodeInfo
+        public let season: Int
+        public let customSid: String?
+        public let directSource: String?
 
         /// Set during decoding when duplicate episode is detected
-        var duplicateIndex: Int = 0
+        public var duplicateIndex: Int = 0
 
         /// Title with duplicate suffix if applicable
-        var displayTitle: String {
+        public var displayTitle: String {
             if duplicateIndex > 0 {
                 return "\(title) - duplicado"
             }
@@ -258,7 +257,7 @@ struct SerieDetail: Codable {
             case duplicateIndex
         }
 
-        init(from decoder: Decoder) throws {
+        public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             id = (try? c.decode(String.self, forKey: .id)) ?? ""
             episodeNum = (try? c.decode(Int.self, forKey: .episodeNum)) ?? 0
@@ -272,7 +271,7 @@ struct SerieDetail: Codable {
             duplicateIndex = (try? c.decodeIfPresent(Int.self, forKey: .duplicateIndex)) ?? 0
         }
 
-        init(
+        public init(
             id: String = "",
             episodeNum: Int = 0,
             title: String = "",
@@ -296,7 +295,7 @@ struct SerieDetail: Codable {
             self.duplicateIndex = duplicateIndex
         }
 
-        func encode(to encoder: Encoder) throws {
+        public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(id, forKey: .id)
             try container.encode(episodeNum, forKey: .episodeNum)
@@ -313,17 +312,17 @@ struct SerieDetail: Codable {
         }
     }
 
-    struct EpisodeInfo: Codable {
-        var movieImage: String
-        var releaseDate: String
-        var youtubeTrailer: String?
-        var plot: String
-        var cast: String
-        var rating: Int
-        var rating5Based: Double
-        var director: String?
-        var durationSecs: Int
-        var duration: String
+    public struct EpisodeInfo: Codable {
+        public var movieImage: String
+        public var releaseDate: String
+        public var youtubeTrailer: String?
+        public var plot: String
+        public var cast: String
+        public var rating: Int
+        public var rating5Based: Double
+        public var director: String?
+        public var durationSecs: Int
+        public var duration: String
 
         enum CodingKeys: String, CodingKey {
             case movieImage = "movie_image"
@@ -338,7 +337,7 @@ struct SerieDetail: Codable {
             case duration
         }
 
-        init(from decoder: Decoder) throws {
+        public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             movieImage = (try? c.decodeIfPresent(String.self, forKey: .movieImage)) ?? ""
             releaseDate = (try? c.decodeIfPresent(String.self, forKey: .releaseDate)) ?? ""
@@ -352,7 +351,7 @@ struct SerieDetail: Codable {
             duration = (try? c.decodeIfPresent(String.self, forKey: .duration)) ?? ""
         }
 
-        init(
+        public init(
             movieImage: String = "",
             releaseDate: String = "",
             youtubeTrailer: String? = nil,

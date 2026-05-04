@@ -8,6 +8,7 @@
 
 import Foundation
 import os
+import IPTVCore
 
 // MARK: - Live Channel EPG Service
 

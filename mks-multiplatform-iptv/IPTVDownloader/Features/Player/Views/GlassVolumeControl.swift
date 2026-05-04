@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import IPTVCore
 
 struct GlassVolumeControl: View {
     @Binding var volume: Float

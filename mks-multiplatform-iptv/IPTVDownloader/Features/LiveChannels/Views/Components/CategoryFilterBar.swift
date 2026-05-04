@@ -7,6 +7,7 @@
 
 import SwiftUI
 import os
+import IPTVCore
 
 // MARK: - Category Filter Bar
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // MARK: - Fullscreen Player Modifier (iOS/tvOS only)
 

@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// Thread-safe CloudKit synchronization engine.
 ///

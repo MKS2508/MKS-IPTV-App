@@ -1,29 +1,29 @@
 import Foundation
 
-struct MovieDetail: Identifiable, Codable {
-    let movieData: Movie
-    let movieImage: String
-    let tmdbId: Int
-    let backdrop: String?
-    let youtubeTrailer: String?
-    let genre: String
-    let plot: String
-    let cast: [String]
-    let rating: String?       // Decodificado desde `info` - ahora opcional
-    let director: String
-    let releaseDate: String
-    let backdropPath: [String]?
-    let durationSecs: Int
-    let duration: String
+public struct MovieDetail: Identifiable, Codable {
+    public let movieData: Movie
+    public let movieImage: String
+    public let tmdbId: Int
+    public let backdrop: String?
+    public let youtubeTrailer: String?
+    public let genre: String
+    public let plot: String
+    public let cast: [String]
+    public let rating: String?       // Decodificado desde `info` - ahora opcional
+    public let director: String
+    public let releaseDate: String
+    public let backdropPath: [String]?
+    public let durationSecs: Int
+    public let duration: String
     
-    var id: Int { movieData.streamId }
+    public var id: Int { movieData.streamId }
     
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case info
         case movieData = "movie_data"
     }
     
-    enum InfoKeys: String, CodingKey {
+    public enum InfoKeys: String, CodingKey {
         case movieImage = "movie_image"
         case tmdbId = "tmdb_id"
         case backdrop
@@ -39,7 +39,7 @@ struct MovieDetail: Identifiable, Codable {
         case duration
     }
     
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         
         // Decoding Movie base data
@@ -66,7 +66,7 @@ struct MovieDetail: Identifiable, Codable {
     }
 
     // Add this inside your MovieDetail struct
-    init(
+    public init(
         movieData: Movie,
         movieImage: String,
         tmdbId: Int,
@@ -98,7 +98,7 @@ struct MovieDetail: Identifiable, Codable {
         self.duration = duration
     }
     
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
         // Encoding Movie base data

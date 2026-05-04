@@ -1,3 +1,4 @@
+import IPTVCore
 //
 //  DownloadLiveActivityManager.swift
 //  mks-multiplatform-iptv
@@ -8,6 +9,7 @@
 #if os(iOS)
 import ActivityKit
 import Foundation
+import IPTVCore
 
 /// Manages Live Activities for iOS Dynamic Island downloads.
 /// Uses ActivityKit framework for tracking download progress.

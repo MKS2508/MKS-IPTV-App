@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 struct DownloadItem: Identifiable, Codable {
     let id: UUID

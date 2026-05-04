@@ -8,24 +8,24 @@
 
 import Foundation
 
-struct TitleMetadata: Sendable {
-    let cleanTitle: String
-    let year: String?
-    let quality: String?
-    let codec: String?
-    let source: String?
-    let audio: String?
-    let isHDR: Bool
-    let is3D: Bool
-    
-    var displayQuality: String? {
+public struct TitleMetadata: Sendable {
+    public let cleanTitle: String
+    public let year: String?
+    public let quality: String?
+    public let codec: String?
+    public let source: String?
+    public let audio: String?
+    public let isHDR: Bool
+    public let is3D: Bool
+
+    public var displayQuality: String? {
         if let quality = quality {
             return quality
         }
         return nil
     }
-    
-    var allBadges: [String] {
+
+    public var allBadges: [String] {
         var badges: [String] = []
         if let year = year { badges.append(year) }
         if let quality = quality { badges.append(quality) }
@@ -36,7 +36,7 @@ struct TitleMetadata: Sendable {
     }
 }
 
-enum TitleParser {
+public enum TitleParser {
     
     private static let yearPattern = #"\b((?:19|20)\d{2})\b"#
     
@@ -100,7 +100,7 @@ enum TitleParser {
     private static let hdrPattern = #"(?i)\bHDR(?:10\+?|10|Dolby)?\b"#
     private static let threeDPattern = #"(?i)\b3D\b"#
     
-    static func parse(_ title: String) -> TitleMetadata {
+    public static func parse(_ title: String) -> TitleMetadata {
         var workingTitle = title
         
         let year = extractYear(from: workingTitle)
@@ -253,19 +253,19 @@ enum TitleParser {
 }
 
 extension TitleMetadata {
-    var primaryBadge: String? {
+    public var primaryBadge: String? {
         if let quality = quality { return quality }
         if let source = source { return source }
         return nil
     }
-    
-    var secondaryBadge: String? {
+
+    public var secondaryBadge: String? {
         if let codec = codec { return codec }
         if let source = source, quality != nil { return source }
         return nil
     }
-    
-    var qualityColor: String {
+
+    public var qualityColor: String {
         guard let quality = quality?.lowercased() else { return "gray" }
         if quality.contains("4k") || quality.contains("2160") { return "purple" }
         if quality.contains("1080") { return "blue" }

@@ -4,25 +4,25 @@
 
 import Foundation
 
-struct LiveChannelCategory: Identifiable, Codable, Equatable {
-    let categoryId: String
-    let categoryName: String
-    @CodableStringInt var parentId: Int
+public struct LiveChannelCategory: Identifiable, Codable, Equatable {
+    public let categoryId: String
+    public let categoryName: String
+    @CodableStringInt public var parentId: Int
 
-    var id: String { categoryId }
+    public var id: String { categoryId }
 
     /// Manual initializer for Previews and testing
-    init(categoryId: String, categoryName: String, parentId: Int) {
+    public init(categoryId: String, categoryName: String, parentId: Int) {
         self.categoryId = categoryId
         self.categoryName = categoryName
         self._parentId = CodableStringInt(wrappedValue: parentId)
     }
 
-    static func == (lhs: LiveChannelCategory, rhs: LiveChannelCategory) -> Bool {
+    public static func == (lhs: LiveChannelCategory, rhs: LiveChannelCategory) -> Bool {
         lhs.categoryId == rhs.categoryId
     }
     
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case categoryId = "category_id"
         case categoryName = "category_name"
         case parentId = "parent_id"

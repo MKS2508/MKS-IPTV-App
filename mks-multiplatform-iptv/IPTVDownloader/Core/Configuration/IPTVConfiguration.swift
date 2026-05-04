@@ -1,6 +1,7 @@
 // TODO: Remove any usage of static config elsewhere. All code should use an IPTVProfile.
 import Foundation
 import SwiftUI
+import IPTVCore
 
 final class IPTVProfile: ObservableObject, Codable, Equatable, Identifiable {
     let id: UUID

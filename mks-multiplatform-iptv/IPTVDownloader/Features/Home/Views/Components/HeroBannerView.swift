@@ -12,6 +12,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Hero Banner View
 
@@ -25,7 +26,7 @@ import SwiftUI
 /// - Safe async metadata loading to prevent content mismatch
 ///
 struct HeroBannerView: View {
-    let item: any LibraryItem
+    let item: any MediaLibraryItem
     @Binding var selectedView: String?
 
     @State private var enrichedMetadata: MetadataResult?

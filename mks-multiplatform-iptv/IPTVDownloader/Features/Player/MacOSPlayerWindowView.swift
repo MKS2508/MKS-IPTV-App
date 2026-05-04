@@ -1,6 +1,7 @@
 #if os(macOS)
 import SwiftUI
 import AppKit
+import IPTVCore
 
 struct MacOSPlayerWindowView: View {
     private let manager = PlayerWindowManager.shared

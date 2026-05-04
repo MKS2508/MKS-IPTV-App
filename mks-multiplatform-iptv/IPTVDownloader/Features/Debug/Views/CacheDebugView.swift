@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct CacheDebugView: View {
     @State private var stats: CacheStats?

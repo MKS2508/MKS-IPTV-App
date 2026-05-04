@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Interactive metadata picker and editor.
 ///

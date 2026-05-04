@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Protocol for device-specific playback control.
 /// Each protocol implementation (DLNA, Cast) provides a concrete controller.

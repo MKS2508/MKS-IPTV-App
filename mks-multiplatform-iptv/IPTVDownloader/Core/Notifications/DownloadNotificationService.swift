@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import os
+import IPTVCore
 
 final class DownloadNotificationService {
     static let shared = DownloadNotificationService()

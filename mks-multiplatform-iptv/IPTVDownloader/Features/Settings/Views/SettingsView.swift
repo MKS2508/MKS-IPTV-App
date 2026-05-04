@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 #if os(macOS)
 struct SettingsView: View {

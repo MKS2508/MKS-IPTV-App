@@ -1,7 +1,7 @@
 import Foundation
 import IPTVCore
 
-// LibraryItem, MediaType, and TitleParseable protocols are defined in MediaProtocols.swift
+// MediaLibraryItem, MediaType, and TitleParseable protocols are defined in MediaProtocols.swift
 // Movie and Serie conformances are also in MediaProtocols.swift
 
 @MainActor
@@ -156,17 +156,17 @@ class MediaListViewModel: ObservableObject {
     
     // MARK: - Content Access & Filtering
     
-    func getLibraryItems(type: ContentType = .all) -> [any LibraryItem] {
+    func getMediaLibraryItems(type: ContentType = .all) -> [any MediaLibraryItem] {
         switch type {
         case .all:
-            // Combine both arrays as LibraryItems
-            let movieItems = movies.map { $0 as any LibraryItem }
-            let seriesItems = series.map { $0 as any LibraryItem }
+            // Combine both arrays as MediaLibraryItems
+            let movieItems = movies.map { $0 as any MediaLibraryItem }
+            let seriesItems = series.map { $0 as any MediaLibraryItem }
             return movieItems + seriesItems
         case .movies:
-            return movies.map { $0 as any LibraryItem }
+            return movies.map { $0 as any MediaLibraryItem }
         case .series:
-            return series.map { $0 as any LibraryItem }
+            return series.map { $0 as any MediaLibraryItem }
         }
     }
     

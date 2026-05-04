@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Converts MetadataResult to Google Cast media metadata format.
 ///

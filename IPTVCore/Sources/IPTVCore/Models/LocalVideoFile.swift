@@ -2,15 +2,15 @@ import Foundation
 import UniformTypeIdentifiers
 
 /// Represents a local video file added by the user to My Content.
-struct LocalVideoFile: Identifiable, Hashable, Codable {
-    let id: UUID
-    let url: URL
-    let displayName: String
-    let fileSize: Int64?
-    let addedDate: Date
-    let fileExtension: String
+public struct LocalVideoFile: Identifiable, Hashable, Codable {
+    public let id: UUID
+    public let url: URL
+    public let displayName: String
+    public let fileSize: Int64?
+    public let addedDate: Date
+    public let fileExtension: String
     
-    init(url: URL) {
+    public init(url: URL) {
         self.id = UUID()
         self.url = url
         self.displayName = url.deletingPathExtension().lastPathComponent
@@ -25,7 +25,7 @@ struct LocalVideoFile: Identifiable, Hashable, Codable {
         }
     }
     
-    var formattedSize: String {
+    public var formattedSize: String {
         guard let size = fileSize else { return "Unknown" }
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useKB, .useMB, .useGB]
@@ -33,7 +33,7 @@ struct LocalVideoFile: Identifiable, Hashable, Codable {
         return formatter.string(fromByteCount: size)
     }
     
-    var fileTypeIcon: String {
+    public var fileTypeIcon: String {
         switch fileExtension {
         case "mkv": return "video.fill"
         case "mp4", "m4v": return "play.rectangle.fill"
@@ -47,11 +47,11 @@ struct LocalVideoFile: Identifiable, Hashable, Codable {
         }
     }
     
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
     
-    static func == (lhs: LocalVideoFile, rhs: LocalVideoFile) -> Bool {
+    public static func == (lhs: LocalVideoFile, rhs: LocalVideoFile) -> Bool {
         lhs.id == rhs.id
     }
 }

@@ -28,7 +28,11 @@ let package = Package(
     targets: [
         .target(
             name: "IPTVCore",
-            path: "Sources/IPTVCore"
+            path: "Sources/IPTVCore",
+            swiftSettings: [
+                // Swift 5.7+ regex literals (e.g. /\d{3,4}[pi]/)
+                .enableUpcomingFeature("BareSlashRegexLiterals")
+            ]
         )
     ]
 )

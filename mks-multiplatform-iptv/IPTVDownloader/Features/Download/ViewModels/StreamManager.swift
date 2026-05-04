@@ -8,6 +8,7 @@
 
 import Foundation
 import AVKit
+import IPTVCore
 
 class StreamManager {
     private var player: AVPlayer?

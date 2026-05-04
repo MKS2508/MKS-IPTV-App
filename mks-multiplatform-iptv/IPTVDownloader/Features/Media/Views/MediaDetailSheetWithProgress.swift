@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Wrapper view that provides progressive loading for media details.
 /// Shows preview data (from grid) immediately while fetching full details.
@@ -134,7 +135,7 @@ struct MoviePreviewWrapper: MediaDetailItem {
     // TitleParseable
     var name: String { movie.name }
     
-    // LibraryItem
+    // MediaLibraryItem
     var streamId: Int { movie.streamId }
     var categoryId: String { movie.categoryId }
     var coverImage: String? { movie.streamIcon }
@@ -163,7 +164,7 @@ struct SeriePreviewWrapper: MediaDetailItem {
     // TitleParseable
     var name: String { serie.name }
     
-    // LibraryItem
+    // MediaLibraryItem
     var streamId: Int { serie.seriesId }
     var categoryId: String { serie.categoryId }
     var coverImage: String? { serie.cover }

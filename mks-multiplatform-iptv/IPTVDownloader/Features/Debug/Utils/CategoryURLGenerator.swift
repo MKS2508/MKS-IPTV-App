@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 struct CategoryURLItem: Codable {
     let id: String

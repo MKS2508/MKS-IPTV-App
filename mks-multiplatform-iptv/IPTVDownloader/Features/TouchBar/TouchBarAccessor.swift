@@ -1,8 +1,11 @@
+import IPTVCore
 import SwiftUI
 import Combine
 
 #if os(macOS)
 import AppKit
+import IPTVCore
+import IPTVCore
 import IPTVCore
 
 struct TouchBarAccessor: NSViewRepresentable {

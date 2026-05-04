@@ -1,7 +1,9 @@
+import IPTVCore
 import SwiftUI
 
 #if os(macOS)
 import AppKit
+import IPTVCore
 import IPTVCore
 
 struct MediaListTouchBarView: View {

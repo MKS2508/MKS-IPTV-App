@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct ComingUpNextTimeline: View {
     let programmes: [(programme: EPGProgramme, channelName: String)]

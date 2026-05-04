@@ -1,5 +1,6 @@
 #if os(macOS)
 import SwiftUI
+import IPTVCore
 
 /// Singleton that holds the active player state for the macOS player window.
 ///

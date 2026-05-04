@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import os
 import TransmuxCore
+import IPTVCore
 
 class VideoDownloader: NSObject, URLSessionDataDelegate {
     private enum Constants {

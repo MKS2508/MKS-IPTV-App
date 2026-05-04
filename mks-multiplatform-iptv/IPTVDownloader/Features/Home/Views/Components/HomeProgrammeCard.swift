@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct HomeProgrammeCard: View {
     let programme: EPGProgramme

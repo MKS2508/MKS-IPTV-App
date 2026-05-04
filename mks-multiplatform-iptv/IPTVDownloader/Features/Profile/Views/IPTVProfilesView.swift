@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct IPTVProfilesView: View {
     @ObservedObject var manager: IPTVProfilesManager = .shared

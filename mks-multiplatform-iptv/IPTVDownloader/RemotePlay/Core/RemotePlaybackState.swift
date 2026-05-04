@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// State machine representing the lifecycle of remote playback.
 /// Used by RemotePlayManager to track and expose current state to UI.

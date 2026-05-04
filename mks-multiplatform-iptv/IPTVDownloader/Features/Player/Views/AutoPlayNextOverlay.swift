@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Netflix-style countdown overlay for auto-playing the next episode.
 ///

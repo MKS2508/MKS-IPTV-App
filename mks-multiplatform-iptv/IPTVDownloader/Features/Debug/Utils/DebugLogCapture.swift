@@ -1,5 +1,6 @@
 import Foundation
 import os.log
+import IPTVCore
 
 // Captures all logs from LiveLogger and system logs
 class DebugLogCapture {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Type-safe navigation destinations for the main app
 enum NavigationDestination: String, CaseIterable, Identifiable, Codable {

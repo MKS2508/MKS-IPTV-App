@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // MARK: - Movie Information Views for AddDownloadView
 

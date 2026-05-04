@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct ErrorView: View {
     let error: Error

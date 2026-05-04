@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct RemotePlayOverlay: View {
     @Environment(RemotePlayManager.self) private var remotePlayManager

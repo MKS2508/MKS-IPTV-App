@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Button that displays available remote devices in a Menu for device selection.
 /// Shows cast icon, when tapped shows a menu with discovered devices.

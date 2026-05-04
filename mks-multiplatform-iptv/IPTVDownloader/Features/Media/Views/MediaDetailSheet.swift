@@ -13,7 +13,7 @@ import IPTVCore
 
 struct MediaDetailSheet: View {
     /// Unified detail item — either MovieDetail or SerieDetail,
-    /// both conforming to MediaDetailItem (which extends LibraryItem).
+    /// both conforming to MediaDetailItem (which extends MediaLibraryItem).
     let detail: any MediaDetailItem
     let onDismiss: () -> Void
 

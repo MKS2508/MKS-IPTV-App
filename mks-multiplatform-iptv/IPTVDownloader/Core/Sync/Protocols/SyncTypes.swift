@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Represents the current state of a sync operation.
 ///

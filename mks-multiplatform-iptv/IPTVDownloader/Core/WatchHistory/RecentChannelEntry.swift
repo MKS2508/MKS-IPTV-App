@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import IPTVCore
 
 /// Tracks recently watched live channels per profile.
 ///

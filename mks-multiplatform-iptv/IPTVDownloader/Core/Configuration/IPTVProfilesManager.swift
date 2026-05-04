@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import IPTVCore
 
 /// Model and persistence for all IPTV profiles, handles active selection
 typealias ProfileID = UUID

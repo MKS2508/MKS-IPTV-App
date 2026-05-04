@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Compact sync status indicator showing an icon and label.
 ///

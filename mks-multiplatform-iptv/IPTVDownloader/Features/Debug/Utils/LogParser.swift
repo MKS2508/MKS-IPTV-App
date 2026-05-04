@@ -9,6 +9,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Parses raw log file text into structured LogEntry arrays.
 enum LogParser {

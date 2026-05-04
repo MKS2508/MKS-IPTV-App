@@ -9,6 +9,7 @@
 import Foundation
 import Combine
 import os
+import IPTVCore
 
 // MARK: - Live Channel Favorites Manager
 

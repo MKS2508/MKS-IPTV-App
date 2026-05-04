@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Groups consecutive similar log entries into collapsed groups.
 enum LogDeduplicator {

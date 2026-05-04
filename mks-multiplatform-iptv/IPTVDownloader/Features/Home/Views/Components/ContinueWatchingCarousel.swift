@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Netflix-style horizontal carousel showing content with saved playback progress.
 ///

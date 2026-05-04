@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Actor that manages enriched metadata for Movie/Serie items.
 ///
@@ -44,7 +45,7 @@ actor EnrichedMediaStore {
     ///   - tmdbId: Optional TMDB ID for exact lookup (confidence 1.0)
     /// - Returns: Best matching ``MetadataResult``, or `nil` if no providers returned data
     func getEnrichedMetadata(
-        for item: any LibraryItem,
+        for item: any MediaLibraryItem,
         tmdbId: Int? = nil
     ) async -> MetadataResult? {
         let key = cacheKey(for: item)
@@ -71,7 +72,7 @@ actor EnrichedMediaStore {
 
     /// Invalidate cached metadata for a specific item, forcing a fresh fetch
     /// on the next access.
-    func invalidate(for item: any LibraryItem) {
+    func invalidate(for item: any MediaLibraryItem) {
         let key = cacheKey(for: item)
         memoryCache.removeValue(forKey: key)
     }
@@ -85,7 +86,7 @@ actor EnrichedMediaStore {
     ///   - items: Library items to prefetch metadata for
     ///   - maxConcurrency: Maximum number of concurrent provider requests (default 5)
     func prefetch(
-        items: [any LibraryItem],
+        items: [any MediaLibraryItem],
         maxConcurrency: Int = 5
     ) async {
         // Filter out items already in memory cache
@@ -115,7 +116,7 @@ actor EnrichedMediaStore {
     /// await the existing Task instead of launching a duplicate.
     private func fetchWithDedup(
         key: String,
-        item: any LibraryItem,
+        item: any MediaLibraryItem,
         tmdbId: Int?
     ) async -> MetadataResult? {
         // Dedup: reuse in-flight request
@@ -143,7 +144,7 @@ actor EnrichedMediaStore {
     /// Does not block the caller — updates cache silently.
     private func revalidate(
         key: String,
-        item: any LibraryItem,
+        item: any MediaLibraryItem,
         tmdbId: Int?
     ) async {
         // Skip if already revalidating
@@ -158,13 +159,13 @@ actor EnrichedMediaStore {
 
     // MARK: - Helpers
 
-    private func cacheKey(for item: any LibraryItem) -> String {
+    private func cacheKey(for item: any MediaLibraryItem) -> String {
         let type = item.mediaType == .movie ? "movie" : "serie"
         return "enriched_\(type)_\(item.streamId)"
     }
 
     private func buildQuery(
-        for item: any LibraryItem,
+        for item: any MediaLibraryItem,
         tmdbId: Int?
     ) -> MetadataSearchQuery {
         let parsed = TitleParser.parse(item.name)

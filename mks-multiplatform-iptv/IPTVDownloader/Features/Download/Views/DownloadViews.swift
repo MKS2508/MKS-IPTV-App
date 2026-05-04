@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // MARK: - Main Views for AddDownloadView
 

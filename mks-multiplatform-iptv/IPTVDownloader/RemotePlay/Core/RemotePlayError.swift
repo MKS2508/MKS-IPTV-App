@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Errors that can occur during remote playback operations.
 /// Covers discovery, connection, transport control, and handoff scenarios.

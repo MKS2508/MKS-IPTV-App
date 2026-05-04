@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Centralized storage for external API keys used by metadata providers.
 ///

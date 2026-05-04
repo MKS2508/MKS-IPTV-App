@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Full modal picker for browsing and selecting remote playback devices.
 struct DevicePickerSheet: View {

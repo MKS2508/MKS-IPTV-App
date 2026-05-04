@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct PreviewTest: View {
     var body: some View {

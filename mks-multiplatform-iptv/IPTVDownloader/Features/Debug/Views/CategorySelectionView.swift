@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct CategorySelectionView: View {
     @ObservedObject var viewModel: DebugStreamingViewModel

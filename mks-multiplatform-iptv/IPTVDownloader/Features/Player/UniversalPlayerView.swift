@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import IPTVCore
 
 struct MetadataOverlayView: View {
     let metadata: MetadataResult

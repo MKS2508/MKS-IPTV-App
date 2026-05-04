@@ -1,5 +1,6 @@
 import Foundation
 import TransmuxCore
+import IPTVCore
 
 // MARK: - StreamProxy Adapter
 

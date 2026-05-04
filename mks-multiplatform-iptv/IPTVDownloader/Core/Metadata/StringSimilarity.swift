@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// String similarity utilities for metadata matching heuristics
 enum StringSimilarity {

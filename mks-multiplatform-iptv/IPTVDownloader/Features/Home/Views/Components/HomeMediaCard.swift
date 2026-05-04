@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 // MARK: - Home Media Card
 
@@ -23,7 +24,7 @@ import SwiftUI
 /// - Focus scaling for tvOS
 ///
 struct HomeMediaCard: View {
-    let item: any LibraryItem
+    let item: any MediaLibraryItem
     @Binding var selectedView: String?
 
     @State private var isPressed = false

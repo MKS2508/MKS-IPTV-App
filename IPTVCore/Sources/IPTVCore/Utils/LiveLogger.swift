@@ -8,13 +8,12 @@
 
 import Foundation
 import AVFoundation
-import IPTVCore
 
 // MARK: - LiveLogger Utility
 
 /// Structured logger for live channel events.
 /// Writes to both console and persistent file via MKSLogConfig.
-enum LiveLogger {
+public enum LiveLogger {
 
     // MARK: - Configuration
 
@@ -32,15 +31,15 @@ enum LiveLogger {
 
     // MARK: - Public API
 
-    static func debug(_ message: String, file: String = #file, line: Int = #line) {
+    public static func debug(_ message: String, file: String = #file, line: Int = #line) {
         writeEntry(level: "DBG", configLevel: .debug, message: message, file: file, line: line)
     }
 
-    static func info(_ message: String, file: String = #file, line: Int = #line) {
+    public static func info(_ message: String, file: String = #file, line: Int = #line) {
         writeEntry(level: "INF", configLevel: .info, message: message, file: file, line: line)
     }
 
-    static func error(_ message: String, file: String = #file, line: Int = #line) {
+    public static func error(_ message: String, file: String = #file, line: Int = #line) {
         writeEntry(level: "ERR", configLevel: .error, message: message, file: file, line: line)
     }
 

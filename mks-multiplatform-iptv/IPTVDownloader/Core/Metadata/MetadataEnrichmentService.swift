@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Top-level orchestrator for the metadata enrichment pipeline.
 ///

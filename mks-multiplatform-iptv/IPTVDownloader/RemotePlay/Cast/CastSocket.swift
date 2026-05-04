@@ -8,6 +8,7 @@
 
 import Foundation
 import Network
+import IPTVCore
 
 /// Manages a TLS socket connection to a Chromecast device on port 8009.
 /// Sends and receives length-prefixed protobuf frames using `NWConnection`.

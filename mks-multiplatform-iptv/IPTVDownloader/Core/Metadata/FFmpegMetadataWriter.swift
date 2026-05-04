@@ -1,7 +1,9 @@
+import IPTVCore
 import Foundation
 
 #if canImport(CFFmpegHelper)
 import CFFmpegHelper
+import IPTVCore
 #endif
 
 // MARK: - Metadata Write Error

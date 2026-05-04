@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Streaming XMLTV parser using XMLParser (SAX) for memory-efficient parsing
 final class EPGXMLParser: NSObject, XMLParserDelegate {

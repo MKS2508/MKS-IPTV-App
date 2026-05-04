@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Controls playback on a Google Cast device via the Cast V2 protocol.
 /// Implements the same `RemoteDeviceController` interface as `DLNAController`.

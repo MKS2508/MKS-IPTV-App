@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct DownloadButton: View {
     let action: () -> Void

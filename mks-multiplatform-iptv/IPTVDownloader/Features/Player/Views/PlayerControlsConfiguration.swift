@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import IPTVCore
 
 enum PlayerControlsMode: String, CaseIterable {
     case native = "native"

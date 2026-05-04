@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 /// Apple TV+ style glass overlay asking the user whether to resume or start over.
 ///

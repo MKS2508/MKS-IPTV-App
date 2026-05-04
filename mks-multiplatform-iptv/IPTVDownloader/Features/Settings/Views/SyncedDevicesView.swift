@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Shows all devices registered in CloudKit for the current iCloud account.
 ///

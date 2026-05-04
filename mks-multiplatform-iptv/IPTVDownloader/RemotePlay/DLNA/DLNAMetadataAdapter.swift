@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Converts MetadataResult to DIDL-Lite XML for DLNA SetAVTransportURI.
 /// Follows the same title-formatting logic as PlayerMetadataHelper.setNowPlayingInfo

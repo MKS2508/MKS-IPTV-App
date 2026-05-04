@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 /// Metadata provider using The Movie Database (TMDB) API v3.
 ///

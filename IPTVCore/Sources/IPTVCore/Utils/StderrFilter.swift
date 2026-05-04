@@ -6,13 +6,13 @@ import Foundation
 /// Filtered patterns:
 /// - CMTimebase NULL errors from CoreMedia (FigTimebase.c) — cosmetic noise
 ///   when AVPlayer's HLS stack initializes segments with slight delivery latency.
-enum StderrFilter {
+public enum StderrFilter {
 
     private static var originalStderr: Int32 = -1
     private static var installed = false
 
     /// Install the stderr filter. Safe to call multiple times (no-op after first).
-    static func install() {
+    public static func install() {
         guard !installed else { return }
         installed = true
 

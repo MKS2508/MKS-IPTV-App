@@ -5,6 +5,7 @@
 //  Created by Marcos Asensio on 18/3/25.
 //
 import SwiftUI
+import IPTVCore
 
 // Implementación de una versión más personalizada del proveedor de tags
 struct EnhancedMovieTagProvider: TagContentProvider {

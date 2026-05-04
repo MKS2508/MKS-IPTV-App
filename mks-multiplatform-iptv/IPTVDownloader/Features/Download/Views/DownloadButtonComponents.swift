@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 // MARK: - Button Components for AddDownloadView
 

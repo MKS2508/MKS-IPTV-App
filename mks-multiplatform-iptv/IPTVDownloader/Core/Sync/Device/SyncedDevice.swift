@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// A device registered in CloudKit for cross-device tracking.
 ///

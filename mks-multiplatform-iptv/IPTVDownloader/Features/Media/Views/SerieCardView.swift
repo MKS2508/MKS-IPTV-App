@@ -1,6 +1,9 @@
+import IPTVCore
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
+import IPTVCore
+import IPTVCore
 #endif
 
 struct SerieCardView: View {

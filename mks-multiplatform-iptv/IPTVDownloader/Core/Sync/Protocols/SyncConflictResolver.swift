@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Strategy for resolving conflicts between local and remote copies.
 enum ConflictResolutionStrategy: Sendable {

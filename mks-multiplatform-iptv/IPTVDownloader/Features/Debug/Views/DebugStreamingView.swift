@@ -1,9 +1,12 @@
+import IPTVCore
 import SwiftUI
 import AVKit
 import Combine
 
 #if os(macOS)
 import AppKit
+import IPTVCore
+import IPTVCore
 #endif
 
 struct DebugStreamingView: View {

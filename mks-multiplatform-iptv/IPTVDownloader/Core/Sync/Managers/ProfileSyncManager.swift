@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// Manages CloudKit synchronization for IPTV profiles.
 ///

@@ -4,28 +4,28 @@ import Foundation
 
 /// Result of a stream preflight validation check.
 /// Contains HTTP metadata and reachability info without consuming a full stream connection.
-struct PreflightResult {
+public struct PreflightResult {
     /// Whether the stream URL is reachable (HTTP 2xx/3xx)
-    let isReachable: Bool
+    public let isReachable: Bool
     /// HTTP status code returned by the server (nil if connection failed entirely)
-    let httpStatus: Int?
+    public let httpStatus: Int?
     /// Content-Type header value (e.g. "video/mp4", "application/octet-stream")
-    let contentType: String?
+    public let contentType: String?
     /// Content-Length in bytes (nil if chunked/unknown/zero)
-    let contentLength: Int64?
+    public let contentLength: Int64?
     /// Server header value (useful for identifying IPTV server software)
-    let serverHeader: String?
+    public let serverHeader: String?
     /// Human-readable error description if the check failed
-    let error: String?
+    public let error: String?
     /// Round-trip latency in milliseconds
-    let latencyMs: Double
+    public let latencyMs: Double
     /// Final URL after redirects (nil if no redirect occurred)
-    let finalURL: URL?
+    public let finalURL: URL?
     /// Whether the request was redirected (302, 301, etc.)
-    let wasRedirected: Bool
+    public let wasRedirected: Bool
 
     /// Whether the content-type suggests a video/audio stream
-    var isMediaContent: Bool {
+    public var isMediaContent: Bool {
         guard let ct = contentType?.lowercased() else { return false }
         return ct.contains("video") || ct.contains("audio")
             || ct.contains("mpegurl") || ct.contains("octet-stream")
@@ -33,7 +33,7 @@ struct PreflightResult {
     }
 
     /// Short human-readable summary for logging
-    var summary: String {
+    public var summary: String {
         if isReachable {
             let status = httpStatus.map { String($0) } ?? "?"
             let ct = contentType ?? "unknown"
@@ -66,7 +66,7 @@ struct PreflightResult {
 ///
 /// This prevents crashes from unreachable/invalid streams and avoids wasting
 /// IPTV server connections on URLs that will fail immediately.
-final class StreamPreflight {
+public final class StreamPreflight {
 
     /// Default User-Agent that IPTV servers recognize and allow
     private static let defaultUserAgent = "VLC/3.0.18 LibVLC/3.0.18"
@@ -79,7 +79,7 @@ final class StreamPreflight {
     ///   - timeoutSeconds: Maximum time to wait for a response (default 10s).
     /// - Returns: A `PreflightResult` describing reachability and HTTP metadata.
     ///            Never throws — all errors are captured in the result.
-    static func check(
+    public static func check(
         url: URL,
         headers: [String: String] = [:],
         timeoutSeconds: TimeInterval = 10
@@ -148,7 +148,7 @@ final class StreamPreflight {
     ///   - headers: Additional HTTP headers.
     ///   - timeoutSeconds: Maximum time to wait.
     /// - Returns: The resolved direct URL, or the original URL if no redirect occurred.
-    static func resolveRedirects(
+    public static func resolveRedirects(
         url: URL,
         headers: [String: String] = [:],
         timeoutSeconds: TimeInterval = 10

@@ -12,14 +12,6 @@ import IPTVCore
 struct mks_multiplataforma_tvos_iptvApp: App {
     @StateObject private var profileStore = ProfileStore()
 
-    init() {
-        let info = Bundle.main.infoDictionary ?? [:]
-        let ats = info["NSAppTransportSecurity"] ?? "<<MISSING>>"
-        let bundleID = info["CFBundleIdentifier"] ?? "<<MISSING>>"
-        MKSLog.app.info("BOOT bundleID=\(bundleID)")
-        MKSLog.app.info("BOOT NSAppTransportSecurity=\(ats)")
-    }
-
     var body: some Scene {
         WindowGroup {
             Group {

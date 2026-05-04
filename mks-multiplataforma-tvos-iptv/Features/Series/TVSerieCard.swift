@@ -39,7 +39,7 @@ struct TVSerieCard: View {
     @ViewBuilder
     private var poster: some View {
         if let urlString = serie.cover, let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)

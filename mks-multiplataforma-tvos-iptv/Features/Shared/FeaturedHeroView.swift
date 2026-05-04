@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 struct FeaturedHeroView: View {
     let title: String
@@ -73,7 +74,7 @@ struct FeaturedHeroView: View {
     @ViewBuilder
     private var backdrop: some View {
         if let url = imageURL {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

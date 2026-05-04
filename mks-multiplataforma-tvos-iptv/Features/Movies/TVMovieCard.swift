@@ -44,7 +44,7 @@ struct TVMovieCard: View {
     @ViewBuilder
     private var poster: some View {
         if let urlString = movie.streamIcon, let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

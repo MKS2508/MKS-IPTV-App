@@ -17,12 +17,12 @@ public enum IPTVAPIError: Error, Sendable {
 }
 
 public actor IPTVService {
-    private let session: URLSession
+    private let client: RawHTTPClient
     public nonisolated let profile: IPTVProfile
 
-    public init(profile: IPTVProfile, session: URLSession = .shared) {
+    public init(profile: IPTVProfile, client: RawHTTPClient = .shared) {
         self.profile = profile
-        self.session = session
+        self.client = client
     }
 
     // MARK: - Movies
@@ -92,10 +92,17 @@ public actor IPTVService {
 
         MKSLog.network.debug("IPTVService GET \(action)")
 
-        let (data, response) = try await session.data(for: URLRequest(url: url))
+        let data: Data
+        let response: RawHTTPResponse
+        do {
+            (data, response) = try await client.get(url)
+        } catch {
+            MKSLog.network.error("IPTVService transport error for \(action): \(error)")
+            throw IPTVAPIError.networkError(error)
+        }
 
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            MKSLog.network.error("IPTVService HTTP error for \(action)")
+        guard response.statusCode == 200 else {
+            MKSLog.network.error("IPTVService HTTP \(response.statusCode) for \(action)")
             throw IPTVAPIError.invalidResponse
         }
 

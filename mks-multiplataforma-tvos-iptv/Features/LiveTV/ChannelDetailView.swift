@@ -101,7 +101,7 @@ struct ChannelDetailView: View {
     @ViewBuilder
     private var backdropImage: some View {
         if let urlString = channel.streamIcon, let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

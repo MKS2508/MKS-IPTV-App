@@ -102,7 +102,7 @@ struct TVChannelCard: View {
     @ViewBuilder
     private var iconView: some View {
         if let urlString = channel.streamIcon, let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fit)

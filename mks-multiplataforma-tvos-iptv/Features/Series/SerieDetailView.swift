@@ -111,7 +111,7 @@ struct SerieDetailView: View {
     private var backdropImage: some View {
         let urlString = detail?.info.backdropPath.first ?? serie.cover ?? ""
         if let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)

@@ -126,7 +126,7 @@ struct MovieDetailView: View {
     private var backdropImage: some View {
         let urlString = detail?.backdropPath?.first ?? detail?.backdrop ?? movie.streamIcon ?? ""
         if let url = URL(string: urlString) {
-            AsyncImage(url: url) { phase in
+            CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().aspectRatio(contentMode: .fill)

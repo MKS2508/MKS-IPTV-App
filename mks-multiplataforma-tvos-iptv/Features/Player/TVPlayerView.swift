@@ -2,36 +2,27 @@
 //  TVPlayerView.swift
 //  mks-multiplataforma-tvos-iptv
 //
-//  AVPlayerViewController-based player for tvOS. Native scrub, info overlay,
-//  focus, AirPlay, subtitles all handled by the system.
+//  AVPlayerViewController-based player for tvOS with the full TransmuxCore
+//  pipeline for VOD. Native scrub, info overlay, focus, AirPlay, PiP.
 //
-//  Phase 1 (Block 5): direct URL → AVPlayer native. MP4 / HLS / m3u8 work.
-//  Phase 2 (Block 6): transmux fallback for MKV/AVI via TransmuxCore.
+//  - VOD (movies, episodes): source URL → TransmuxingService → fMP4 + HLS
+//    playlist served by TransmuxServer → AVPlayer plays the local HLS URL.
+//    Required because the IPTV catalog is MKV/AVI, which AVPlayer can't
+//    consume natively.
+//  - LIVE: m3u8 URL piped directly to AVPlayer (HLS is native).
 //
 
 import SwiftUI
 import AVKit
 import IPTVCore
+import TransmuxCore
 
-// MARK: - Public entry
-
-struct TVPlayerView: View {
-    let item: PlayableItem
-    let onDismiss: () -> Void
-
-    var body: some View {
-        TVPlayerControllerHost(item: item, onDismiss: onDismiss)
-            .ignoresSafeArea()
-            .background(Color.black.ignoresSafeArea())
-    }
-}
-
-// MARK: - Playable item
+// MARK: - PlayableItem
 
 struct PlayableItem: Equatable, Identifiable {
     enum Kind: Equatable {
-        case vod          // movies, series episodes
-        case live         // live channels (HLS)
+        case vod          // movies, series episodes (transmuxed)
+        case live         // live channels (HLS, no transmux)
     }
 
     let title: String
@@ -78,48 +69,218 @@ struct PlayableItem: Equatable, Identifiable {
     }
 }
 
+// MARK: - TVPlayerView
+
+struct TVPlayerView: View {
+    let item: PlayableItem
+    let onDismiss: () -> Void
+
+    @StateObject private var pipeline = PlaybackPipeline()
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            switch pipeline.state {
+            case .idle, .preparing(_):
+                preparing
+            case .ready(let url):
+                TVPlayerControllerHost(item: item, playbackURL: url, onExit: onDismiss)
+                    .ignoresSafeArea()
+            case .failed(let message):
+                failed(message)
+            }
+        }
+        .task {
+            await pipeline.prepare(for: item)
+        }
+        .onDisappear {
+            Task { await pipeline.tearDown() }
+        }
+    }
+
+    private var preparing: some View {
+        VStack(spacing: 24) {
+            ProgressView()
+                .scaleEffect(2.0)
+            Text(pipeline.statusMessage)
+                .font(.title3)
+                .foregroundStyle(.white.opacity(0.8))
+            Text(item.title)
+                .font(.title.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 200)
+            if let subtitle = item.subtitle {
+                Text(subtitle)
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func failed(_ message: String) -> some View {
+        VStack(spacing: 24) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 96))
+                .foregroundStyle(.orange)
+            Text("Couldn't start playback")
+                .font(.title.weight(.semibold))
+                .foregroundStyle(.white)
+            Text(message)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 200)
+            Button("Close") { onDismiss() }
+                .buttonStyle(.borderedProminent)
+                .tint(.white)
+                .foregroundStyle(.black)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - PlaybackPipeline
+
+@MainActor
+final class PlaybackPipeline: ObservableObject {
+    enum State: Equatable {
+        case idle
+        case preparing(String)
+        case ready(URL)
+        case failed(String)
+    }
+
+    @Published private(set) var state: State = .idle
+
+    private var transmuxSessionID: String?
+
+    var statusMessage: String {
+        if case .preparing(let message) = state { return message }
+        return "Preparing…"
+    }
+
+    func prepare(for item: PlayableItem) async {
+        guard case .idle = state else { return }
+
+        switch item.kind {
+        case .live:
+            await prepareLive(item)
+        case .vod:
+            await prepareVOD(item)
+        }
+    }
+
+    func tearDown() async {
+        if let sessionID = transmuxSessionID {
+            MKSLog.player.info("Player teardown — cancelling transmux session \(sessionID)")
+            await TransmuxingService.shared.cancelTransmux(sessionID: sessionID)
+            await TransmuxServer.shared.stop()
+            await TransmuxingService.shared.cleanup(sessionID: sessionID)
+            transmuxSessionID = nil
+        }
+        state = .idle
+    }
+
+    // MARK: - Live (no transmux)
+
+    private func prepareLive(_ item: PlayableItem) async {
+        MKSLog.player.info("Live prepare url=\(item.url)")
+        state = .preparing("Connecting…")
+        state = .ready(item.url)
+    }
+
+    // MARK: - VOD (transmux pipeline)
+
+    private func prepareVOD(_ item: PlayableItem) async {
+        let sourceURL = item.url
+        MKSLog.player.info("VOD prepare url=\(sourceURL)")
+
+        state = .preparing("Checking stream…")
+        let preflight = await StreamPreflight.check(url: sourceURL)
+        guard preflight.isReachable else {
+            let msg = "Stream unreachable (HTTP \(preflight.httpStatus ?? -1)) — \(preflight.error ?? "unknown")"
+            MKSLog.player.error("VOD preflight failed: \(msg)")
+            state = .failed(msg)
+            return
+        }
+
+        state = .preparing("Starting transmux…")
+        do {
+            let session = try await TransmuxingService.shared.startTransmux(from: sourceURL)
+            transmuxSessionID = session.sessionID
+            MKSLog.player.info("Transmux started session=\(session.sessionID) expectedSize=\(session.expectedSize)")
+
+            var effectiveSize = session.expectedSize
+            if effectiveSize <= 0, let preflightSize = preflight.contentLength, preflightSize > 0 {
+                effectiveSize = preflightSize
+            }
+
+            state = .preparing("Starting HTTP server…")
+            let serverSession = try await TransmuxServer.shared.start(
+                filePath: session.outputPath,
+                playlistPath: session.playlistPath,
+                mediaPlaylistPath: session.mediaPlaylistPath,
+                expectedSize: effectiveSize,
+                segmenter: session.segmenter,
+                initSegmentSize: session.initSegmentSize,
+                seekHandle: session.seekHandle
+            )
+
+            MKSLog.player.info("Server ready local=\(serverSession.localURL)")
+            state = .ready(serverSession.localURL)
+        } catch {
+            MKSLog.player.error("VOD transmux failed: \(error)")
+            state = .failed("\(error.localizedDescription)")
+        }
+    }
+}
+
 // MARK: - UIViewControllerRepresentable
 
 private struct TVPlayerControllerHost: UIViewControllerRepresentable {
     let item: PlayableItem
-    let onDismiss: () -> Void
+    let playbackURL: URL
+    let onExit: () -> Void
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let player = AVPlayer(url: item.url)
+        let player = AVPlayer(url: playbackURL)
         player.preventsDisplaySleepDuringVideoPlayback = true
+        if item.kind == .live {
+            player.automaticallyWaitsToMinimizeStalling = false
+        }
 
         let vc = AVPlayerViewController()
         vc.player = player
         vc.allowsPictureInPicturePlayback = true
 
-        // tvOS-specific: rich info overlay shown when user swipes down during playback.
-        let info = AVMutableMetadataItem()
-        info.identifier = .commonIdentifierTitle
-        info.value = item.title as NSString
-        info.locale = Locale.current
+        var metadata: [AVMetadataItem] = []
+        let titleItem = AVMutableMetadataItem()
+        titleItem.identifier = .commonIdentifierTitle
+        titleItem.value = item.title as NSString
+        titleItem.locale = Locale.current
+        metadata.append(titleItem)
 
         if let subtitle = item.subtitle {
             let sub = AVMutableMetadataItem()
             sub.identifier = .iTunesMetadataTrackSubTitle
             sub.value = subtitle as NSString
             sub.locale = Locale.current
-            vc.player?.currentItem?.externalMetadata = [info, sub]
-        } else {
-            vc.player?.currentItem?.externalMetadata = [info]
+            metadata.append(sub)
         }
+        vc.player?.currentItem?.externalMetadata = metadata
 
         context.coordinator.player = player
-        context.coordinator.onDismiss = onDismiss
-
-        MKSLog.player.info("TVPlayer load url=\(item.url) kind=\(String(describing: item.kind))")
+        MKSLog.player.info("TVPlayer load url=\(playbackURL) kind=\(String(describing: item.kind))")
         player.play()
 
         return vc
     }
 
-    func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
-        // Item is immutable per cover presentation — no updates needed.
-    }
+    func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {}
 
     static func dismantleUIViewController(_ vc: AVPlayerViewController, coordinator: Coordinator) {
         coordinator.player?.pause()
@@ -132,6 +293,5 @@ private struct TVPlayerControllerHost: UIViewControllerRepresentable {
 
     final class Coordinator {
         var player: AVPlayer?
-        var onDismiss: (() -> Void)?
     }
 }

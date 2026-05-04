@@ -3,7 +3,14 @@
 # 4. Create XCFrameworks
 #
 # Creates XCFrameworks from the built static libraries for each FFmpeg library.
-# Each XCFramework contains: iOS device (arm64), iOS simulator (x86_64), macOS (arm64)
+#
+# Each XCFramework contains 6 slices:
+#   - macOS arm64 (Apple Silicon)
+#   - iOS device arm64
+#   - iOS simulator x86_64 (Intel Mac)
+#   - iOS simulator arm64 (Apple Silicon Mac)
+#   - tvOS device arm64
+#   - tvOS simulator arm64 (Apple Silicon Mac)
 #
 # Usage: ./4-build-xcframeworks.sh [--force]
 #===============================================================================
@@ -41,148 +48,66 @@ verify_build() {
     log_success "${name} build verified"
 }
 
-verify_build "${BUILD_MACOS}" "macOS"
-verify_build "${BUILD_IOS_ARM64}" "iOS device"
-verify_build "${BUILD_IOS_X64}" "iOS simulator"
+verify_build "${BUILD_MACOS}" "macOS arm64"
+verify_build "${BUILD_IOS_ARM64}" "iOS device arm64"
+verify_build "${BUILD_IOS_X64}" "iOS simulator x86_64"
+verify_build "${BUILD_IOS_SIM_ARM64}" "iOS simulator arm64"
+verify_build "${BUILD_TVOS_ARM64}" "tvOS device arm64"
+verify_build "${BUILD_TVOS_SIM_ARM64}" "tvOS simulator arm64"
 
 #-------------------------------------------------------------------------------
 # Create XCFrameworks
 #-------------------------------------------------------------------------------
 ensure_clean_dir "${XCFRAMEWORKS_DIR}"
-TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
+
+# Scratch directory for fat (multi-arch) .a archives. iOS Simulator has two
+# arches (x86_64 + arm64) that must share a single LibraryIdentifier — they
+# are combined with `lipo -create` into one fat archive per platform variant.
+FAT_DIR="${BUILD_ROOT}/scratch/xcframework-fat"
+ensure_clean_dir "${FAT_DIR}"
 
 create_framework() {
     local LIB_NAME="$1"  # e.g., "avcodec"
     # Capitalize first letter: avcodec -> Avcodec
     local FRAMEWORK_NAME="$(echo "$LIB_NAME" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')"
-    
+
     log_info "Creating ${FRAMEWORK_NAME}.xcframework..."
-    
-    # Create framework directories for each platform
-    local IOS_DEVICE_FW="${TEMP_DIR}/ios-device/${FRAMEWORK_NAME}.framework"
-    local IOS_SIM_FW="${TEMP_DIR}/ios-simulator/${FRAMEWORK_NAME}.framework"
-    local MACOS_FW="${TEMP_DIR}/macos/${FRAMEWORK_NAME}.framework"
-    
-    mkdir -p "${IOS_DEVICE_FW}/Headers"
-    mkdir -p "${IOS_SIM_FW}/Headers"
-    mkdir -p "${MACOS_FW}/Headers"
-    
-    # Copy binaries
-    cp "${BUILD_IOS_ARM64}/lib/lib${LIB_NAME}.a" "${IOS_DEVICE_FW}/${FRAMEWORK_NAME}"
-    cp "${BUILD_IOS_X64}/lib/lib${LIB_NAME}.a" "${IOS_SIM_FW}/${FRAMEWORK_NAME}"
-    cp "${BUILD_MACOS}/lib/lib${LIB_NAME}.a" "${MACOS_FW}/${FRAMEWORK_NAME}"
-    
-    # Copy headers (use iOS as reference)
-    if [[ -d "${BUILD_IOS_ARM64}/include/${LIB_NAME}" ]]; then
-        cp -R "${BUILD_IOS_ARM64}/include/${LIB_NAME}" "${IOS_DEVICE_FW}/Headers/"
-        cp -R "${BUILD_IOS_X64}/include/${LIB_NAME}" "${IOS_SIM_FW}/Headers/"
-        cp -R "${BUILD_MACOS}/include/${LIB_NAME}" "${MACOS_FW}/Headers/"
+
+    # iOS Simulator: lipo x86_64 + arm64 into single fat .a (one slice).
+    local IOS_SIM_FAT="${FAT_DIR}/ios-sim-fat-lib${LIB_NAME}.a"
+    lipo -create \
+        "${BUILD_IOS_X64}/lib/lib${LIB_NAME}.a" \
+        "${BUILD_IOS_SIM_ARM64}/lib/lib${LIB_NAME}.a" \
+        -output "${IOS_SIM_FAT}"
+
+    # Use the -library variant of xcodebuild -create-xcframework. This passes
+    # static .a archives directly; xcodebuild reads each archive's
+    # LC_BUILD_VERSION to assign the correct slice. No framework wrappers,
+    # modulemaps, or Info.plists needed — those are only required for dynamic
+    # frameworks. Headers are not bundled into the XCFramework; consumers get
+    # headers via Package.swift cSettings header search paths pointing to
+    # Frameworks/FFmpeg/include/.
+    local OUTPUT_PATH="${XCFRAMEWORKS_DIR}/${FRAMEWORK_NAME}.xcframework"
+    local CMD_OUT
+    if ! CMD_OUT=$(xcodebuild -create-xcframework \
+            -library "${BUILD_MACOS}/lib/lib${LIB_NAME}.a" \
+            -library "${BUILD_IOS_ARM64}/lib/lib${LIB_NAME}.a" \
+            -library "${IOS_SIM_FAT}" \
+            -library "${BUILD_TVOS_ARM64}/lib/lib${LIB_NAME}.a" \
+            -library "${BUILD_TVOS_SIM_ARM64}/lib/lib${LIB_NAME}.a" \
+            -output "${OUTPUT_PATH}" 2>&1); then
+        log_error "xcodebuild failed for ${FRAMEWORK_NAME}.xcframework:"
+        echo "$CMD_OUT" >&2
+        exit 1
     fi
-    
-    # Create module.modulemap for each framework
-    create_modulemap "${IOS_DEVICE_FW}" "${LIB_NAME}"
-    create_modulemap "${IOS_SIM_FW}" "${LIB_NAME}"
-    create_modulemap "${MACOS_FW}" "${LIB_NAME}"
-    
-    # Create Info.plist for each framework
-    create_info_plist "${IOS_DEVICE_FW}" "${FRAMEWORK_NAME}" "iPhoneOS"
-    create_info_plist "${IOS_SIM_FW}" "${FRAMEWORK_NAME}" "iPhoneSimulator"
-    create_info_plist "${MACOS_FW}" "${FRAMEWORK_NAME}" "MacOSX"
-    
-    # Create XCFramework
-    xcodebuild -create-xcframework \
-        -framework "${IOS_DEVICE_FW}" \
-        -framework "${IOS_SIM_FW}" \
-        -framework "${MACOS_FW}" \
-        -output "${XCFRAMEWORKS_DIR}/${FRAMEWORK_NAME}.xcframework" \
-        2>&1 | grep -v "^$" | while read line; do
-            if [[ "$line" == *"error"* ]]; then
-                log_error "$line"
-            elif [[ "$line" == *"warning"* ]]; then
-                log_warning "$line"
-            fi
-        done
-    
-    if [[ -d "${XCFRAMEWORKS_DIR}/${FRAMEWORK_NAME}.xcframework" ]]; then
+
+    if [[ -d "${OUTPUT_PATH}" ]]; then
         log_success "Created ${FRAMEWORK_NAME}.xcframework"
     else
         log_error "Failed to create ${FRAMEWORK_NAME}.xcframework"
+        echo "$CMD_OUT" >&2
         exit 1
     fi
-}
-
-create_modulemap() {
-    local FW_DIR="$1"
-    local LIB_NAME="$2"
-    
-    mkdir -p "${FW_DIR}/Modules"
-    cat > "${FW_DIR}/Modules/module.modulemap" << EOF
-framework module ${LIB_NAME} {
-    umbrella header "${LIB_NAME}.h"
-    export *
-    module * { export * }
-}
-EOF
-    
-    # Create umbrella header
-    cat > "${FW_DIR}/Headers/${LIB_NAME}.h" << EOF
-// Auto-generated umbrella header for ${LIB_NAME}
-// FFmpeg ${FFMPEG_VERSION}
-
-#ifndef ${LIB_NAME}_umbrella_h
-#define ${LIB_NAME}_umbrella_h
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-EOF
-    
-    # Add all headers from the library
-    if [[ -d "${FW_DIR}/Headers/${LIB_NAME}" ]]; then
-        for header in "${FW_DIR}/Headers/${LIB_NAME}"/*.h; do
-            echo "#include <${LIB_NAME}/$(basename "$header")>" >> "${FW_DIR}/Headers/${LIB_NAME}.h"
-        done
-    fi
-    
-    cat >> "${FW_DIR}/Headers/${LIB_NAME}.h" << EOF
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* ${LIB_NAME}_umbrella_h */
-EOF
-}
-
-create_info_plist() {
-    local FW_DIR="$1"
-    local FRAMEWORK_NAME="$2"
-    local PLATFORM="$3"
-    
-    cat > "${FW_DIR}/Info.plist" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleIdentifier</key>
-    <string>com.ffmpeg.${FRAMEWORK_NAME}</string>
-    <key>CFBundleName</key>
-    <string>${FRAMEWORK_NAME}</string>
-    <key>CFBundleVersion</key>
-    <string>${FFMPEG_VERSION}</string>
-    <key>CFBundleShortVersionString</key>
-    <string>${FFMPEG_VERSION}</string>
-    <key>CFBundlePackageType</key>
-    <string>FMWK</string>
-    <key>CFBundleSupportedPlatforms</key>
-    <array>
-        <string>${PLATFORM}</string>
-    </array>
-</dict>
-</plist>
-EOF
 }
 
 #-------------------------------------------------------------------------------

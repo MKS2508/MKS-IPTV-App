@@ -43,6 +43,10 @@ export BUILD_MACOS="${BUILD_ROOT}/macos"
 export BUILD_IOS="${BUILD_ROOT}/ios"
 export BUILD_IOS_ARM64="${BUILD_IOS}/arm64"
 export BUILD_IOS_X64="${BUILD_IOS}/x86_64"
+export BUILD_IOS_SIM_ARM64="${BUILD_IOS}/arm64-simulator"
+export BUILD_TVOS="${BUILD_ROOT}/tvos"
+export BUILD_TVOS_ARM64="${BUILD_TVOS}/arm64"
+export BUILD_TVOS_SIM_ARM64="${BUILD_TVOS}/arm64-simulator"
 
 # Final XCFrameworks output
 export XCFRAMEWORKS_DIR="${TRANSMUX_ROOT}/Frameworks/FFmpeg/xcframeworks"
@@ -55,6 +59,19 @@ export SCRATCH_DIR="${BUILD_ROOT}/scratch"
 #-------------------------------------------------------------------------------
 export MACOS_DEPLOYMENT_TARGET="14.0"
 export IOS_DEPLOYMENT_TARGET="17.0"
+export TVOS_DEPLOYMENT_TARGET="17.0"
+
+#-------------------------------------------------------------------------------
+# Build parallelism
+#
+# FFmpeg + clang -O3 -flto=thin can consume ~2GB RAM per compile job. Running
+# at full ncpu (10+ cores on M-series Macs) overwhelms RAM (~20GB+) and triggers
+# the OOM killer which silently kills smaller helper processes like bin2c,
+# producing confusing "Error 137" failures mid-build.
+#
+# Default to 4 parallel jobs — stable on 16-32GB Macs. Override via env var.
+#-------------------------------------------------------------------------------
+export FFMPEG_PARALLEL_JOBS="${FFMPEG_PARALLEL_JOBS:-4}"
 
 #-------------------------------------------------------------------------------
 # FFmpeg Configure Flags (common for all platforms)
@@ -76,8 +93,18 @@ export FFMPEG_CONFIGURE_FLAGS="
     --enable-encoder=h264_videotoolbox,hevc_videotoolbox
     --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox
     --enable-filter=scale_vt,transpose_vt
+    --disable-filter=yadif_videotoolbox
     --enable-bsf=dts2pts
 "
+
+# NOTE: --disable-filter=yadif_videotoolbox disables a Metal-based deinterlacing
+# filter whose .metallib build step invokes 'xcrun metal' with inconsistent SDK
+# defaults that conflict with our explicit '--cc=xcrun -sdk macosx clang' (or
+# iphoneos/appletvos). The mismatch produces 'using sysroot for MacOSX but
+# targeting AppleTV' warnings and corrupted .metallib output that crashes bin2c.
+#
+# We don't use deinterlacing in TransmuxCore (passthrough remux), so disabling
+# is safe and removes the cross-platform contamination point.
 
 #-------------------------------------------------------------------------------
 # Libraries to build

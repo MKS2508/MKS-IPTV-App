@@ -4,16 +4,14 @@ import Foundation
 
 // MARK: - FFmpeg Configuration
 
-/// Absolute path to the package root — ensures linker -L paths resolve correctly
-/// even when Xcode propagates them to the consuming app target.
 let packageDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
-
-/// FFmpeg headers and libraries root (relative to package directory for headers,
-/// absolute for linker search paths)
 let ffmpegRoot = "Frameworks/FFmpeg"
-let ffmpegAbsRoot = "\(packageDir)/Frameworks/FFmpeg"
 
-/// Header search paths for FFmpeg includes
+/// Header search paths for FFmpeg includes. Required because the C wrapper
+/// (`Sources/CTransmuxFFI`) uses `#include <libavformat/avformat.h>` style
+/// includes — these resolve via the search path, not via the XCFramework's
+/// own bundled headers (XCFrameworks here ship binaries only). Headers live
+/// at `Frameworks/FFmpeg/include/` and are platform-independent.
 let ffmpegHeaderSearchPaths: [CSetting] = [
     .headerSearchPath("../../\(ffmpegRoot)/include"),
     .headerSearchPath("../../\(ffmpegRoot)/include/libavcodec"),
@@ -25,18 +23,7 @@ let ffmpegHeaderSearchPaths: [CSetting] = [
     .headerSearchPath("../../\(ffmpegRoot)/include/libavdevice")
 ]
 
-/// FFmpeg static libraries to link
-let ffmpegLinkedLibraries: [LinkerSetting] = [
-    .linkedLibrary("avformat"),
-    .linkedLibrary("avcodec"),
-    .linkedLibrary("avutil"),
-    .linkedLibrary("swresample"),
-    .linkedLibrary("swscale"),
-    .linkedLibrary("avfilter"),
-    .linkedLibrary("avdevice"),
-]
-
-/// System dependencies required by FFmpeg
+/// System dependencies required by FFmpeg.
 let systemDependencies: [LinkerSetting] = [
     .linkedLibrary("z"),
     .linkedLibrary("bz2"),
@@ -49,14 +36,13 @@ let systemDependencies: [LinkerSetting] = [
     .linkedFramework("Security"),
 ]
 
-/// Platform-specific library search paths (absolute to ensure correct resolution
-/// when linker settings propagate from SPM package to the consuming Xcode target)
-/// macOS: native arm64 build
-/// iOS/tvOS: arm64 device builds
-let librarySearchPaths: [LinkerSetting] = [
-    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/macos/arm64"], .when(platforms: [.macOS])),
-    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/ios/arm64"], .when(platforms: [.iOS])),
-    .unsafeFlags(["-L", "\(ffmpegAbsRoot)/ios/arm64"], .when(platforms: [.tvOS])),
+/// FFmpeg static libraries shipped as XCFramework binary targets. Each XCFramework
+/// contains 5 slices: macos-arm64, ios-arm64, ios-arm64_x86_64-simulator,
+/// tvos-arm64, tvos-arm64-simulator. xcodebuild auto-resolves the correct slice
+/// per consumer's platform/arch — no `unsafeFlags -L` needed per platform.
+let ffmpegBinaryDeps: [Target.Dependency] = [
+    "Avformat", "Avcodec", "Avutil",
+    "Swresample", "Swscale", "Avfilter", "Avdevice"
 ]
 
 let package = Package(
@@ -77,28 +63,38 @@ let package = Package(
         )
     ],
     targets: [
-        // MARK: - CTransmuxFFI (Modular C FFI library wrapping FFmpeg 8.0.1)
+        // MARK: - FFmpeg XCFramework binary targets
+        .binaryTarget(name: "Avformat",   path: "Frameworks/FFmpeg/xcframeworks/Avformat.xcframework"),
+        .binaryTarget(name: "Avcodec",    path: "Frameworks/FFmpeg/xcframeworks/Avcodec.xcframework"),
+        .binaryTarget(name: "Avutil",     path: "Frameworks/FFmpeg/xcframeworks/Avutil.xcframework"),
+        .binaryTarget(name: "Swresample", path: "Frameworks/FFmpeg/xcframeworks/Swresample.xcframework"),
+        .binaryTarget(name: "Swscale",    path: "Frameworks/FFmpeg/xcframeworks/Swscale.xcframework"),
+        .binaryTarget(name: "Avfilter",   path: "Frameworks/FFmpeg/xcframeworks/Avfilter.xcframework"),
+        .binaryTarget(name: "Avdevice",   path: "Frameworks/FFmpeg/xcframeworks/Avdevice.xcframework"),
+
+        // MARK: - CTransmuxFFI (C FFI library wrapping FFmpeg 8.0.1)
         .target(
             name: "CTransmuxFFI",
+            dependencies: ffmpegBinaryDeps,
             path: "Sources/CTransmuxFFI",
             publicHeadersPath: "include",
             cSettings: ffmpegHeaderSearchPaths,
-            linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths
+            linkerSettings: systemDependencies
         ),
         // MARK: - TransmuxCore (Swift library)
         .target(
             name: "TransmuxCore",
-            dependencies: ["CTransmuxFFI"],
+            dependencies: ["CTransmuxFFI"] + ffmpegBinaryDeps,
             path: "Sources/TransmuxCore",
             cSettings: ffmpegHeaderSearchPaths,
-            linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths
+            linkerSettings: systemDependencies
         ),
         // MARK: - transmux-cli (Command-line tool)
         .executableTarget(
             name: "transmux-cli",
             dependencies: ["TransmuxCore"],
             path: "Sources/transmux-cli",
-            linkerSettings: ffmpegLinkedLibraries + systemDependencies + librarySearchPaths
+            linkerSettings: systemDependencies
         ),
         // MARK: - Tests
         .testTarget(

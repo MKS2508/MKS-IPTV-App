@@ -47,8 +47,10 @@ log_info "Configuring FFmpeg for macOS arm64..."
 
 cd "${FFMPEG_SOURCE_DIR}"
 
-# Clean previous build
-make clean 2>/dev/null || true
+# Clean previous build — distclean wipes config.mak, intermediate metallib
+# artifacts, and all generated headers. Plain `make clean` leaves these and
+# they cause cross-platform contamination on subsequent ./configure runs.
+make distclean 2>/dev/null || true
 
 # Configure
 ./configure \
@@ -57,12 +59,16 @@ make clean 2>/dev/null || true
     --target-os=darwin \
     --cc="xcrun -sdk macosx clang" \
     --ar="xcrun -sdk macosx ar" \
-    --extra-cflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET} -O3 -flto=thin" \
-    --extra-ldflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET} -flto=thin" \
+    --extra-cflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET} -O3" \
+    --extra-ldflags="-arch arm64 -mmacosx-version-min=${MACOS_DEPLOYMENT_TARGET}" \
     ${FFMPEG_CONFIGURE_FLAGS}
 
-log_info "Building FFmpeg for macOS arm64..."
-make -j$(sysctl -n hw.ncpu)
+log_info "Building FFmpeg for macOS arm64 (parallel jobs: ${FFMPEG_PARALLEL_JOBS})..."
+# NOTE: -flto=thin was previously enabled but produces bitcode-embedded .o
+# files that cannot be packaged into XCFrameworks via xcodebuild
+# -create-xcframework (fails with "Unknown header: 0xb17c0de"). Plain -O3
+# without LTO gives Mach-O native objects that xcframeworks can wrap.
+make -j${FFMPEG_PARALLEL_JOBS}
 
 log_info "Installing to ${BUILD_MACOS}..."
 make install

@@ -7,12 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01E9C36701B9D5ADF3742684 /* IPTVCore in Frameworks */ = {isa = PBXBuildFile; productRef = DF740426CAB5C3972536A40D /* IPTVCore */; };
 		0534110F2F5C65B800A6C87F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0534110E2F5C65B800A6C87F /* WidgetKit.framework */; };
 		053411112F5C65B800A6C87F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 053411102F5C65B800A6C87F /* SwiftUI.framework */; };
 		0534111E2F5C65B900A6C87F /* MKSDownloadActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05548F942F5626330060E2DD /* TransmuxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F932F5626330060E2DD /* TransmuxCore */; };
 		05548F962F5626330060E2DD /* transmux-cli in Frameworks */ = {isa = PBXBuildFile; productRef = 05548F952F5626330060E2DD /* transmux-cli */; };
 		05A1B2C3D4E5F60718293A4C /* CloudKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05A1B2C3D4E5F60718293A4B /* CloudKit.framework */; };
+		43421A8EC8549F8D9B898299 /* IPTVCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A1027F777F9A7FEB1E45FAD /* IPTVCore */; };
+		53532E429C1F453896BAE933 /* IPTVPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 11317A2A350DE3A20B7F602F /* IPTVPlayer */; };
+		9B6D9E8CA658821BDA52B5C6 /* IPTVPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 6E0DD2D110059C3A3C3D3326 /* IPTVPlayer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXBuildRule section */
@@ -90,6 +94,8 @@
 		};
 		057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = "mks-multiplataforma-tvos-iptv";
 			sourceTree = "<group>";
 		};
@@ -117,6 +123,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				01E9C36701B9D5ADF3742684 /* IPTVCore in Frameworks */,
+				9B6D9E8CA658821BDA52B5C6 /* IPTVPlayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +135,8 @@
 				05A1B2C3D4E5F60718293A4C /* CloudKit.framework in Frameworks */,
 				05548F942F5626330060E2DD /* TransmuxCore in Frameworks */,
 				05548F962F5626330060E2DD /* transmux-cli in Frameworks */,
+				43421A8EC8549F8D9B898299 /* IPTVCore in Frameworks */,
+				53532E429C1F453896BAE933 /* IPTVPlayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -183,8 +193,6 @@
 				053411122F5C65B800A6C87F /* MKSDownloadActivityWidget */,
 			);
 			name = MKSDownloadActivityWidgetExtension;
-			packageProductDependencies = (
-			);
 			productName = MKSDownloadActivityWidgetExtension;
 			productReference = 0534110C2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
@@ -205,6 +213,10 @@
 				057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */,
 			);
 			name = "mks-multiplataforma-tvos-iptv";
+			packageProductDependencies = (
+				DF740426CAB5C3972536A40D /* IPTVCore */,
+				6E0DD2D110059C3A3C3D3326 /* IPTVPlayer */,
+			);
 			productName = "mks-multiplataforma-tvos-iptv";
 			productReference = 057C1B9B2D95EAC20059601D /* mks-multiplataforma-tvos-iptv.app */;
 			productType = "com.apple.product-type.application";
@@ -228,6 +240,10 @@
 				058CC0712D39C8CF006E00BF /* mks-multiplatform-iptv */,
 			);
 			name = "mks-multiplatform-iptv";
+			packageProductDependencies = (
+				4A1027F777F9A7FEB1E45FAD /* IPTVCore */,
+				11317A2A350DE3A20B7F602F /* IPTVPlayer */,
+			);
 			productName = "mks-multiplatform-iptv";
 			productReference = 058CC06F2D39C8CF006E00BF /* mks-multiplatform-iptv.app */;
 			productType = "com.apple.product-type.application";
@@ -269,6 +285,8 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				05548F922F5626330060E2DD /* XCLocalSwiftPackageReference "TransmuxCore" */,
+				DE0A45CA1884EDBB25DBF8A2 /* XCLocalSwiftPackageReference "IPTVCore" */,
+				1A28056F74335BDADE717D6C /* XCLocalSwiftPackageReference "IPTVPlayer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 058CC0702D39C8CF006E00BF /* Products */;
@@ -776,6 +794,14 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = TransmuxCore;
 		};
+		1A28056F74335BDADE717D6C /* XCLocalSwiftPackageReference "IPTVPlayer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = IPTVPlayer;
+		};
+		DE0A45CA1884EDBB25DBF8A2 /* XCLocalSwiftPackageReference "IPTVCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = IPTVCore;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -786,6 +812,26 @@
 		05548F952F5626330060E2DD /* transmux-cli */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = "transmux-cli";
+		};
+		11317A2A350DE3A20B7F602F /* IPTVPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A28056F74335BDADE717D6C /* XCLocalSwiftPackageReference "IPTVPlayer" */;
+			productName = IPTVPlayer;
+		};
+		4A1027F777F9A7FEB1E45FAD /* IPTVCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE0A45CA1884EDBB25DBF8A2 /* XCLocalSwiftPackageReference "IPTVCore" */;
+			productName = IPTVCore;
+		};
+		6E0DD2D110059C3A3C3D3326 /* IPTVPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1A28056F74335BDADE717D6C /* XCLocalSwiftPackageReference "IPTVPlayer" */;
+			productName = IPTVPlayer;
+		};
+		DF740426CAB5C3972536A40D /* IPTVCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE0A45CA1884EDBB25DBF8A2 /* XCLocalSwiftPackageReference "IPTVCore" */;
+			productName = IPTVCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

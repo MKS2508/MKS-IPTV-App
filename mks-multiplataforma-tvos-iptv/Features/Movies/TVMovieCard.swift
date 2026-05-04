@@ -2,11 +2,10 @@
 //  TVMovieCard.swift
 //  mks-multiplataforma-tvos-iptv
 //
-//  Focus-driven movie poster card for tvOS following Apple HIG:
-//  - Min 250x150pt target
-//  - Scale 1.1x on focus + shadow
-//  - Title 48pt+, body 29pt+
-//  - Reduce Motion respected
+//  Focus-driven movie poster card for tvOS.
+//  Use as a NavigationLink label or wrap in your own Button.
+//  Min 250x150pt, scale 1.08x on focus, parallax via .buttonStyle(.card)
+//  applied at the container site.
 //
 
 import SwiftUI
@@ -14,35 +13,30 @@ import IPTVCore
 
 struct TVMovieCard: View {
     let movie: Movie
-    let onSelect: () -> Void
 
-    @FocusState private var isFocused: Bool
+    @Environment(\.isFocused) private var isFocused
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let cardWidth: CGFloat = 280
     private let cardHeight: CGFloat = 420
 
     var body: some View {
-        Button(action: onSelect) {
-            ZStack(alignment: .bottom) {
-                poster
-                titleOverlay
-            }
-            .frame(width: cardWidth, height: cardHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white, lineWidth: isFocused ? 4 : 0)
-            )
-            .scaleEffect(isFocused && !reduceMotion ? 1.08 : 1.0)
-            .shadow(color: .black.opacity(isFocused ? 0.6 : 0.25),
-                    radius: isFocused ? 28 : 8,
-                    x: 0,
-                    y: isFocused ? 18 : 4)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isFocused)
+        ZStack(alignment: .bottom) {
+            poster
+            titleOverlay
         }
-        .buttonStyle(.card)
-        .focused($isFocused)
+        .frame(width: cardWidth, height: cardHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white, lineWidth: isFocused ? 4 : 0)
+        )
+        .scaleEffect(isFocused && !reduceMotion ? 1.08 : 1.0)
+        .shadow(color: .black.opacity(isFocused ? 0.6 : 0.25),
+                radius: isFocused ? 28 : 8,
+                x: 0,
+                y: isFocused ? 18 : 4)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isFocused)
         .accessibilityLabel(movie.name)
         .accessibilityHint(Text("Opens movie details"))
     }

@@ -25,11 +25,16 @@ final class ProfileStore: ObservableObject {
             username: username,
             password: password
         )
+        adopt(p)
+    }
+
+    /// Adopt an externally-built profile (e.g. one pulled from iCloud).
+    func adopt(_ p: IPTVProfile) {
         profile = p
         if let data = try? JSONEncoder().encode(p) {
             UserDefaults.standard.set(data, forKey: key)
         }
-        MKSLog.app.info("ProfileStore saved profile name=\(name) host=\(baseURL)")
+        MKSLog.app.info("ProfileStore adopted profile name=\(p.name) host=\(p.baseURL)")
     }
 
     func clear() {

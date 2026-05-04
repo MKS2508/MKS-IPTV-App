@@ -74,6 +74,13 @@
 			);
 			target = 0534110B2F5C65B800A6C87F /* MKSDownloadActivityWidgetExtension */;
 		};
+		057C1BFF2D95EAC30059601D /* Exceptions for "mks-multiplataforma-tvos-iptv" folder in "mks-multiplataforma-tvos-iptv" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 057C1B9A2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */;
+		};
 		058CC0E02D39C9E9006E00BF /* Exceptions for "mks-multiplatform-iptv" folder in "mks-multiplatform-iptv" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -94,6 +101,9 @@
 		};
 		057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				057C1BFF2D95EAC30059601D /* Exceptions for "mks-multiplataforma-tvos-iptv" folder in "mks-multiplataforma-tvos-iptv" target */,
+			);
 			path = "mks-multiplataforma-tvos-iptv";
 			sourceTree = "<group>";
 		};
@@ -446,14 +456,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "mks-multiplataforma-tvos-iptv/mks-multiplataforma-tvos-iptv.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplataforma-tvos-iptv/Preview Content\"";
 				DEVELOPMENT_TEAM = QL3NVUPD27;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "mks-multiplataforma-tvos-iptv/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -474,15 +484,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "mks-multiplataforma-tvos-iptv/mks-multiplataforma-tvos-iptv.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"mks-multiplataforma-tvos-iptv/Preview Content\"";
 				DEVELOPMENT_TEAM = QL3NVUPD27;
 				DISABLE_MANUAL_TARGET_ORDER_BUILD_WARNING = YES;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "mks-multiplataforma-tvos-iptv/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

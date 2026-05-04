@@ -10,9 +10,18 @@ import IPTVCore
 
 @main
 struct mks_multiplataforma_tvos_iptvApp: App {
+    @StateObject private var profileStore = ProfileStore()
+
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            Group {
+                if profileStore.profile != nil {
+                    RootTabView()
+                } else {
+                    ProfileBootstrapView()
+                }
+            }
+            .environmentObject(profileStore)
         }
     }
 }

@@ -1,0 +1,132 @@
+name: Baseline Profiles
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+    paths:
+      - 'app/smartphone/build.gradle.kts'
+      - 'app/tv/build.gradle.kts'
+      - '.github/workflows/baseline-profiles.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: baseline-profiles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Check baseline profile trigger
+        id: baseline-trigger
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base="${{ github.event.before }}"
+          if [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-list --max-parents=0 HEAD)"
+          fi
+          if git diff --name-only "$base" HEAD -- .github/workflows/baseline-profiles.yml | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff "$base" HEAD -- app/smartphone/build.gradle.kts app/tv/build.gradle.kts | grep -E '^[-+][[:space:]]*version(Code|Name)[[:space:]]*='; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "No app version change detected."
+          echo "run=false" >> "$GITHUB_OUTPUT"
+
+      - name: Setup JDK
+        if: steps.baseline-trigger.outputs.run == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: zulu
+
+      - name: Setup Gradle
+        if: steps.baseline-trigger.outputs.run == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Enable KVM
+        if: steps.baseline-trigger.outputs.run == 'true'
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "/dev/kvm is not available on this runner"
+            exit 1
+          fi
+          sudo chown root:$(id -gn) /dev/kvm
+          sudo chmod 660 /dev/kvm
+          ls -l /dev/kvm
+
+      - name: Generate smartphone baseline profile
+        if: steps.baseline-trigger.outputs.run == 'true'
+        run: |
+          ./gradlew :app:smartphone:generateBaselineProfile \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.emulator.showKernelLogging=true \
+            -Pandroid.experimental.androidTest.numManagedDeviceShards=1 \
+            -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
+
+      - name: Generate TV baseline profile
+        if: steps.baseline-trigger.outputs.run == 'true'
+        run: |
+          ./gradlew :app:tv:generateBaselineProfile \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            -Pandroid.experimental.testOptions.managedDevices.emulator.showKernelLogging=true \
+            -Pandroid.experimental.androidTest.numManagedDeviceShards=1 \
+            -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
+
+      - name: Validate baseline profile output
+        if: steps.baseline-trigger.outputs.run == 'true'
+        run: |
+          set -euo pipefail
+          test ! -d app/tv/src/release/generated/baselineProfiles
+
+      - name: Create baseline profile update pull request
+        if: steps.baseline-trigger.outputs.run == 'true'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+        run: |
+          set -euo pipefail
+          update_branch="baseline-profile-updates-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -B "$update_branch"
+          git add \
+            app/smartphone/src/main/generated/baselineProfiles \
+            app/tv/src/main/generated/baselineProfiles
+          if git diff --cached --quiet; then
+            echo "Baseline profiles are already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update baseline profiles"
+          git push --set-upstream origin "$update_branch"
+          pr_body="$(cat <<EOF
+          Generated baseline profile updates from workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
+
+          Baseline profiles are Android performance optimization artifacts. Review the generated changes before merging.
+          EOF
+          )"
+          gh pr create \
+            --base "$DEFAULT_BRANCH" \
+            --head "$update_branch" \
+            --title "Update baseline profiles" \
+            --body "$pr_body"

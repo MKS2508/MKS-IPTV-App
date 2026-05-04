@@ -1,0 +1,73 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '.github/**'
+      - '.idea/**'
+      - 'fastlane/**'
+      - '!.github/workflows/**'
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup JDK
+        id: setup-java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: "zulu"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-home-cache-cleanup: true
+
+      - name: Clean GMD
+        run: ./gradlew cleanManagedDevices --unused-only
+
+      - name: Build production app
+        run: ./gradlew :app:smartphone:assembleRelease
+
+      - name: Build production TV app
+        run: ./gradlew :app:tv:assembleRelease
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          path: |
+            app/smartphone/build/outputs/apk/release/*.apk
+            app/tv/build/outputs/apk/release/*.apk
+
+      - name: Upload To Telegram
+        if: github.event_name != 'pull_request'
+        uses: xireiki/channel-post@v1.0.10
+        with:
+          bot_token: ${{ secrets.BOT_TOKEN }}
+          chat_id: ${{ secrets.CHAT_ID }}
+          api_id: ${{ secrets.API_ID }}
+          api_hash: ${{ secrets.API_HASH }}
+          large_file: true
+          method: sendFile
+          path: |
+            app/smartphone/build/outputs/apk/release/*.apk
+            app/tv/build/outputs/apk/release/*.apk

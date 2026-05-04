@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import IPTVCore
 
 struct MyContentView: View {
     @EnvironmentObject private var downloadManager: DownloadManager

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import IPTVCore
 #if os(macOS)
 import AppKit
 #else

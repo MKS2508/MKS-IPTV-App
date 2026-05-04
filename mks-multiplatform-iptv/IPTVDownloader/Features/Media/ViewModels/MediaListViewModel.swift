@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 // LibraryItem, MediaType, and TitleParseable protocols are defined in MediaProtocols.swift
 // Movie and Serie conformances are also in MediaProtocols.swift

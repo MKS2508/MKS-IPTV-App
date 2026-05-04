@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AVKit
+import IPTVCore
 
 // MARK: - Models
 

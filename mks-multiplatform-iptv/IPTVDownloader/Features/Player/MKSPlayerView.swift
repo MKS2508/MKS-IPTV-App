@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import MediaPlayer
+import IPTVCore
 
 // MARK: - Presentation Mode
 

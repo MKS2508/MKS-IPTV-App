@@ -30,6 +30,7 @@
 import Foundation
 import CloudKit
 import SwiftData
+import IPTVCore
 
 actor WatchHistorySyncEngine {
 

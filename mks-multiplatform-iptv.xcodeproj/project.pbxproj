@@ -94,8 +94,6 @@
 		};
 		057C1B9C2D95EAC20059601D /* mks-multiplataforma-tvos-iptv */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "mks-multiplataforma-tvos-iptv";
 			sourceTree = "<group>";
 		};

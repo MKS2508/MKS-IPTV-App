@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 // NOTE: This service must always use the currently active profile.
 actor MovieService {

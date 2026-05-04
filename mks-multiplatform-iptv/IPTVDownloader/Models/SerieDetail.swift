@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 struct SerieDetail: Codable {
     /// Set from the calling context after decoding (the API response doesn't include it).

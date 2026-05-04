@@ -3,12 +3,12 @@ import Foundation
 // MARK: - Glitch Severity
 
 /// Severity levels for glitch events, designed for log filtering.
-enum GlitchSeverity: String, Codable, CaseIterable {
+public enum GlitchSeverity: String, Codable, CaseIterable {
     case info = "INF"
     case warning = "WRN"
     case critical = "ERR"
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .info: return "Info"
         case .warning: return "Warning"
@@ -21,7 +21,7 @@ enum GlitchSeverity: String, Codable, CaseIterable {
 
 /// Categories of playback glitches that can be detected.
 /// Raw values are designed for structured logging and grep-friendly output.
-enum PlaybackGlitchType: String, Codable, CaseIterable {
+public enum PlaybackGlitchType: String, Codable, CaseIterable {
     // Video anomalies
     case videoFreeze = "VIDEO_FREEZE"           // Video frames not advancing
     case videoStutter = "VIDEO_STUTTER"         // Intermittent frame drops
@@ -50,7 +50,7 @@ enum PlaybackGlitchType: String, Codable, CaseIterable {
     // MARK: - Computed Properties
 
     /// Severity level for this glitch type.
-    var severity: GlitchSeverity {
+    public var severity: GlitchSeverity {
         switch self {
         case .videoFreeze, .audioMute, .seekFailure, .bufferStarvation:
             return .critical
@@ -62,7 +62,7 @@ enum PlaybackGlitchType: String, Codable, CaseIterable {
     }
 
     /// Category for grouping in logs and UI.
-    var category: String {
+    public var category: String {
         switch self {
         case .videoFreeze, .videoStutter, .frameDrop: return "video"
         case .audioStutter, .audioMute, .audioGlitch: return "audio"
@@ -73,7 +73,7 @@ enum PlaybackGlitchType: String, Codable, CaseIterable {
     }
 
     /// Human-readable description.
-    var description: String {
+    public var description: String {
         switch self {
         case .videoFreeze: return "Video frozen"
         case .videoStutter: return "Video stuttering"
@@ -98,35 +98,67 @@ enum PlaybackGlitchType: String, Codable, CaseIterable {
 
 /// Glitch-type-specific metrics for detailed logging and analysis.
 /// Uses optional fields to accommodate different glitch types.
-struct GlitchMetrics: Codable {
+public struct GlitchMetrics: Codable {
     // Video freeze/stutter
-    var freezeDuration: Double?               // How long frozen (seconds)
-    var framesDropped: Int?                    // Number of dropped frames
+    public var freezeDuration: Double?               // How long frozen (seconds)
+    public var framesDropped: Int?                    // Number of dropped frames
 
     // Audio issues
-    var audioGap: Double?                      // Audio silence duration (seconds)
+    public var audioGap: Double?                      // Audio silence duration (seconds)
 
     // A/V sync
-    var avDriftMs: Double?                     // A/V timestamp difference (milliseconds)
-    var videoPTS: Double?                      // Video presentation timestamp
-    var audioPTS: Double?                      // Audio presentation timestamp
+    public var avDriftMs: Double?                     // A/V timestamp difference (milliseconds)
+    public var videoPTS: Double?                      // Video presentation timestamp
+    public var audioPTS: Double?                      // Audio presentation timestamp
 
     // Seek
-    var seekTarget: Double?                    // Requested seek position
-    var seekActual: Double?                    // Actual position after seek
-    var seekLatencyMs: Double?                 // Time to complete seek (milliseconds)
+    public var seekTarget: Double?                    // Requested seek position
+    public var seekActual: Double?                    // Actual position after seek
+    public var seekLatencyMs: Double?                 // Time to complete seek (milliseconds)
 
     // Buffer
-    var bufferAhead: Double?                   // Seconds buffered ahead
-    var bufferEmpty: Bool?                     // Buffer reached zero
-    var segmentIndex: Int?                     // Affected segment number
+    public var bufferAhead: Double?                   // Seconds buffered ahead
+    public var bufferEmpty: Bool?                     // Buffer reached zero
+    public var segmentIndex: Int?                     // Affected segment number
 
     // Network
-    var httpStatus: Int?                       // HTTP response code
-    var bytesTransferred: Int64?               // Bytes before failure
+    public var httpStatus: Int?                       // HTTP response code
+    public var bytesTransferred: Int64?               // Bytes before failure
+
+    public init(
+        freezeDuration: Double? = nil,
+        framesDropped: Int? = nil,
+        audioGap: Double? = nil,
+        avDriftMs: Double? = nil,
+        videoPTS: Double? = nil,
+        audioPTS: Double? = nil,
+        seekTarget: Double? = nil,
+        seekActual: Double? = nil,
+        seekLatencyMs: Double? = nil,
+        bufferAhead: Double? = nil,
+        bufferEmpty: Bool? = nil,
+        segmentIndex: Int? = nil,
+        httpStatus: Int? = nil,
+        bytesTransferred: Int64? = nil
+    ) {
+        self.freezeDuration = freezeDuration
+        self.framesDropped = framesDropped
+        self.audioGap = audioGap
+        self.avDriftMs = avDriftMs
+        self.videoPTS = videoPTS
+        self.audioPTS = audioPTS
+        self.seekTarget = seekTarget
+        self.seekActual = seekActual
+        self.seekLatencyMs = seekLatencyMs
+        self.bufferAhead = bufferAhead
+        self.bufferEmpty = bufferEmpty
+        self.segmentIndex = segmentIndex
+        self.httpStatus = httpStatus
+        self.bytesTransferred = bytesTransferred
+    }
 
     /// Grep-friendly string representation for logs.
-    var grepString: String {
+    public var grepString: String {
         var parts: [String] = []
         if let v = freezeDuration { parts.append("freeze=\(String(format: "%.2f", v))s") }
         if let v = framesDropped { parts.append("drops=\(v)") }
@@ -146,29 +178,29 @@ struct GlitchMetrics: Codable {
 
 /// A single detected glitch event with full context.
 /// Designed for JSON serialization and log aggregation.
-struct GlitchEvent: Codable, Identifiable {
-    let id: UUID
-    let timestamp: Date
-    let type: PlaybackGlitchType
-    let severity: GlitchSeverity
+public struct GlitchEvent: Codable, Identifiable {
+    public let id: UUID
+    public let timestamp: Date
+    public let type: PlaybackGlitchType
+    public let severity: GlitchSeverity
 
     // Playback context
-    let currentTime: Double           // Playhead position (seconds)
-    let duration: Double              // Total duration (seconds)
-    let playbackRate: Float           // Current rate (0=paused, 1=normal)
+    public let currentTime: Double           // Playhead position (seconds)
+    public let duration: Double              // Total duration (seconds)
+    public let playbackRate: Float           // Current rate (0=paused, 1=normal)
 
     // Glitch-specific metrics
-    let metrics: GlitchMetrics
+    public let metrics: GlitchMetrics
 
     // Source identification
-    let playerType: String            // "AVPlayer", "FFmpeg", "VLC"
-    let sessionID: String?            // Correlate with TransmuxLog session
+    public let playerType: String            // "AVPlayer", "FFmpeg", "VLC"
+    public let sessionID: String?            // Correlate with TransmuxLog session
 
     // Additional context
-    let message: String               // Human-readable description
+    public let message: String               // Human-readable description
 
     /// Create a new glitch event.
-    init(
+    public init(
         type: PlaybackGlitchType,
         currentTime: Double,
         duration: Double,
@@ -196,39 +228,69 @@ struct GlitchEvent: Codable, Identifiable {
 
 /// Thresholds and settings for glitch detection.
 /// Tunable for different sensitivity levels.
-struct GlitchDetectionConfig: Codable {
+public struct GlitchDetectionConfig: Codable {
     // Video freeze detection
-    var freezeThreshold: TimeInterval = 0.5      // Seconds without frame change
-    var freezeMinDuration: TimeInterval = 0.3    // Report if frozen this long
+    public var freezeThreshold: TimeInterval = 0.5      // Seconds without frame change
+    public var freezeMinDuration: TimeInterval = 0.3    // Report if frozen this long
 
     // Frame drop detection
-    var frameDropWindow: TimeInterval = 1.0      // Window for counting drops
-    var frameDropThreshold: Int = 3              // Drops in window to trigger
+    public var frameDropWindow: TimeInterval = 1.0      // Window for counting drops
+    public var frameDropThreshold: Int = 3              // Drops in window to trigger
 
     // A/V sync detection
-    var avDriftThresholdMs: Double = 100         // Milliseconds drift to warn
-    var avDriftCriticalMs: Double = 500          // Milliseconds for critical
+    public var avDriftThresholdMs: Double = 100         // Milliseconds drift to warn
+    public var avDriftCriticalMs: Double = 500          // Milliseconds for critical
 
     // Buffer detection
-    var bufferUnderrunThreshold: Double = 0.5    // Seconds ahead = underrun
-    var bufferStarvationThreshold: Double = 0.1  // Seconds ahead = starvation
+    public var bufferUnderrunThreshold: Double = 0.5    // Seconds ahead = underrun
+    public var bufferStarvationThreshold: Double = 0.1  // Seconds ahead = starvation
 
     // Seek latency detection
-    var seekLatencyWarnMs: Double = 2000         // Warn if seek > 2 seconds
-    var seekLatencyCriticalMs: Double = 5000     // Critical if > 5 seconds
+    public var seekLatencyWarnMs: Double = 2000         // Warn if seek > 2 seconds
+    public var seekLatencyCriticalMs: Double = 5000     // Critical if > 5 seconds
 
     // Segment gap detection
-    var segmentTimeoutMs: Double = 10000         // Segment request timeout
+    public var segmentTimeoutMs: Double = 10000         // Segment request timeout
 
     // Detection sampling
-    var sampleInterval: TimeInterval = 0.1       // How often to check (100ms)
-    var historySize: Int = 100                   // Keep last N events
+    public var sampleInterval: TimeInterval = 0.1       // How often to check (100ms)
+    public var historySize: Int = 100                   // Keep last N events
+
+    public init(
+        freezeThreshold: TimeInterval = 0.5,
+        freezeMinDuration: TimeInterval = 0.3,
+        frameDropWindow: TimeInterval = 1.0,
+        frameDropThreshold: Int = 3,
+        avDriftThresholdMs: Double = 100,
+        avDriftCriticalMs: Double = 500,
+        bufferUnderrunThreshold: Double = 0.5,
+        bufferStarvationThreshold: Double = 0.1,
+        seekLatencyWarnMs: Double = 2000,
+        seekLatencyCriticalMs: Double = 5000,
+        segmentTimeoutMs: Double = 10000,
+        sampleInterval: TimeInterval = 0.1,
+        historySize: Int = 100
+    ) {
+        self.freezeThreshold = freezeThreshold
+        self.freezeMinDuration = freezeMinDuration
+        self.frameDropWindow = frameDropWindow
+        self.frameDropThreshold = frameDropThreshold
+        self.avDriftThresholdMs = avDriftThresholdMs
+        self.avDriftCriticalMs = avDriftCriticalMs
+        self.bufferUnderrunThreshold = bufferUnderrunThreshold
+        self.bufferStarvationThreshold = bufferStarvationThreshold
+        self.seekLatencyWarnMs = seekLatencyWarnMs
+        self.seekLatencyCriticalMs = seekLatencyCriticalMs
+        self.segmentTimeoutMs = segmentTimeoutMs
+        self.sampleInterval = sampleInterval
+        self.historySize = historySize
+    }
 
     /// Default configuration with balanced sensitivity.
-    static let `default` = GlitchDetectionConfig()
+    public static let `default` = GlitchDetectionConfig()
 
     /// Sensitive configuration for detailed debugging.
-    static let sensitive = GlitchDetectionConfig(
+    public static let sensitive = GlitchDetectionConfig(
         freezeThreshold: 0.3,
         freezeMinDuration: 0.2,
         frameDropThreshold: 1,
@@ -238,7 +300,7 @@ struct GlitchDetectionConfig: Codable {
     )
 
     /// Relaxed configuration for production.
-    static let relaxed = GlitchDetectionConfig(
+    public static let relaxed = GlitchDetectionConfig(
         freezeThreshold: 1.0,
         freezeMinDuration: 0.5,
         frameDropThreshold: 5,
@@ -251,23 +313,41 @@ struct GlitchDetectionConfig: Codable {
 // MARK: - Glitch Session Summary
 
 /// Summary statistics for a playback session.
-struct GlitchSessionSummary: Codable {
-    let totalEvents: Int
-    let countsByType: [PlaybackGlitchType: Int]
-    let firstGlitchTime: Date?
-    let lastGlitchTime: Date?
-    let criticalCount: Int
-    let warningCount: Int
-    let infoCount: Int
+public struct GlitchSessionSummary: Codable {
+    public let totalEvents: Int
+    public let countsByType: [PlaybackGlitchType: Int]
+    public let firstGlitchTime: Date?
+    public let lastGlitchTime: Date?
+    public let criticalCount: Int
+    public let warningCount: Int
+    public let infoCount: Int
+
+    public init(
+        totalEvents: Int,
+        countsByType: [PlaybackGlitchType: Int],
+        firstGlitchTime: Date?,
+        lastGlitchTime: Date?,
+        criticalCount: Int,
+        warningCount: Int,
+        infoCount: Int
+    ) {
+        self.totalEvents = totalEvents
+        self.countsByType = countsByType
+        self.firstGlitchTime = firstGlitchTime
+        self.lastGlitchTime = lastGlitchTime
+        self.criticalCount = criticalCount
+        self.warningCount = warningCount
+        self.infoCount = infoCount
+    }
 
     /// Duration of the session (from first to last glitch).
-    var sessionDuration: TimeInterval? {
+    public var sessionDuration: TimeInterval? {
         guard let first = firstGlitchTime, let last = lastGlitchTime else { return nil }
         return last.timeIntervalSince(first)
     }
 
     /// Glitch rate (events per minute).
-    var glitchesPerMinute: Double? {
+    public var glitchesPerMinute: Double? {
         guard let duration = sessionDuration, duration > 0 else { return nil }
         return Double(totalEvents) / (duration / 60)
     }

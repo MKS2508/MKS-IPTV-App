@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 #if os(macOS)
 /// macOS settings view for centralized log configuration.

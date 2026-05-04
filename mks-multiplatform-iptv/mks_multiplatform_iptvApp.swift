@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import TransmuxCore
+import IPTVCore
 #if os(iOS)
 import AVFoundation
 #elseif os(macOS)
@@ -276,6 +277,7 @@ struct MainWindowContent: View {
 #if os(macOS)
 import AppKit
 import Combine
+import IPTVCore
 
 /// Notification to open player window from non-View context
 extension Notification.Name {

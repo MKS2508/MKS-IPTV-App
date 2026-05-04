@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 #if os(macOS)
 import AppKit
 #else

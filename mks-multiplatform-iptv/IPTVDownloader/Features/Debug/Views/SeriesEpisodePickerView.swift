@@ -1,4 +1,5 @@
 import SwiftUI
+import IPTVCore
 
 struct SeriesEpisodePickerView: View {
     let serie: DebugStreamItem

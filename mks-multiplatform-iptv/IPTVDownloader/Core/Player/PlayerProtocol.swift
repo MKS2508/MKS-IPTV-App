@@ -126,6 +126,7 @@ extension VideoPlayerProtocol {
 // MARK: - AVPlayer Metadata Helper
 
 import MediaPlayer
+import IPTVCore
 
 /// Helper for setting Now Playing metadata that appears in Control Center, Lock Screen, and AirPlay displays.
 /// Uses MPNowPlayingInfoCenter + MPRemoteCommandCenter which works across all Apple platforms.

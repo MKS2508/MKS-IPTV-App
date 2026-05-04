@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Controls playback on a DLNA MediaRenderer via AVTransport:1 SOAP actions.
 /// Implements RemoteDeviceController protocol for integration with RemotePlayManager.

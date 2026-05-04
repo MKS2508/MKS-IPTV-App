@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Thread-safe structured logger for Google Cast protocol events.
 /// Mirrors PlayerLog design for consistency across the codebase.

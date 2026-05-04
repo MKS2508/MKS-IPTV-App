@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 /// Loading status updates during app initialization
 enum AppLoadingStatus: Equatable {

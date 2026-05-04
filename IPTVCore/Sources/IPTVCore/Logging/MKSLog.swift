@@ -22,39 +22,39 @@ import MediaPlayer
 /// MKSLog.seekStart(target: 300, currentPosition: 10)
 /// MKSLog.stateChange(from: "paused", to: "playing", playerType: "AVPlayer")
 /// ```
-enum MKSLog {
+public enum MKSLog {
 
     // MARK: - Categories (type-safe)
 
-    static let player   = Logger(category: "player",     tag: "Player")
-    static let live     = Logger(category: "live",        tag: "LiveTV")
-    static let dlna     = Logger(category: "remoteplay",  tag: "DLNA")
-    static let cast     = Logger(category: "remoteplay",  tag: "Cast")
-    static let transmux = Logger(category: "transmux",    tag: "Transmux")
-    static let app      = Logger(category: "app",         tag: "App")
-    static let network  = Logger(category: "network",     tag: "Network")
-    static let media    = Logger(category: "media",       tag: "Media")
-    static let debug    = Logger(category: "debug",       tag: "Debug")
+    public static let player   = Logger(category: "player",     tag: "Player")
+    public static let live     = Logger(category: "live",        tag: "LiveTV")
+    public static let dlna     = Logger(category: "remoteplay",  tag: "DLNA")
+    public static let cast     = Logger(category: "remoteplay",  tag: "Cast")
+    public static let transmux = Logger(category: "transmux",    tag: "Transmux")
+    public static let app      = Logger(category: "app",         tag: "App")
+    public static let network  = Logger(category: "network",     tag: "Network")
+    public static let media    = Logger(category: "media",       tag: "Media")
+    public static let debug    = Logger(category: "debug",       tag: "Debug")
 
     // MARK: - Local UI Observer
 
     /// Callback for the in-app debug view. Every log entry is forwarded here
     /// so DebugStreamingViewModel can display ALL logs (local + transmux + DLNA).
     /// Set by DebugStreamingViewModel on init, cleared on deinit.
-    static var localObserver: ((_ message: String, _ category: String, _ level: String) -> Void)?
+    public static var localObserver: ((_ message: String, _ category: String, _ level: String) -> Void)?
 
     // MARK: - Session Management
 
     /// Session ID for correlating events across logs.
-    static var sessionID: String = UUID().uuidString.prefix(8).lowercased().description
+    public static var sessionID: String = UUID().uuidString.prefix(8).lowercased().description
 
     /// File path for the log file.
-    static var filePath: String {
+    public static var filePath: String {
         MKSLogConfig.shared.filePath(for: .player)
     }
 
     /// Start a new logging session.
-    static func startSession(playerType: String, url: String?) {
+    public static func startSession(playerType: String, url: String?) {
         sessionID = UUID().uuidString.prefix(8).lowercased().description
         let redactedURL = url?.replacingOccurrences(of: "/[^/]*@", with: "/***@", options: .regularExpression)
         let ts = isoFormatter.string(from: Date())
@@ -65,7 +65,7 @@ enum MKSLog {
     }
 
     /// End the current logging session.
-    static func endSession() {
+    public static func endSession() {
         let ts = isoFormatter.string(from: Date())
         let separator = String(repeating: "=", count: 60)
         let entry = "\n\(separator)\n[\(ts)] [INF] [session] SESSION_END session=\(sessionID)\n\(separator)\n"
@@ -76,35 +76,40 @@ enum MKSLog {
     // MARK: - Remote Transport
 
     /// Shared transport for WebSocket log delivery. Set by RemoteDebugService on connect.
-    static var remoteTransport: RemoteLogTransport?
+    public static var remoteTransport: RemoteLogTransport?
 
     // MARK: - Logger Wrapper
 
     /// A lightweight logger that wraps os.Logger and forwards to file + WebSocket.
-    struct Logger {
-        let category: String
-        let tag: String
+    public struct Logger {
+        public let category: String
+        public let tag: String
+
+        public init(category: String, tag: String) {
+            self.category = category
+            self.tag = tag
+        }
 
         private var osLogger: os.Logger {
             os.Logger(subsystem: "com.mks.iptv", category: category)
         }
 
-        func debug(_ message: String, fields: [String: String]? = nil) {
+        public func debug(_ message: String, fields: [String: String]? = nil) {
             emit(level: "debug", message: message, fields: fields)
             osLogger.debug("\(message, privacy: .public)")
         }
 
-        func info(_ message: String, fields: [String: String]? = nil) {
+        public func info(_ message: String, fields: [String: String]? = nil) {
             emit(level: "info", message: message, fields: fields)
             osLogger.info("\(message, privacy: .public)")
         }
 
-        func warning(_ message: String, fields: [String: String]? = nil) {
+        public func warning(_ message: String, fields: [String: String]? = nil) {
             emit(level: "warning", message: message, fields: fields)
             osLogger.warning("\(message, privacy: .public)")
         }
 
-        func error(_ message: String, fields: [String: String]? = nil) {
+        public func error(_ message: String, fields: [String: String]? = nil) {
             emit(level: "error", message: message, fields: fields)
             osLogger.error("\(message, privacy: .public)")
         }
@@ -152,14 +157,14 @@ enum MKSLog {
 
     private static let fileQueue = DispatchQueue(label: "MKSLog.file", qos: .utility)
 
-    static let isoFormatter: ISO8601DateFormatter = {
+    public static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
 
     /// Write a raw string to the log file (thread-safe).
-    static func writeToFile(_ text: String) {
+    public static func writeToFile(_ text: String) {
         fileQueue.async {
             guard let data = text.data(using: .utf8) else { return }
             if let handle = FileHandle(forWritingAtPath: filePath) {
@@ -177,7 +182,7 @@ enum MKSLog {
 extension MKSLog {
 
     /// Log a structured player event (key-value pairs for grepability).
-    static func log(
+    public static func log(
         _ action: String,
         category: String,
         level: GlitchSeverity = .info,
@@ -212,7 +217,7 @@ extension MKSLog {
     }
 
     /// Log a detected glitch.
-    static func glitch(_ event: GlitchEvent) {
+    public static func glitch(_ event: GlitchEvent) {
         var fields: [String: Any] = [
             "type": event.type.rawValue,
             "currentTime": String(format: "%.3f", event.currentTime),
@@ -228,14 +233,14 @@ extension MKSLog {
         log("GLITCH", category: event.type.category, level: event.severity, fields: fields)
     }
 
-    static func seekStart(target: Double, currentPosition: Double) {
+    public static func seekStart(target: Double, currentPosition: Double) {
         log("SEEK_START", category: "timing", fields: [
             "target": String(format: "%.3f", target),
             "from": String(format: "%.3f", currentPosition)
         ])
     }
 
-    static func seekComplete(target: Double, actual: Double, latencyMs: Double, accuracy: Double) {
+    public static func seekComplete(target: Double, actual: Double, latencyMs: Double, accuracy: Double) {
         let level: GlitchSeverity = latencyMs > 5000 ? .critical : (latencyMs > 2000 ? .warning : .info)
         log("SEEK_COMPLETE", category: "timing", level: level, fields: [
             "target": String(format: "%.3f", target),
@@ -245,14 +250,14 @@ extension MKSLog {
         ])
     }
 
-    static func segmentGap(expected: Int, actual: Int, gapSize: Int, currentTime: Double) {
+    public static func segmentGap(expected: Int, actual: Int, gapSize: Int, currentTime: Double) {
         log("SEGMENT_GAP", category: "buffer", level: .warning, fields: [
             "expected": expected, "actual": actual, "gapSize": gapSize,
             "currentTime": String(format: "%.1f", currentTime)
         ])
     }
 
-    static func bufferingChange(reason: String?, bufferAhead: Double?, currentTime: Double) {
+    public static func bufferingChange(reason: String?, bufferAhead: Double?, currentTime: Double) {
         log("BUFFERING", category: "buffer", fields: [
             "reason": reason ?? "unknown",
             "bufferAhead": bufferAhead.map { String(format: "%.2f", $0) } ?? "nil",
@@ -260,13 +265,13 @@ extension MKSLog {
         ])
     }
 
-    static func stateChange(from: String, to: String, playerType: String) {
+    public static func stateChange(from: String, to: String, playerType: String) {
         log("STATE_CHANGE", category: "lifecycle", fields: [
             "from": from, "to": to, "player": playerType
         ])
     }
 
-    static func videoFreeze(duration: Double, currentTime: Double, playbackRate: Float) {
+    public static func videoFreeze(duration: Double, currentTime: Double, playbackRate: Float) {
         log("VIDEO_FREEZE", category: "video", level: duration > 1.0 ? .critical : .warning, fields: [
             "freezeDuration": String(format: "%.2f", duration),
             "currentTime": String(format: "%.1f", currentTime),
@@ -274,7 +279,7 @@ extension MKSLog {
         ])
     }
 
-    static func bufferUnderrun(bufferAhead: Double, currentTime: Double, isStarvation: Bool) {
+    public static func bufferUnderrun(bufferAhead: Double, currentTime: Double, isStarvation: Bool) {
         log(isStarvation ? "BUFFER_STARVATION" : "BUFFER_UNDERRUN", category: "buffer",
             level: isStarvation ? .critical : .warning, fields: [
             "bufferAhead": String(format: "%.2f", bufferAhead),
@@ -282,14 +287,14 @@ extension MKSLog {
         ])
     }
 
-    static func frameDrops(count: Int, totalDropped: Int, currentTime: Double) {
+    public static func frameDrops(count: Int, totalDropped: Int, currentTime: Double) {
         log("FRAME_DROP", category: "video", level: count >= 3 ? .warning : .info, fields: [
             "drops": count, "totalDropped": totalDropped,
             "currentTime": String(format: "%.1f", currentTime)
         ])
     }
 
-    static func avSyncDrift(driftMs: Double, videoPTS: Double, audioPTS: Double) {
+    public static func avSyncDrift(driftMs: Double, videoPTS: Double, audioPTS: Double) {
         let level: GlitchSeverity = driftMs > 500 ? .critical : (driftMs > 100 ? .warning : .info)
         log("AV_DESYNC", category: "timing", level: level, fields: [
             "driftMs": String(format: "%.0f", driftMs),
@@ -298,14 +303,14 @@ extension MKSLog {
         ])
     }
 
-    static func networkError(httpStatus: Int?, error: String?, currentTime: Double) {
+    public static func networkError(httpStatus: Int?, error: String?, currentTime: Double) {
         var fields: [String: Any] = ["currentTime": String(format: "%.1f", currentTime)]
         if let status = httpStatus { fields["httpStatus"] = status }
         if let error = error { fields["error"] = error }
         log("NETWORK_ERROR", category: "network", level: .critical, fields: fields)
     }
 
-    static func networkTimeout(segmentIndex: Int?, currentTime: Double, elapsedMs: Double) {
+    public static func networkTimeout(segmentIndex: Int?, currentTime: Double, elapsedMs: Double) {
         var fields: [String: Any] = [
             "currentTime": String(format: "%.1f", currentTime),
             "elapsedMs": String(format: "%.0f", elapsedMs)
@@ -314,7 +319,7 @@ extension MKSLog {
         log("NETWORK_TIMEOUT", category: "network", level: .warning, fields: fields)
     }
 
-    static func metricsSnapshot(
+    public static func metricsSnapshot(
         currentTime: Double, duration: Double, bufferAhead: Double,
         bitrate: Double?, stallCount: Int, playbackRate: Float
     ) {
@@ -333,7 +338,7 @@ extension MKSLog {
 // MARK: - Report Generation
 
 extension MKSLog {
-    static func generateReport() -> String {
+    public static func generateReport() -> String {
         var report = "=== Player Glitch Report ===\n\n"
         guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
             return "No log file found at \(filePath)"
@@ -368,7 +373,7 @@ extension MKSLog {
         return report
     }
 
-    static func printReport() {
+    public static func printReport() {
         print(generateReport())
     }
 }

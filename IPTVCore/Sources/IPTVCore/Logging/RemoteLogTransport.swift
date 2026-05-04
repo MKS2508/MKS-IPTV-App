@@ -5,11 +5,11 @@ import Foundation
 /// flushes on reconnect.
 ///
 /// Uses `URLSessionWebSocketTask` — zero external dependencies.
-actor RemoteLogTransport {
+public actor RemoteLogTransport {
 
     // MARK: - Types
 
-    struct LogEntry: Codable, Sendable {
+    public struct LogEntry: Codable, Sendable {
         let type: String // always "log"
         let timestamp: String
         let level: String
@@ -20,7 +20,7 @@ actor RemoteLogTransport {
         let sessionId: String?
     }
 
-    struct DeviceHandshake: Codable, Sendable {
+    public struct DeviceHandshake: Codable, Sendable {
         let type: String // "handshake"
         let deviceName: String
         let appVersion: String
@@ -54,10 +54,12 @@ actor RemoteLogTransport {
         return f
     }()
 
+    public init() {}
+
     // MARK: - Public API
 
     /// Connect to the remote debug viewer WebSocket.
-    func connect(to url: URL) {
+    public func connect(to url: URL) {
         disconnect()
         let ws = session.webSocketTask(with: url)
         webSocketTask = ws
@@ -75,7 +77,7 @@ actor RemoteLogTransport {
     }
 
     /// Disconnect and stop reconnection attempts.
-    func disconnect() {
+    public func disconnect() {
         reconnectTask?.cancel()
         reconnectTask = nil
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
@@ -84,7 +86,7 @@ actor RemoteLogTransport {
     }
 
     /// Send a log entry. If disconnected, buffers it (ring buffer).
-    func send(
+    public func send(
         level: String,
         category: String,
         tag: String,
@@ -112,13 +114,13 @@ actor RemoteLogTransport {
     }
 
     /// Whether currently connected to a viewer.
-    var connected: Bool { isConnected }
+    public var connected: Bool { isConnected }
 
     /// Callback for incoming messages (commands from viewer).
     private var onMessage: ((Data) -> Void)?
 
     /// Set the message handler (actor-safe entry point for external callers).
-    func setOnMessage(_ handler: @escaping (Data) -> Void) {
+    public func setOnMessage(_ handler: @escaping (Data) -> Void) {
         onMessage = handler
     }
 

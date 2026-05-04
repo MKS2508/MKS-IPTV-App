@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Actor that manages EPG data fetching, caching, and querying
 actor EPGService {

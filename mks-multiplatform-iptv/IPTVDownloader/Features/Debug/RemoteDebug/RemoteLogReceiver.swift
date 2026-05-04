@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import IPTVCore
 
 /// Receives logs from remote iOS devices via WebSocket.
 /// Runs on macOS as an NWListener that accepts WS connections from iOS apps

@@ -9,6 +9,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import IPTVCore
 
 struct MediaDetailSheet: View {
     /// Unified detail item — either MovieDetail or SerieDetail,

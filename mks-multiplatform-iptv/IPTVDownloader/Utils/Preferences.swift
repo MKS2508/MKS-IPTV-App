@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// App-level UserDefaults keys for download and debug preferences.
 ///

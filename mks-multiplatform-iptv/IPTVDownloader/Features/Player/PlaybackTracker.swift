@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import IPTVCore
 
 /// Identity of the content being tracked — everything needed to persist a watch history entry.
 struct ContentIdentity {

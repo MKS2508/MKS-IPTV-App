@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import IPTVCore
 
 // MARK: - Player Debug Overlay
 

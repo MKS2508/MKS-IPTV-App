@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Parses UPnP device description XML from the LOCATION URL in SSDP responses.
 /// Extracts device info, service control URLs, and icon URLs.

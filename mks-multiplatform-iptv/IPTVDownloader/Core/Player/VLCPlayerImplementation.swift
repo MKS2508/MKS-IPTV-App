@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import AVFoundation
+import IPTVCore
 
 // MARK: - VLC Player Implementation
 // Conditional imports for VLCKit
@@ -363,6 +364,7 @@ struct VLCPlayerViewMacOS: NSViewRepresentable {
 // MARK: - VLC Player View iOS
 #if canImport(UIKit)
 import UIKit
+import IPTVCore
 
 struct VLCPlayerViewiOS: UIViewRepresentable {
     private let viewSetup: (Any) -> Void

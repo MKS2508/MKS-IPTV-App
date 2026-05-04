@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import IPTVCore
 
 // MARK: - Player Factory
 

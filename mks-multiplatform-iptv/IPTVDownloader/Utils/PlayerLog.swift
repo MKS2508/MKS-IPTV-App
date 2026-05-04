@@ -1,4 +1,5 @@
 import Foundation
+import IPTVCore
 
 // MARK: - PlayerLog (Backward Compatibility Alias)
 

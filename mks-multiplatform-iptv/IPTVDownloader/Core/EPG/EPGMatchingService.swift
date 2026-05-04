@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Actor that matches EPG channels to LiveChannels
 /// Pass 1: Exact epgChannelId match

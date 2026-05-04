@@ -1,5 +1,6 @@
 #if os(macOS)
 import SwiftUI
+import IPTVCore
 
 /// Singleton that manages global app state including launch mode detection.
 /// Detects if the app was launched with a file (Open With) vs normal IPTV mode.

@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import IPTVCore
 
 #if os(macOS)
 class TouchBarManager: ObservableObject {

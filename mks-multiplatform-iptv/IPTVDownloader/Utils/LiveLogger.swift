@@ -8,6 +8,7 @@
 
 import Foundation
 import AVFoundation
+import IPTVCore
 
 // MARK: - LiveLogger Utility
 

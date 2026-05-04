@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Sends SOAP requests to DLNA/UPnP control endpoints and parses responses.
 /// Handles AVTransport:1 and RenderingControl:1 service actions.

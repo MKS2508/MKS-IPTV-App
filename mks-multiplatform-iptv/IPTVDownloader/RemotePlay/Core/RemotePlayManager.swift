@@ -8,6 +8,7 @@
 import Foundation
 import Network
 import TransmuxCore
+import IPTVCore
 
 /// Main coordinator for remote playback (DLNA and future Cast support).
 /// Manages device discovery, connection lifecycle, and content handoff.

@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import IPTVCore
 
 // MARK: - AVPlayer Implementation
 class AVPlayerImplementation: VideoPlayerProtocol, ObservableObject {

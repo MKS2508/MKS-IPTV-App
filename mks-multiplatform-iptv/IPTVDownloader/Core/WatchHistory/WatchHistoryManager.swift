@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import CloudKit
+import IPTVCore
 
 /// Thread-safe service for reading and writing watch history data.
 ///

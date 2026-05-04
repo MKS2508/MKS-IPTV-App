@@ -11,6 +11,7 @@
 import SwiftUI
 import AVKit
 import UniformTypeIdentifiers
+import IPTVCore
 
 #if os(iOS)
 import UIKit

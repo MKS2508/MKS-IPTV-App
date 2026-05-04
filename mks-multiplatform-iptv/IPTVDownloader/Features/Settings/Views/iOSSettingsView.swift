@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IPTVCore
 
 #if os(iOS)
 struct iOSSettingsView: View {

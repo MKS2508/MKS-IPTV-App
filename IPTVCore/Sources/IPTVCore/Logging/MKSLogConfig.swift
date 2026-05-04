@@ -11,33 +11,32 @@
 //
 
 import Foundation
-import TransmuxCore
 
 /// Centralized logging configuration for all app subsystems.
 ///
 /// Priority chain: UserDefaults (`MKSLog.*` keys) > LogConfig.plist > hardcoded `.info`.
 /// The debug panel (Settings > Logging) writes to UserDefaults so changes take
 /// effect immediately and persist across launches.
-final class MKSLogConfig: @unchecked Sendable {
+public final class MKSLogConfig: @unchecked Sendable {
 
     // MARK: - Singleton
 
-    static let shared = MKSLogConfig()
+    public static let shared = MKSLogConfig()
 
     // MARK: - Subsystem
 
     /// Identifies each independent logging subsystem.
-    enum Subsystem: String, CaseIterable, Identifiable {
+    public enum Subsystem: String, CaseIterable, Identifiable {
         case transmux
         case player
         case cast
         case live
         case ffmpeg
 
-        var id: String { rawValue }
+        public var id: String { rawValue }
 
         /// Human-readable name for the Settings UI.
-        var displayName: String {
+        public var displayName: String {
             switch self {
             case .transmux: return "Transmux"
             case .player:   return "Player"
@@ -48,7 +47,7 @@ final class MKSLogConfig: @unchecked Sendable {
         }
 
         /// Log file name on disk.
-        var fileName: String {
+        public var fileName: String {
             switch self {
             case .transmux, .ffmpeg: return "mks-iptv-transmux.log"
             case .player:            return "mks-iptv-player.log"
@@ -58,21 +57,21 @@ final class MKSLogConfig: @unchecked Sendable {
         }
 
         /// UserDefaults key for the level override.
-        var defaultsKey: String { "MKSLog.level.\(rawValue)" }
+        public var defaultsKey: String { "MKSLog.level.\(rawValue)" }
     }
 
     // MARK: - Level
 
     /// Log severity level. Lower raw value = more verbose.
-    enum Level: Int, CaseIterable, Comparable, Identifiable {
+    public enum Level: Int, CaseIterable, Comparable, Identifiable {
         case debug   = 0
         case info    = 1
         case warning = 2
         case error   = 3
 
-        var id: Int { rawValue }
+        public var id: Int { rawValue }
 
-        var displayName: String {
+        public var displayName: String {
             switch self {
             case .debug:   return "Debug"
             case .info:    return "Info"
@@ -81,7 +80,7 @@ final class MKSLogConfig: @unchecked Sendable {
             }
         }
 
-        var abbreviation: String {
+        public var abbreviation: String {
             switch self {
             case .debug:   return "DBG"
             case .info:    return "INF"
@@ -90,7 +89,7 @@ final class MKSLogConfig: @unchecked Sendable {
             }
         }
 
-        static func < (lhs: Level, rhs: Level) -> Bool {
+        public static func < (lhs: Level, rhs: Level) -> Bool {
             lhs.rawValue < rhs.rawValue
         }
     }
@@ -133,7 +132,7 @@ final class MKSLogConfig: @unchecked Sendable {
 
     /// Resolved log directory path.
     /// Priority: UserDefaults > plist > default Application Support path.
-    var logDirectory: String {
+    public var logDirectory: String {
         if let override = defaults.string(forKey: "MKSLog.directory"), !override.isEmpty {
             return override
         }
@@ -144,7 +143,7 @@ final class MKSLogConfig: @unchecked Sendable {
     }
 
     /// Default log directory: ~/Library/Application Support/MKS-IPTV/Logs/
-    static var defaultLogDirectory: String {
+    public static var defaultLogDirectory: String {
         #if os(tvOS)
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         #else
@@ -154,17 +153,17 @@ final class MKSLogConfig: @unchecked Sendable {
     }
 
     /// Maximum log file size in bytes.
-    var maxFileSize: Int { plistMaxFileSize }
+    public var maxFileSize: Int { plistMaxFileSize }
 
     // MARK: - File Paths
 
     /// Full file path for a given subsystem's log.
-    func filePath(for subsystem: Subsystem) -> String {
+    public func filePath(for subsystem: Subsystem) -> String {
         (logDirectory as NSString).appendingPathComponent(subsystem.fileName)
     }
 
     /// File size in bytes for a given subsystem's log, or 0 if not present.
-    func fileSize(for subsystem: Subsystem) -> Int64 {
+    public func fileSize(for subsystem: Subsystem) -> Int64 {
         let path = filePath(for: subsystem)
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: path),
               let size = attrs[.size] as? Int64 else {
@@ -177,7 +176,7 @@ final class MKSLogConfig: @unchecked Sendable {
 
     /// Current effective level for a subsystem.
     /// Priority: UserDefaults > plist > `.info`.
-    func level(for subsystem: Subsystem) -> Level {
+    public func level(for subsystem: Subsystem) -> Level {
         let key = subsystem.defaultsKey
         // UserDefaults returns 0 for missing keys, but 0 is a valid level (debug).
         // Use object(forKey:) to distinguish "not set" from "set to 0".
@@ -192,19 +191,19 @@ final class MKSLogConfig: @unchecked Sendable {
     }
 
     /// Persist a level override for a subsystem via UserDefaults.
-    func setLevel(_ level: Level, for subsystem: Subsystem) {
+    public func setLevel(_ level: Level, for subsystem: Subsystem) {
         defaults.set(level.rawValue, forKey: subsystem.defaultsKey)
     }
 
     /// Reset a subsystem's level to the plist/hardcoded default.
-    func resetLevel(for subsystem: Subsystem) {
+    public func resetLevel(for subsystem: Subsystem) {
         defaults.removeObject(forKey: subsystem.defaultsKey)
     }
 
     // MARK: - Directory Management
 
     /// Create the log directory (with intermediates) if it doesn't exist.
-    func ensureLogDirectoryExists() {
+    public func ensureLogDirectoryExists() {
         let dir = logDirectory
         if !FileManager.default.fileExists(atPath: dir) {
             try? FileManager.default.createDirectory(
@@ -216,14 +215,14 @@ final class MKSLogConfig: @unchecked Sendable {
     }
 
     /// Reset the log directory override to the default Application Support path.
-    func resetLogDirectory() {
+    public func resetLogDirectory() {
         defaults.removeObject(forKey: "MKSLog.directory")
     }
 
     // MARK: - File Operations
 
     /// Clear (truncate) all log files.
-    func clearAllLogs() {
+    public func clearAllLogs() {
         let fm = FileManager.default
         // Collect unique file names to avoid truncating the shared transmux file twice.
         var cleared = Set<String>()
@@ -239,24 +238,10 @@ final class MKSLogConfig: @unchecked Sendable {
     }
 
     /// Clear a single subsystem's log file.
-    func clearLog(for subsystem: Subsystem) {
+    public func clearLog(for subsystem: Subsystem) {
         let path = filePath(for: subsystem)
         if FileManager.default.fileExists(atPath: path) {
             FileManager.default.createFile(atPath: path, contents: nil)
-        }
-    }
-}
-
-// MARK: - TransmuxLog Bridge
-
-extension MKSLogConfig.Level {
-    /// Convert to TransmuxLog.Level for configuring the TransmuxCore SPM package.
-    func toTransmuxLevel() -> TransmuxLog.Level {
-        switch self {
-        case .debug:   return .debug
-        case .info:    return .info
-        case .warning: return .warn
-        case .error:   return .error
         }
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import TransmuxCore
+import IPTVCore
 
 // MARK: - Stream Forwarder (URLSession → NWConnection bridge)
 

@@ -7,6 +7,7 @@
 
 import Foundation
 import CloudKit
+import IPTVCore
 
 /// Registers the current device in CloudKit and fetches all synced devices.
 ///

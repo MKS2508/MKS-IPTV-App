@@ -2,6 +2,7 @@ import SwiftUI
 
 #if os(macOS)
 import AppKit
+import IPTVCore
 
 struct MediaListTouchBarView: View {
     let searchText: String

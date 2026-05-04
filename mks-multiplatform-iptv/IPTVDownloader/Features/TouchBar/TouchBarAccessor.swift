@@ -3,6 +3,7 @@ import Combine
 
 #if os(macOS)
 import AppKit
+import IPTVCore
 
 struct TouchBarAccessor: NSViewRepresentable {
     @ObservedObject var touchBarManager: TouchBarManager

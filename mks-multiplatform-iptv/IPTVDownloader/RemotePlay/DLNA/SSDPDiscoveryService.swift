@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IPTVCore
 
 /// Discovers DLNA MediaRenderer devices via SSDP multicast (239.255.255.250:1900).
 ///

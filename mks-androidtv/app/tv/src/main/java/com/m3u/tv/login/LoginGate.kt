@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.map
 
 @Composable
 fun LoginGate(
-    content: @Composable () -> Unit,
-    viewModel: LoginGateViewModel = hiltViewModel()
+    viewModel: LoginGateViewModel = hiltViewModel(),
+    content: @Composable () -> Unit
 ) {
     val hasXtreamProfile by viewModel.hasXtreamProfile.collectAsStateWithLifecycle(initialValue = null)
     when (hasXtreamProfile) {

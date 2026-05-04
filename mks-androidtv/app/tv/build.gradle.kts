@@ -14,7 +14,7 @@ android {
     namespace = "com.m3u.tv"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.m3u.tv"
+        applicationId = "com.mks2508.iptv.tv"
         minSdk = 26
         targetSdk = 33
         versionCode = 2
@@ -53,7 +53,7 @@ android {
         outputs
             .map { it as com.android.build.gradle.internal.api.ApkVariantOutputImpl }
             .forEach { output ->
-                output.outputFileName = "tv-${versionName}.apk"
+                output.outputFileName = "mks-iptv-tv-${versionName}.apk"
             }
     }
 }

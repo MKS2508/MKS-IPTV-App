@@ -16,7 +16,7 @@ dependencyResolutionManagement {
         maven("https://plugins.gradle.org/m2/")
     }
 }
-rootProject.name = "M3U"
+rootProject.name = "MKS-IPTV-Android"
 include(
     ":app:smartphone",
     ":app:tv",

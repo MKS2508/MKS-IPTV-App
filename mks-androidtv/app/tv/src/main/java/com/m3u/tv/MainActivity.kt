@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
+import com.m3u.tv.login.LoginGate
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -36,7 +37,9 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 Box(Modifier.background(MaterialTheme.colorScheme.background)) {
-                    App(onBackPressed = onBackPressedDispatcher::onBackPressed)
+                    LoginGate {
+                        App(onBackPressed = onBackPressedDispatcher::onBackPressed)
+                    }
                 }
             }
         }

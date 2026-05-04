@@ -36,10 +36,10 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
-		<key>NSExceptionDomains</key>
-		<dict/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MKS IPTV uses your local network to serve transmuxed video to AVPlayer.</string>

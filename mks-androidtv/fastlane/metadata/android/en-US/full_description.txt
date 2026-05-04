@@ -1,0 +1,8 @@
+<p><i>M3U</i> is a stream media player on Android devices. Android 8.0 and above supported.</p>
+<p><br><b>Features:</b></p>
+<ul>
+<li>M3U and M3U8 files.</li>
+<li>HTTPS and RTMP stream.</li>
+<li>Android TV.</li>
+</ul>
+<p>More to come.</p>

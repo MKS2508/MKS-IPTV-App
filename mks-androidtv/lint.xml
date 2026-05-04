@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <issue id="OldTargetApi" severity="ignore" />
+    <issue id="TrustAllX509TrustManager" severity="ignore" />
+    <issue id="UnsafeOptInUsageError" severity="ignore" />
+</lint>

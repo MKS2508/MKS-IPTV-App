@@ -12,7 +12,7 @@ import IPTVCore
 struct mks_multiplataforma_tvos_iptvApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootTabView()
         }
     }
 }

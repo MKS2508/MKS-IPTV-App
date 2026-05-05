@@ -2,8 +2,8 @@
 //  CategoryRowView.swift
 //  mks-multiplataforma-tvos-iptv
 //
-//  Generic horizontal-scroll row of focusable cards.
-//  Apple TV+ style: title above, lazy horizontal stack below.
+//  Apple TV+ style horizontal scroll row.
+//  Padding 48pt, peek del siguiente card, glass title.
 //
 
 import SwiftUI
@@ -13,22 +13,33 @@ struct CategoryRowView<Item: Identifiable, Card: View>: View {
     let items: [Item]
     let card: (Item) -> Card
 
+    private let leadingPadding: CGFloat = 48
+    private let spacing: CGFloat = 28
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 80)
+            categoryTitle
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 32) {
+                LazyHStack(spacing: spacing) {
                     ForEach(items) { item in
                         card(item)
                     }
                 }
-                .padding(.horizontal, 80)
-                .padding(.vertical, 40)
+                .padding(.horizontal, leadingPadding)
+                .padding(.vertical, 24)
             }
+            .scrollClipDisabled()
         }
     }
+
+    private var categoryTitle: some View {
+        Text(title.uppercased())
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.white)
+            .tracking(1.5)
+            .padding(.leading, leadingPadding)
+    }
 }
+
+

@@ -2,6 +2,8 @@
 //  SeriesViewModel.swift
 //  mks-multiplataforma-tvos-iptv
 //
+//  Loads series + categories from IPTVService with disk-based SWR cache.
+//
 
 import Foundation
 import SwiftUI
@@ -19,6 +21,7 @@ final class SeriesViewModel: ObservableObject {
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var featured: Serie?
     @Published private(set) var sections: [SerieSection] = []
+    @Published private(set) var isRefreshing = false
 
     struct SerieSection: Identifiable, Equatable {
         let id: String
@@ -26,27 +29,65 @@ final class SeriesViewModel: ObservableObject {
         let series: [Serie]
     }
 
+    func loadIfNeeded(profile: IPTVProfile) async {
+        guard case .idle = state else { return }
+
+        let cache = TVCacheManager.shared
+
+        async let seriesResult = cache.cachedSeries()
+        async let catsResult   = cache.cachedSeriesCategories()
+        let (seriesCache, cats) = await (seriesResult, catsResult)
+
+        if let seriesCache, let cats {
+            populateUI(series: seriesCache.value, categories: cats.value)
+            state = .loaded
+
+            if seriesCache.isStale || cats.isStale {
+                isRefreshing = true
+                await refreshFromNetwork(profile: profile, silent: true)
+                isRefreshing = false
+            }
+        } else {
+            await load(profile: profile)
+        }
+    }
+
     func load(profile: IPTVProfile) async {
         state = .loading
+        await refreshFromNetwork(profile: profile, silent: false)
+    }
+
+    // MARK: - Private
+
+    private func refreshFromNetwork(profile: IPTVProfile, silent: Bool) async {
         let service = IPTVService(profile: profile)
         do {
-            async let seriesTask = service.fetchSeries()
+            async let seriesTask     = service.fetchSeries()
             async let categoriesTask = service.fetchSeriesCategories()
             let (series, categories) = try await (seriesTask, categoriesTask)
 
-            MKSLog.app.info("SeriesVM loaded \(series.count) series, \(categories.count) categories")
+            MKSLog.app.info("SeriesVM fetched \(series.count) series, \(categories.count) categories")
 
-            featured = series
-                .filter { ($0.cover?.isEmpty == false) && $0.rating5Based >= 4 }
-                .randomElement()
-                ?? series.first
+            let cache = TVCacheManager.shared
+            await cache.cacheSeries(series)
+            await cache.cacheSeriesCategories(categories)
 
-            sections = buildSections(series: series, categories: categories)
+            populateUI(series: series, categories: categories)
             state = .loaded
         } catch {
-            MKSLog.app.error("SeriesVM load failed: \(error)")
-            state = .failed("\(error)")
+            MKSLog.app.error("SeriesVM refresh failed: \(error)")
+            if !silent {
+                state = .failed("\(error)")
+            }
         }
+    }
+
+    private func populateUI(series: [Serie], categories: [SeriesCategory]) {
+        featured = series
+            .filter { ($0.cover?.isEmpty == false) && $0.rating5Based >= 4 }
+            .randomElement()
+            ?? series.first
+        sections = buildSections(series: series, categories: categories)
     }
 
     private func buildSections(series: [Serie], categories: [SeriesCategory]) -> [SerieSection] {

@@ -370,15 +370,7 @@ struct CategorySelectionView: View {
         
         do {
             // Load series from selected categories
-            var allSeries: [Serie] = []
-            var currentPage = 1
-            let maxPages = 3 // Limit to avoid excessive loading
-            
-            repeat {
-                let series = try await viewModel.movieService.fetchSeries(page: currentPage)
-                allSeries.append(contentsOf: series)
-                currentPage += 1
-            } while currentPage <= maxPages
+            let allSeries = try await viewModel.movieService.fetchSeries()
             
             let filteredSeries = allSeries.filter { selectedCategoryIds.contains($0.categoryId) }
             

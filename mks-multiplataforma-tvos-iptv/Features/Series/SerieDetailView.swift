@@ -2,7 +2,9 @@
 //  SerieDetailView.swift
 //  mks-multiplataforma-tvos-iptv
 //
-//  Hero + plot + season picker + episodes list.
+//  tvOS detail: poster izquierda + info + episodios derecha, fondo blur del poster.
+//  Patrón estándar Apple TV+.
+//  IPTV detail cached with SWR. TMDB enrichment cached 7 days.
 //
 
 import SwiftUI
@@ -14,38 +16,409 @@ struct SerieDetailView: View {
     @EnvironmentObject private var profileStore: ProfileStore
 
     @State private var detail: SerieDetail?
+    @State private var tmdbData: TMDBEnrichment?   // TMDB enrichment (may arrive after IPTV detail)
     @State private var loadError: String?
     @State private var selectedSeasonKey: String?
     @State private var playingItem: PlayableItem?
+    @State private var showInfoPanel = false
+    @FocusState private var focusedButton: SerieButton?
+
+    enum SerieButton { case play, info }
 
     var body: some View {
+        ZStack {
+            backgroundBlur
+            // Poster column: absolute left, fixed width
+            HStack {
+                posterColumn
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            // Info column: explicit leading offset so it never depends on HStack space distribution
+            HStack {
+                Spacer().frame(width: 640)
+                infoColumn
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            infoPanelOverlay
+        }
+        .ignoresSafeArea()
+        .task { await loadAll() }
+        .onAppear { focusedButton = .play }
+        .fullScreenCover(item: $playingItem) { item in
+            TVPlayerView(item: item) { playingItem = nil }
+        }
+    }
+
+    // MARK: - Background
+
+    private var backgroundBlur: some View {
+        ZStack {
+            let backdropURL: URL? = {
+                if let u = tmdbData?.backdropURL  { return URL(string: u) }
+                if let u = serie.cover            { return URL(string: u) }
+                return nil
+            }()
+
+            if let url = backdropURL {
+                CachedHTTPImage(url: url) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        Color.black
+                    }
+                }
+            } else {
+                Color.black
+            }
+            Color.black.opacity(0.82)
+            Rectangle().fill(.ultraThinMaterial).opacity(0.6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Poster Column
+
+    private var posterColumn: some View {
+        VStack {
+            Spacer()
+            posterImage
+                .frame(width: 460, height: 680)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .shadow(color: .black.opacity(0.7), radius: 40, x: 0, y: 20)
+            Spacer()
+        }
+        .padding(.leading, 120)
+        .padding(.trailing, 60)
+        .frame(width: 640)
+    }
+
+    @ViewBuilder
+    private var posterImage: some View {
+        let posterURL: URL? = {
+            if let u = tmdbData?.posterURL { return URL(string: u) }
+            if let u = serie.cover         { return URL(string: u) }
+            return nil
+        }()
+
+        if let url = posterURL {
+            CachedHTTPImage(url: url) { phase in
+                switch phase {
+                case .success(let image): image.resizable().aspectRatio(contentMode: .fill)
+                default: posterPlaceholder
+                }
+            }
+        } else {
+            posterPlaceholder
+        }
+    }
+
+    private var posterPlaceholder: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(red: 0.25, green: 0.1, blue: 0.45), Color(red: 0.1, green: 0.2, blue: 0.6)],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            Image(systemName: "play.rectangle.on.rectangle")
+                .font(.system(size: 80, weight: .light))
+                .foregroundStyle(.white.opacity(0.5))
+        }
+    }
+
+    // MARK: - Info Column
+
+    private var infoColumn: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                hero
+            VStack(alignment: .leading, spacing: 28) {
+
+                Text(serie.name)
+                    .font(.system(size: 56, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(3)
 
                 if let detail {
-                    if !detail.info.plot.isEmpty {
-                        plotSection(detail.info.plot)
-                    }
-
-                    seasonsSection(detail)
-                    episodesSection(detail)
-                } else if loadError != nil {
-                    errorBanner
+                    metadataPills(detail)
                 } else {
-                    ProgressView()
-                        .scaleEffect(1.6)
-                        .frame(maxWidth: .infinity, minHeight: 200)
+                    HStack(spacing: 10) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 80, height: 32)
+                        }
+                    }
+                }
+
+                actionButtons
+
+                // Plot: prefer TMDB
+                let plot = (tmdbData?.plot?.isEmpty == false ? tmdbData?.plot : nil)
+                         ?? (detail?.info.plot.isEmpty == false ? detail?.info.plot : nil)
+                         ?? (serie.plot.isEmpty ? nil : serie.plot)
+                if let plot {
+                    Divider().overlay(Color.white.opacity(0.15))
+                    plotBlock(plot)
+                }
+
+                // Cast / director: prefer TMDB
+                let castList = tmdbData?.cast.isEmpty == false
+                    ? tmdbData!.cast
+                    : detail?.info.cast.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } ?? []
+                let director = tmdbData?.director
+                    ?? detail?.info.director
+                    ?? (serie.director?.isEmpty == false ? serie.director : nil)
+                if !castList.isEmpty || director != nil {
+                    Divider().overlay(Color.white.opacity(0.15))
+                    castBlock(cast: castList, director: director)
+                }
+
+                // Episodes
+                if let detail, !detail.episodes.isEmpty {
+                    Divider().overlay(Color.white.opacity(0.15))
+                    episodeBrowserSection(detail)
+                } else if detail == nil && loadError == nil {
+                    HStack {
+                        ProgressView().scaleEffect(1.4)
+                        Text("Loading episodes…")
+                            .font(.callout)
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .padding(.top, 12)
+                } else if let loadError {
+                    errorBanner(loadError)
                 }
 
                 Spacer(minLength: 80)
             }
+            .padding(.top, 120)
+            .padding(.trailing, 100)
+            .padding(.leading, 20)
         }
-        .background(Color.black.ignoresSafeArea())
-        .ignoresSafeArea(edges: .top)
-        .task { await loadDetail() }
-        .fullScreenCover(item: $playingItem) { item in
-            TVPlayerView(item: item) { playingItem = nil }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Metadata Pills
+
+    private func metadataPills(_ d: SerieDetail) -> some View {
+        HStack(spacing: 10) {
+            let genre = tmdbData?.genre.first ?? (serie.genre.isEmpty ? nil : serie.genre)
+            if let genre { GlassPill(text: genre) }
+
+            let year = tmdbData?.year.map(String.init)
+                    ?? (serie.releaseDate.isEmpty ? nil : String(serie.releaseDate.prefix(4)))
+            if let year { GlassPill(text: year) }
+
+            let rating = tmdbData?.rating.map { String(format: "★ %.1f", $0) }
+                      ?? (serie.rating5Based > 0 ? String(format: "★ %.1f", serie.rating5Based) : nil)
+            if let r = rating { GlassPill(text: r) }
+
+            if !d.seasons.isEmpty {
+                GlassPill(text: "\(d.seasons.count) Season\(d.seasons.count == 1 ? "" : "s")")
+            }
+        }
+    }
+
+    // MARK: - Action Buttons
+
+    private var actionButtons: some View {
+        HStack(spacing: 16) {
+            Button(action: playFirstEpisode) {
+                Label("Play", systemImage: "play.fill")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 16)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .focused($focusedButton, equals: .play)
+
+            Button { showInfoPanel = true } label: {
+                Label("Info", systemImage: "info.circle")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+                    .background(Color.white.opacity(0.18))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .focused($focusedButton, equals: .info)
+        }
+    }
+
+    // MARK: - Plot / Cast
+
+    private func plotBlock(_ plot: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Storyline")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.5))
+                .tracking(1)
+            Text(plot)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.9))
+                .lineSpacing(5)
+        }
+    }
+
+    private func castBlock(cast: [String], director: String?) -> some View {
+        HStack(alignment: .top, spacing: 60) {
+            if let director, !director.isEmpty {
+                metaBlock(label: "Director", value: director)
+            }
+            if !cast.isEmpty {
+                metaBlock(label: "Cast", value: cast.prefix(4).joined(separator: ", "))
+            }
+        }
+    }
+
+    private func metaBlock(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(.white.opacity(0.4))
+                .tracking(2)
+            Text(value)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+    }
+
+    // MARK: - Episode Browser
+
+    private func episodeBrowserSection(_ detail: SerieDetail) -> some View {
+        EpisodeBrowserView(
+            seasons: detail.seasons,
+            episodes: detail.episodes,
+            selectedSeasonKey: effectiveSeasonKey(detail),
+            onSeasonChange: { key in selectedSeasonKey = key },
+            onEpisodePlay: { episode in playEpisode(episode) }
+        )
+        .padding(.top, 8)
+    }
+
+    private func errorBanner(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.orange)
+            Text("Couldn't load episodes")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+            Text(message)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    // MARK: - Info Panel Overlay
+
+    @ViewBuilder
+    private var infoPanelOverlay: some View {
+        if showInfoPanel, let detail {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture { showInfoPanel = false }
+
+            DetailInfoPanel(
+                title: serie.name,
+                metadata: buildMetadata(detail),
+                synopsis: tmdbData?.plot ?? detail.info.plot,
+                actions: [
+                    PanelAction(label: "Play", icon: "play.fill") {
+                        if let first = detail.episodes[effectiveSeasonKey(detail)]?.first {
+                            playEpisode(first)
+                        }
+                    }
+                ],
+                onDismiss: { showInfoPanel = false }
+            )
+            .frame(maxWidth: .infinity)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    private func buildMetadata(_ detail: SerieDetail) -> [MetadataItem] {
+        var items: [MetadataItem] = []
+        let genre = tmdbData?.genre.first ?? (serie.genre.isEmpty ? nil : serie.genre)
+        if let genre { items.append(MetadataItem(text: genre)) }
+        if !serie.releaseDate.isEmpty { items.append(MetadataItem(text: serie.releaseDate)) }
+        if !detail.seasons.isEmpty { items.append(MetadataItem(text: "\(detail.seasons.count) Seasons")) }
+        let rating = tmdbData?.rating ?? (serie.rating5Based > 0 ? serie.rating5Based : nil)
+        if let r = rating { items.append(MetadataItem(text: String(format: "%.1f", r), icon: "star.fill")) }
+        return items
+    }
+
+    // MARK: - Load All (IPTV detail + TMDB in parallel)
+
+    private func loadAll() async {
+        guard let profile = profileStore.profile else { return }
+        async let iptv: () = loadDetail(profile: profile)
+        async let tmdb: () = loadTMDBEnrichment()
+        _ = await (iptv, tmdb)
+    }
+
+    private func loadDetail(profile: IPTVProfile) async {
+        let cache = TVCacheManager.shared
+
+        if let cached = await cache.cachedSerieDetail(id: serie.seriesId) {
+            detail = cached.value
+            if cached.isStale {
+                Task { await fetchAndCacheDetail(profile: profile) }
+            }
+            return
+        }
+
+        await fetchAndCacheDetail(profile: profile)
+    }
+
+    private func fetchAndCacheDetail(profile: IPTVProfile) async {
+        let service = IPTVService(profile: profile)
+        do {
+            var d = try await service.fetchSeriesDetails(seriesId: serie.seriesId)
+            d.seriesId = serie.seriesId
+            await TVCacheManager.shared.cacheSerieDetail(d, id: serie.seriesId)
+            detail = d
+        } catch {
+            if detail == nil { loadError = "\(error)" }
+            MKSLog.app.error("SerieDetail load failed: \(error)")
+        }
+    }
+
+    private func loadTMDBEnrichment() async {
+        let cache = TVCacheManager.shared
+        let tmdb  = TVTMDBService.shared
+        let cacheKey = "tmdb_serie_\(serie.seriesId)"
+
+        // Check cache
+        if let cached = await cache.cachedTMDB(key: cacheKey) {
+            tmdbData = cached.value
+            if !cached.isStale { return }
+        }
+
+        // Search by clean title + year (Serie has no tmdbId)
+        do {
+            let year = serie.year.flatMap { Int($0) }
+                    ?? (serie.releaseDate.isEmpty ? nil : Int(serie.releaseDate.prefix(4)))
+            if let enrichment = try await tmdb.searchSerie(title: serie.cleanTitle, year: year) {
+                await cache.cacheTMDB(enrichment, key: cacheKey)
+                tmdbData = enrichment
+            }
+        } catch {
+            MKSLog.app.debug("TMDB enrichment skipped for serie \(serie.seriesId): \(error)")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func playFirstEpisode() {
+        guard let detail else { return }
+        if let first = detail.episodes[effectiveSeasonKey(detail)]?.first {
+            playEpisode(first)
         }
     }
 
@@ -59,187 +432,6 @@ struct SerieDetailView: View {
         playingItem = item
     }
 
-    private var hero: some View {
-        ZStack(alignment: .bottomLeading) {
-            backdropImage
-                .frame(height: 720)
-                .clipped()
-
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.5), .black],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 720)
-
-            VStack(alignment: .leading, spacing: 18) {
-                Text(serie.name)
-                    .font(.system(size: 72, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .frame(maxWidth: 1200, alignment: .leading)
-
-                HStack(spacing: 16) {
-                    if !serie.genre.isEmpty {
-                        Text(serie.genre)
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                    if !serie.releaseDate.isEmpty {
-                        metaPill(serie.releaseDate)
-                    }
-                    if serie.rating5Based > 0 {
-                        HStack(spacing: 6) {
-                            Image(systemName: "star.fill").foregroundStyle(.yellow)
-                            Text(String(format: "%.1f", serie.rating5Based))
-                        }
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                    }
-                    if let detail {
-                        metaPill("\(detail.seasons.count) seasons")
-                    }
-                }
-            }
-            .padding(.horizontal, 80)
-            .padding(.bottom, 60)
-        }
-        .frame(height: 720)
-    }
-
-    @ViewBuilder
-    private var backdropImage: some View {
-        let urlString = detail?.info.backdropPath.first ?? serie.cover ?? ""
-        if let url = URL(string: urlString) {
-            CachedHTTPImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
-                case .failure, .empty:
-                    backdropPlaceholder
-                @unknown default:
-                    backdropPlaceholder
-                }
-            }
-        } else {
-            backdropPlaceholder
-        }
-    }
-
-    private var backdropPlaceholder: some View {
-        LinearGradient(
-            colors: [.indigo.opacity(0.7), .pink.opacity(0.4), .black],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private func plotSection(_ plot: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Storyline")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-            Text(plot)
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.85))
-                .lineLimit(6)
-                .frame(maxWidth: 1400, alignment: .leading)
-        }
-        .padding(.horizontal, 80)
-        .padding(.top, 40)
-    }
-
-    private func seasonsSection(_ detail: SerieDetail) -> some View {
-        let availableKeys = orderedSeasonKeys(detail)
-        return VStack(alignment: .leading, spacing: 16) {
-            Text("Seasons")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 80)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(availableKeys, id: \.self) { key in
-                        seasonChip(key: key, isSelected: key == effectiveSeasonKey(detail))
-                    }
-                }
-                .padding(.horizontal, 80)
-                .padding(.vertical, 20)
-            }
-        }
-        .padding(.top, 40)
-    }
-
-    private func seasonChip(key: String, isSelected: Bool) -> some View {
-        Button {
-            selectedSeasonKey = key
-        } label: {
-            Text("Season \(key)")
-                .font(.title3.weight(.semibold))
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-        }
-        .buttonStyle(.bordered)
-        .tint(isSelected ? .white : .white.opacity(0.5))
-        .foregroundStyle(isSelected ? .black : .white)
-    }
-
-    private func episodesSection(_ detail: SerieDetail) -> some View {
-        let key = effectiveSeasonKey(detail)
-        let episodes = detail.episodes[key] ?? []
-
-        return VStack(alignment: .leading, spacing: 16) {
-            Text("Episodes")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 80)
-
-            if episodes.isEmpty {
-                Text("No episodes available")
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.horizontal, 80)
-            } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(episodes.sorted(by: { $0.episodeNum < $1.episodeNum })) { episode in
-                        EpisodeRow(episode: episode) { playEpisode(episode) }
-                            .padding(.horizontal, 80)
-                    }
-                }
-                .padding(.vertical, 16)
-            }
-        }
-        .padding(.top, 40)
-    }
-
-    private var errorBanner: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.orange)
-            Text("Couldn't load episodes")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
-            if let loadError {
-                Text(loadError)
-                    .font(.body)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-
-    private func metaPill(_ text: String) -> some View {
-        Text(text)
-            .font(.title3.weight(.medium))
-            .foregroundStyle(.white.opacity(0.85))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(.white.opacity(0.12), in: Capsule())
-    }
-
     private func orderedSeasonKeys(_ detail: SerieDetail) -> [String] {
         let keys = Set(detail.episodes.keys).union(detail.seasons.map { String($0.id) })
         return keys.sorted { (Int($0) ?? 0) < (Int($1) ?? 0) }
@@ -248,63 +440,5 @@ struct SerieDetailView: View {
     private func effectiveSeasonKey(_ detail: SerieDetail) -> String {
         if let selected = selectedSeasonKey { return selected }
         return orderedSeasonKeys(detail).first ?? "1"
-    }
-
-    private func loadDetail() async {
-        guard detail == nil, let profile = profileStore.profile else { return }
-        let service = IPTVService(profile: profile)
-        do {
-            var d = try await service.fetchSeriesDetails(seriesId: serie.seriesId)
-            d.seriesId = serie.seriesId
-            detail = d
-        } catch {
-            loadError = "\(error)"
-            MKSLog.app.error("SerieDetail load failed: \(error)")
-        }
-    }
-}
-
-// MARK: - EpisodeRow
-
-private struct EpisodeRow: View {
-    let episode: SerieDetail.Episode
-    let onPlay: () -> Void
-
-    @Environment(\.isFocused) private var isFocused
-
-    var body: some View {
-        Button(action: onPlay) {
-            HStack(spacing: 24) {
-                Text(String(format: "%02d", episode.episodeNum))
-                    .font(.system(size: 56, weight: .heavy, design: .rounded))
-                    .foregroundStyle(isFocused ? .white : .white.opacity(0.6))
-                    .frame(width: 100, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(episode.title)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Text("Season \(episode.season) · Episode \(episode.episodeNum)")
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.55))
-                }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "play.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(isFocused ? .white : .white.opacity(0.5))
-            }
-            .padding(.vertical, 22)
-            .padding(.horizontal, 28)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isFocused ? Color.white.opacity(0.16) : Color.white.opacity(0.04))
-            )
-        }
-        .buttonStyle(.plain)
     }
 }

@@ -9,17 +9,13 @@ import SwiftUI
 import IPTVCore
 
 struct SeriesGridView: View {
-    @EnvironmentObject private var profileStore: ProfileStore
-    @StateObject private var viewModel = SeriesViewModel()
+    @ObservedObject var viewModel: SeriesViewModel
+    var onRetry: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
             content
                 .background(backgroundGradient.ignoresSafeArea())
-        }
-        .task {
-            guard case .idle = viewModel.state, let profile = profileStore.profile else { return }
-            await viewModel.load(profile: profile)
         }
     }
 
@@ -59,22 +55,16 @@ struct SeriesGridView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 200)
 
-            Button("Retry") {
-                Task {
-                    if let profile = profileStore.profile {
-                        await viewModel.load(profile: profile)
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.accentColor)
+            Button("Retry") { onRetry?() }
+                .buttonStyle(.borderedProminent)
+                .tint(.accentColor)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var feed: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 60) {
+            LazyVStack(alignment: .leading, spacing: 60, pinnedViews: []) {
                 if let featured = viewModel.featured {
                     FeaturedHeroView(
                         title: featured.name,
@@ -84,6 +74,7 @@ struct SeriesGridView: View {
                             MKSLog.app.info("Featured serie play seriesId=\(featured.seriesId)")
                         }
                     )
+                    .ignoresSafeArea(edges: .top)
                 }
 
                 ForEach(viewModel.sections) { section in

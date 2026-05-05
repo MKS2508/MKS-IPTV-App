@@ -65,6 +65,12 @@ public actor RawHTTPClient {
         try await perform(url: url, timeout: timeout)
     }
 
+    /// Send a HEAD request and return only the response headers (no body downloaded).
+    /// ATS-safe — uses NWConnection, not URLSession.
+    public func head(_ url: URL, timeout: TimeInterval = 10) async throws -> RawHTTPResponse {
+        try await performHead(url: url, timeout: timeout)
+    }
+
     // MARK: - Core
 
     private func perform(url: URL, timeout: TimeInterval) async throws -> (Data, RawHTTPResponse) {
@@ -89,6 +95,38 @@ public actor RawHTTPClient {
                 let bytes = try await self.readUntilClose(on: connection)
                 connection.cancel()
                 return try self.parse(bytes, url: url)
+            }
+        } onCancel: {
+            connection.cancel()
+        }
+    }
+
+    /// HEAD request: sends a HEAD and reads only until the blank line (no body).
+    /// The server may keep the connection open after headers; we close immediately
+    /// after parsing the status + headers — no body download.
+    private func performHead(url: URL, timeout: TimeInterval) async throws -> RawHTTPResponse {
+        guard let host = url.host, let scheme = url.scheme?.lowercased() else {
+            throw RawHTTPError.invalidURL
+        }
+        let isTLS = (scheme == "https")
+        guard let portValue = NWEndpoint.Port(rawValue: UInt16(url.port ?? (isTLS ? 443 : 80))) else {
+            throw RawHTTPError.invalidURL
+        }
+
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: portValue)
+        let connection = NWConnection(to: endpoint, using: isTLS ? .tls : .tcp)
+
+        return try await withTaskCancellationHandler {
+            try await withDeadline(timeout) {
+                try Task.checkCancellation()
+                try await self.open(connection)
+                try Task.checkCancellation()
+                try await self.send(self.buildHeadRequest(url: url), on: connection)
+                try Task.checkCancellation()
+                // Read until we see \r\n\r\n (end of headers) or connection closes
+                let headerBytes = try await self.readUntilHeadersEnd(on: connection)
+                connection.cancel()
+                return try self.parseHeadersOnly(headerBytes, url: url)
             }
         } onCancel: {
             connection.cancel()
@@ -139,33 +177,107 @@ public actor RawHTTPClient {
         let cap = 64 * 1024 * 1024
 
         while true {
-            let chunk = try await receive(on: connection, max: 64 * 1024)
-            if chunk.isEmpty { return buffer }
+            let (chunk, isComplete) = try await receive(on: connection, max: 64 * 1024)
             buffer.append(chunk)
+            if isComplete { return buffer }
             if buffer.count > cap {
                 throw RawHTTPError.readFailed("response exceeds 64 MB cap")
             }
         }
     }
 
-    private nonisolated func receive(on connection: NWConnection, max: Int) async throws -> Data {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, Error>) in
+    /// Reads one chunk. Returns the bytes plus whether this was the final delivery.
+    /// NWConnection can return `data + isComplete=true` in one callback — calling
+    /// `receive` again after that fails ("already delivered final read"), so the
+    /// caller MUST stop based on `isComplete`.
+    private nonisolated func receive(
+        on connection: NWConnection,
+        max: Int
+    ) async throws -> (Data, Bool) {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<(Data, Bool), Error>) in
             connection.receive(minimumIncompleteLength: 1, maximumLength: max) { content, _, isComplete, error in
                 if let error {
                     cont.resume(throwing: RawHTTPError.readFailed(error.localizedDescription))
                     return
                 }
-                let chunk = content ?? Data()
-                if chunk.isEmpty && isComplete {
-                    cont.resume(returning: Data())
-                } else {
-                    cont.resume(returning: chunk)
-                }
+                cont.resume(returning: (content ?? Data(), isComplete))
             }
         }
     }
 
     // MARK: - Request / Response
+
+    private nonisolated func buildHeadRequest(url: URL) -> Data {
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        var path = (comps?.path).flatMap { $0.isEmpty ? nil : $0 } ?? "/"
+        if let q = comps?.percentEncodedQuery, !q.isEmpty { path += "?" + q }
+
+        var hostHeader = url.host ?? ""
+        if let port = url.port { hostHeader += ":\(port)" }
+
+        let lines = [
+            "HEAD \(path) HTTP/1.1",
+            "Host: \(hostHeader)",
+            "User-Agent: VLC/3.0.18 LibVLC/3.0.18",
+            "Accept: */*",
+            "Accept-Encoding: identity",
+            "Connection: close"
+        ]
+        return Data((lines.joined(separator: "\r\n") + "\r\n\r\n").utf8)
+    }
+
+    /// Read from a connection until we see the HTTP header terminator \r\n\r\n.
+    /// Stops immediately after headers — does not read body (suitable for HEAD responses).
+    private nonisolated func readUntilHeadersEnd(on connection: NWConnection) async throws -> Data {
+        let terminator = Data([0x0d, 0x0a, 0x0d, 0x0a])
+        var buffer = Data()
+        let cap = 64 * 1024   // 64 KB is more than enough for any HTTP header block
+
+        while true {
+            let (chunk, isComplete) = try await receive(on: connection, max: 4096)
+            buffer.append(chunk)
+            if buffer.range(of: terminator) != nil { return buffer }
+            if isComplete { return buffer }   // Connection closed — parse what we have
+            if buffer.count > cap { throw RawHTTPError.malformedResponse("headers exceed 64 KB") }
+        }
+    }
+
+    /// Parse only the HTTP status line + headers from raw bytes (no body required).
+    private nonisolated func parseHeadersOnly(_ bytes: Data, url: URL) throws -> RawHTTPResponse {
+        // Allow parsing even if terminator is absent (server closed without it)
+        let terminator = Data([0x0d, 0x0a, 0x0d, 0x0a])
+        let headerBytes: Data
+        if let range = bytes.range(of: terminator) {
+            headerBytes = bytes.subdata(in: 0..<range.lowerBound)
+        } else {
+            headerBytes = bytes
+        }
+
+        guard let headerString = String(data: headerBytes, encoding: .utf8),
+              !headerString.isEmpty else {
+            throw RawHTTPError.malformedResponse("empty response")
+        }
+
+        var lines = headerString.components(separatedBy: "\r\n")
+        guard let statusLine = lines.first, !statusLine.isEmpty else {
+            throw RawHTTPError.malformedResponse("no status line")
+        }
+        lines.removeFirst()
+
+        let parts = statusLine.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+        let status = parts.count >= 2 ? Int(parts[1]) ?? 0 : 0
+
+        var headerDict: [String: String] = [:]
+        for line in lines where !line.isEmpty {
+            if let colon = line.firstIndex(of: ":") {
+                let key = String(line[..<colon]).trimmingCharacters(in: .whitespaces)
+                let value = String(line[line.index(after: colon)...]).trimmingCharacters(in: .whitespaces)
+                headerDict[key.lowercased()] = value
+            }
+        }
+
+        return RawHTTPResponse(url: url, statusCode: status, headers: headerDict)
+    }
 
     private nonisolated func buildRequest(url: URL) -> Data {
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)

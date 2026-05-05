@@ -2,7 +2,9 @@
 //  MoviesViewModel.swift
 //  mks-multiplataforma-tvos-iptv
 //
-//  Loads movies + categories from IPTVService, exposes grouped sections.
+//  Loads movies + categories from IPTVService with disk-based SWR cache.
+//  - First launch: load from API, cache to disk.
+//  - Subsequent launches: serve from cache immediately, refresh in background if stale.
 //
 
 import Foundation
@@ -21,6 +23,7 @@ final class MoviesViewModel: ObservableObject {
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var featured: Movie?
     @Published private(set) var sections: [MovieSection] = []
+    @Published private(set) var isRefreshing = false   // true during background SWR refresh
 
     struct MovieSection: Identifiable, Equatable {
         let id: String
@@ -28,24 +31,70 @@ final class MoviesViewModel: ObservableObject {
         let movies: [Movie]
     }
 
+    // Called on tab appear — only loads once per process unless idle.
+    func loadIfNeeded(profile: IPTVProfile) async {
+        guard case .idle = state else { return }
+
+        let cache = TVCacheManager.shared
+
+        // Try to serve from cache first
+        async let moviesResult = cache.cachedMovies()
+        async let catsResult   = cache.cachedMovieCategories()
+        let (movies, cats) = await (moviesResult, catsResult)
+
+        if let movies, let cats {
+            // Instant display from cache
+            populateUI(movies: movies.value, categories: cats.value)
+            state = .loaded
+
+            // Background refresh if stale
+            if movies.isStale || cats.isStale {
+                isRefreshing = true
+                await refreshFromNetwork(profile: profile, silent: true)
+                isRefreshing = false
+            }
+        } else {
+            // Cache miss → full blocking load
+            await load(profile: profile)
+        }
+    }
+
+    // Forces a fresh network load (used for retry and explicit refresh).
     func load(profile: IPTVProfile) async {
         state = .loading
-        let service = IPTVService(profile: profile)
+        await refreshFromNetwork(profile: profile, silent: false)
+    }
 
+    // MARK: - Private
+
+    private func refreshFromNetwork(profile: IPTVProfile, silent: Bool) async {
+        let service = IPTVService(profile: profile)
         do {
-            async let moviesTask = service.fetchMovies()
+            async let moviesTask     = service.fetchMovies()
             async let categoriesTask = service.fetchMovieCategories()
             let (movies, categories) = try await (moviesTask, categoriesTask)
 
-            MKSLog.app.info("MoviesVM loaded \(movies.count) movies, \(categories.count) categories")
+            MKSLog.app.info("MoviesVM fetched \(movies.count) movies, \(categories.count) categories")
 
-            featured = pickFeatured(from: movies)
-            sections = buildSections(movies: movies, categories: categories)
+            // Persist to disk
+            let cache = TVCacheManager.shared
+            await cache.cacheMovies(movies)
+            await cache.cacheMovieCategories(categories)
+
+            populateUI(movies: movies, categories: categories)
             state = .loaded
         } catch {
-            MKSLog.app.error("MoviesVM load failed: \(error)")
-            state = .failed("\(error)")
+            MKSLog.app.error("MoviesVM refresh failed: \(error)")
+            // If we already have data on screen (silent SWR refresh), don't show error.
+            if !silent {
+                state = .failed("\(error)")
+            }
         }
+    }
+
+    private func populateUI(movies: [Movie], categories: [MovieCategory]) {
+        featured = pickFeatured(from: movies)
+        sections = buildSections(movies: movies, categories: categories)
     }
 
     private func pickFeatured(from movies: [Movie]) -> Movie? {

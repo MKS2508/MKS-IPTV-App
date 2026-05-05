@@ -22,6 +22,10 @@ struct mks_multiplataforma_tvos_iptvApp: App {
                 }
             }
             .environmentObject(profileStore)
+            .task {
+                // Clean up expired cache entries once on launch
+                await TVCacheManager.shared.clearExpired()
+            }
         }
     }
 }

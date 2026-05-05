@@ -12,9 +12,6 @@ import IPTVCore
 struct TVChannelCard: View {
     let channel: LiveChannel
 
-    @Environment(\.isFocused) private var isFocused
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     private let cardWidth: CGFloat = 360
     private let cardHeight: CGFloat = 220
 
@@ -28,16 +25,6 @@ struct TVChannelCard: View {
         .frame(width: cardWidth, height: cardHeight)
         .background(.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white, lineWidth: isFocused ? 4 : 0)
-        )
-        .scaleEffect(isFocused && !reduceMotion ? 1.06 : 1.0)
-        .shadow(color: .black.opacity(isFocused ? 0.6 : 0.25),
-                radius: isFocused ? 28 : 8,
-                x: 0,
-                y: isFocused ? 18 : 4)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isFocused)
         .accessibilityLabel(channel.name)
         .accessibilityHint(Text("Opens live channel"))
     }

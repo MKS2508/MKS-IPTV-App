@@ -2,6 +2,8 @@
 //  LiveTVViewModel.swift
 //  mks-multiplataforma-tvos-iptv
 //
+//  Loads live channels + categories from IPTVService with disk-based SWR cache.
+//
 
 import Foundation
 import SwiftUI
@@ -19,6 +21,7 @@ final class LiveTVViewModel: ObservableObject {
     @Published private(set) var state: LoadState = .idle
     @Published private(set) var featured: LiveChannel?
     @Published private(set) var sections: [ChannelSection] = []
+    @Published private(set) var isRefreshing = false
 
     struct ChannelSection: Identifiable, Equatable {
         let id: String
@@ -26,27 +29,65 @@ final class LiveTVViewModel: ObservableObject {
         let channels: [LiveChannel]
     }
 
+    func loadIfNeeded(profile: IPTVProfile) async {
+        guard case .idle = state else { return }
+
+        let cache = TVCacheManager.shared
+
+        async let channelsResult = cache.cachedLiveChannels()
+        async let catsResult     = cache.cachedLiveChannelCategories()
+        let (channelsCache, cats) = await (channelsResult, catsResult)
+
+        if let channelsCache, let cats {
+            populateUI(channels: channelsCache.value, categories: cats.value)
+            state = .loaded
+
+            if channelsCache.isStale || cats.isStale {
+                isRefreshing = true
+                await refreshFromNetwork(profile: profile, silent: true)
+                isRefreshing = false
+            }
+        } else {
+            await load(profile: profile)
+        }
+    }
+
     func load(profile: IPTVProfile) async {
         state = .loading
+        await refreshFromNetwork(profile: profile, silent: false)
+    }
+
+    // MARK: - Private
+
+    private func refreshFromNetwork(profile: IPTVProfile, silent: Bool) async {
         let service = IPTVService(profile: profile)
         do {
-            async let channelsTask = service.fetchLiveChannels()
-            async let categoriesTask = service.fetchLiveChannelsCategories()
+            async let channelsTask    = service.fetchLiveChannels()
+            async let categoriesTask  = service.fetchLiveChannelsCategories()
             let (channels, categories) = try await (channelsTask, categoriesTask)
 
-            MKSLog.app.info("LiveVM loaded \(channels.count) channels, \(categories.count) categories")
+            MKSLog.app.info("LiveVM fetched \(channels.count) channels, \(categories.count) categories")
 
-            featured = channels
-                .filter { ($0.streamIcon?.isEmpty == false) && ($0.isAdult ?? "0") != "1" }
-                .randomElement()
-                ?? channels.first
+            let cache = TVCacheManager.shared
+            await cache.cacheLiveChannels(channels)
+            await cache.cacheLiveChannelCategories(categories)
 
-            sections = buildSections(channels: channels, categories: categories)
+            populateUI(channels: channels, categories: categories)
             state = .loaded
         } catch {
-            MKSLog.app.error("LiveVM load failed: \(error)")
-            state = .failed("\(error)")
+            MKSLog.app.error("LiveVM refresh failed: \(error)")
+            if !silent {
+                state = .failed("\(error)")
+            }
         }
+    }
+
+    private func populateUI(channels: [LiveChannel], categories: [LiveChannelCategory]) {
+        featured = channels
+            .filter { ($0.streamIcon?.isEmpty == false) && ($0.isAdult ?? "0") != "1" }
+            .randomElement()
+            ?? channels.first
+        sections = buildSections(channels: channels, categories: categories)
     }
 
     private func buildSections(channels: [LiveChannel], categories: [LiveChannelCategory]) -> [ChannelSection] {

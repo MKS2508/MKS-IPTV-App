@@ -745,7 +745,7 @@ struct DebugStreamingView: View {
         do {
             switch item.type {
             case .movie:
-                let detail = try await viewModel.movieService.fetchMovieDetails(movieId: item.id)
+                let detail = try await viewModel.movieService.fetchMovieDetails(vodId: item.id)
                 viewModel.log("Got movie detail: \(detail.movieData.name)", type: .info)
 
                 // Try enriched metadata from TMDB/providers

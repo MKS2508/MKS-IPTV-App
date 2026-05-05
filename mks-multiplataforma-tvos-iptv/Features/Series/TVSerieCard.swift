@@ -2,6 +2,9 @@
 //  TVSerieCard.swift
 //  mks-multiplataforma-tvos-iptv
 //
+//  Focus-driven series poster card.
+//  320x480pt, FocusableCardModifier, glass overlay, rating glass pill.
+//
 
 import SwiftUI
 import IPTVCore
@@ -9,29 +12,17 @@ import IPTVCore
 struct TVSerieCard: View {
     let serie: Serie
 
-    @Environment(\.isFocused) private var isFocused
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let cardWidth: CGFloat = 280
-    private let cardHeight: CGFloat = 420
+    private let cardWidth: CGFloat = 320
+    private let cardHeight: CGFloat = 480
 
     var body: some View {
         ZStack(alignment: .bottom) {
             poster
             titleOverlay
+            ratingBadge
         }
         .frame(width: cardWidth, height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white, lineWidth: isFocused ? 4 : 0)
-        )
-        .scaleEffect(isFocused && !reduceMotion ? 1.08 : 1.0)
-        .shadow(color: .black.opacity(isFocused ? 0.6 : 0.25),
-                radius: isFocused ? 28 : 8,
-                x: 0,
-                y: isFocused ? 18 : 4)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isFocused)
         .accessibilityLabel(serie.name)
         .accessibilityHint(Text("Opens series details"))
     }
@@ -42,7 +33,9 @@ struct TVSerieCard: View {
             CachedHTTPImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
                 case .failure, .empty:
                     placeholder
                 @unknown default:
@@ -57,7 +50,10 @@ struct TVSerieCard: View {
     private var placeholder: some View {
         ZStack {
             LinearGradient(
-                colors: [.indigo.opacity(0.7), .pink.opacity(0.4)],
+                colors: [
+                    Color(red: 0.15, green: 0.1, blue: 0.4),
+                    Color(red: 0.3, green: 0.15, blue: 0.5)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -69,38 +65,47 @@ struct TVSerieCard: View {
 
     private var titleOverlay: some View {
         VStack(alignment: .leading, spacing: 6) {
+            Spacer()
+
             Text(serie.name)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .lineLimit(2)
+                .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
-                if !serie.genre.isEmpty {
-                    Text(serie.genre.split(separator: ",").first.map(String.init) ?? serie.genre)
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                if serie.rating5Based > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill").foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", serie.rating5Based))
-                    }
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-                }
+            if !serie.genre.isEmpty {
+                Text(serie.genre.split(separator: ",").first.map(String.init) ?? serie.genre)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(
             LinearGradient(
-                colors: [.clear, .black.opacity(0.85)],
+                colors: [.clear, .black.opacity(0.9)],
                 startPoint: .top,
                 endPoint: .bottom
             )
         )
+    }
+
+    @ViewBuilder
+    private var ratingBadge: some View {
+        if serie.rating5Based > 0 {
+            VStack {
+                HStack {
+                    Spacer()
+                    GlassBadge(
+                        text: String(format: "%.1f", serie.rating5Based),
+                        icon: "star.fill"
+                    )
+                    .padding(12)
+                }
+                Spacer()
+            }
+        }
     }
 }

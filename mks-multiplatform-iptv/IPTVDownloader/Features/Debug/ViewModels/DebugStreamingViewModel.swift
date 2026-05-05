@@ -266,45 +266,38 @@ class DebugStreamingViewModel: ObservableObject {
         do {
             switch type {
             case .movies:
-                let movies = try await movieService.fetchMovies(page: 1)
+                let movies = try await movieService.fetchMovies()
                 // Sort by added date (most recent first)
-                let sortedMovies = movies
-                    .filter { $0.added != nil }
-                    .sorted { (Int($0.added ?? "0") ?? 0) > (Int($1.added ?? "0") ?? 0) }
-                    .prefix(10)
-                
-                items = sortedMovies.map { DebugStreamItem(from: $0, profile: movieService.profile) }
+                let filteredMovies = movies.filter { $0.added != nil }
+                let sortedMovies = filteredMovies.sorted { (Int($0.added ?? "0") ?? 0) > (Int($1.added ?? "0") ?? 0) }
+                let topMovies = Array(sortedMovies.prefix(10))
+                items = topMovies.map { DebugStreamItem(from: $0, profile: movieService.profile) }
                 log("✅ Loaded \(items.count) movies", type: .success)
                 
             case .series:
-                let series = try await movieService.fetchSeries(page: 1)
+                let series = try await movieService.fetchSeries()
                 // Sort by last modified (most recent first)
-                let sortedSeries = series
-                    .sorted { (Int($0.lastModified) ?? 0) > (Int($1.lastModified) ?? 0) }
-                    .prefix(10)
-                
-                items = sortedSeries.map { DebugStreamItem(from: $0) }
+                let sortedSeries = series.sorted { (Int($0.lastModified) ?? 0) > (Int($1.lastModified) ?? 0) }
+                let topSeries = Array(sortedSeries.prefix(10))
+                items = topSeries.map { DebugStreamItem(from: $0) }
                 log("✅ Loaded \(items.count) series", type: .success)
                 
             case .mixed:
                 // Load both and mix
-                async let moviesTask = movieService.fetchMovies(page: 1)
-                async let seriesTask = movieService.fetchSeries(page: 1)
+                async let moviesTask = movieService.fetchMovies()
+                async let seriesTask = movieService.fetchSeries()
                 
                 let (movies, series) = try await (moviesTask, seriesTask)
                 
-                let movieItems = movies
-                    .filter { $0.added != nil }
-                    .sorted { (Int($0.added ?? "0") ?? 0) > (Int($1.added ?? "0") ?? 0) }
-                    .prefix(5)
-                    .map { DebugStreamItem(from: $0, profile: movieService.profile) }
+                let filteredMovies = movies.filter { $0.added != nil }
+                let sortedMovies = filteredMovies.sorted { (Int($0.added ?? "0") ?? 0) > (Int($1.added ?? "0") ?? 0) }
+                let movieItems: [DebugStreamItem] = Array(sortedMovies.prefix(5)).map { DebugStreamItem(from: $0, profile: movieService.profile) }
                 
-                let seriesItems = series
-                    .sorted { (Int($0.lastModified) ?? 0) > (Int($1.lastModified) ?? 0) }
-                    .prefix(5)
-                    .map { DebugStreamItem(from: $0) }
+                let sortedSeries = series.sorted { (Int($0.lastModified) ?? 0) > (Int($1.lastModified) ?? 0) }
+                let seriesItems: [DebugStreamItem] = Array(sortedSeries.prefix(5)).map { DebugStreamItem(from: $0) }
                 
-                items = (movieItems + seriesItems).sorted { $0.added > $1.added }
+                let combined = movieItems + seriesItems
+                items = combined.sorted { $0.added > $1.added }
                 log("✅ Loaded \(items.count) items (mixed)", type: .success)
                 
             case .liveTV:
@@ -367,7 +360,7 @@ class DebugStreamingViewModel: ObservableObject {
         do {
             switch item.type {
             case .movie:
-                let details = try await movieService.fetchMovieDetails(movieId: item.id)
+                let details = try await movieService.fetchMovieDetails(vodId: item.id)
                 log("✅ Got movie details:", type: .success)
                 log("  Duration: \(details.duration)", type: .info)
                 log("  Director: \(details.director)", type: .info)
@@ -562,17 +555,8 @@ class DebugStreamingViewModel: ObservableObject {
         log("🎬 Loading movies for selected categories...", type: .info)
         
         // Load all movies (this might take time for large libraries)
-        var allMovies: [Movie] = []
-        var currentPage = 1
-        let maxPages = 5 // Limit to avoid excessive loading
-        
-        repeat {
-            let movies = try await movieService.fetchMovies(page: currentPage)
-            allMovies.append(contentsOf: movies)
-            currentPage += 1
-            
-            log("  Loaded page \(currentPage - 1): \(movies.count) movies", type: .info)
-        } while currentPage <= maxPages
+        let allMovies = try await movieService.fetchMovies()
+        log("  Loaded \(allMovies.count) movies", type: .info)
         
         let filteredMovies = selectedCategoryIds.isEmpty ? allMovies : allMovies.filter { selectedCategoryIds.contains($0.categoryId) }
         let filteredCategories = selectedCategoryIds.isEmpty ? movieCategories : movieCategories.filter { selectedCategoryIds.contains($0.categoryId) }
@@ -591,17 +575,8 @@ class DebugStreamingViewModel: ObservableObject {
         log("📺 Loading series for selected categories...", type: .info)
         
         // Load all series
-        var allSeries: [Serie] = []
-        var currentPage = 1
-        let maxPages = 5 // Limit to avoid excessive loading
-        
-        repeat {
-            let series = try await movieService.fetchSeries(page: currentPage)
-            allSeries.append(contentsOf: series)
-            currentPage += 1
-            
-            log("  Loaded page \(currentPage - 1): \(series.count) series", type: .info)
-        } while currentPage <= maxPages
+        let allSeries = try await movieService.fetchSeries()
+        log("  Loaded \(allSeries.count) series", type: .info)
         
         let filteredSeries = selectedCategoryIds.isEmpty ? allSeries : allSeries.filter { selectedCategoryIds.contains($0.categoryId) }
         let filteredCategories = selectedCategoryIds.isEmpty ? seriesCategories : seriesCategories.filter { selectedCategoryIds.contains($0.categoryId) }

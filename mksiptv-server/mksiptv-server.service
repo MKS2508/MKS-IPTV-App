@@ -1,0 +1,52 @@
+[Unit]
+Description=MKS IPTV Server
+Documentation=https://github.com/MKS2508/MKS-IPTV-App
+After=network.target
+
+[Service]
+Type=simple
+User=mksiptv
+Group=mksiptv
+WorkingDirectory=/opt/mksiptv-server
+
+# Binary path
+ExecStart=/opt/mksiptv-server/mksiptv-server
+
+# Auto-restart configuration
+Restart=always
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mksiptv-server
+
+# Environment variables (can be overridden in /etc/systemd/system/mksiptv-server.service.d/override.conf)
+Environment="PORT=4848"
+Environment="HOST=0.0.0.0"
+Environment="LOG_LEVEL=info"
+Environment="CONFIG_PATH=/opt/mksiptv-server/config"
+Environment="DOWNLOAD_PATH=/opt/mksiptv-server/downloads"
+
+# OIDC Configuration (PocketID)
+Environment="OIDC_ISSUER=https://pocketid.mks2508.systems"
+Environment="OIDC_CLIENT_ID=mksiptv-server"
+Environment="OIDC_REDIRECT_URI=http://localhost:4848/auth/callback"
+Environment="OIDC_SCOPES=openid profile email"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mksiptv-server/config /opt/mksiptv-server/logs /opt/mksiptv-server/downloads
+ReadOnlyPaths=/
+
+# Resource limits (adjust based on your needs)
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

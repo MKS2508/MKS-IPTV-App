@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MKS IPTV WebSocket Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .log-info { color: #0099ff; }
+        .log-success { color: #00ff00; }
+        .log-error { color: #ff0000; }
+        .log-event { color: #ffff00; }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .status-connected { background: #006600; }
+        .status-disconnected { background: #660000; }
+        .status-connecting { background: #666600; }
+    </style>
+</head>
+<body>
+    <h1>MKS IPTV WebSocket Test Client</h1>
+
+    <div class="container">
+        <div id="status" class="status status-disconnected">Disconnected</div>
+        <div>
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            <button onclick="subscribe('new_content')">Subscribe: new_content</button>
+            <button onclick="subscribe('downloads')">Subscribe: downloads</button>
+            <button onclick="subscribe('profile')">Subscribe: profile</button>
+            <button onclick="unsubscribe('new_content')">Unsubscribe: new_content</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>Event Log</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status status-${status}`;
+            statusDiv.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+
+            document.getElementById('connectBtn').disabled = status === 'connected' || status === 'connecting';
+            document.getElementById('disconnectBtn').disabled = status === 'disconnected';
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'error');
+                return;
+            }
+
+            updateStatus('connecting');
+            log('Connecting to ws://localhost:4848/ws/events...', 'info');
+
+            try {
+                ws = new WebSocket('ws://localhost:4848/ws/events');
+
+                ws.onopen = () => {
+                    log('WebSocket connected successfully!', 'success');
+                    updateStatus('connected');
+                    reconnectAttempts = 0;
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        log(`Received: ${JSON.stringify(message, null, 2)}`, 'event');
+                    } catch (e) {
+                        log(`Received (raw): ${event.data}`, 'info');
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    log('WebSocket error occurred', 'error');
+                    console.error('WebSocket error:', error);
+                };
+
+                ws.onclose = (event) => {
+                    log(`WebSocket disconnected: ${event.code} - ${event.reason}`, 'error');
+                    updateStatus('disconnected');
+
+                    // Attempt to reconnect with exponential backoff
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+                        log(`Attempting reconnect in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})`, 'info');
+                        setTimeout(connect, delay);
+                    } else {
+                        log('Max reconnect attempts reached. Please reconnect manually.', 'error');
+                    }
+                };
+
+            } catch (error) {
+                log(`Connection error: ${error.message}`, 'error');
+                updateStatus('disconnected');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                reconnectAttempts = maxReconnectAttempts; // Prevent auto-reconnect
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function subscribe(channel) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Cannot subscribe: not connected', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'subscribe',
+                channel: channel
+            };
+
+            ws.send(JSON.stringify(message));
+            log(`Sent subscribe request for channel: ${channel}`, 'info');
+        }
+
+        function unsubscribe(channel) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Cannot unsubscribe: not connected', 'error');
+                return;
+            }
+
+            const message = {
+                type: 'unsubscribe',
+                channel: channel
+            };
+
+            ws.send(JSON.stringify(message));
+            log(`Sent unsubscribe request for channel: ${channel}`, 'info');
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        // Auto-connect on page load
+        window.addEventListener('load', () => {
+            log('WebSocket test client loaded', 'info');
+            log('Click "Connect" to establish WebSocket connection', 'info');
+        });
+    </script>
+</body>
+</html>

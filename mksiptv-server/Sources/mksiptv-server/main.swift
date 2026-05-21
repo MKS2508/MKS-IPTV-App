@@ -1,4 +1,5 @@
 import Vapor
+import JWT
 import Foundation
 
 // MARK: - Main Entry Point
@@ -43,6 +44,69 @@ func configure(_ app: Application) async throws {
     // Initialize download manager
     let downloadPath = Environment.get("DOWNLOAD_PATH")
     let downloadManager = ServerDownloadManager(eventBus: eventBus, downloadPath: downloadPath)
+
+    // MARK: - OIDC Authentication Setup
+
+    // Initialize OIDC provider
+    guard let oidcIssuer = Environment.get("OIDC_ISSUER") else {
+        MKSLog.server.error("OIDC_ISSUER environment variable not set")
+        throw Abort(.internalServerError, reason: "OIDC_ISSUER environment variable not set")
+    }
+
+    guard let oidcClientID = Environment.get("OIDC_CLIENT_ID") else {
+        MKSLog.server.error("OIDC_CLIENT_ID environment variable not set")
+        throw Abort(.internalServerError, reason: "OIDC_CLIENT_ID environment variable not set")
+    }
+
+    guard let oidcClientSecret = Environment.get("OIDC_CLIENT_SECRET") else {
+        MKSLog.server.error("OIDC_CLIENT_SECRET environment variable not set")
+        throw Abort(.internalServerError, reason: "OIDC_CLIENT_SECRET environment variable not set")
+    }
+
+    let oidcRedirectURI = Environment.get("OIDC_REDIRECT_URI") ?? "http://localhost:4848/auth/callback"
+    let oidcScopes = (Environment.get("OIDC_SCOPES") ?? "openid profile email").components(separatedBy: " ")
+    let sessionTTL = TimeInterval(Environment.get("SESSION_TTL") ?? "3600") ?? 3600
+
+    let credentials = OIDCProvider.ClientCredentials(
+        clientId: oidcClientID,
+        clientSecret: oidcClientSecret,
+        redirectURI: oidcRedirectURI,
+        scopes: oidcScopes
+    )
+
+    let oidcProvider = OIDCProvider(
+        issuer: oidcIssuer,
+        credentials: credentials,
+        client: app.client
+    )
+
+    // Initialize auth session
+    let authSession = AuthSession(sessionTTL: sessionTTL)
+
+    // Initialize JWT validator
+    let jwtValidator = JWTValidator(client: app.client)
+
+    // Register auth routes BEFORE other routes
+    let authRoutes = AuthRoutes(
+        oidcProvider: oidcProvider,
+        authSession: authSession,
+        jwtValidator: jwtValidator,
+        credentials: credentials
+    )
+    try app.register(collection: authRoutes)
+
+    // Apply auth middleware globally EXCEPT public paths
+    app.middleware.use(AuthMiddleware(
+        authSession: authSession,
+        publicPaths: ["/health", "/", "/auth/login", "/auth/callback"]
+    ))
+
+    MKSLog.server.info("OIDC authentication initialized", fields: [
+        "issuer": oidcIssuer,
+        "clientId": oidcClientID,
+        "redirectURI": oidcRedirectURI,
+        "sessionTTL": sessionTTL
+    ])
 
     // Register profile routes
     try app.register(collection: ProfileRoutes(profileStore: profileStore))

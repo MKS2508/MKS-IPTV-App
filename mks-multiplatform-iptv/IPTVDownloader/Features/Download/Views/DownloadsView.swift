@@ -81,6 +81,12 @@ struct DownloadsView: View {
                                 } label: {
                                     Label("Remove", systemImage: "trash")
                                 }
+                            } else if download.status == .queued {
+                                Button(role: .destructive) {
+                                    downloadManager.cancelDownload(id: download.id)
+                                } label: {
+                                    Label("Cancel", systemImage: "xmark.circle")
+                                }
                             } else if download.status == .completed || download.status == .cancelled {
                                 Button(role: .destructive) {
                                     downloadManager.removeDownload(id: download.id)

@@ -38,13 +38,24 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         }
     }
 
-    enum DownloadError: Error {
+    enum DownloadError: Error, LocalizedError {
         case invalidURL
         case invalidResponse
         case downloadFailed(String)
         case fileError(String)
         case downloadCancelled
         case downloadPaused
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidURL: return "Invalid download URL"
+            case .invalidResponse: return "The server rejected the request"
+            case .downloadFailed(let reason): return "Download failed: \(reason)"
+            case .fileError(let reason): return "File error: \(reason)"
+            case .downloadCancelled: return "Download cancelled"
+            case .downloadPaused: return "Download paused"
+            }
+        }
     }
 
     var outputFormat: OutputFormat = .mp4
@@ -113,7 +124,6 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
     }
 
     private let logger = Logger(subsystem: "com.mks.iptv.VideoDownloader", category: "Download")
-    private let downloadStateKey = "com.mks.iptv.VideoDownloader.downloadState"
 
     init(profile: IPTVProfile) {
         self.profile = profile
@@ -121,7 +131,9 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         let configuration = URLSessionConfiguration.default
         configuration.httpMaximumConnectionsPerHost = 1
         configuration.timeoutIntervalForRequest = 60
-        configuration.timeoutIntervalForResource = 3600
+        // 24h — a multi-GB movie on a slow line easily exceeds 1h; the per-request
+        // timeout above already covers stalled connections
+        configuration.timeoutIntervalForResource = 86400
         configuration.httpShouldUsePipelining = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.urlCache = nil
@@ -149,7 +161,6 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         }
 
         currentState = .cancelled
-        clearDownloadState()
         downloadContinuation?.resume(throwing: DownloadError.downloadCancelled)
         downloadContinuation = nil
         closeFileHandle()
@@ -176,101 +187,60 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         flushBuffer()
 
         currentState = .paused
-        saveDownloadState()
-        downloadContinuation?.resume()
+        downloadContinuation?.resume(throwing: DownloadError.downloadPaused)
         downloadContinuation = nil
         closeFileHandle()
     }
 
-    func resume() async throws {
-        guard case .paused = currentState else { return }
-        logger.info("Resuming download for vodID: \(self.currentVodId ?? "unknown")")
-
-        guard let vodId = currentVodId,
-              let destinationPath = currentDestinationPath else {
-            throw DownloadError.downloadFailed("Missing download information")
-        }
-
-        // Ensure file exists and is writable
-        let fileURL = URL(fileURLWithPath: destinationPath)
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            throw DownloadError.fileError("Download file not found")
-        }
-
-        do {
-            outputFileHandle = try FileHandle(forWritingTo: fileURL)
-            try outputFileHandle?.seekToEnd()
-        } catch {
-            logger.error("Failed to open file for resuming: \(error.localizedDescription)")
-            throw DownloadError.fileError("Cannot open file for resuming: \(error.localizedDescription)")
-        }
-
-        let urlString = IPTVConfiguration.buildMovieURL(profile: profile, vodID: vodId, vodExtension: "mp4")
-        guard let url = URL(string: urlString) else {
-            throw DownloadError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue("bytes=\(downloadedBytes)-", forHTTPHeaderField: "Range")
-        IPTVConfiguration.defaultRequestHeaders().forEach { key, value in
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-
-        dataTask = session.dataTask(with: request)
-        currentState = .downloading
-        startTime = Date()
-
-        try await streamData()
-    }
-
     // MARK: - Download Methods
 
+    /// Bytes already present in the partial file on disk — the source of truth for
+    /// the resume offset (in-memory/UserDefaults state doesn't survive crashes or
+    /// network failures, but every flushed byte does).
+    private static func partialFileSize(at path: String) -> Int64 {
+        (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int64) ?? 0
+    }
+
     /// Download a movie via direct HTTP (no transmux). Full pause/resume via Range headers.
-    func downloadMovie(vodID: String, to destinationPath: String, vodExtension: String) async throws {
+    func downloadMovie(vodID: String, to destinationPath: String, vodExtension: String, allowResume: Bool = false) async throws {
         currentVodId = vodID
         currentDestinationPath = destinationPath
         currentState = .downloading
-        downloadedBytes = 0
+        downloadedBytes = allowResume ? Self.partialFileSize(at: destinationPath) : 0
         totalBytes = 0
 
-        if let (savedBytes, _) = loadDownloadState(forVodId: vodID) {
-            downloadedBytes = savedBytes
-        }
-
-        logger.info("Starting movie download: vodID=\(vodID)")
+        logger.info("Starting movie download: vodID=\(vodID), resumeOffset=\(self.downloadedBytes)")
         let urlString = IPTVConfiguration.buildMovieURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
         try await download(from: urlString, to: destinationPath)
     }
 
     /// Download a series episode via direct HTTP (no transmux). Full pause/resume via Range headers.
-    func downloadSerie(vodID: String, to destinationPath: String, vodExtension: String) async throws {
+    func downloadSerie(vodID: String, to destinationPath: String, vodExtension: String, allowResume: Bool = false) async throws {
         currentVodId = vodID
         currentDestinationPath = destinationPath
         currentState = .downloading
-        downloadedBytes = 0
+        downloadedBytes = allowResume ? Self.partialFileSize(at: destinationPath) : 0
         totalBytes = 0
 
-        if let (savedBytes, _) = loadDownloadState(forVodId: vodID) {
-            downloadedBytes = savedBytes
-        }
-
-        logger.info("Starting series download: vodID=\(vodID)")
+        logger.info("Starting series download: vodID=\(vodID), resumeOffset=\(self.downloadedBytes)")
         let urlString = IPTVConfiguration.buildSeriesURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
         try await download(from: urlString, to: destinationPath)
     }
 
     /// Download for saving — thin wrapper that routes to downloadMovie or downloadSerie based on media type.
     /// Uses direct HTTP download (wire speed), no transmux involved.
+    /// Pass `allowResume: true` to continue an interrupted download from the partial file's byte offset.
     func downloadForSave(
         vodID: String,
         to destinationPath: String,
         vodExtension: String,
-        isMovie: Bool
+        isMovie: Bool,
+        allowResume: Bool = false
     ) async throws {
         if isMovie {
-            try await downloadMovie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
+            try await downloadMovie(vodID: vodID, to: destinationPath, vodExtension: vodExtension, allowResume: allowResume)
         } else {
-            try await downloadSerie(vodID: vodID, to: destinationPath, vodExtension: vodExtension)
+            try await downloadSerie(vodID: vodID, to: destinationPath, vodExtension: vodExtension, allowResume: allowResume)
         }
     }
 
@@ -321,7 +291,7 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
 
         let tmxSession: ProgressiveTransmuxSession
         do {
-            tmxSession = try await TransmuxingService.shared.startTransmux(from: sourceURL)
+            tmxSession = try await TransmuxingService.shared.startTransmux(from: sourceURL, transcodeAudio: true)
         } catch {
             logger.error("TransmuxingService.startTransmux FAILED: \(error)")
             logger.error("Error type: \(type(of: error)), description: \(error.localizedDescription)")
@@ -499,6 +469,7 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
             logger.error("Error writing data to file: \(error.localizedDescription)")
             currentState = .error(error)
             downloadContinuation?.resume(throwing: DownloadError.fileError(error.localizedDescription))
+            downloadContinuation = nil
         }
     }
 
@@ -529,35 +500,6 @@ class VideoDownloader: NSObject, URLSessionDataDelegate {
         let remainingBytes = Double(totalBytes - downloadedBytes)
 
         return bytesPerSecond > 0 ? remainingBytes / bytesPerSecond : 0
-    }
-
-    // MARK: - Download State Persistence
-
-    private func saveDownloadState() {
-        guard let vodId = currentVodId else { return }
-
-        let downloadState: [String: Any] = [
-            "vodId": vodId,
-            "bytesDownloaded": downloadedBytes,
-            "destinationPath": currentDestinationPath ?? "",
-            "timestamp": Date().timeIntervalSince1970
-        ]
-
-        UserDefaults.standard.set(downloadState, forKey: "\(downloadStateKey).\(vodId)")
-    }
-
-    private func loadDownloadState(forVodId vodId: String) -> (Int64, String)? {
-        guard let state = UserDefaults.standard.dictionary(forKey: "\(downloadStateKey).\(vodId)"),
-              let bytes = state["bytesDownloaded"] as? Int64,
-              let path = state["destinationPath"] as? String else {
-            return nil
-        }
-        return (bytes, path)
-    }
-
-    private func clearDownloadState() {
-        guard let vodId = currentVodId else { return }
-        UserDefaults.standard.removeObject(forKey: "\(downloadStateKey).\(vodId)")
     }
 
     // MARK: - Helper
@@ -611,6 +553,33 @@ extension VideoDownloader {
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         if let httpResponse = response as? HTTPURLResponse {
+            // Error responses (404, 416, 458…) would otherwise be written into the
+            // video file as if they were media data
+            guard httpResponse.statusCode < 400 else {
+                logger.error("Server returned HTTP \(httpResponse.statusCode) for vodID: \(self.currentVodId ?? "unknown")")
+                currentState = .error(DownloadError.invalidResponse)
+                downloadContinuation?.resume(throwing: DownloadError.invalidResponse)
+                downloadContinuation = nil
+                completionHandler(.cancel)
+                return
+            }
+
+            if downloadedBytes > 0 {
+                // Content-Range is "bytes <start>-<end>/<total>"
+                let rangeStart = httpResponse.value(forHTTPHeaderField: "Content-Range")
+                    .flatMap { $0.split(separator: " ").last }
+                    .flatMap { $0.split(separator: "-").first }
+                    .flatMap { Int64($0) }
+
+                if httpResponse.statusCode != 206 || rangeStart != downloadedBytes {
+                    // Server ignored or mis-applied the Range header — appending its bytes
+                    // would corrupt the file, so drop the partial data and restart from byte 0
+                    logger.warning("Resume requested at \(self.downloadedBytes) but server answered \(httpResponse.statusCode) (range start: \(rangeStart.map(String.init) ?? "none")) — restarting from byte 0")
+                    try? outputFileHandle?.truncate(atOffset: 0)
+                    downloadedBytes = 0
+                }
+            }
+
             if downloadedBytes > 0 {
                 // Resuming: content-length is remaining bytes
                 if httpResponse.expectedContentLength > 0 {

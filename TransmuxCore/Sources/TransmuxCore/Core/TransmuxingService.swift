@@ -2007,14 +2007,19 @@ public actor TransmuxingService {
         mks_log_init(TransmuxLog.filePath)
 
         // --- Open input ---
+        // NOTE: Do NOT set reconnect_streamed=1 for on-demand files (MKV, MP4 over HTTP).
+        // reconnect_streamed tells FFmpeg the source is a non-seekable live stream, which
+        // conflicts with container formats that need backward seeks to read index headers
+        // (MKV cues, MP4 moov). The combination causes avformat_open_input to return
+        // EINVAL (-22) because the seekability contract is violated.
+        // reconnect_streamed is only correct for live MPEG-TS — see performLiveTransmux.
         var inputOptions: OpaquePointer?
         av_dict_set(&inputOptions, "user_agent", "VLC/3.0.18 LibVLC/3.0.18", 0)
         av_dict_set(&inputOptions, "timeout", "30000000", 0)
         av_dict_set(&inputOptions, "reconnect", "1", 0)
-        av_dict_set(&inputOptions, "reconnect_streamed", "1", 0)
         av_dict_set(&inputOptions, "reconnect_delay_max", "5", 0)
-        av_dict_set(&inputOptions, "probesize", "33554432", 0)
-        av_dict_set(&inputOptions, "analyzeduration", "30000000", 0)
+        av_dict_set(&inputOptions, "probesize", "5000000", 0)
+        av_dict_set(&inputOptions, "analyzeduration", "5000000", 0)
 
         var ret = avformat_open_input(&inputCtx, inputPath, nil, &inputOptions)
         av_dict_free(&inputOptions)
@@ -2620,6 +2625,16 @@ public actor TransmuxingService {
         var pendingAudioPackets: [UnsafeMutablePointer<AVPacket>] = []
         let maxPendingAudioPackets = 500
 
+        // Track consecutive transcoder errors per input stream index.
+        // If a transcoder consistently fails (e.g., EAC3 features not supported by FFmpeg decoder),
+        // we destroy it and drop packets from that stream to avoid crashes.
+        var transcoderConsecutiveErrors: [Int32: Int] = [:]
+        let maxConsecutiveTranscoderErrors = 10
+        // Set of input stream indices whose transcoder has permanently failed.
+        // Packets from these streams are dropped (not remuxed) to avoid writing
+        // EAC3 packets into an AAC-configured output stream.
+        var failedTranscoderStreams: Set<Int32> = []
+
         // Map output stream indices
         let videoOutputIdx: Int32 = bestVideo >= 0 ? Int32(streamMapping[Int(bestVideo)]) : -1
         // Set of all audio output indices (for multi-audio seek rebasing)
@@ -2747,6 +2762,15 @@ public actor TransmuxingService {
                 continue
             }
 
+            // Drop packets from streams whose transcoder permanently failed.
+            // The output stream was configured for AAC but the decoder couldn't decode EAC3.
+            // Writing EAC3 into an AAC stream would corrupt the file.
+            if failedTranscoderStreams.contains(Int32(streamIndex)) {
+                av_packet_unref(pkt)
+                packetCount += 1
+                continue
+            }
+
             let outStreamIdx = Int32(streamMapping[streamIndex])
             let isVideo = outStreamIdx == videoOutputIdx
             let rawDtsBefore = mks_packet_get_dts(pkt)
@@ -2831,9 +2855,27 @@ public actor TransmuxingService {
             if let tc = audioTranscoders[Int32(streamIndex)] {
                 let sendRet = mks_audio_transcoder_send(tc, pkt)
                 if sendRet != MKS_OK {
-                    TransmuxLog.remux("audio transcoder send error for stream \(streamIndex) (\(sendRet.rawValue))", level: .warn)
+                    // Track consecutive errors — destroy transcoder if it keeps failing.
+                    // This prevents crashes from writing EAC3 packets into an AAC-configured
+                    // output stream, and avoids silent data loss when the decoder can't decode.
+                    transcoderConsecutiveErrors[Int32(streamIndex), default: 0] += 1
+                    let errors = transcoderConsecutiveErrors[Int32(streamIndex)] ?? 0
+                    if errors >= maxConsecutiveTranscoderErrors {
+                        TransmuxLog.remux("DESTROYING transcoder for stream \(streamIndex) after \(errors) consecutive errors — dropping packets", level: .error)
+                        mks_audio_transcoder_free(tc)
+                        audioTranscoders.removeValue(forKey: Int32(streamIndex))
+                        transcoderConsecutiveErrors.removeValue(forKey: Int32(streamIndex))
+                        failedTranscoderStreams.insert(Int32(streamIndex))
+                        av_packet_unref(pkt)
+                        packetCount += 1
+                        continue
+                    }
+                    TransmuxLog.remux("audio transcoder send error for stream \(streamIndex) (\(sendRet.rawValue), consecutive=\(errors))", level: .warn)
+                    av_packet_unref(pkt)
+                } else {
+                    // Success — reset error counter
+                    transcoderConsecutiveErrors.removeValue(forKey: Int32(streamIndex))
                 }
-                av_packet_unref(pkt)
 
                 var outPktPtr = av_packet_alloc()
                 if let outPkt = outPktPtr {

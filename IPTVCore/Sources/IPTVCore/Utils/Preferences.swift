@@ -14,6 +14,7 @@ import Foundation
 extension UserDefaults {
     private static let downloadPathKey = "DownloadPath"
     private static let showPlayerDebugOverlayKey = "showPlayerDebugOverlay"
+    private static let maxConcurrentDownloadsKey = "MaxConcurrentDownloads"
 
     public static var downloadPath: String {
         get {
@@ -31,6 +32,18 @@ extension UserDefaults {
         }
         set {
             UserDefaults.standard.setValue(newValue, forKey: downloadPathKey)
+        }
+    }
+
+    /// Maximum number of downloads running at once (1–3). Additional downloads
+    /// wait in the queue and start automatically as slots free up.
+    public static var maxConcurrentDownloads: Int {
+        get {
+            let stored = UserDefaults.standard.integer(forKey: maxConcurrentDownloadsKey)
+            return stored == 0 ? 1 : min(max(stored, 1), 3)
+        }
+        set {
+            UserDefaults.standard.setValue(min(max(newValue, 1), 3), forKey: maxConcurrentDownloadsKey)
         }
     }
 

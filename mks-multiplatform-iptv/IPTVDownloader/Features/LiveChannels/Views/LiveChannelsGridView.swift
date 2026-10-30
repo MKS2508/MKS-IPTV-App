@@ -602,7 +602,7 @@ struct LiveChannelsGridView: View {
         logger.info("[LivePlay] Segmenter: TS URL = \(tsURL.absoluteString)")
 
         do {
-            let liveSession = try await TransmuxingService.shared.startLiveTransmux(from: tsURL)
+            let liveSession = try await TransmuxingService.shared.startLiveTransmux(from: tsURL, transcodeAudio: true)
             logger.info("[LivePlay] Segmenter: FFmpeg session started, output dir = \(liveSession.outputDir)")
             let serverSession = try await TransmuxServer.shared.startLiveSegmented(
                 directory: liveSession.outputDir,

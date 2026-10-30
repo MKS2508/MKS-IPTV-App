@@ -21,6 +21,10 @@ class DownloadManager: ObservableObject {
     private var lastNotificationUpdate: [UUID: Date] = [:]
     private let notificationThrottle: TimeInterval = 2.0
 
+    /// Downloads currently holding a download slot. Main-thread only —
+    /// slot accounting relies on synchronous updates (item status changes async inside Tasks).
+    private var activeIDs: Set<UUID> = []
+
     // MARK: - Persistence
 
     private static var persistenceURL: URL {
@@ -43,6 +47,18 @@ class DownloadManager: ObservableObject {
     init(profile: IPTVProfile) {
         self.profile = profile
         loadPersistedDownloads()
+
+        // Re-drain the queue when maxConcurrentDownloads changes in Settings
+        NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: UserDefaults.standard,
+            queue: .main
+        ) { [weak self] _ in
+            self?.processQueue()
+        }
+
+        // Auto-start downloads that were queued when the app last quit
+        DispatchQueue.main.async { self.processQueue() }
     }
 
     // MARK: - Public API
@@ -64,8 +80,9 @@ class DownloadManager: ObservableObject {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             downloads[index].status = .cancelled
 
-            // Delete the partial file
-            if let filePath = downloads[index].filePath ?? downloads[index].downloadPath {
+            // Delete the partial file (filePath points at the in-progress raw file;
+            // downloadPath is the destination directory and must never be deleted)
+            if let filePath = downloads[index].filePath {
                 try? FileManager.default.removeItem(atPath: filePath)
             }
         }
@@ -74,6 +91,7 @@ class DownloadManager: ObservableObject {
         liveActivityManager.endActivity(for: id.uuidString, status: "Cancelled")
         #endif
         downloaders[id] = nil
+        releaseSlot(id)
         persistDownloads()
     }
 
@@ -100,6 +118,7 @@ class DownloadManager: ObservableObject {
             status: "Paused"
         )
         #endif
+        releaseSlot(id)
         persistDownloads()
     }
 
@@ -109,61 +128,44 @@ class DownloadManager: ObservableObject {
 
         let item = downloads[index]
 
-        // For transmux downloads, we need to restart (can't resume transmux mid-stream)
-        if item.transmuxSessionID != nil {
-            // Restart the transmux from scratch
+        // Transmux can't resume mid-stream — restart (play-while-downloading bypasses the queue)
+        if item.transmuxSessionID != nil || item.playWhileDownloading {
             logger.info("Resuming transmux download — restarting transmux session for \(item.title)")
             restartDownload(id: id)
             return
         }
 
-        // For HTTP downloads: resume from byte offset
-        if let downloader = downloaders[id] {
-            // Resubscribe to progress
-            progressSubscriptions[id]?.cancel()
-            let progressSubscription = downloader.progressPublisher
-                .receive(on: DispatchQueue.main)
-                .sink(receiveCompletion: { [weak self] completion in
-                    self?.handleCompletion(for: id, completion: completion)
-                }, receiveValue: { [weak self] progress in
-                    self?.updateProgress(for: id, progress: progress)
-                })
-            progressSubscriptions[id] = progressSubscription
-
-            Task {
-                do {
-                    try await downloader.resume()
-                    await MainActor.run {
-                        if let index = self.downloads.firstIndex(where: { $0.id == id }) {
-                            self.downloads[index].status = .downloading
-                        }
-                    }
-                } catch {
-                    await MainActor.run {
-                        self.handleError(for: id, error: error)
-                    }
-                }
-            }
-        } else {
-            // Downloader was released (e.g., app restart) — restart from byte offset
-            restartDownload(id: id)
-        }
+        // HTTP downloads re-enter the queue. The byte offset is restored from
+        // VideoDownloader's persisted per-vodID state when the download restarts.
+        downloads[index].speed = 0
+        downloads[index].eta = 0
+        downloads[index].status = .queued
+        persistDownloads()
+        processQueue()
     }
 
     func cancelAllDownloads() {
-        for download in downloads where download.status == .downloading || download.status == .paused {
+        for download in downloads where download.status == .downloading || download.status == .paused || download.status == .queued {
             cancelDownload(id: download.id)
         }
     }
 
     func togglePauseResumeAll() {
         let activeDownloads = downloads.filter { $0.status == .downloading }
+        let queuedDownloads = downloads.filter { $0.status == .queued }
         let pausedDownloads = downloads.filter { $0.status == .paused }
 
-        if !activeDownloads.isEmpty {
+        if !activeDownloads.isEmpty || !queuedDownloads.isEmpty {
+            // Park queued items first so freed slots don't immediately start them
+            for download in queuedDownloads {
+                if let index = downloads.firstIndex(where: { $0.id == download.id }) {
+                    downloads[index].status = .paused
+                }
+            }
             for download in activeDownloads {
                 pauseDownload(id: download.id)
             }
+            persistDownloads()
         } else if !pausedDownloads.isEmpty {
             for download in pausedDownloads {
                 resumeDownload(id: download.id)
@@ -180,10 +182,11 @@ class DownloadManager: ObservableObject {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             let item = downloads[index]
             // Cancel if active
-            if item.status == .downloading || item.status == .converting {
+            if item.status == .downloading || item.status == .converting || item.status == .notStarted {
                 cancelDownload(id: id)
             }
-            downloads.remove(at: index)
+            downloads.removeAll { $0.id == id }
+            releaseSlot(id)
             persistDownloads()
         }
     }
@@ -217,6 +220,9 @@ class DownloadManager: ObservableObject {
         download.playWhileDownloading = playWhileDownloading
         download.saveToPhotos = saveToPhotos
         download.sourceExtension = vodExtension
+        download.tmdbId = tmdbId
+        download.genre = genre
+        download.runtimeMinutes = runtimeMinutes
 
         if let metadata = preResolvedMetadata {
             download.metadataResult = metadata
@@ -234,69 +240,78 @@ class DownloadManager: ObservableObject {
             : IPTVConfiguration.buildSeriesURL(profile: profile, vodID: vodID, vodExtension: vodExtension)
         download.sourceURLString = urlString
 
+        // Play-while-downloading bypasses the queue (the user is about to watch it);
+        // everything else waits for a free download slot.
+        download.status = playWhileDownloading ? .notStarted : .queued
+
         let finalDownload = download
-        let downloadId = finalDownload.id
 
-        DispatchQueue.main.async {
-            self.downloads.append(finalDownload)
-            self.persistDownloads()
-        }
-
-        // Decide download strategy:
-        // - If playWhileDownloading: use transmux (stream + play simultaneously)
-        // - Otherwise: direct HTTP download (wire speed) → optional post-download convert
         if playWhileDownloading {
-            startTransmuxDownload(
-                downloadId: downloadId,
-                vodID: vodID,
-                title: title,
-                type: type,
-                vodExtension: vodExtension,
-                outputFormat: outputFormat,
-                downloadPath: downloadPath,
-                saveToPhotos: saveToPhotos,
-                tmdbId: tmdbId,
-                genre: genre,
-                runtimeMinutes: runtimeMinutes,
-                preResolvedMetadata: preResolvedMetadata,
-                metadataCandidates: metadataCandidates
-            )
+            DispatchQueue.main.async {
+                self.downloads.append(finalDownload)
+                self.persistDownloads()
+            }
+            startTransmuxDownload(finalDownload)
         } else {
-            startDirectDownload(
-                downloadId: downloadId,
-                vodID: vodID,
-                title: title,
-                type: type,
-                vodExtension: vodExtension,
-                outputFormat: outputFormat,
-                downloadPath: downloadPath,
-                saveToPhotos: saveToPhotos,
-                tmdbId: tmdbId,
-                genre: genre,
-                runtimeMinutes: runtimeMinutes,
-                preResolvedMetadata: preResolvedMetadata,
-                metadataCandidates: metadataCandidates
-            )
+            DispatchQueue.main.async {
+                self.downloads.append(finalDownload)
+                self.persistDownloads()
+                self.processQueue()
+            }
         }
+    }
+
+    // MARK: - Download Queue
+
+    /// Starts queued downloads while slots are available. Main-thread only.
+    private func processQueue() {
+        while activeIDs.count < UserDefaults.maxConcurrentDownloads,
+              let next = downloads.first(where: { $0.status == .queued }) {
+            startQueuedDownload(next)
+        }
+    }
+
+    private func startQueuedDownload(_ item: DownloadItem) {
+        guard let index = downloads.firstIndex(where: { $0.id == item.id }) else { return }
+        activeIDs.insert(item.id)
+        downloads[index].status = .notStarted
+        startDirectDownload(downloads[index])
+    }
+
+    /// Frees a download slot and starts the next queued download, if any.
+    /// Must run on every terminal transition (completed/failed/cancelled/paused)
+    /// or the queue stalls silently. No-op for downloads that never held a slot.
+    private func releaseSlot(_ id: UUID) {
+        activeIDs.remove(id)
+        processQueue()
+    }
+
+    // MARK: - File Naming
+
+    /// IPTV titles can contain "/" (breaks the path) or exceed the 255-byte filename
+    /// limit (HFS+/APFS/exFAT); ":" is rejected by exFAT/SMB volumes commonly used
+    /// as download targets. Must stay deterministic — retries recompute the same path.
+    private static func sanitizedFileName(title: String, ext: String) -> String {
+        var name = title
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        while name.utf8.count > 200 {
+            name.removeLast()
+        }
+        return "\(name).\(ext)"
     }
 
     // MARK: - Direct HTTP Download (Wire Speed)
 
-    private func startDirectDownload(
-        downloadId: UUID,
-        vodID: String,
-        title: String,
-        type: MediaType,
-        vodExtension: String,
-        outputFormat: VideoDownloader.OutputFormat,
-        downloadPath: String,
-        saveToPhotos: Bool,
-        tmdbId: Int?,
-        genre: String?,
-        runtimeMinutes: Int?,
-        preResolvedMetadata: MetadataResult?,
-        metadataCandidates: [ScoredMetadataResult]?
-    ) {
+    private func startDirectDownload(_ item: DownloadItem) {
+        let downloadId = item.id
+        let vodID = item.vodID
+        let title = item.title
+        let type = item.type
+        let vodExtension = item.sourceExtension ?? "mkv"
+        let outputFormat = item.outputFormat
+        let downloadPath = item.downloadPath ?? UserDefaults.downloadPath
+
         let downloader = VideoDownloader(profile: profile)
         downloader.outputFormat = outputFormat
         downloaders[downloadId] = downloader
@@ -315,13 +330,15 @@ class DownloadManager: ObservableObject {
             do {
                 // Use source extension for the raw download file
                 let rawFilePath = URL(fileURLWithPath: downloadPath)
-                    .appendingPathComponent("\(title).\(vodExtension)")
+                    .appendingPathComponent(Self.sanitizedFileName(title: title, ext: vodExtension))
                     .path
 
                 await MainActor.run {
                     if let index = self.downloads.firstIndex(where: { $0.id == downloadId }) {
                         self.downloads[index].status = .downloading
-                        self.downloads[index].downloadPath = rawFilePath
+                        // Track the in-progress raw file so cancel can delete it;
+                        // downloadPath keeps pointing at the destination directory
+                        self.downloads[index].filePath = rawFilePath
                     }
                     #if os(iOS)
                     self.liveActivityManager.startActivity(
@@ -332,12 +349,16 @@ class DownloadManager: ObservableObject {
                     #endif
                 }
 
-                // Phase A: Download raw file at wire speed
+                // Phase A: Download raw file at wire speed.
+                // filePath is only set once a download has started writing, so it marks
+                // retries/resumes — the partial file's byte offset is picked up from disk.
+                // (bytesDownloaded is unreliable: it reports 0 when the server sends no Content-Length.)
                 try await downloader.downloadForSave(
                     vodID: vodID,
                     to: rawFilePath,
                     vodExtension: vodExtension,
-                    isMovie: type == .movie
+                    isMovie: type == .movie,
+                    allowResume: item.filePath != nil
                 )
 
                 // Phase A complete — mark as downloaded
@@ -364,7 +385,7 @@ class DownloadManager: ObservableObject {
                 } else {
                     // No conversion needed — rename to target format if needed and mark completed
                     let finalPath = URL(fileURLWithPath: downloadPath)
-                        .appendingPathComponent("\(title).\(outputFormat.fileExtension)")
+                        .appendingPathComponent(Self.sanitizedFileName(title: title, ext: outputFormat.fileExtension))
                         .path
 
                     if rawFilePath != finalPath {
@@ -380,13 +401,14 @@ class DownloadManager: ObservableObject {
                         self.progressSubscriptions[downloadId]?.cancel()
                         self.progressSubscriptions[downloadId] = nil
                         self.sendCompletionNotification(for: downloadId)
+                        self.releaseSlot(downloadId)
                         self.persistDownloads()
                     }
                 }
 
                 // Save to Photos if requested (iOS)
                 #if os(iOS)
-                if saveToPhotos {
+                if item.saveToPhotos {
                     let finalFilePath: String = await MainActor.run {
                         self.downloads.first(where: { $0.id == downloadId })?.filePath ?? rawFilePath
                     }
@@ -402,11 +424,11 @@ class DownloadManager: ObservableObject {
                     downloadId: downloadId,
                     title: title,
                     type: type,
-                    tmdbId: tmdbId,
-                    genre: genre,
-                    runtimeMinutes: runtimeMinutes,
-                    preResolvedMetadata: preResolvedMetadata,
-                    metadataCandidates: metadataCandidates
+                    tmdbId: item.tmdbId,
+                    genre: item.genre,
+                    runtimeMinutes: item.runtimeMinutes,
+                    preResolvedMetadata: item.metadataResult,
+                    metadataCandidates: item.metadataCandidates.isEmpty ? nil : item.metadataCandidates
                 )
 
             } catch {
@@ -420,21 +442,15 @@ class DownloadManager: ObservableObject {
 
     // MARK: - Transmux Download (Play-While-Downloading)
 
-    private func startTransmuxDownload(
-        downloadId: UUID,
-        vodID: String,
-        title: String,
-        type: MediaType,
-        vodExtension: String,
-        outputFormat: VideoDownloader.OutputFormat,
-        downloadPath: String,
-        saveToPhotos: Bool,
-        tmdbId: Int?,
-        genre: String?,
-        runtimeMinutes: Int?,
-        preResolvedMetadata: MetadataResult?,
-        metadataCandidates: [ScoredMetadataResult]?
-    ) {
+    private func startTransmuxDownload(_ item: DownloadItem) {
+        let downloadId = item.id
+        let vodID = item.vodID
+        let title = item.title
+        let type = item.type
+        let vodExtension = item.sourceExtension ?? "mkv"
+        let outputFormat = item.outputFormat
+        let downloadPath = item.downloadPath ?? UserDefaults.downloadPath
+
         let downloader = VideoDownloader(profile: profile)
         downloader.outputFormat = outputFormat
         downloaders[downloadId] = downloader
@@ -451,7 +467,7 @@ class DownloadManager: ObservableObject {
         Task {
             do {
                 let destinationPath = URL(fileURLWithPath: downloadPath)
-                    .appendingPathComponent("\(title).\(outputFormat.fileExtension)")
+                    .appendingPathComponent(Self.sanitizedFileName(title: title, ext: outputFormat.fileExtension))
                     .path
 
                 let session = try await downloader.downloadWithTransmux(
@@ -498,7 +514,7 @@ class DownloadManager: ObservableObject {
 
                 // Save to Photos if requested (iOS)
                 #if os(iOS)
-                if saveToPhotos {
+                if item.saveToPhotos {
                     await Self.saveVideoToPhotos(
                         fileURL: URL(fileURLWithPath: session.outputPath),
                         downloadId: downloadId
@@ -511,11 +527,11 @@ class DownloadManager: ObservableObject {
                     downloadId: downloadId,
                     title: title,
                     type: type,
-                    tmdbId: tmdbId,
-                    genre: genre,
-                    runtimeMinutes: runtimeMinutes,
-                    preResolvedMetadata: preResolvedMetadata,
-                    metadataCandidates: metadataCandidates
+                    tmdbId: item.tmdbId,
+                    genre: item.genre,
+                    runtimeMinutes: item.runtimeMinutes,
+                    preResolvedMetadata: item.metadataResult,
+                    metadataCandidates: item.metadataCandidates.isEmpty ? nil : item.metadataCandidates
                 )
 
             } catch {
@@ -555,7 +571,7 @@ class DownloadManager: ObservableObject {
 
         do {
             let rawFileURL = URL(fileURLWithPath: rawFilePath)
-            let tmxSession = try await TransmuxingService.shared.startTransmux(from: rawFileURL)
+            let tmxSession = try await TransmuxingService.shared.startTransmux(from: rawFileURL, transcodeAudio: true)
 
             logger.info("[DownloadManager] Post-download conversion started, session: \(tmxSession.sessionID)")
 
@@ -571,7 +587,7 @@ class DownloadManager: ObservableObject {
 
             // Move converted file to final destination
             let finalPath = URL(fileURLWithPath: downloadPath)
-                .appendingPathComponent("\(title).\(outputFormat.fileExtension)")
+                .appendingPathComponent(Self.sanitizedFileName(title: title, ext: outputFormat.fileExtension))
                 .path
 
             if convertedPath != finalPath {
@@ -587,6 +603,7 @@ class DownloadManager: ObservableObject {
                 self.progressSubscriptions[downloadId]?.cancel()
                 self.progressSubscriptions[downloadId] = nil
                 self.sendCompletionNotification(for: downloadId)
+                self.releaseSlot(downloadId)
                 self.persistDownloads()
             }
 
@@ -604,6 +621,7 @@ class DownloadManager: ObservableObject {
                 }
                 self.downloaders[downloadId] = nil
                 self.sendCompletionNotification(for: downloadId)
+                self.releaseSlot(downloadId)
                 self.persistDownloads()
             }
         }
@@ -657,9 +675,8 @@ class DownloadManager: ObservableObject {
 
     private func restartDownload(id: UUID) {
         guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
-        let item = downloads[index]
 
-        guard item.status == .paused || item.status == .failed else { return }
+        guard downloads[index].status == .paused || downloads[index].status == .failed else { return }
 
         // Clean up old downloader
         downloaders[id]?.cancel()
@@ -667,44 +684,19 @@ class DownloadManager: ObservableObject {
         progressSubscriptions[id]?.cancel()
         progressSubscriptions[id] = nil
 
-        // Restart with same parameters
-        downloads[index].status = .notStarted
         downloads[index].speed = 0
         downloads[index].eta = 0
 
-        if item.playWhileDownloading {
-            startTransmuxDownload(
-                downloadId: id,
-                vodID: item.vodID,
-                title: item.title,
-                type: item.type,
-                vodExtension: item.sourceExtension ?? "mkv",
-                outputFormat: item.outputFormat,
-                downloadPath: item.downloadPath ?? UserDefaults.downloadPath,
-                saveToPhotos: item.saveToPhotos,
-                tmdbId: nil,
-                genre: nil,
-                runtimeMinutes: nil,
-                preResolvedMetadata: item.metadataResult,
-                metadataCandidates: item.metadataCandidates.isEmpty ? nil : item.metadataCandidates
-            )
+        if downloads[index].playWhileDownloading {
+            // Transmux bypasses the queue — the user expects immediate playback
+            downloads[index].status = .notStarted
+            releaseSlot(id)
+            startTransmuxDownload(downloads[index])
         } else {
-            startDirectDownload(
-                downloadId: id,
-                vodID: item.vodID,
-                title: item.title,
-                type: item.type,
-                vodExtension: item.sourceExtension ?? "mkv",
-                outputFormat: item.outputFormat,
-                downloadPath: item.downloadPath ?? UserDefaults.downloadPath,
-                saveToPhotos: item.saveToPhotos,
-                tmdbId: nil,
-                genre: nil,
-                runtimeMinutes: nil,
-                preResolvedMetadata: item.metadataResult,
-                metadataCandidates: item.metadataCandidates.isEmpty ? nil : item.metadataCandidates
-            )
+            downloads[index].status = .queued
+            releaseSlot(id)
         }
+        persistDownloads()
     }
 
     /// Retry a failed download
@@ -1016,6 +1008,7 @@ class DownloadManager: ObservableObject {
         progressSubscriptions[id]?.cancel()
         progressSubscriptions[id] = nil
         lastNotificationUpdate[id] = nil
+        releaseSlot(id)
         persistDownloads()
     }
 
@@ -1056,11 +1049,34 @@ class DownloadManager: ObservableObject {
             let data = try Data(contentsOf: Self.persistenceURL)
             var loaded = try JSONDecoder().decode([DownloadItem].self, from: data)
 
-            // Mark any downloads that were .downloading as .failed (interrupted)
+            // Mark any downloads that were .downloading as .failed (interrupted);
+            // downloads caught mid-start go back to the queue
             for i in loaded.indices {
                 if loaded[i].status == .downloading {
                     loaded[i].status = .failed
                     loaded[i].errorMessage = "Download interrupted — tap to retry"
+                } else if loaded[i].status == .notStarted {
+                    loaded[i].status = .queued
+                }
+
+                // Migrate items persisted by older builds where downloadPath was
+                // overwritten with the raw FILE path (broke every retry with fileError).
+                // Decided from the path string alone — a corrupted retry may have left
+                // a real DIRECTORY named "<title>.<ext>" behind, so the filesystem lies.
+                if let dp = loaded[i].downloadPath {
+                    let lastComponent = (dp as NSString).lastPathComponent.lowercased()
+                    let mediaExtensions = [loaded[i].sourceExtension?.lowercased(),
+                                           loaded[i].outputFormat.fileExtension.lowercased()].compactMap { $0 }
+                    if mediaExtensions.contains(where: { lastComponent.hasSuffix(".\($0)") }) {
+                        if loaded[i].filePath == nil {
+                            var isDirectory: ObjCBool = false
+                            if FileManager.default.fileExists(atPath: dp, isDirectory: &isDirectory),
+                               !isDirectory.boolValue {
+                                loaded[i].filePath = dp
+                            }
+                        }
+                        loaded[i].downloadPath = (dp as NSString).deletingLastPathComponent
+                    }
                 }
             }
 

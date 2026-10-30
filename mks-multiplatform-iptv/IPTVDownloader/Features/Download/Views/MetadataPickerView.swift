@@ -6,16 +6,49 @@ import IPTVCore
 /// Displays all metadata candidates from providers as selectable cards.
 /// The user picks one, optionally edits fields, then confirms to write tags.
 struct MetadataPickerView: View {
-    let downloadItem: DownloadItem
+    let downloadItem: DownloadItem?
+    let fileTitleOverride: String?
+    let candidatesOverride: [ScoredMetadataResult]?
     let onConfirm: (MetadataResult) -> Void
     let onDismiss: () -> Void
+
+    /// Convenience init for DownloadItem-backed usage (existing callers).
+    init(
+        downloadItem: DownloadItem,
+        onConfirm: @escaping (MetadataResult) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.downloadItem = downloadItem
+        self.fileTitleOverride = nil
+        self.candidatesOverride = nil
+        self.onConfirm = onConfirm
+        self.onDismiss = onDismiss
+    }
+
+    /// Init for local file usage — pass candidates fetched separately.
+    init(
+        fileTitle: String,
+        candidates: [ScoredMetadataResult],
+        onConfirm: @escaping (MetadataResult) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        self.downloadItem = nil
+        self.fileTitleOverride = fileTitle
+        self.candidatesOverride = candidates
+        self.onConfirm = onConfirm
+        self.onDismiss = onDismiss
+    }
 
     @State private var selectedCandidateId: UUID?
     @State private var editableMetadata: EditableMetadata?
     @State private var isEditing = false
 
     private var candidates: [ScoredMetadataResult] {
-        downloadItem.metadataCandidates
+        candidatesOverride ?? downloadItem?.metadataCandidates ?? []
+    }
+
+    private var effectiveTitle: String {
+        fileTitleOverride ?? downloadItem?.title ?? "Unknown"
     }
 
     var body: some View {
@@ -52,7 +85,7 @@ struct MetadataPickerView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Metadata for: \(downloadItem.title)")
+                Text("Metadata for: \(effectiveTitle)")
                     .font(.headline)
                     .lineLimit(1)
                 Text("\(candidates.count) results from providers")

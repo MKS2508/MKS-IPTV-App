@@ -27,7 +27,11 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
     private let configuration: PlayerConfiguration
     private let progressSubject = PassthroughSubject<Double, Never>()
     private var cancellables = Set<AnyCancellable>()
-    private var transmuxSessionID: String?
+    private(set) var transmuxSessionID: String?
+    /// Timestamp when load() was called — used by error view to show elapsed time on failure.
+    private(set) var loadStartedAt: Date?
+    /// Timestamp when error was set — used by error view to show "failed Xs after load".
+    private(set) var loadFailedAt: Date?
     @Published private(set) var isTransmuxing: Bool = false
 
     /// Stored metadata to pass to the inner AVPlayer after transmux starts
@@ -72,6 +76,8 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
         isTransmuxing = true
         error = nil
+        loadStartedAt = Date()
+        loadFailedAt = nil
         pendingMetadata = metadata
 
         Task { @MainActor in
@@ -87,9 +93,10 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
 
                 guard preflight.isReachable else {
                     self.isTransmuxing = false
+                    self.loadFailedAt = Date()
                     self.error = .networkError(
                         NSError(domain: "StreamPreflight", code: preflight.httpStatus ?? -1,
-                                userInfo: [NSLocalizedDescriptionKey: "Stream unreachable: \(preflight.error ?? "unknown")"])
+                                userInfo: [NSLocalizedDescriptionKey: "Stream unreachable — \(preflight.summary)"])
                     )
                     PlayerLog.networkError(
                         httpStatus: preflight.httpStatus,
@@ -100,7 +107,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 }
 
                 // Step 1: Start progressive transmux (returns after header written)
-                let session = try await TransmuxingService.shared.startTransmux(from: url)
+                let session = try await TransmuxingService.shared.startTransmux(from: url, transcodeAudio: true)
                 self.transmuxSessionID = session.sessionID
                 self.seekHandle = session.seekHandle
                 PlayerLog.log("TRANSMUX_STARTED", category: "transmux", fields: [
@@ -178,6 +185,7 @@ class FFmpegPlayerImplementation: VideoPlayerProtocol, ObservableObject {
                 self.isPlaying = true
             } catch {
                 self.isTransmuxing = false
+                self.loadFailedAt = Date()
                 self.error = .unknown(error)
                 PlayerLog.log("TRANSMUX_FAILED", category: "transmux", level: .critical, fields: [
                     "error": error.localizedDescription
@@ -346,6 +354,8 @@ fileprivate struct FFmpegPlayerContentView: View {
                         .font(.caption)
                 }
             }
+        } else if let error = player.error {
+            TransmuxErrorView(player: player, error: error)
         } else if let innerView = player.innerPlayerView() {
             ZStack {
                 innerView
@@ -386,5 +396,213 @@ fileprivate struct FFmpegPlayerContentView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Transmux Error View
+
+/// Verbose failure UI shown when the transmux pipeline aborts before producing
+/// a playable AVPlayer. Surfaces every piece of diagnostic information available
+/// so the user can debug without needing Xcode attached.
+fileprivate struct TransmuxErrorView: View {
+    @ObservedObject var player: FFmpegPlayerImplementation
+    let error: PlayerError
+
+    @State private var copied = false
+
+    private var errorKind: String {
+        switch error {
+        case .unsupportedFormat: return "unsupported_format"
+        case .networkError: return "network_error"
+        case .decodingError: return "decoding_error"
+        case .unknown: return "unknown"
+        }
+    }
+
+    private var underlyingNSError: NSError? {
+        switch error {
+        case .networkError(let e), .unknown(let e): return e as NSError
+        default: return nil
+        }
+    }
+
+    private var elapsed: String {
+        guard let start = player.loadStartedAt else { return "—" }
+        let end = player.loadFailedAt ?? Date()
+        return String(format: "%.2fs", end.timeIntervalSince(start))
+    }
+
+    private var failedAtString: String {
+        guard let date = player.loadFailedAt else { return "—" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
+    private var fullDiagnostics: String {
+        var lines: [String] = []
+        lines.append("=== Transmux Failure Report ===")
+        lines.append("Failed at: \(failedAtString)")
+        lines.append("Elapsed:   \(elapsed)")
+        lines.append("Kind:      \(errorKind)")
+        lines.append("Message:   \(error.errorDescription ?? "—")")
+        if let ns = underlyingNSError {
+            lines.append("Domain:    \(ns.domain)")
+            lines.append("Code:      \(ns.code)")
+            if !ns.userInfo.isEmpty {
+                lines.append("UserInfo:")
+                for (k, v) in ns.userInfo {
+                    lines.append("  \(k) = \(v)")
+                }
+            }
+        }
+        lines.append("Source URL:    \(player.sourceURL?.absoluteString ?? "—")")
+        lines.append("URL length:    \(player.sourceURL?.absoluteString.count ?? 0) chars")
+        lines.append("Session ID:    \(player.transmuxSessionID ?? "—")")
+        lines.append("Log dir:       \(MKSLogConfig.shared.logDirectory)")
+        return lines.joined(separator: "\n")
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Header
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.red)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Transmux failed")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text("The FFmpeg pipeline could not start playback")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                        Spacer()
+                    }
+
+                    Divider().background(.white.opacity(0.2))
+
+                    // Error description (primary)
+                    field(label: "MESSAGE", value: error.errorDescription ?? "Unknown error", monospaced: false, accent: .red)
+
+                    // Kind / domain / code
+                    HStack(alignment: .top, spacing: 12) {
+                        field(label: "KIND", value: errorKind)
+                        if let ns = underlyingNSError {
+                            field(label: "DOMAIN", value: ns.domain)
+                            field(label: "CODE", value: String(ns.code))
+                        }
+                    }
+
+                    // Timing
+                    HStack(alignment: .top, spacing: 12) {
+                        field(label: "FAILED AT", value: failedAtString)
+                        field(label: "ELAPSED", value: elapsed)
+                    }
+
+                    // Source URL
+                    if let url = player.sourceURL {
+                        field(
+                            label: "SOURCE URL (\(url.absoluteString.count) chars)",
+                            value: url.absoluteString,
+                            monospaced: true
+                        )
+                    }
+
+                    // Session + log path
+                    field(label: "SESSION ID", value: player.transmuxSessionID ?? "—", monospaced: true)
+                    field(label: "LOG DIRECTORY", value: MKSLogConfig.shared.logDirectory, monospaced: true)
+
+                    // UserInfo dump
+                    if let ns = underlyingNSError, !ns.userInfo.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("USER INFO")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.55))
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(ns.userInfo.keys.map { "\($0)" }.sorted()), id: \.self) { key in
+                                    if let value = ns.userInfo[key] {
+                                        HStack(alignment: .top, spacing: 6) {
+                                            Text("\(key):")
+                                                .foregroundStyle(.white.opacity(0.7))
+                                            Text("\(value)")
+                                                .foregroundStyle(.white)
+                                                .textSelection(.enabled)
+                                        }
+                                        .font(.system(size: 11, design: .monospaced))
+                                    }
+                                }
+                            }
+                            .padding(8)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(.white.opacity(0.06)))
+                        }
+                    }
+
+                    // Actions
+                    HStack(spacing: 10) {
+                        if let url = player.sourceURL {
+                            Button {
+                                player.load(url: url)
+                            } label: {
+                                Label("Retry", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+
+                        Button {
+                            copyToClipboard(fullDiagnostics)
+                            copied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                        } label: {
+                            Label(copied ? "Copied!" : "Copy full report", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        }
+                        .buttonStyle(.bordered)
+
+                        #if os(macOS)
+                        Button {
+                            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: MKSLogConfig.shared.logDirectory)
+                        } label: {
+                            Label("Open logs", systemImage: "folder")
+                        }
+                        .buttonStyle(.bordered)
+                        #endif
+
+                        Spacer()
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(20)
+                .frame(maxWidth: 720, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func field(label: String, value: String, monospaced: Bool = false, accent: Color = .white) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.55))
+            Text(value)
+                .font(monospaced ? .system(size: 12, design: .monospaced) : .callout)
+                .foregroundStyle(accent)
+                .textSelection(.enabled)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func copyToClipboard(_ text: String) {
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #else
+        UIPasteboard.general.string = text
+        #endif
     }
 }

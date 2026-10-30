@@ -98,7 +98,7 @@ struct DownloadRowView: View {
             return 1.0
         case .converting:
             return 0.0 // Indeterminate — handled by animation
-        case .notStarted:
+        case .notStarted, .queued:
             return 0.0
         default:
             return min(progress / 100.0, 1.0)
@@ -111,6 +111,8 @@ struct DownloadRowView: View {
         case .notStarted:
             ProgressView()
                 .scaleEffect(0.6)
+        case .queued:
+            Image(systemName: "clock")
         case .downloading:
             Image(systemName: "arrow.down")
         case .paused:
@@ -296,6 +298,14 @@ struct DownloadRowView: View {
                     .font(.caption)
                 Spacer()
             }
+
+        case .queued:
+            HStack {
+                Text("Queued")
+                    .foregroundStyle(.cyan)
+                    .font(.caption.weight(.medium))
+                Spacer()
+            }
         }
 
         // Metadata preview for completed downloads
@@ -369,6 +379,14 @@ struct DownloadRowView: View {
                 }
                 #endif
 
+            case .queued:
+                Button { downloadManager.cancelDownload(id: item.id) } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+
             case .converting:
                 // No actions during conversion
                 EmptyView()
@@ -384,6 +402,7 @@ struct DownloadRowView: View {
     private var statusAccentColor: Color {
         switch item.status {
         case .downloading: return .accentColor
+        case .queued: return .cyan
         case .paused: return .orange
         case .downloaded: return .green
         case .converting: return .purple
@@ -427,6 +446,12 @@ struct DownloadRowView: View {
                 downloadManager.retryDownload(id: item.id)
             } label: {
                 Label("Retry", systemImage: "arrow.clockwise")
+            }
+        } else if item.status == .queued {
+            Button(role: .destructive) {
+                downloadManager.cancelDownload(id: item.id)
+            } label: {
+                Label("Cancel", systemImage: "xmark.circle")
             }
         }
 

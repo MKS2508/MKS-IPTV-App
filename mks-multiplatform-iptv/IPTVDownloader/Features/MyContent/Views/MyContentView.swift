@@ -5,119 +5,103 @@ import IPTVCore
 struct MyContentView: View {
     @EnvironmentObject private var downloadManager: DownloadManager
     @State private var localFiles: [LocalVideoFile] = []
+    @State private var localFileMetadata: [UUID: LocalFileMetadata] = [:]
     @State private var showFileImporter = false
+
+    // Sheet state
+    @State private var selectedLocalFile: LocalVideoFile?
+    @State private var showActionSheet = false
+    @State private var showMetadataPicker = false
+    @State private var metadataCandidates: [ScoredMetadataResult] = []
+    @State private var showConvertSheet = false
+
     #if os(macOS)
     @EnvironmentObject private var touchBarManager: TouchBarManager
     @Environment(\.openWindow) private var openWindow
     #endif
 
     var body: some View {
-        AdaptiveGlassContainer {
-            Group {
-                if downloadManager.downloads.isEmpty && localFiles.isEmpty {
-                    emptyStateView
-                } else {
-                    contentView
-                }
-            }
-        }
-        .navigationTitle("My Content")
-        .toolbar { toolbarContent }
-        .fileImporter(
-            isPresented: $showFileImporter,
-            allowedContentTypes: [.movie, .video, .quickTimeMovie, .mpeg, .mpeg4Movie],
-            allowsMultipleSelection: true
-        ) { result in
-            handleFileImport(result)
-        }
-        #if os(macOS)
-        .onAppear {
-            updateTouchBarProgress()
-        }
-        .onReceive(downloadManager.$downloads) { _ in
-            updateTouchBarProgress()
-        }
-        .onReceive(downloadManager.objectWillChange) { _ in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                updateTouchBarProgress()
-            }
-        }
-        #endif
+        content
+            .navigationTitle("My Content")
+            .toolbar { toolbarContent }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.movie, .video, .quickTimeMovie, .mpeg, .mpeg4Movie],
+                allowsMultipleSelection: true
+            ) { handleFileImport($0) }
+            .onAppear { loadLocalFiles() }
+            .sheet(isPresented: $showMetadataPicker) { metadataPickerSheet }
+            .sheet(isPresented: $showConvertSheet) { convertSheet }
     }
 
-    // MARK: - Content View
+    // MARK: - Content
 
-    private var contentView: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                // MARK: - IPTV Downloads Section
-                if !downloadManager.downloads.isEmpty {
-                    Section {
-                        ForEach(downloadManager.downloads) { download in
-                            DownloadRowView(item: download, progress: download.progress)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    downloadSwipeActions(for: download)
-                                }
-                        }
-                    } header: {
-                        SectionHeader(
-                            title: "IPTV Downloads",
-                            icon: "arrow.down.circle",
-                            count: downloadManager.downloads.count
-                        )
+    @ViewBuilder
+    private var content: some View {
+        if localFiles.isEmpty && downloadManager.downloads.isEmpty {
+            emptyState
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    if !downloadManager.downloads.isEmpty {
+                        downloadsSection
+                    }
+                    if !localFiles.isEmpty {
+                        localFilesSection
                     }
                 }
-
-                // MARK: - Local Files Section
-                if !localFiles.isEmpty {
-                    Section {
-                        ForEach(localFiles) { file in
-                            LocalFileRowView(
-                                file: file,
-                                onPlay: { playLocalFile(file) },
-                                onRemove: { removeLocalFile(file) }
-                            )
-                        }
-                    } header: {
-                        SectionHeader(
-                            title: "Local Files",
-                            icon: "doc.video",
-                            count: localFiles.count
-                        )
-                    }
-                }
+                .padding()
             }
-            .padding()
+        }
+    }
+
+    // MARK: - Downloads Section
+
+    private var downloadsSection: some View {
+        Section {
+            ForEach(downloadManager.downloads) { download in
+                DownloadRowView(item: download, progress: download.progress)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        downloadSwipeActions(for: download)
+                    }
+            }
+        } header: {
+            SectionHeader(title: "IPTV Downloads", icon: "arrow.down.circle", count: downloadManager.downloads.count)
+        }
+    }
+
+    // MARK: - Local Files Section
+
+    private var localFilesSection: some View {
+        Section {
+            ForEach(localFiles) { file in
+                LocalFileRowView(
+                    file: file,
+                    effectiveDisplayName: effectiveDisplayName(for: file),
+                    onPlay: { playLocalFile(file) },
+                    onShowActions: { _ in showActionSheet(for: file) }
+                )
+            }
+        } header: {
+            SectionHeader(title: "Local Files", icon: "doc.video", count: localFiles.count)
         }
     }
 
     // MARK: - Empty State
 
-    private var emptyStateView: some View {
+    private var emptyState: some View {
         VStack(spacing: 20) {
             Spacer()
-
             Image(systemName: "folder.badge.plus")
                 .font(.system(size: 56))
                 .foregroundStyle(.tertiary)
-
             Text("My Content")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.primary)
-
             Text("Add video files or download from your IPTV library")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-
-            Button {
-                showFileImporter = true
-            } label: {
-                Label("Add Files", systemImage: "plus.circle")
-                    .font(.headline)
-            }
-            .buttonStyle(.borderedProminent)
-
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Add Files") { showFileImporter = true }
+                .buttonStyle(.borderedProminent)
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -127,158 +111,186 @@ struct MyContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .automatic) {
-            Button {
-                showFileImporter = true
-            } label: {
-                Label("Add Files", systemImage: "plus")
-            }
-
-            if !downloadManager.downloads.isEmpty {
-                if downloadManager.hasActiveDownloads {
-                    Button {
-                        downloadManager.togglePauseResumeAll()
-                    } label: {
-                        Label("Pause All", systemImage: "pause.circle")
+        ToolbarItem { Button("Add Files") { showFileImporter = true } }
+        if !downloadManager.downloads.isEmpty {
+            ToolbarItem {
+                Menu {
+                    if downloadManager.hasActiveDownloads {
+                        Button("Pause All") { downloadManager.togglePauseResumeAll() }
+                    } else if downloadManager.hasPausedDownloads {
+                        Button("Resume All") { downloadManager.togglePauseResumeAll() }
                     }
-                } else if downloadManager.hasPausedDownloads {
-                    Button {
-                        downloadManager.togglePauseResumeAll()
-                    } label: {
-                        Label("Resume All", systemImage: "play.circle")
+                    if downloadManager.hasActiveDownloads || downloadManager.hasPausedDownloads {
+                        Divider()
+                        Button("Cancel All", role: .destructive) { downloadManager.cancelAllDownloads() }
                     }
-                }
-
-                if downloadManager.hasActiveDownloads || downloadManager.hasPausedDownloads {
-                    Button(role: .destructive) {
-                        downloadManager.cancelAllDownloads()
-                    } label: {
-                        Label("Cancel All", systemImage: "xmark.circle")
+                    if downloadManager.downloads.contains(where: { $0.status == .completed || $0.status == .failed }) {
+                        Button("Clear Finished") { downloadManager.clearFinished() }
                     }
-                }
-
-                if downloadManager.downloads.contains(where: { $0.status == .completed || $0.status == .cancelled || $0.status == .failed }) {
-                    Button {
-                        downloadManager.clearFinished()
-                    } label: {
-                        Label("Clear Finished", systemImage: "trash")
-                    }
+                } label: {
+                    Label("Manage", systemImage: "ellipsis.circle")
                 }
             }
         }
     }
-
-    // MARK: - Download Swipe Actions
 
     @ViewBuilder
     private func downloadSwipeActions(for download: DownloadItem) -> some View {
-        if download.status == .downloading {
-            Button {
-                downloadManager.pauseDownload(id: download.id)
-            } label: {
-                Label("Pause", systemImage: "pause.circle")
-            }
-            .tint(.yellow)
-
-            Button(role: .destructive) {
-                downloadManager.cancelDownload(id: download.id)
-            } label: {
-                Label("Cancel", systemImage: "xmark.circle")
-            }
-        } else if download.status == .paused {
-            Button {
-                downloadManager.resumeDownload(id: download.id)
-            } label: {
-                Label("Resume", systemImage: "play.circle")
-            }
-            .tint(.green)
-
-            Button(role: .destructive) {
-                downloadManager.cancelDownload(id: download.id)
-            } label: {
-                Label("Cancel", systemImage: "xmark.circle")
-            }
-        } else if download.status == .failed {
-            Button {
-                downloadManager.retryDownload(id: download.id)
-            } label: {
-                Label("Retry", systemImage: "arrow.clockwise")
-            }
-            .tint(.accentColor)
-
-            Button(role: .destructive) {
-                downloadManager.removeDownload(id: download.id)
-            } label: {
-                Label("Remove", systemImage: "trash")
-            }
-        } else if download.status == .completed || download.status == .cancelled {
-            Button(role: .destructive) {
-                downloadManager.removeDownload(id: download.id)
-            } label: {
-                Label("Remove", systemImage: "trash")
-            }
+        switch download.status {
+        case .downloading:
+            Button("Pause") { downloadManager.pauseDownload(id: download.id) }
+                .tint(.yellow)
+            Button("Cancel", role: .destructive) { downloadManager.cancelDownload(id: download.id) }
+        case .paused:
+            Button("Resume") { downloadManager.resumeDownload(id: download.id) }
+                .tint(.green)
+            Button("Cancel", role: .destructive) { downloadManager.cancelDownload(id: download.id) }
+        case .failed:
+            Button("Retry") { downloadManager.retryDownload(id: download.id) }
+            Button("Remove", role: .destructive) { downloadManager.removeDownload(id: download.id) }
+        case .completed, .cancelled:
+            Button("Remove", role: .destructive) { downloadManager.removeDownload(id: download.id) }
+        default:
+            EmptyView()
         }
     }
 
-    // MARK: - File Handling
+    // MARK: - Local File Helpers
 
-    private func handleFileImport(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            for url in urls {
-                let file = LocalVideoFile(url: url)
-                if !localFiles.contains(where: { $0.url == url }) {
-                    localFiles.append(file)
-                    MKSLog.media.info("[MyContent] Added local file: \(file.displayName)")
-                }
-            }
-        case .failure(let error):
-            MKSLog.media.error("[MyContent] Import error: \(error)")
-        }
+    private func effectiveDisplayName(for file: LocalVideoFile) -> String {
+        localFileMetadata[file.id]?.displayName ?? file.displayName
+    }
+
+    private func loadLocalFiles() {
+        let (files, metadata) = LocalFileManager.shared.load()
+        localFiles = files
+        localFileMetadata = metadata
+    }
+
+    private func showActionSheet(for file: LocalVideoFile) {
+        selectedLocalFile = file
+        showActionSheet = true
     }
 
     private func playLocalFile(_ file: LocalVideoFile) {
         #if os(macOS)
         let player = PlayerFactory.shared.createPlayer(for: file.url)
-        PlayerWindowManager.shared.present(
-            player: player,
-            title: file.displayName,
-            metadata: nil
-        )
+        PlayerWindowManager.shared.present(player: player, title: effectiveDisplayName(for: file), metadata: nil)
         openWindow(id: "player")
         player.load(url: file.url)
         player.play()
         #endif
     }
 
-    private func removeLocalFile(_ file: LocalVideoFile) {
-        localFiles.removeAll { $0.id == file.id }
-        MKSLog.media.info("[MyContent] Removed local file: \(file.displayName)")
+    // MARK: - File Import
+
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result else { return }
+        for url in urls {
+            guard url.startAccessingSecurityScopedResource() else { continue }
+            defer { url.stopAccessingSecurityScopedResource() }
+            let file = LocalVideoFile(url: url)
+            localFiles = LocalFileManager.shared.add(file, to: localFiles, metadata: localFileMetadata)
+        }
     }
 
-    // MARK: - TouchBar (macOS)
+    // MARK: - Action Sheet
 
-    #if os(macOS)
-    private func updateTouchBarProgress() {
-        let activeDownloads = downloadManager.downloads.filter { $0.status == .downloading }
-        let totalProgress = activeDownloads.isEmpty ? 0.0 :
-            activeDownloads.map { $0.progress / 100.0 }.reduce(0, +) / Double(activeDownloads.count)
-
-        let totalSpeed = activeDownloads.map { $0.speed }.reduce(0, +)
-
-        let averageETA = activeDownloads.isEmpty ? 0.0 :
-            activeDownloads.map { $0.eta }.reduce(0, +) / Double(activeDownloads.count)
-
-        touchBarManager.updateDownloadProgress(
-            active: activeDownloads.count,
-            progress: totalProgress,
-            speed: totalSpeed,
-            eta: averageETA
-        )
-
-        touchBarManager.isPaused = downloadManager.downloads.contains { $0.status == .paused }
+    @ViewBuilder
+    private var actionSheet: some View {
+        if let file = selectedLocalFile {
+            LocalFileActionSheet(
+                file: file,
+                metadata: localFileMetadata[file.id] ?? LocalFileMetadata(displayName: file.displayName),
+                onDismiss: { showActionSheet = false },
+                onEditMetadata: {
+                    showActionSheet = false
+                    startEditMetadata(for: file)
+                },
+                onConvert: {
+                    showActionSheet = false
+                    showConvertSheet = true
+                },
+                onDelete: {
+                    showActionSheet = false
+                    deleteLocalFile(file)
+                }
+            )
+        }
     }
-    #endif
+
+    // MARK: - Metadata
+
+    private func startEditMetadata(for file: LocalVideoFile) {
+        selectedLocalFile = file
+        Task {
+            let query = MetadataSearchQuery(
+                title: file.displayName, year: nil, tmdbId: nil, genre: nil,
+                runtimeMinutes: nil, mediaType: .movie, seasonNumber: nil, episodeNumber: nil, showTitle: nil
+            )
+            let candidates = await MetadataEnrichmentService.shared.fetchAllCandidates(query: query)
+            metadataCandidates = candidates
+            showMetadataPicker = true
+        }
+    }
+
+    @ViewBuilder
+    private var metadataPickerSheet: some View {
+        if let file = selectedLocalFile {
+            MetadataPickerView(
+                fileTitle: effectiveDisplayName(for: file),
+                candidates: metadataCandidates,
+                onConfirm: { result in
+                    showMetadataPicker = false
+                    applyMetadata(result, to: file)
+                },
+                onDismiss: { showMetadataPicker = false }
+            )
+        }
+    }
+
+    private func applyMetadata(_ result: MetadataResult, to file: LocalVideoFile) {
+        Task {
+            do {
+                try await MetadataEnrichmentService.shared.writeChosenMetadata(to: file.url, metadata: result)
+                if result.title != file.displayName {
+                    localFileMetadata = LocalFileManager.shared.updateDisplayName(
+                        id: file.id, displayName: result.title,
+                        files: localFiles, metadata: localFileMetadata
+                    )
+                }
+            } catch {
+                MKSLog.media.error("[MyContent] Metadata write failed: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Convert
+
+    @ViewBuilder
+    private var convertSheet: some View {
+        if let file = selectedLocalFile {
+            ConvertFileSheet(
+                file: file,
+                onDismiss: { showConvertSheet = false },
+                onComplete: { newURL in
+                    showConvertSheet = false
+                    replaceLocalFile(original: file, with: newURL)
+                }
+            )
+        }
+    }
+
+    private func replaceLocalFile(original: LocalVideoFile, with newURL: URL) {
+        let newFile = LocalVideoFile(url: newURL)
+        localFiles = LocalFileManager.shared.remove(id: original.id, from: localFiles, metadata: localFileMetadata)
+        localFiles = LocalFileManager.shared.add(newFile, to: localFiles, metadata: localFileMetadata)
+        selectedLocalFile = newFile
+    }
+
+    private func deleteLocalFile(_ file: LocalVideoFile) {
+        localFiles = LocalFileManager.shared.remove(id: file.id, from: localFiles, metadata: localFileMetadata)
+    }
 }
 
 // MARK: - Preview
@@ -286,14 +298,10 @@ struct MyContentView: View {
 #if DEBUG
 struct MyContentView_Previews: PreviewProvider {
     static var previews: some View {
-        let previewDownloadManager = DownloadManager(profile: IPTVProfile(name: "Preview", baseURL: "http://preview.com", username: "test", password: "test"))
-
-        previewDownloadManager.addDownload(DownloadItem(id: UUID(), vodID: "1", title: "Downloading", type: .movie, status: .downloading, totalBytes: 100_000_000, bytesDownloaded: 45_000_000, progress: 45, speed: 2.5, eta: 120))
-        previewDownloadManager.addDownload(DownloadItem(id: UUID(), vodID: "2", title: "Completed", type: .movie, status: .completed, totalBytes: 100_000_000, bytesDownloaded: 100_000_000, progress: 100))
-
-        return NavigationStack {
+        let mgr = DownloadManager(profile: IPTVProfile(name: "Test", baseURL: "http://x.com", username: "u", password: "p"))
+        NavigationStack {
             MyContentView()
-                .environmentObject(previewDownloadManager)
+                .environmentObject(mgr)
         }
         .preferredColorScheme(.dark)
     }

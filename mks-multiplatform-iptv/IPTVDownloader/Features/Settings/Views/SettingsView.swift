@@ -218,9 +218,26 @@ struct ProfileRow: View {
 
 struct GeneralSettingsView: View {
     @EnvironmentObject private var profilesManager: IPTVProfilesManager
+    @State private var maxConcurrentDownloads = UserDefaults.maxConcurrentDownloads
 
     var body: some View {
         Form {
+            Section {
+                Stepper(value: $maxConcurrentDownloads, in: 1...3) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Simultaneous Downloads: \(maxConcurrentDownloads)")
+                        Text("Additional downloads wait in the queue and start automatically.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onChange(of: maxConcurrentDownloads) { _, newValue in
+                    UserDefaults.maxConcurrentDownloads = newValue
+                }
+            } header: {
+                Label("Downloads", systemImage: "arrow.down.circle")
+            }
+
             Section {
                 SyncStatusDetailView(manager: profilesManager)
             } header: {

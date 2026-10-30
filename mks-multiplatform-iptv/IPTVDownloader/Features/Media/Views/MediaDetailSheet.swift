@@ -51,6 +51,12 @@ struct MediaDetailSheet: View {
     @State private var showDownloadOptions = false
     @State private var downloadEpisode: SerieDetail.Episode?
     @State private var downloadStartedBanner = false
+    @State private var bannerText = "Download started"
+
+    // Episode multi-select (long-press a row or tap Select to enter)
+    @State private var isSelectingEpisodes = false
+    @State private var selectedEpisodeIDs: Set<String> = []
+    @State private var isBatchDownload = false
     @State private var selectedFormat: VideoDownloader.OutputFormat = .mp4
     @State private var playWhileDownloading = false
     @State private var showFolderPicker = false
@@ -121,6 +127,13 @@ struct MediaDetailSheet: View {
             if downloadStartedBanner {
                 downloadBanner
                     .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            // Episode multi-select action bar
+            if isSelectingEpisodes && selectedTab == .episodes {
+                episodeSelectionBar
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .fullscreenPlayer(
@@ -449,6 +462,7 @@ struct MediaDetailSheet: View {
 
             Button {
                 downloadEpisode = nil
+                isBatchDownload = false
                 showDownloadOptions = true
             } label: {
                 Label("Download", systemImage: "arrow.down.circle")
@@ -558,32 +572,19 @@ struct MediaDetailSheet: View {
     private var episodesContent: some View {
         if let serieDetail {
             VStack(alignment: .leading, spacing: 12) {
-                // Season picker
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(serieDetail.seasons, id: \.id) { season in
-                            Button(season.name) {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectedSeason = season.id
-                                }
-                            }
-                            .font(.subheadline.weight(.medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .foregroundStyle(
-                                selectedSeason == season.id
-                                    ? .white : AppColors.textSecondary
-                            )
-                            .adaptiveGlass(in: Capsule())
-                            .overlay {
-                                if selectedSeason == season.id {
-                                    Capsule()
-                                        .stroke(AppColors.accent, lineWidth: 1.5)
-                                }
+                // Season picker + selection mode toggle
+                HStack(spacing: 8) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(serieDetail.seasons, id: \.id) { season in
+                                seasonChip(season)
                             }
                         }
+                        .padding(.leading, 20)
                     }
-                    .padding(.horizontal, 20)
+
+                    selectModeButton
+                        .padding(.trailing, 20)
                 }
 
                 // Episode list
@@ -597,26 +598,149 @@ struct MediaDetailSheet: View {
                     )
                     .padding(.top, 40)
                 } else {
-                    LazyVStack(spacing: 1) {
+                    LazyVStack(spacing: 8) {
                         ForEach(episodes, id: \.id) { episode in
                             EpisodeRowView(
                                 episode: episode,
                                 serieName: detail.cleanTitle,
+                                isSelecting: isSelectingEpisodes,
+                                isSelected: selectedEpisodeIDs.contains(episode.id),
                                 onPlay: {
                                     playEpisode(episode)
                                 },
                                 onDownload: {
                                     downloadEpisode = episode
+                                    isBatchDownload = false
                                     showDownloadOptions = true
+                                },
+                                onToggleSelection: {
+                                    toggleEpisodeSelection(episode)
+                                },
+                                onEnterSelection: {
+                                    withAnimation(.snappy(duration: 0.25)) {
+                                        isSelectingEpisodes = true
+                                        selectedEpisodeIDs.insert(episode.id)
+                                    }
                                 }
                             )
                         }
                     }
                     .padding(.horizontal, 20)
+                    // Keep the floating selection bar from covering the last rows
+                    .padding(.bottom, isSelectingEpisodes ? 76 : 0)
                 }
             }
             .padding(.top, 12)
         }
+    }
+
+    private func seasonChip(_ season: SerieDetail.Season) -> some View {
+        Button(season.name) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedSeason = season.id
+            }
+        }
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .foregroundStyle(
+            selectedSeason == season.id
+                ? .white : AppColors.textSecondary
+        )
+        .adaptiveGlass(in: Capsule())
+        .overlay {
+            if selectedSeason == season.id {
+                Capsule()
+                    .stroke(AppColors.accent, lineWidth: 1.5)
+            }
+        }
+    }
+
+    private var selectModeButton: some View {
+        Button {
+            withAnimation(.snappy(duration: 0.25)) {
+                isSelectingEpisodes.toggle()
+                if !isSelectingEpisodes {
+                    selectedEpisodeIDs.removeAll()
+                }
+            }
+        } label: {
+            Label(isSelectingEpisodes ? "Done" : "Select",
+                  systemImage: isSelectingEpisodes ? "checkmark" : "checklist")
+                .font(.subheadline.weight(.medium))
+        }
+        .buttonStyle(.appGlass)
+    }
+
+    private func toggleEpisodeSelection(_ episode: SerieDetail.Episode) {
+        withAnimation(.snappy(duration: 0.2)) {
+            if selectedEpisodeIDs.contains(episode.id) {
+                selectedEpisodeIDs.remove(episode.id)
+            } else {
+                selectedEpisodeIDs.insert(episode.id)
+            }
+        }
+    }
+
+    private func toggleSelectSeason() {
+        guard let serieDetail else { return }
+        let seasonIDs = (serieDetail.episodes[selectedSeason] ?? []).map(\.id)
+        withAnimation(.snappy(duration: 0.2)) {
+            if Set(seasonIDs).isSubset(of: selectedEpisodeIDs) {
+                selectedEpisodeIDs.subtract(seasonIDs)
+            } else {
+                selectedEpisodeIDs.formUnion(seasonIDs)
+            }
+        }
+    }
+
+    // MARK: - Episode Selection Bar
+
+    private var episodeSelectionBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.snappy(duration: 0.25)) {
+                    isSelectingEpisodes = false
+                    selectedEpisodeIDs.removeAll()
+                }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.appGlass)
+
+            Text("\(selectedEpisodeIDs.count) selected")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.2), value: selectedEpisodeIDs.count)
+
+            Spacer(minLength: 8)
+
+            Button {
+                toggleSelectSeason()
+            } label: {
+                Label("Season", systemImage: "checklist.checked")
+                    .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.appGlass)
+
+            Button {
+                isBatchDownload = true
+                downloadEpisode = nil
+                showDownloadOptions = true
+            } label: {
+                Label("Download \(selectedEpisodeIDs.count)", systemImage: "arrow.down.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.appGlassProminent)
+            .disabled(selectedEpisodeIDs.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .adaptiveGlass(in: RoundedRectangle(cornerRadius: AppGlass.cornerRadius))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 16)
     }
 
     private func filteredEpisodes(serieDetail: SerieDetail) -> [SerieDetail.Episode] {
@@ -699,20 +823,22 @@ struct MediaDetailSheet: View {
             }
             
             Divider()
-            
-            // Play while downloading toggle
-            Toggle(isOn: $playWhileDownloading) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Play While Downloading", systemImage: "play.circle")
-                        .font(.subheadline)
-                    Text("Start playback once 10% is buffered")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .toggleStyle(SwitchToggleStyle(tint: AppColors.accent))
 
-            Divider()
+            // Play while downloading toggle (single downloads only — batches always queue)
+            if !isBatchDownload {
+                Toggle(isOn: $playWhileDownloading) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("Play While Downloading", systemImage: "play.circle")
+                            .font(.subheadline)
+                        Text("Start playback once 10% is buffered")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .toggleStyle(SwitchToggleStyle(tint: AppColors.accent))
+
+                Divider()
+            }
 
             // Save location
             VStack(alignment: .leading, spacing: 8) {
@@ -782,7 +908,9 @@ struct MediaDetailSheet: View {
                 startDownload()
             } label: {
                 Label(
-                    downloadEpisode != nil ? "Download Episode" : "Download Movie",
+                    isBatchDownload
+                        ? "Download \(selectedEpisodeIDs.count) Episodes"
+                        : (downloadEpisode != nil ? "Download Episode" : "Download Movie"),
                     systemImage: "arrow.down.circle.fill"
                 )
                 .font(.headline)
@@ -798,7 +926,39 @@ struct MediaDetailSheet: View {
     // MARK: - Download Action (stays in detail)
 
     private func startDownload() {
-        if let episode = downloadEpisode, serieDetail != nil {
+        if isBatchDownload, let serieDetail {
+            // Enqueue selected episodes in season/episode order — the download
+            // queue starts them as slots free up.
+            let selected = serieDetail.episodes.values
+                .flatMap { $0 }
+                .filter { selectedEpisodeIDs.contains($0.id) }
+                .sorted { ($0.season, $0.episodeNum) < ($1.season, $1.episodeNum) }
+
+            for episode in selected {
+                downloadManager.startDownload(
+                    vodID: episode.id,
+                    title: episode.title,
+                    type: .series,
+                    vodExtension: episode.containerExtension,
+                    outputFormat: selectedFormat,
+                    playWhileDownloading: false,
+                    saveToPhotos: saveToPhotos,
+                    downloadPathParam: selectedFolder.path,
+                    genre: detail.detailGenre,
+                    runtimeMinutes: nil,
+                    preResolvedMetadata: enrichedMetadata,
+                    metadataCandidates: metadataCandidates
+                )
+            }
+
+            bannerText = "\(selected.count) episodes queued"
+            withAnimation(.snappy(duration: 0.25)) {
+                isSelectingEpisodes = false
+            }
+            selectedEpisodeIDs.removeAll()
+            isBatchDownload = false
+        } else if let episode = downloadEpisode, serieDetail != nil {
+            bannerText = "Download started"
             downloadManager.startDownload(
                 vodID: episode.id,
                 title: episode.title,
@@ -814,6 +974,7 @@ struct MediaDetailSheet: View {
                 metadataCandidates: metadataCandidates
             )
         } else if let movie = movieDetail {
+            bannerText = "Download started"
             downloadManager.startDownload(
                 vodID: String(movie.movieData.streamId),
                 title: detail.cleanTitle,
@@ -871,7 +1032,7 @@ struct MediaDetailSheet: View {
             HStack(spacing: 10) {
                 Image(systemName: "arrow.down.circle.fill")
                     .foregroundStyle(.green)
-                Text("Download started")
+                Text(bannerText)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                 Spacer()
@@ -1168,11 +1329,17 @@ struct MediaDetailSheet: View {
 
 // MARK: - Episode Row
 
+/// Episode card with play/download actions and multi-select support.
+/// Tap plays (or toggles selection while selecting); long-press enters selection mode.
 struct EpisodeRowView: View {
     let episode: SerieDetail.Episode
     let serieName: String
+    var isSelecting: Bool = false
+    var isSelected: Bool = false
     let onPlay: () -> Void
     let onDownload: () -> Void
+    var onToggleSelection: () -> Void = {}
+    var onEnterSelection: () -> Void = {}
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
@@ -1184,65 +1351,117 @@ struct EpisodeRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Episode thumbnail
-            if let imageURL = URL(string: episode.info.movieImage) {
-                CachedAsyncImage(url: imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: thumbWidth, height: thumbHeight)
-                            .clipped()
-                    default:
-                        AppColors.surface
-                    }
+            // Selection checkbox
+            if isSelecting {
+                Button(action: onToggleSelection) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? AppColors.accent : AppColors.textTertiary)
+                        .contentTransition(.symbolEffect(.replace))
                 }
-                .frame(width: thumbWidth, height: thumbHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(AppColors.surface)
-                    .frame(width: thumbWidth, height: thumbHeight)
-                    .overlay {
-                        Image(systemName: "play.rectangle")
-                            .foregroundStyle(AppColors.textTertiary)
-                    }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isSelected ? "Deselect episode" : "Select episode")
+                .transition(.move(edge: .leading).combined(with: .opacity))
             }
+
+            thumbnail
 
             // Episode info
             VStack(alignment: .leading, spacing: 4) {
-                Text("E\(episode.episodeNum)")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(AppColors.accent)
+                HStack(spacing: 6) {
+                    Text("E\(episode.episodeNum)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(AppColors.accent)
+                    if !episode.info.duration.isEmpty {
+                        Text(episode.info.duration)
+                            .font(.caption2)
+                            .foregroundStyle(AppColors.textTertiary)
+                    }
+                }
                 Text(episode.title)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                     .lineLimit(2)
-                if !episode.info.duration.isEmpty {
-                    Text(episode.info.duration)
-                        .font(.caption2)
-                        .foregroundStyle(AppColors.textTertiary)
+                if !episode.info.plot.isEmpty {
+                    Text(episode.info.plot)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .lineLimit(2)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 4)
 
-            // Actions
-            HStack(spacing: 8) {
-                Button(action: onPlay) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
+            // Actions (hidden while selecting — the whole row becomes the toggle)
+            if !isSelecting {
+                HStack(spacing: 8) {
+                    Button(action: onPlay) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Play episode")
+
+                    Button(action: onDownload) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.title3)
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Download episode")
                 }
-                Button(action: onDownload) {
-                    Image(systemName: "arrow.down.circle")
-                        .font(.title3)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
+                .transition(.opacity)
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 4)
+        .padding(10)
+        .contentShape(Rectangle())
+        .adaptiveGlass(in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? AppColors.accent : .clear, lineWidth: 1.5)
+        }
+        .onTapGesture {
+            if isSelecting {
+                onToggleSelection()
+            } else {
+                onPlay()
+            }
+        }
+        .onLongPressGesture {
+            if !isSelecting {
+                onEnterSelection()
+            }
+        }
+        .animation(.snappy(duration: 0.25), value: isSelecting)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let imageURL = URL(string: episode.info.movieImage) {
+            CachedAsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: thumbWidth, height: thumbHeight)
+                        .clipped()
+                default:
+                    AppColors.surface
+                }
+            }
+            .frame(width: thumbWidth, height: thumbHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(AppColors.surface)
+                .frame(width: thumbWidth, height: thumbHeight)
+                .overlay {
+                    Image(systemName: "play.rectangle")
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+        }
     }
 }

@@ -42,6 +42,15 @@ struct DownloadItem: Identifiable, Codable {
     /// Download path for persistence
     var downloadPath: String?
 
+    /// TMDB id hint for metadata enrichment (persisted so queued/restarted downloads keep it)
+    var tmdbId: Int?
+
+    /// Genre hint for metadata enrichment
+    var genre: String?
+
+    /// Runtime hint (minutes) for metadata enrichment
+    var runtimeMinutes: Int?
+
     // MARK: - Backward Compat
 
     /// Computed error property for backward compatibility with code that uses Error?
@@ -59,6 +68,7 @@ struct DownloadItem: Identifiable, Codable {
         case filePath, outputFormat, playWhileDownloading, saveToPhotos
         case sourceExtension, dateStarted, transmuxSessionID
         case sourceURLString, downloadPath
+        case tmdbId, genre, runtimeMinutes
     }
 }
 
@@ -66,6 +76,7 @@ struct DownloadItem: Identifiable, Codable {
 
 enum DownloadStatus: String, Codable, Equatable {
     case notStarted
+    case queued       // Waiting for a free download slot
     case downloading
     case paused
     case downloaded   // Raw file download complete, may need conversion
@@ -80,6 +91,7 @@ extension DownloadStatus: CustomStringConvertible {
         switch self {
         case .cancelled: return "Cancelled"
         case .notStarted: return "Not Started"
+        case .queued: return "Queued"
         case .downloading: return "Downloading"
         case .paused: return "Paused"
         case .downloaded: return "Downloaded"

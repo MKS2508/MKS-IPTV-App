@@ -267,7 +267,6 @@ class DebugStreamingViewModel: ObservableObject {
             switch type {
             case .movies:
                 let movies = try await movieService.fetchMovies()
-                // Sort by added date (most recent first)
                 let filteredMovies = movies.filter { $0.added != nil }
                 let sortedMovies = filteredMovies.sorted { (Int($0.added ?? "0") ?? 0) > (Int($1.added ?? "0") ?? 0) }
                 let topMovies = Array(sortedMovies.prefix(10))
@@ -283,7 +282,6 @@ class DebugStreamingViewModel: ObservableObject {
                 log("✅ Loaded \(items.count) series", type: .success)
                 
             case .mixed:
-                // Load both and mix
                 async let moviesTask = movieService.fetchMovies()
                 async let seriesTask = movieService.fetchSeries()
                 

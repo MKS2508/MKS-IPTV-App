@@ -84,3 +84,6 @@ dist/
 
 # Reference repositories (git submodules for study, not part of project)
 references/
+.claude/last-active.json
+.claude/rules/glossary.md
+.claude/settings.local.json
